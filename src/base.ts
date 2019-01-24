@@ -30,10 +30,6 @@ export default abstract class MuxCommand extends Command {
     } catch (err) {
       if (err.errno !== -2) {
         this.error(err);
-      } else if (!process.env.MUX_TOKEN_ID || !process.env.MUX_TOKEN_SECRET) {
-        this.log(
-          chalk`{bold.underline.red No Mux config file found!} If you'd like to create one, run the {bold.magenta init} command. Otherwise, make sure to have the {bold.yellow MUX_TOKEN_ID} and {bold.yellow MUX_TOKEN_SECRET} environment variables set.`
-        );
       }
 
       return null;
@@ -43,9 +39,16 @@ export default abstract class MuxCommand extends Command {
   async init() {
     await this.readConfig();
 
-    const { Video } = new Mux();
+    try {
+      const { Video } = new Mux();
+      this.Video = Video;
+      this.JWT = Mux.JWT;
+    } catch {
+      if (this.id === 'init') return; // If we're initing we're trying to fix this, so don't yell :)
 
-    this.Video = Video;
-    this.JWT = Mux.JWT;
+      this.log(
+        chalk`{bold.underline.red No Mux config file found!} If you'd like to create one, run the {bold.magenta init} command. Otherwise, make sure to have the {bold.yellow MUX_TOKEN_ID} and {bold.yellow MUX_TOKEN_SECRET} environment variables set. 👋`
+      );
+    }
   }
 }

@@ -19,7 +19,7 @@ $ npm install -g mux-cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-mux-cli/0.0.0 darwin-x64 node-v10.14.2
+mux-cli/0.0.0 darwin-x64 node-v11.6.0
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -28,66 +28,58 @@ USAGE
 <!-- usagestop -->
 # Commands
 <!-- commands -->
-* [`mux assets [FILE]`](#mux-assets-file)
-* [`mux assets:create [FILE]`](#mux-assetscreate-file)
-* [`mux hello [FILE]`](#mux-hello-file)
+* [`mux assets:base`](#mux-assetsbase)
+* [`mux assets:create INPUT`](#mux-assetscreate-input)
+* [`mux assets:upload PATH`](#mux-assetsupload-path)
 * [`mux help [COMMAND]`](#mux-help-command)
+* [`mux init`](#mux-init)
+* [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
 
-## `mux assets [FILE]`
-
-describe the command here
-
-```
-USAGE
-  $ mux assets [FILE]
-
-OPTIONS
-  -f, --force
-  -h, --help       show CLI help
-  -n, --name=name  name to print
-
-EXAMPLE
-  $ mux hello
-  hello world from ./src/hello.ts!
-```
-
-_See code: [src/commands/assets.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/assets.ts)_
-
-## `mux assets:create [FILE]`
-
-describe the command here
+## `mux assets:base`
 
 ```
 USAGE
-  $ mux assets:create [FILE]
+  $ mux assets:base
 
 OPTIONS
-  -f, --force
-  -h, --help       show CLI help
-  -n, --name=name  name to print
+  -p, --private  add a private playback policy to the created asset
+```
+
+_See code: [src/commands/assets/base.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/assets/base.ts)_
+
+## `mux assets:create INPUT`
+
+Create a new asset in Mux using a file that's already available online
+
+```
+USAGE
+  $ mux assets:create INPUT
+
+ARGUMENTS
+  INPUT  input URL for the file you'd like to create this asset from
+
+OPTIONS
+  -p, --private  add a private playback policy to the created asset
 ```
 
 _See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/assets/create.ts)_
 
-## `mux hello [FILE]`
+## `mux assets:upload PATH`
 
-describe the command here
+Create a new asset in Mux via a local file
 
 ```
 USAGE
-  $ mux hello [FILE]
+  $ mux assets:upload PATH
+
+ARGUMENTS
+  PATH  local path for the file you'd like to create this asset from
 
 OPTIONS
-  -f, --force
-  -h, --help       show CLI help
-  -n, --name=name  name to print
-
-EXAMPLE
-  $ mux hello
-  hello world from ./src/hello.ts!
+  -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/hello.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/hello.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/assets/upload.ts)_
 
 ## `mux help [COMMAND]`
 
@@ -105,4 +97,29 @@ OPTIONS
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v2.1.4/src/commands/help.ts)_
+
+## `mux init`
+
+set up a user-level config
+
+```
+USAGE
+  $ mux init
+```
+
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/init.ts)_
+
+## `mux sign PLAYBACK-ID`
+
+Creates a new signed URL token for a playback ID
+
+```
+USAGE
+  $ mux sign PLAYBACK-ID
+
+ARGUMENTS
+  PLAYBACK-ID  Playback ID to create a signed URL token for.
+```
+
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/sign.ts)_
 <!-- commandsstop -->

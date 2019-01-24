@@ -59,6 +59,9 @@
     "plugins": [
       "@oclif/plugin-help"
     ],
+    "macos": {
+      "identifier": "com.mux.cli"
+    },
     "topics": {
       "assets": {
         "description": "tools for managing Mux assets"
