@@ -2,6 +2,8 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as inquirer from 'inquirer';
 import { promisify } from 'util';
+import Mux from '@mux/mux-node';
+
 const writeFile = promisify(fs.writeFile);
 const mkdir = promisify(fs.mkdir);
 
@@ -65,9 +67,16 @@ export default class Init extends MuxBase {
     this.muxConfig.tokenSecret = process.env.MUX_TOKEN_SECRET = tokenSecret;
 
     if (createSigningKey) {
-      const { id, private_key } = await this.Video.SigningKeys.create();
-      this.muxConfig.signingKeyId = process.env.MUX_SIGNING_KEY = id;
-      this.muxConfig.signingKeySecret = process.env.MUX_PRIVATE_KEY = private_key;
+      const { Video } = new Mux();
+      try {
+        const { id, private_key } = await Video.SigningKeys.create();
+        this.muxConfig.signingKeyId = process.env.MUX_SIGNING_KEY = id;
+        this.muxConfig.signingKeySecret = process.env.MUX_PRIVATE_KEY = private_key;
+      } catch {
+        this.error(
+          "Couldn't create a signing key pair! Are you sure your token credentials were right?"
+        );
+      }
     }
 
     try {
