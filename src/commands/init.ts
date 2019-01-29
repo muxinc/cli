@@ -1,9 +1,8 @@
+import * as Mux from '@mux/mux-node';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as inquirer from 'inquirer';
 import { promisify } from 'util';
-import Mux from '@mux/mux-node';
-
 const writeFile = promisify(fs.writeFile);
 const mkdir = promisify(fs.mkdir);
 
