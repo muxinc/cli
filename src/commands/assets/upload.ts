@@ -125,8 +125,8 @@ export default class AssetsCreate extends Command {
         const playbackUrl = this.playbackUrl(asset);
         task.title = `${file}: ${playbackUrl}`;
         ctx.assets = [
-          ...(ctx.assets || ['Filename', 'Asset ID', 'PlaybackURL']),
-          `${file}\t${asset.id}\t${playbackUrl}`,
+          ...(ctx.assets || [['Filename', 'Asset ID', 'PlaybackURL']]),
+          [file, asset.id, playbackUrl],
         ];
       },
     }));
@@ -135,12 +135,27 @@ export default class AssetsCreate extends Command {
       concurrent: flags.concurrent,
     }).run();
 
-    await clipboard.write(finalCtx.assets.join('\n'));
+    if (prompt.files.length > 1) {
+      await clipboard.write(
+        finalCtx.assets.map((row: string[]) => row.join('\t')).join('\n')
+      );
 
-    this.log(
-      chalk`
+      return this.log(
+        chalk`
 📹 {bold.underline Assets ready for your enjoyment:}
-${finalCtx.assets}`
+${finalCtx.assets}
+
+{blue (copied to your clipboard as a CSV)}`
+      );
+    }
+
+    await clipboard.write(finalCtx.assets[1][2]);
+    return this.log(
+      chalk`
+📹 {bold.underline Asset ready for your enjoyment:}
+${finalCtx.assets}
+
+{blue (since you only uploaded one asset, we just added the playback URL to your clipboard.)}`
     );
   }
 }
