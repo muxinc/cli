@@ -1,10 +1,7 @@
 import * as Mux from '@mux/mux-node';
 import chalk from 'chalk';
-import * as fs from 'fs';
+import * as fs from 'fs-extra';
 import * as inquirer from 'inquirer';
-import { promisify } from 'util';
-const writeFile = promisify(fs.writeFile);
-const mkdir = promisify(fs.mkdir);
 
 import MuxBase from '../base';
 
@@ -79,12 +76,15 @@ export default class Init extends MuxBase {
     }
 
     try {
-      await mkdir(this.config.configDir);
-    } catch {
-      // We're going to assume if this fails, we're ok because it exists.
+      await fs.ensureDir(this.config.configDir);
+      await fs.writeFile(
+        this.configFile,
+        JSON.stringify(this.muxConfig),
+        'utf8'
+      );
+    } catch (err) {
+      this.error(err);
     }
-
-    await writeFile(this.configFile, JSON.stringify(this.muxConfig), 'utf8');
 
     this.log(
       chalk`{bold.underline Configuration written to:} ${this.configFile}`

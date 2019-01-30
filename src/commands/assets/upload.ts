@@ -1,7 +1,7 @@
 import { flags } from '@oclif/command';
 import chalk from 'chalk';
 import * as clipboard from 'clipboardy';
-import * as fs from 'fs';
+import * as fs from 'fs-extra';
 import * as inquirer from 'inquirer';
 import * as Listr from 'listr';
 import * as path from 'path';

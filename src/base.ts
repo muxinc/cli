@@ -1,10 +1,8 @@
 import * as Mux from '@mux/mux-node';
 import Command from '@oclif/command';
 import chalk from 'chalk';
-import * as fs from 'fs';
+import * as fs from 'fs-extra';
 import * as path from 'path';
-import { promisify } from 'util';
-const readFile = promisify(fs.readFile);
 
 export default abstract class MuxCommand extends Command {
   configFile = path.join(this.config.configDir, 'config.json');
@@ -14,7 +12,7 @@ export default abstract class MuxCommand extends Command {
 
   async readConfig() {
     try {
-      const configFile = await readFile(this.configFile, 'utf8');
+      const configFile = await fs.readFile(this.configFile, 'utf8');
       const config = JSON.parse(configFile);
 
       process.env.MUX_TOKEN_ID = process.env.MUX_TOKEN_ID || config.tokenId;
