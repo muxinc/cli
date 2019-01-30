@@ -135,17 +135,18 @@ export default class AssetsCreate extends Command {
       concurrent: flags.concurrent,
     }).run();
 
+    const tsv = finalCtx.assets
+      .map((row: string[]) => row.join('\t'))
+      .join('\n');
     if (prompt.files.length > 1) {
-      await clipboard.write(
-        finalCtx.assets.map((row: string[]) => row.join('\t')).join('\n')
-      );
+      await clipboard.write(tsv);
 
       return this.log(
         chalk`
 📹 {bold.underline Assets ready for your enjoyment:}
-${finalCtx.assets}
+${tsv}
 
-{blue (copied to your clipboard as a CSV)}`
+{blue (copied to your clipboard)}`
       );
     }
 
@@ -153,7 +154,7 @@ ${finalCtx.assets}
     return this.log(
       chalk`
 📹 {bold.underline Asset ready for your enjoyment:}
-${finalCtx.assets}
+${tsv}
 
 {blue (since you only uploaded one asset, we just added the playback URL to your clipboard.)}`
     );
