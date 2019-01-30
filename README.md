@@ -15,11 +15,11 @@ Your friendly neighborhood Mux CLI tool
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g mux-cli
+$ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-mux-cli/0.0.0 darwin-x64 node-v11.6.0
+@mux/cli/0.1.1 darwin-x64 node-v11.6.0
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -28,24 +28,11 @@ USAGE
 <!-- usagestop -->
 # Commands
 <!-- commands -->
-* [`mux assets:base`](#mux-assetsbase)
 * [`mux assets:create INPUT`](#mux-assetscreate-input)
 * [`mux assets:upload PATH`](#mux-assetsupload-path)
 * [`mux help [COMMAND]`](#mux-help-command)
 * [`mux init`](#mux-init)
 * [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
-
-## `mux assets:base`
-
-```
-USAGE
-  $ mux assets:base
-
-OPTIONS
-  -p, --private  add a private playback policy to the created asset
-```
-
-_See code: [src/commands/assets/base.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/assets/base.ts)_
 
 ## `mux assets:create INPUT`
 
@@ -62,7 +49,7 @@ OPTIONS
   -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/assets/create.ts)_
+_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.1.1/src/commands/assets/create.ts)_
 
 ## `mux assets:upload PATH`
 
@@ -76,10 +63,12 @@ ARGUMENTS
   PATH  local path for the file you'd like to create this asset from
 
 OPTIONS
-  -p, --private  add a private playback policy to the created asset
+  -c, --concurrent=concurrent  [default: 3] max number of files to upload at once
+  -f, --filter=filter          regex that filters the selected destination if the provided path is a folder
+  -p, --private                add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/assets/upload.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.1.1/src/commands/assets/upload.ts)_
 
 ## `mux help [COMMAND]`
 
@@ -107,7 +96,7 @@ USAGE
   $ mux init
 ```
 
-_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/init.ts)_
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.1.1/src/commands/init.ts)_
 
 ## `mux sign PLAYBACK-ID`
 
@@ -121,5 +110,5 @@ ARGUMENTS
   PLAYBACK-ID  Playback ID to create a signed URL token for.
 ```
 
-_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.0.0/src/commands/sign.ts)_
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.1.1/src/commands/sign.ts)_
 <!-- commandsstop -->
