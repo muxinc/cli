@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as Listr from 'listr';
 
-import MuxBase from './base';
+import MuxBase from '../../assets-base';
 
 export default class AssetsCreate extends MuxBase {
   static description =

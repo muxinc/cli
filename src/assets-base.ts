@@ -1,6 +1,6 @@
 import { flags } from '@oclif/command';
 
-import MuxBase from '../../base';
+import MuxBase from './base';
 
 export default abstract class MuxCommand extends MuxBase {
   static flags = {
@@ -23,7 +23,7 @@ export default abstract class MuxCommand extends MuxBase {
     }`;
   }
 
-  pollAsset(assetId: string) {
+  pollAsset(assetId: string): Promise<IMuxAsset> {
     return new Promise((resolve, reject) => {
       const poll = () =>
         setTimeout(async () => {

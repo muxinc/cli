@@ -1,11 +1,13 @@
+import { flags } from '@oclif/command';
 import chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as fs from 'fs';
+import * as inquirer from 'inquirer';
 import * as Listr from 'listr';
 import * as path from 'path';
 import * as request from 'request';
 
-import Command from './base';
+import Command from '../../assets-base';
 
 export default class AssetsCreate extends Command {
   static description = 'Create a new asset in Mux via a local file';
@@ -18,6 +20,28 @@ export default class AssetsCreate extends Command {
       required: true,
     },
   ];
+
+  static flags = {
+    ...Command.flags,
+    filter: flags.string({
+      char: 'f',
+      description:
+        'regex that filters the selected destination if the provided path is a folder',
+    }),
+    concurrent: flags.integer({
+      char: 'c',
+      description: 'max number of files to upload at once',
+      default: 3,
+    }),
+  };
+
+  getFilePaths(filePath: string, filter = '') {
+    if (fs.lstatSync(filePath).isDirectory()) {
+      return fs.readdirSync(filePath).filter(file => file.match(filter));
+    }
+
+    return [filePath];
+  }
 
   uploadFile(filePath: string, url: string) {
     return new Promise((resolve, reject) => {
@@ -61,41 +85,62 @@ export default class AssetsCreate extends Command {
       },
     };
 
-    const tasks = new Listr([
-      {
-        title: 'Creating Mux Direct Upload',
-        task: async ctx => {
-          const upload = await this.Video.Uploads.create(assetBodyParams);
-          ctx.upload = upload;
-        },
-      },
-      {
-        title: 'Uploading file',
-        task: async ctx => {
-          await this.uploadFile(args.path, ctx.upload.url);
-        },
-      },
-      {
-        title: 'Waiting for asset to be playable',
-        task: async ctx => {
-          const { asset_id } = await this.pollUpload(ctx.upload.id);
-          const asset = await this.pollAsset(asset_id);
-          ctx.asset = asset;
-        },
-      },
-    ]);
+    const regex = new RegExp(flags.filter || '', 'ig');
+    const files = this.getFilePaths(path.resolve(__dirname, args.path)).filter(
+      file => file.match(regex)
+    );
 
-    tasks.run().then(async ctx => {
-      const playbackUrl = this.playbackUrl(ctx.asset);
-
-      await clipboard.write(playbackUrl);
-
-      this.log(
-        chalk`
-📹 {bold.underline Asset ready for your enjoyment:}
-${playbackUrl}
-`
+    let prompt;
+    if (files.length === 0) {
+      return this.log(
+        `We were unable to find any files. You might want to double check your path or make sure your filter isn't too strict`
       );
-    });
+    } else if (files.length > 1) {
+      prompt = await inquirer.prompt([
+        {
+          type: 'checkbox',
+          name: 'files',
+          message: 'We found a few files! Do all of these look good?',
+          choices: files,
+          default: files,
+        },
+      ]);
+    }
+
+    const tasks: Listr.ListrTask[] = prompt.files.map((file: string) => ({
+      title: `${file}: getting direct upload URL`,
+      task: async (ctx: any, task: Listr.ListrTask) => {
+        const upload = await this.Video.Uploads.create(assetBodyParams);
+
+        task.title = `${file}: uploading`;
+        await this.uploadFile(
+          path.resolve(__dirname, args.path, file),
+          upload.url
+        );
+
+        task.title = `${file}: waiting for asset to be playable`;
+        const { asset_id } = await this.pollUpload(upload.id);
+        const asset = await this.pollAsset(asset_id);
+
+        const playbackUrl = this.playbackUrl(asset);
+        task.title = `${file}: ${playbackUrl}`;
+        ctx.assets = [
+          ...(ctx.assets || ['Filename', 'Asset ID', 'PlaybackURL']),
+          `${file}\t${asset.id}\t${playbackUrl}`,
+        ];
+      },
+    }));
+
+    const finalCtx = await new Listr(tasks, {
+      concurrent: flags.concurrent,
+    }).run();
+
+    await clipboard.write(finalCtx.assets.join('\n'));
+
+    this.log(
+      chalk`
+📹 {bold.underline Assets ready for your enjoyment:}
+${finalCtx.assets}`
+    );
   }
 }
