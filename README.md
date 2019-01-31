@@ -19,7 +19,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.2.0 darwin-x64 node-v10.14.2
+@mux/cli/0.3.0 darwin-x64 node-v10.14.2
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -31,7 +31,7 @@ USAGE
 * [`mux assets:create INPUT`](#mux-assetscreate-input)
 * [`mux assets:upload PATH`](#mux-assetsupload-path)
 * [`mux help [COMMAND]`](#mux-help-command)
-* [`mux init`](#mux-init)
+* [`mux init [ENVFILE]`](#mux-init-envfile)
 * [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
 
 ## `mux assets:create INPUT`
@@ -49,7 +49,7 @@ OPTIONS
   -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.2.0/src/commands/assets/create.ts)_
+_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.3.0/src/commands/assets/create.ts)_
 
 ## `mux assets:upload PATH`
 
@@ -68,7 +68,7 @@ OPTIONS
   -p, --private                add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.2.0/src/commands/assets/upload.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.3.0/src/commands/assets/upload.ts)_
 
 ## `mux help [COMMAND]`
 
@@ -85,18 +85,21 @@ OPTIONS
   --all  see all commands in CLI
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v2.1.4/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v2.1.6/src/commands/help.ts)_
 
-## `mux init`
+## `mux init [ENVFILE]`
 
 set up a user-level config
 
 ```
 USAGE
-  $ mux init
+  $ mux init [ENVFILE]
+
+ARGUMENTS
+  ENVFILE  path to a Mux access token .env file
 ```
 
-_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.2.0/src/commands/init.ts)_
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.3.0/src/commands/init.ts)_
 
 ## `mux sign PLAYBACK-ID`
 
@@ -110,5 +113,5 @@ ARGUMENTS
   PLAYBACK-ID  Playback ID to create a signed URL token for.
 ```
 
-_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.2.0/src/commands/sign.ts)_
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.3.0/src/commands/sign.ts)_
 <!-- commandsstop -->
