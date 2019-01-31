@@ -1,19 +1,22 @@
-mux-cli
-=======
+# mux-cli
 
 Your friendly neighborhood Mux CLI tool
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
-[![Version](https://img.shields.io/npm/v/mux-cli.svg)](https://npmjs.org/package/mux-cli)
-[![Downloads/week](https://img.shields.io/npm/dw/mux-cli.svg)](https://npmjs.org/package/mux-cli)
+[![Version](https://img.shields.io/npm/v/mux-cli.svg)](https://npmjs.org/package/@mux/cli)
+[![Downloads/week](https://img.shields.io/npm/dw/mux-cli.svg)](https://npmjs.org/package/@mux/cli)
 [![License](https://img.shields.io/npm/l/mux-cli.svg)](https://github.com/muxinc/cli/blob/master/package.json)
 
 <!-- toc -->
-* [Usage](#usage)
-* [Commands](#commands)
-<!-- tocstop -->
+
+- [Usage](#usage)
+- [Commands](#commands)
+  <!-- tocstop -->
+
 # Usage
+
 <!-- usage -->
+
 ```sh-session
 $ npm install -g @mux/cli
 $ mux COMMAND
@@ -25,14 +28,18 @@ USAGE
   $ mux COMMAND
 ...
 ```
+
 <!-- usagestop -->
+
 # Commands
+
 <!-- commands -->
-* [`mux assets:create INPUT`](#mux-assetscreate-input)
-* [`mux assets:upload PATH`](#mux-assetsupload-path)
-* [`mux help [COMMAND]`](#mux-help-command)
-* [`mux init [ENVFILE]`](#mux-init-envfile)
-* [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
+
+- [`mux assets:create INPUT`](#mux-assetscreate-input)
+- [`mux assets:upload PATH`](#mux-assetsupload-path)
+- [`mux help [COMMAND]`](#mux-help-command)
+- [`mux init [ENVFILE]`](#mux-init-envfile)
+- [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
 
 ## `mux assets:create INPUT`
 
@@ -114,4 +121,5 @@ ARGUMENTS
 ```
 
 _See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.3.0/src/commands/sign.ts)_
+
 <!-- commandsstop -->
