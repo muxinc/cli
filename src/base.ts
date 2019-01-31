@@ -12,8 +12,7 @@ export default abstract class MuxCommand extends Command {
 
   async readConfig() {
     try {
-      const configFile = await fs.readFile(this.configFile, 'utf8');
-      const config = JSON.parse(configFile);
+      const config = await fs.readJSON(this.configFile);
 
       process.env.MUX_TOKEN_ID = process.env.MUX_TOKEN_ID || config.tokenId;
       process.env.MUX_TOKEN_SECRET =

@@ -1,12 +1,24 @@
 import * as Mux from '@mux/mux-node';
+import { flags } from '@oclif/command';
 import chalk from 'chalk';
+import * as dotenv from 'dotenv';
 import * as fs from 'fs-extra';
 import * as inquirer from 'inquirer';
+import * as path from 'path';
 
 import MuxBase from '../base';
 
 export default class Init extends MuxBase {
   static description = 'set up a user-level config';
+
+  static args = [
+    {
+      name: 'envFile',
+      required: false,
+      description: 'path to a Mux access token .env file',
+      parse: (input: string) => path.resolve(input),
+    },
+  ];
 
   Video: any;
   JWT: any;
@@ -19,6 +31,24 @@ export default class Init extends MuxBase {
   } = {};
 
   async run() {
+    const { args } = this.parse(Init);
+
+    if (args.envFile) {
+      const envFile = path.resolve(args.envFile);
+      const env = dotenv.config({ path: envFile });
+      if (env.error) {
+        this.error(`Unable to load env file: ${envFile}`);
+      } else if (env.parsed) {
+        this.log(
+          chalk`Loaded your Mux .env file! Using token with id: {blue ${
+            env.parsed.ACCESS_TOKEN_ID
+          }}`
+        );
+        process.env.MUX_TOKEN_ID = env.parsed.ACCESS_TOKEN_ID;
+        process.env.MUX_TOKEN_SECRET = env.parsed.ACCESS_TOKEN_SECRET;
+      }
+    }
+
     await this.readConfig();
 
     let prompts: {
