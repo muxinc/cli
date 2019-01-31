@@ -8,15 +8,14 @@ Your friendly neighborhood Mux CLI tool
 [![License](https://img.shields.io/npm/l/@mux/cli.svg)](https://github.com/muxinc/cli/blob/master/package.json)
 
 <!-- toc -->
-
-- [Usage](#usage)
-- [Commands](#commands)
-  <!-- tocstop -->
+* [mux-cli](#mux-cli)
+* [Usage](#usage)
+* [Commands](#commands)
+<!-- tocstop -->
 
 # Usage
 
 <!-- usage -->
-
 ```sh-session
 $ npm install -g @mux/cli
 $ mux COMMAND
@@ -28,18 +27,16 @@ USAGE
   $ mux COMMAND
 ...
 ```
-
 <!-- usagestop -->
 
 # Commands
 
 <!-- commands -->
-
-- [`mux assets:create INPUT`](#mux-assetscreate-input)
-- [`mux assets:upload PATH`](#mux-assetsupload-path)
-- [`mux help [COMMAND]`](#mux-help-command)
-- [`mux init [ENVFILE]`](#mux-init-envfile)
-- [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
+* [`mux assets:create INPUT`](#mux-assetscreate-input)
+* [`mux assets:upload PATH`](#mux-assetsupload-path)
+* [`mux help [COMMAND]`](#mux-help-command)
+* [`mux init [ENVFILE]`](#mux-init-envfile)
+* [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
 
 ## `mux assets:create INPUT`
 
@@ -67,7 +64,7 @@ USAGE
   $ mux assets:upload PATH
 
 ARGUMENTS
-  PATH  local path for the file you'd like to create this asset from
+  PATH  local path for the file (or folder) you'd like to upload
 
 OPTIONS
   -c, --concurrent=concurrent  [default: 3] max number of files to upload at once
@@ -121,5 +118,4 @@ ARGUMENTS
 ```
 
 _See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.3.0/src/commands/sign.ts)_
-
 <!-- commandsstop -->

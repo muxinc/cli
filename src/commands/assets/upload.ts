@@ -15,8 +15,7 @@ export default class AssetsCreate extends Command {
   static args = [
     {
       name: 'path',
-      description:
-        "local path for the file you'd like to create this asset from",
+      description: "local path for the file (or folder) you'd like to upload",
       required: true,
     },
   ];
