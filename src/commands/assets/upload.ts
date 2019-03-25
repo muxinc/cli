@@ -89,7 +89,7 @@ export default class AssetsCreate extends Command {
       file => file.match(regex)
     );
 
-    let prompt;
+    let prompt = { files };
     if (files.length === 0) {
       return this.log(
         `We were unable to find any files. You might want to double check your path or make sure your filter isn't too strict`
@@ -106,7 +106,7 @@ export default class AssetsCreate extends Command {
       ]);
     }
 
-    const tasks: Listr.ListrTask[] = prompt.files.map((file: string) => ({
+    const tasks = prompt.files.map((file: string) => ({
       title: `${file}: getting direct upload URL`,
       task: async (ctx: any, task: Listr.ListrTask) => {
         const upload = await this.Video.Uploads.create(assetBodyParams);
@@ -130,7 +130,9 @@ export default class AssetsCreate extends Command {
       },
     }));
 
-    const finalCtx = await new Listr(tasks, {
+    // I hate this `any` here, but I'm running into a weird issue casting
+    // the `tasks` above to an array of `ListrTasks[]`.
+    const finalCtx = await new Listr(tasks as any, {
       concurrent: flags.concurrent,
     }).run();
 
