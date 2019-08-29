@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.3.0 darwin-x64 node-v10.14.2
+@mux/cli/0.3.0 darwin-x64 node-v10.15.3
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
