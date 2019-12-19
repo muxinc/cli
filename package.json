@@ -1,7 +1,7 @@
 {
   "name": "@mux/cli",
   "description": "Your friendly neighborhood Mux CLI tool!",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "author": "Matthew McClure @mmcc",
   "bin": {
     "mux": "./bin/run"
