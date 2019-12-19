@@ -86,7 +86,7 @@ export default class AssetsCreate extends Command {
 
     const regex = new RegExp(flags.filter || '', 'ig');
     const files = this.getFilePaths(
-      path.resolve(__dirname, args.path)
+      path.resolve(process.cwd(), args.path)
     ).filter(file => file.match(regex));
 
     let prompt = { files };
