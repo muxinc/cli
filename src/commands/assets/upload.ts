@@ -113,7 +113,7 @@ export default class AssetsCreate extends Command {
 
         task.title = `${file}: uploading`;
         await this.uploadFile(
-          path.resolve(__dirname, args.path, file),
+          path.resolve(process.cwd(), args.path, file),
           upload.url
         );
 
