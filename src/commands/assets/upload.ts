@@ -44,7 +44,7 @@ export default class AssetsCreate extends Command {
 
   uploadFile(filePath: string, url: string) {
     return new Promise((resolve, reject) => {
-      fs.createReadStream(path.resolve(__dirname, filePath)).pipe(
+      fs.createReadStream(path.resolve(process.cwd(), filePath)).pipe(
         request
           .put(url)
           .on('response', resolve)
@@ -85,9 +85,9 @@ export default class AssetsCreate extends Command {
     };
 
     const regex = new RegExp(flags.filter || '', 'ig');
-    const files = this.getFilePaths(path.resolve(__dirname, args.path)).filter(
-      file => file.match(regex)
-    );
+    const files = this.getFilePaths(
+      path.resolve(__dirname, args.path)
+    ).filter(file => file.match(regex));
 
     let prompt = { files };
     if (files.length === 0) {
