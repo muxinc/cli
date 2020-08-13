@@ -21,13 +21,19 @@ export default class Sign extends MuxBase {
       description: 'How long the signature is valid for. If no unit is specified, milliseconds is assumed.',
       default: '7d',
     }),
+    type: flags.string({
+      char: 't',
+      description: 'What type of token this signature is for.',
+      default: 'video',
+      options: ['video', 'thumbnail', 'gif'],
+    })
   };
 
   async run() {
     const { args, flags } = this.parse(Sign);
     const playbackId = args['playback-id'];
 
-    const options = { expiration: flags.expiresIn }
+    const options = { expiration: flags.expiresIn, type: flags.type }
     const key = this.JWT.sign(playbackId, options);
     const url = `https://stream.mux.com/${playbackId}.m3u8?token=${key}`;
 
