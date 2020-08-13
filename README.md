@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.4.0 linux-x64 node-v10.20.1
+@mux/cli/0.4.1 linux-x64 node-v10.20.1
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -53,7 +53,7 @@ OPTIONS
   -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.4.0/src/commands/assets/create.ts)_
+_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.4.1/src/commands/assets/create.ts)_
 
 ## `mux assets:upload PATH`
 
@@ -72,7 +72,7 @@ OPTIONS
   -p, --private                add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.4.0/src/commands/assets/upload.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.4.1/src/commands/assets/upload.ts)_
 
 ## `mux help [COMMAND]`
 
@@ -103,7 +103,7 @@ ARGUMENTS
   ENVFILE  path to a Mux access token .env file
 ```
 
-_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.4.0/src/commands/init.ts)_
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.4.1/src/commands/init.ts)_
 
 ## `mux sign PLAYBACK-ID`
 
@@ -115,7 +115,13 @@ USAGE
 
 ARGUMENTS
   PLAYBACK-ID  Playback ID to create a signed URL token for.
+
+OPTIONS
+  -e, --expiresIn=expiresIn       [default: 7d] How long the signature is valid for. If no unit is specified,
+                                  milliseconds is assumed.
+
+  -t, --type=video|thumbnail|gif  [default: video] What type of token this signature is for.
 ```
 
-_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.4.0/src/commands/sign.ts)_
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.4.1/src/commands/sign.ts)_
 <!-- commandsstop -->
