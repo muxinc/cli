@@ -32,6 +32,13 @@ export default class Init extends MuxBase {
   async run() {
     const { args } = this.parse(Init);
 
+    let prompts: {
+      name: string;
+      message: string;
+      type: string;
+      default?: string;
+    }[] = [];
+
     if (args.envFile) {
       const envFile = path.resolve(args.envFile);
       const env = dotenv.config({ path: envFile });
@@ -40,35 +47,30 @@ export default class Init extends MuxBase {
       } else if (env.parsed) {
         this.log(
           chalk`Loaded your Mux .env file! Using token with id: {blue ${
-            env.parsed.ACCESS_TOKEN_ID
+            env.parsed.MUX_TOKEN_ID
           }}`
         );
-        process.env.MUX_TOKEN_ID = env.parsed.ACCESS_TOKEN_ID;
-        process.env.MUX_TOKEN_SECRET = env.parsed.ACCESS_TOKEN_SECRET;
+        process.env.MUX_TOKEN_ID = env.parsed.MUX_TOKEN_ID;
+        process.env.MUX_TOKEN_SECRET = env.parsed.MUX_TOKEN_SECRET;
       }
+    } else {
+      prompts = [
+        {
+          name: 'tokenId',
+          message: "What's your token ID?",
+          type: 'string',
+          default: process.env.MUX_TOKEN_ID,
+        },
+        {
+          name: 'tokenSecret',
+          message: "What's your token secret?",
+          type: 'password',
+          default: process.env.MUX_TOKEN_SECRET,
+        },
+      ];
     }
 
     await this.readConfig();
-
-    let prompts: {
-      name: string;
-      message: string;
-      type: string;
-      default?: string;
-    }[] = [
-      {
-        name: 'tokenId',
-        message: "What's your token ID?",
-        type: 'string',
-        default: process.env.MUX_TOKEN_ID,
-      },
-      {
-        name: 'tokenSecret',
-        message: "What's your token secret?",
-        type: 'password',
-        default: process.env.MUX_TOKEN_SECRET,
-      },
-    ];
 
     const signingKeyPrompt = {
       name: 'createSigningKey',
@@ -84,12 +86,14 @@ export default class Init extends MuxBase {
 
     prompts = [...prompts, signingKeyPrompt];
 
-    let { createSigningKey, tokenId, tokenSecret }: any = await inquirer.prompt(
+    let { createSigningKey, promptTokenId, promptTokenSecret }: any = await inquirer.prompt(
       prompts
     );
 
-    this.muxConfig.tokenId = process.env.MUX_TOKEN_ID = tokenId;
-    this.muxConfig.tokenSecret = process.env.MUX_TOKEN_SECRET = tokenSecret;
+    // If the token was loaded from an env file they'll already be set in the appropriate environment variables and 
+    // the prompts themselves will be null.
+    this.muxConfig.tokenId = process.env.MUX_TOKEN_ID = promptTokenId || process.env.MUX_TOKEN_ID;
+    this.muxConfig.tokenSecret = process.env.MUX_TOKEN_SECRET = promptTokenSecret || process.env.MUX_TOKEN_SECRET;
 
     if (createSigningKey) {
       const { Video } = new Mux();
