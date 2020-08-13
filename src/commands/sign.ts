@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import * as clipboard from 'clipboardy';
+import { flags } from '@oclif/command';
 
 import MuxBase from '../base';
 
@@ -14,11 +15,26 @@ export default class Sign extends MuxBase {
     },
   ];
 
+  static flags = {
+    expiresIn: flags.string({
+      char: 'e',
+      description: 'How long the signature is valid for. If no unit is specified, milliseconds is assumed.',
+      default: '7d',
+    }),
+    type: flags.string({
+      char: 't',
+      description: 'What type of token this signature is for.',
+      default: 'video',
+      options: ['video', 'thumbnail', 'gif'],
+    })
+  };
+
   async run() {
-    const { args } = this.parse(Sign);
+    const { args, flags } = this.parse(Sign);
     const playbackId = args['playback-id'];
 
-    const key = this.JWT.sign(playbackId);
+    const options = { expiration: flags.expiresIn, type: flags.type }
+    const key = this.JWT.sign(playbackId, options);
     const url = `https://stream.mux.com/${playbackId}.m3u8?token=${key}`;
 
     this.log(
