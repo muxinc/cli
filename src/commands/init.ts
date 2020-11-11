@@ -86,14 +86,13 @@ export default class Init extends MuxBase {
 
     prompts = [...prompts, signingKeyPrompt];
 
-    let { createSigningKey, promptTokenId, promptTokenSecret }: any = await inquirer.prompt(
-      prompts
-    );
+    const answers = await inquirer.prompt(prompts);
+    let { createSigningKey, tokenId, tokenSecret }: any = answers;
 
     // If the token was loaded from an env file they'll already be set in the appropriate environment variables and 
     // the prompts themselves will be null.
-    this.muxConfig.tokenId = process.env.MUX_TOKEN_ID = promptTokenId || process.env.MUX_TOKEN_ID;
-    this.muxConfig.tokenSecret = process.env.MUX_TOKEN_SECRET = promptTokenSecret || process.env.MUX_TOKEN_SECRET;
+    this.muxConfig.tokenId = process.env.MUX_TOKEN_ID = tokenId || process.env.MUX_TOKEN_ID;
+    this.muxConfig.tokenSecret = process.env.MUX_TOKEN_SECRET = tokenSecret || process.env.MUX_TOKEN_SECRET;
 
     if (createSigningKey) {
       const { Video } = new Mux();
