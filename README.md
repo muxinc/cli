@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.4.2 linux-x64 node-v10.20.1
+@mux/cli/0.4.2 linux-x64 node-v8.17.0
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -89,7 +89,7 @@ OPTIONS
   --all  see all commands in CLI
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.0/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v2.1.6/src/commands/help.ts)_
 
 ## `mux init [ENVFILE]`
 
