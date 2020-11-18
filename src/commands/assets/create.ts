@@ -44,7 +44,10 @@ export default class AssetsCreate extends MuxBase {
     try {
       const ctx = await tasks.run();
       const playbackUrl = this.playbackUrl(ctx.asset);
-      await clipboard.write(playbackUrl);
+
+      if (!process.env.WSL_DISTRO_NAME) {
+        await clipboard.write(playbackUrl);
+      }
 
       this.log(
         chalk`

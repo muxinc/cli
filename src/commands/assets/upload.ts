@@ -140,7 +140,7 @@ export default class AssetsCreate extends Command {
       const tsv = finalCtx.assets
         .map((row: string[]) => row.join('\t'))
         .join('\n');
-      if (prompt.files.length > 1) {
+      if (prompt.files.length > 1 && !process.env.WSL_DISTRO_NAME) {
         await clipboard.write(tsv);
 
         return this.log(
