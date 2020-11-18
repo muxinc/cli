@@ -1,3 +1,6 @@
 {
-  "extends": ["@oclif/tslint", "tslint-config-prettier"]
+  "extends": ["@oclif/tslint", "tslint-config-prettier"],
+  "rules": {
+    "no-console": false,
+  }
 }
