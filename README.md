@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.4.2 linux-x64 node-v8.17.0
+@mux/cli/0.4.2 linux-x64 node-v13.9.0
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
