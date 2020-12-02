@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as Listr from 'listr';
 
@@ -19,7 +19,7 @@ export default class AssetsCreate extends MuxBase {
 
   async run() {
     const { args, flags } = this.parse(AssetsCreate);
-    let assetBodyParams: IMuxAssetBody = {
+    let assetBodyParams = {
       input: args.input,
       playback_policies: flags.private ? ['signed'] : ['public'],
     };

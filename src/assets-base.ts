@@ -1,3 +1,4 @@
+import { Asset } from '@mux/mux-node';
 import { flags } from '@oclif/command';
 
 import MuxBase from './base';
@@ -10,8 +11,8 @@ export default abstract class MuxCommand extends MuxBase {
     }),
   };
 
-  playbackUrl(asset: IMuxAsset) {
-    const publicPlaybackId = asset.playback_ids.find(
+  playbackUrl(asset: Asset) {
+    const publicPlaybackId = (asset.playback_ids ?? []).find(
       p => p.policy === 'public'
     );
     if (!publicPlaybackId) {
@@ -23,7 +24,7 @@ export default abstract class MuxCommand extends MuxBase {
     }`;
   }
 
-  pollAsset(assetId: string): Promise<IMuxAsset> {
+  pollAsset(assetId: string): Promise<Asset> {
     return new Promise((resolve, reject) => {
       const poll = () =>
         setTimeout(async () => {

@@ -1,5 +1,6 @@
+import { CreateUploadParams, Upload } from '@mux/mux-node';
 import { flags } from '@oclif/command';
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as fs from 'fs-extra';
 import * as inquirer from 'inquirer';
@@ -53,7 +54,7 @@ export default class AssetsCreate extends Command {
     });
   }
 
-  pollUpload(uploadId: string): Promise<IMuxUpload> {
+  pollUpload(uploadId: string): Promise<Upload> {
     return new Promise((resolve, reject) => {
       const poll = () =>
         setTimeout(async () => {
@@ -78,9 +79,9 @@ export default class AssetsCreate extends Command {
   async run() {
     const { args, flags } = this.parse(AssetsCreate);
 
-    let assetBodyParams: IMuxUploadBody = {
+    let assetBodyParams: CreateUploadParams = {
       new_asset_settings: {
-        playback_policies: flags.private ? ['signed'] : ['public'],
+        playback_policy: flags.private ? ['signed'] : ['public'],
       },
     };
 
@@ -118,8 +119,12 @@ export default class AssetsCreate extends Command {
         );
 
         task.title = `${file}: waiting for asset to be playable`;
-        const { asset_id } = await this.pollUpload(upload.id);
-        const asset = await this.pollAsset(asset_id);
+        const { asset_id: assetId } = await this.pollUpload(upload.id);
+
+        if (!assetId) {
+          throw new Error(`Asset for upload '${upload.id}' failed to resolve.`);
+        }
+        const asset = await this.pollAsset(assetId);
 
         const playbackUrl = this.playbackUrl(asset);
         task.title = `${file}: ${playbackUrl}`;
