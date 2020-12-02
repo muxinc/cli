@@ -1,4 +1,4 @@
-import * as Mux from '@mux/mux-node';
+import Mux, { Video as MuxVideo } from '@mux/mux-node';
 import Command from '@oclif/command';
 import chalk from 'chalk';
 import * as fs from 'fs-extra';
@@ -7,7 +7,7 @@ import * as path from 'path';
 export default abstract class MuxCommand extends Command {
   configFile = path.join(this.config.configDir, 'config.json');
 
-  Video: any;
+  Video!: MuxVideo;
   JWT: any;
 
   async readConfig() {
@@ -38,6 +38,7 @@ export default abstract class MuxCommand extends Command {
 
     try {
       const { Video } = new Mux();
+
       this.Video = Video;
       this.JWT = Mux.JWT;
     } catch {

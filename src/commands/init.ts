@@ -1,4 +1,4 @@
-import * as Mux from '@mux/mux-node';
+import Mux from '@mux/mux-node';
 import chalk from 'chalk';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs-extra';
@@ -89,7 +89,7 @@ export default class Init extends MuxBase {
     const answers = await inquirer.prompt(prompts);
     let { createSigningKey, tokenId, tokenSecret }: any = answers;
 
-    // If the token was loaded from an env file they'll already be set in the appropriate environment variables and 
+    // If the token was loaded from an env file they'll already be set in the appropriate environment variables and
     // the prompts themselves will be null.
     this.muxConfig.tokenId = process.env.MUX_TOKEN_ID = tokenId || process.env.MUX_TOKEN_ID;
     this.muxConfig.tokenSecret = process.env.MUX_TOKEN_SECRET = tokenSecret || process.env.MUX_TOKEN_SECRET;
@@ -97,6 +97,9 @@ export default class Init extends MuxBase {
     if (createSigningKey) {
       const { Video } = new Mux();
       try {
+        // this is not great; we need to also update mux-node for this call
+        // but that's a bigger can of worms. We'll come back to this one.
+        // @ts-ignore
         const { id, private_key } = await Video.SigningKeys.create();
         this.muxConfig.signingKeyId = process.env.MUX_SIGNING_KEY = id;
         this.muxConfig.signingKeySecret = process.env.MUX_PRIVATE_KEY = private_key;

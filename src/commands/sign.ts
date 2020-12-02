@@ -1,6 +1,6 @@
+import { flags } from '@oclif/command';
 import chalk from 'chalk';
 import * as clipboard from 'clipboardy';
-import { flags } from '@oclif/command';
 
 import MuxBase from '../base';
 
