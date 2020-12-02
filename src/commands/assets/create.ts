@@ -41,18 +41,24 @@ export default class AssetsCreate extends MuxBase {
       },
     ]);
 
-    tasks.run().then(async ctx => {
+    try {
+      const ctx = await tasks.run();
       const playbackUrl = this.playbackUrl(ctx.asset);
-      await clipboard.write(playbackUrl);
+
+      if (!process.env.WSL_DISTRO_NAME) {
+        await clipboard.write(playbackUrl);
+      }
 
       this.log(
         chalk`
-💫 {bold.blue Asset ready for your enjoyment!}
+  💫 {bold.blue Asset ready for your enjoyment!}
 
-{bold.underline Playback URL}
-${playbackUrl}
-`
+  {bold.underline Playback URL}
+  ${playbackUrl}
+  `
       );
-    });
+    } catch (err) {
+      console.log("Error during asset:create:", err);
+    }
   }
 }

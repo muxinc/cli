@@ -132,32 +132,37 @@ export default class AssetsCreate extends Command {
 
     // I hate this `any` here, but I'm running into a weird issue casting
     // the `tasks` above to an array of `ListrTasks[]`.
-    const finalCtx = await new Listr(tasks as any, {
-      concurrent: flags.concurrent,
-    }).run();
+    try {
+      const finalCtx = await new Listr(tasks as any, {
+        concurrent: flags.concurrent,
+      }).run();
 
-    const tsv = finalCtx.assets
-      .map((row: string[]) => row.join('\t'))
-      .join('\n');
-    if (prompt.files.length > 1) {
-      await clipboard.write(tsv);
+      const tsv = finalCtx.assets
+        .map((row: string[]) => row.join('\t'))
+        .join('\n');
+      if (prompt.files.length > 1 && !process.env.WSL_DISTRO_NAME) {
+        await clipboard.write(tsv);
 
+        return this.log(
+          chalk`
+  📹 {bold.underline Assets ready for your enjoyment:}
+  ${tsv}
+
+  {blue (copied to your clipboard)}`
+        );
+      }
+
+      await clipboard.write(finalCtx.assets[1][2]);
       return this.log(
         chalk`
-📹 {bold.underline Assets ready for your enjoyment:}
-${tsv}
+  📹 {bold.underline Asset ready for your enjoyment:}
+  ${tsv}
 
-{blue (copied to your clipboard)}`
+  {blue (since you only uploaded one asset, we just added the playback URL to your clipboard.)}`
       );
+    } catch (err) {
+      // TODO: make this clearer / separate it out per video for more obvious debugging.
+      console.log("Error during video processing: ", err);
     }
-
-    await clipboard.write(finalCtx.assets[1][2]);
-    return this.log(
-      chalk`
-📹 {bold.underline Asset ready for your enjoyment:}
-${tsv}
-
-{blue (since you only uploaded one asset, we just added the playback URL to your clipboard.)}`
-    );
   }
 }
