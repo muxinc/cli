@@ -1,5 +1,5 @@
 import Mux from '@mux/mux-node';
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs-extra';
 import * as inquirer from 'inquirer';

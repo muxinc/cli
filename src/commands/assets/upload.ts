@@ -1,6 +1,6 @@
 import { CreateUploadParams, Upload } from '@mux/mux-node';
 import { flags } from '@oclif/command';
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as fs from 'fs-extra';
 import * as inquirer from 'inquirer';

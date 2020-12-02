@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as Listr from 'listr';
 
