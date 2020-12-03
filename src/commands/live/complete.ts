@@ -1,4 +1,5 @@
 import * as Listr from 'listr';
+import { flags } from '@oclif/command';
 
 import LiveCommandBase from '../../command-bases/live-base';
 
@@ -10,6 +11,12 @@ export default class LiveComplete extends LiveCommandBase {
 
   static flags = {
     ...LiveCommandBase.flags,
+    disableAfterCompletion: flags.boolean({
+      name: 'disable-after-completion',
+      char: 'd',
+      description: 'If set, disables the stream upon completion.',
+      default: false,
+    }),
   }
 
   async run() {
@@ -22,6 +29,14 @@ export default class LiveComplete extends LiveCommandBase {
           title: `Signaling completion of '${streamId}'`,
           task: async (ctx, task) => {
             await this.Video.LiveStreams.signalComplete(streamId),
+            task.title = `${task.title} (OK)`;
+          },
+        },
+        {
+          title: `Disabling '${streamId}'`,
+          enabled: () => flags.disableAfterCompletion,
+          task: async (ctx, task) => {
+            await this.Video.LiveStreams.disable(streamId);
             task.title = `${task.title} (OK)`;
           },
         },
