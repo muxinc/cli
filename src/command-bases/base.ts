@@ -1,10 +1,10 @@
 import Mux, { Video as MuxVideo } from '@mux/mux-node';
 import Command from '@oclif/command';
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 
-export default abstract class MuxCommand extends Command {
+export default abstract class CommandBase extends Command {
   configFile = path.join(this.config.configDir, 'config.json');
 
   Video!: MuxVideo;

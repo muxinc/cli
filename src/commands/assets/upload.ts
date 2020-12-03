@@ -8,7 +8,7 @@ import * as Listr from 'listr';
 import * as path from 'path';
 import * as request from 'request';
 
-import Command from '../../assets-base';
+import Command from '../../command-bases/asset-base';
 
 export default class AssetsCreate extends Command {
   static description = 'Create a new asset in Mux via a local file';
@@ -109,7 +109,7 @@ export default class AssetsCreate extends Command {
 
     const tasks = prompt.files.map((file: string) => ({
       title: `${file}: getting direct upload URL`,
-      task: async (ctx: any, task: Listr.ListrTask) => {
+      task: async (ctx: any, task: Listr.ListrTaskWrapper) => {
         const upload = await this.Video.Uploads.create(assetBodyParams);
 
         task.title = `${file}: uploading`;
@@ -138,7 +138,7 @@ export default class AssetsCreate extends Command {
     // I hate this `any` here, but I'm running into a weird issue casting
     // the `tasks` above to an array of `ListrTasks[]`.
     try {
-      const finalCtx = await new Listr(tasks as any, {
+      const finalCtx = await new Listr(tasks, {
         concurrent: flags.concurrent,
       }).run();
 
@@ -168,6 +168,7 @@ export default class AssetsCreate extends Command {
     } catch (err) {
       // TODO: make this clearer / separate it out per video for more obvious debugging.
       console.log("Error during video processing: ", err);
+      throw err;
     }
   }
 }

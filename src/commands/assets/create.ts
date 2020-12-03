@@ -2,9 +2,9 @@ import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as Listr from 'listr';
 
-import MuxBase from '../../assets-base';
+import AssetCommandBase from '../../command-bases/asset-base';
 
-export default class AssetsCreate extends MuxBase {
+export default class AssetsCreate extends AssetCommandBase {
   static description =
     "Create a new asset in Mux using a file that's already available online";
 

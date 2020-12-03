@@ -1,8 +1,8 @@
 import { flags } from '@oclif/command';
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 
-import MuxBase from '../base';
+import MuxBase from '../command-bases/base';
 
 export default class Sign extends MuxBase {
   static description = 'Creates a new signed URL token for a playback ID';

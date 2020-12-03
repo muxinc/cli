@@ -1,9 +1,8 @@
 import { Asset } from '@mux/mux-node';
 import { flags } from '@oclif/command';
+import CommandBase from './base';
 
-import MuxBase from './base';
-
-export default abstract class MuxCommand extends MuxBase {
+export default abstract class AssetCommandBase extends CommandBase {
   static flags = {
     private: flags.boolean({
       char: 'p',

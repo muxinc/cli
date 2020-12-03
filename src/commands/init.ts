@@ -5,7 +5,7 @@ import * as fs from 'fs-extra';
 import * as inquirer from 'inquirer';
 import * as path from 'path';
 
-import MuxBase from '../base';
+import MuxBase from '../command-bases/base';
 
 export default class Init extends MuxBase {
   static description = 'set up a user-level config';
