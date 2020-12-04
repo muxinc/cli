@@ -1,5 +1,6 @@
 import * as Listr from 'listr';
 import { flags } from '@oclif/command';
+import { IFlag } from '@oclif/command/lib/flags';
 
 import LiveCommandBase from '../../command-bases/live-base';
 
@@ -7,10 +8,12 @@ export default class LiveComplete extends LiveCommandBase {
   static description =
     "Signal to Mux that a live stream has concluded and should be closed.";
 
-  static args = [];
+  static args = [
+    ...LiveCommandBase.argsForSingleLiveStream,
+  ];
 
-  static flags = {
-    ...LiveCommandBase.flags,
+  static flags: Record<string, IFlag<any>> = {
+    ...LiveCommandBase.flagsForSingleLiveStream,
     disableAfterCompletion: flags.boolean({
       name: 'disable-after-completion',
       char: 'd',
@@ -21,7 +24,7 @@ export default class LiveComplete extends LiveCommandBase {
 
   async run() {
     const { args, flags } = this.parse(LiveComplete);
-    const streamId: string = this.getStreamId(flags);
+    const streamId: string = this.getStreamId(flags, args.streamName);
 
     try {
       await (new Listr([

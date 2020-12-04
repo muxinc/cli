@@ -6,15 +6,17 @@ export default class LiveEnable extends LiveCommandBase {
   static description =
     "Enables a live stream, allowing encoders to streaming to it.";
 
-  static args = [];
+  static args = [
+    ...LiveCommandBase.argsForSingleLiveStream,
+  ];
 
   static flags = {
-    ...LiveCommandBase.flags,
+    ...LiveCommandBase.flagsForSingleLiveStream,
   }
 
   async run() {
     const { args, flags } = this.parse(LiveEnable);
-    const streamId: string = this.getStreamId(flags);
+    const streamId: string = this.getStreamId(flags, args.streamName);
 
     try {
       await (new Listr([

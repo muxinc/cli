@@ -1,20 +1,32 @@
 import { flags } from '@oclif/command';
+import { IFlag } from '@oclif/command/lib/flags';
 
 import CommandBase from './base';
 
 export default abstract class LiveCommandBase extends CommandBase {
-  static flags = {
-    streamId: flags.string({
-      name: 'stream-id',
-      char: 'i',
-      description: 'The live stream, by its stream id',
+  static argsForSingleLiveStream = [
+    {
+      name: 'streamName',
+      description:
+        "the name (coupled with --reference-type) to look up in Mux to yield this livestream",
       required: true,
+    },
+  ];
+
+  static flagsForSingleLiveStream: Record<string, IFlag<any>> = {
+    streamId: flags.string({
+      name: 'reference-type',
+      char: 't',
+      description: 'the type of the provided reference name',
+      options: ['stream-id'],
+      default: 'stream-id',
     }),
   }
 
-  protected getStreamId(flags: Record<string, any>): string {
+  protected getStreamId(flags: Record<string, any>, streamName: string): string {
     if (flags.streamId) {
-      return flags.streamId;
+      // just a pass-through
+      return streamName;
     }
 
     throw new Error("Could not derive a stream ID. Please pass one with --stream-id.");

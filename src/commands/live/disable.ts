@@ -6,15 +6,17 @@ export default class LiveDisable extends LiveCommandBase {
   static description =
     "Disables a live stream and prevents encoders from streaming to it.";
 
-  static args = [];
+  static args = [
+    ...LiveCommandBase.argsForSingleLiveStream,
+  ];
 
   static flags = {
-    ...LiveCommandBase.flags,
+    ...LiveCommandBase.flagsForSingleLiveStream,
   }
 
   async run() {
     const { args, flags } = this.parse(LiveDisable);
-    const streamId: string = this.getStreamId(flags);
+    const streamId: string = this.getStreamId(flags, args.streamName);
 
     try {
       await (new Listr([
