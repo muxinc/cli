@@ -14,3 +14,5 @@ package-lock.json
 .env
 *.env
 !sample*.env
+
+*.tsbuildinfo
