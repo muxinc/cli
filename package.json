@@ -2,7 +2,15 @@
   "name": "@mux/cli",
   "description": "Your friendly neighborhood Mux CLI tool!",
   "version": "0.4.2",
-  "author": "Matthew McClure @mmcc",
+  "author": {
+    "name": "Mux",
+    "email": "devex@mux.com",
+    "url": "https://docs.mux.com"
+  },
+  "contributors": [
+    "Matt McClure <matt@mux.com>",
+    "Ed Ropple <ed@mux.com>"
+  ],
   "bin": {
     "mux": "./bin/run"
   },
