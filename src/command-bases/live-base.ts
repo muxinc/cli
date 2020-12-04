@@ -24,9 +24,10 @@ export default abstract class LiveCommandBase extends CommandBase {
   }
 
   protected getStreamId(flags: Record<string, any>, streamName: string): string {
-    if (flags.streamId) {
-      // just a pass-through
-      return streamName;
+    switch (flags.streamId) {
+      case 'stream-id':
+        // just a pass-through
+        return streamName;
     }
 
     throw new Error("Could not derive a stream ID. Please pass one with --stream-id.");
