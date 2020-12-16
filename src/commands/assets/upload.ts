@@ -167,12 +167,12 @@ export default class AssetsCreate extends Command {
       );
     } catch (err) {
       // TODO: make this clearer / separate it out per video for more obvious debugging.
-      chalk`
-      {bold.red} Error during video processing:
-
-      ${err}
-      `;
-      throw err;
+      console.log(
+        chalk.redBright('Error:') +
+        "\n\n" +
+        err
+      );
+      this.error(err);
     }
   }
 }
