@@ -1,6 +1,7 @@
 import * as Listr from 'listr';
 
 import LiveCommandBase from '../../command-bases/live-base';
+import chalk = require('chalk');
 
 export default class LiveDisable extends LiveCommandBase {
   static description =
@@ -30,7 +31,11 @@ export default class LiveDisable extends LiveCommandBase {
       ], {}).run());
     } catch (err) {
       // TODO: make this clearer
-      console.log("Error: ", err);
+      chalk`
+      {bold.red} Error:
+
+      ${err}
+      `;
       throw err;
     }
   }

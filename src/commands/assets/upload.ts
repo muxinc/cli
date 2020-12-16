@@ -167,7 +167,11 @@ export default class AssetsCreate extends Command {
       );
     } catch (err) {
       // TODO: make this clearer / separate it out per video for more obvious debugging.
-      console.log("Error during video processing: ", err);
+      chalk`
+      {bold.red} Error during video processing:
+
+      ${err}
+      `;
       throw err;
     }
   }
