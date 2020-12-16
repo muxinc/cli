@@ -70,7 +70,7 @@ export default class Init extends MuxBase {
       ];
     }
 
-    await this.readConfig();
+    await this.readConfigV1();
 
     const signingKeyPrompt = {
       name: 'createSigningKey',

@@ -33,6 +33,7 @@
     "inquirer": "^7.3.3",
     "listr": "^0.14.3",
     "request": "^2.88.2",
+    "runtypes": "^5.0.1",
     "rxjs": "^6.6.3"
   },
   "devDependencies": {
