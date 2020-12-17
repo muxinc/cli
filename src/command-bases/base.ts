@@ -1,29 +1,34 @@
-import Mux, { Video as MuxVideo } from '@mux/mux-node';
+import Mux, { Video as MuxVideo, Data as MuxData } from '@mux/mux-node';
 import Command from '@oclif/command';
 import * as chalk from 'chalk';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 
+import { MuxCliConfigV1 } from '../config';
+
 export default abstract class CommandBase extends Command {
   configFile = path.join(this.config.configDir, 'config.json');
 
+  MuxConfig!: MuxCliConfigV1;
   Video!: MuxVideo;
+  Data!: MuxData;
   JWT: any;
 
-  async readConfig() {
+  async readConfigV1(): Promise<MuxCliConfigV1 | null> {
     try {
-      const config = await fs.readJSON(this.configFile);
+      const configRaw = await fs.readJSON(this.configFile);
 
-      process.env.MUX_TOKEN_ID = process.env.MUX_TOKEN_ID || config.tokenId;
-      process.env.MUX_TOKEN_SECRET =
-        process.env.MUX_TOKEN_SECRET || config.tokenSecret;
+      // Mux SDK configuration options
+      configRaw.tokenId = process.env.MUX_TOKEN_ID || configRaw.tokenId;
+      configRaw.tokenSecret = process.env.MUX_TOKEN_SECRET || configRaw.tokenSecret;
+      configRaw.signingKeyId = process.env.MUX_SIGNING_KEY || configRaw.signingKeyId;
+      configRaw.signingKeySecret = process.env.MUX_PRIVATE_KEY || configRaw.signingKeySecret;
 
-      process.env.MUX_SIGNING_KEY =
-        process.env.MUX_SIGNING_KEY || config.signingKeyId;
-      process.env.MUX_PRIVATE_KEY =
-        process.env.MUX_PRIVATE_KEY || config.signingKeySecret;
+      // Mux CLI specific configuration options
+      configRaw.configVersion = configRaw.configVersion || 1;
+      configRaw.baseUrl = process.env.MUX_CLI_BASE_URL || configRaw.baseUrl;
 
-      return config;
+      return MuxCliConfigV1.check(configRaw);
     } catch (err) {
       if (err.errno !== -2) {
         this.error(err);
@@ -34,12 +39,14 @@ export default abstract class CommandBase extends Command {
   }
 
   async init() {
-    await this.readConfig();
-
     try {
-      const { Video } = new Mux();
+      const config = await this.readConfigV1();
+      const { Video, Data } = new Mux(config?.tokenId, config?.tokenSecret, {
+        baseUrl: config?.baseUrl,
+      });
 
       this.Video = Video;
+      this.Data = Data;
       this.JWT = Mux.JWT;
     } catch {
       if (this.id === 'init') return; // If we're initing we're trying to fix this, so don't yell :)

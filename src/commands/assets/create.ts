@@ -58,7 +58,12 @@ export default class AssetsCreate extends AssetCommandBase {
   `
       );
     } catch (err) {
-      console.log("Error during asset:create:", err);
+      console.log(
+        chalk.redBright('Error:') +
+        "\n\n" +
+        err
+      );
+      this.error(err);
     }
   }
 }
