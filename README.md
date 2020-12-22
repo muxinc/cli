@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.5.0 linux-x64 node-v13.9.0
+@mux/cli/0.6.0 linux-x64 node-v13.9.0
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -41,6 +41,11 @@ USAGE
 * [`mux live:complete STREAMNAME`](#mux-livecomplete-streamname)
 * [`mux live:disable STREAMNAME`](#mux-livedisable-streamname)
 * [`mux live:enable STREAMNAME`](#mux-liveenable-streamname)
+* [`mux plugins`](#mux-plugins)
+* [`mux plugins:install PLUGIN...`](#mux-pluginsinstall-plugin)
+* [`mux plugins:link PLUGIN`](#mux-pluginslink-plugin)
+* [`mux plugins:uninstall PLUGIN...`](#mux-pluginsuninstall-plugin)
+* [`mux plugins:update`](#mux-pluginsupdate)
 * [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
 * [`mux update [CHANNEL]`](#mux-update-channel)
 
@@ -59,7 +64,7 @@ OPTIONS
   -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.5.0/src/commands/assets/create.ts)_
+_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.6.0/src/commands/assets/create.ts)_
 
 ## `mux assets:upload PATH`
 
@@ -78,7 +83,7 @@ OPTIONS
   -p, --private                add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.5.0/src/commands/assets/upload.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.6.0/src/commands/assets/upload.ts)_
 
 ## `mux autocomplete [SHELL]`
 
@@ -156,7 +161,7 @@ ARGUMENTS
   ENVFILE  path to a Mux access token .env file
 ```
 
-_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.5.0/src/commands/init.ts)_
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.6.0/src/commands/init.ts)_
 
 ## `mux live:complete STREAMNAME`
 
@@ -174,7 +179,7 @@ OPTIONS
   -t, --streamId=stream-id      [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.5.0/src/commands/live/complete.ts)_
+_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.6.0/src/commands/live/complete.ts)_
 
 ## `mux live:disable STREAMNAME`
 
@@ -191,7 +196,7 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.5.0/src/commands/live/disable.ts)_
+_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.6.0/src/commands/live/disable.ts)_
 
 ## `mux live:enable STREAMNAME`
 
@@ -208,7 +213,124 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.5.0/src/commands/live/enable.ts)_
+_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.6.0/src/commands/live/enable.ts)_
+
+## `mux plugins`
+
+list installed plugins
+
+```
+USAGE
+  $ mux plugins
+
+OPTIONS
+  --core  show core plugins
+
+EXAMPLE
+  $ mux plugins
+```
+
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/index.ts)_
+
+## `mux plugins:install PLUGIN...`
+
+installs a plugin into the CLI
+
+```
+USAGE
+  $ mux plugins:install PLUGIN...
+
+ARGUMENTS
+  PLUGIN  plugin to install
+
+OPTIONS
+  -f, --force    yarn install with force flag
+  -h, --help     show CLI help
+  -v, --verbose
+
+DESCRIPTION
+  Can be installed from npm or a git url.
+
+  Installation of a user-installed plugin will override a core plugin.
+
+  e.g. If you have a core plugin that has a 'hello' command, installing a user-installed plugin with a 'hello' command 
+  will override the core plugin implementation. This is useful if a user needs to update core plugin functionality in 
+  the CLI without the need to patch and update the whole CLI.
+
+ALIASES
+  $ mux plugins:add
+
+EXAMPLES
+  $ mux plugins:install myplugin 
+  $ mux plugins:install https://github.com/someuser/someplugin
+  $ mux plugins:install someuser/someplugin
+```
+
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/install.ts)_
+
+## `mux plugins:link PLUGIN`
+
+links a plugin into the CLI for development
+
+```
+USAGE
+  $ mux plugins:link PLUGIN
+
+ARGUMENTS
+  PATH  [default: .] path to plugin
+
+OPTIONS
+  -h, --help     show CLI help
+  -v, --verbose
+
+DESCRIPTION
+  Installation of a linked plugin will override a user-installed or core plugin.
+
+  e.g. If you have a user-installed or core plugin that has a 'hello' command, installing a linked plugin with a 'hello' 
+  command will override the user-installed or core plugin implementation. This is useful for development work.
+
+EXAMPLE
+  $ mux plugins:link myplugin
+```
+
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/link.ts)_
+
+## `mux plugins:uninstall PLUGIN...`
+
+removes a plugin from the CLI
+
+```
+USAGE
+  $ mux plugins:uninstall PLUGIN...
+
+ARGUMENTS
+  PLUGIN  plugin to uninstall
+
+OPTIONS
+  -h, --help     show CLI help
+  -v, --verbose
+
+ALIASES
+  $ mux plugins:unlink
+  $ mux plugins:remove
+```
+
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/uninstall.ts)_
+
+## `mux plugins:update`
+
+update installed plugins
+
+```
+USAGE
+  $ mux plugins:update
+
+OPTIONS
+  -h, --help     show CLI help
+  -v, --verbose
+```
+
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/update.ts)_
 
 ## `mux sign PLAYBACK-ID`
 
@@ -228,7 +350,7 @@ OPTIONS
   -t, --type=video|thumbnail|gif  [default: video] What type of token this signature is for.
 ```
 
-_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.5.0/src/commands/sign.ts)_
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.6.0/src/commands/sign.ts)_
 
 ## `mux update [CHANNEL]`
 
