@@ -47,13 +47,7 @@ export default class LiveComplete extends LiveCommandBase {
         },
       ], {}).run());
     } catch (err) {
-      // TODO: make this clearer
-      console.log(
-        chalk.redBright('Error:') +
-        "\n\n" +
-        err
-      );
-      this.error(err);
+      this.printErrorAndDie(err);
     }
   }
 }

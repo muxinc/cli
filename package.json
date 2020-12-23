@@ -34,7 +34,8 @@
     "listr": "^0.14.3",
     "request": "^2.88.2",
     "runtypes": "^5.0.1",
-    "rxjs": "^6.6.3"
+    "rxjs": "^6.6.3",
+    "serialize-error": "^7.0.1"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1.24.3",

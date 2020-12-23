@@ -166,13 +166,7 @@ export default class AssetsCreate extends AssetCommandBase {
   {blue (since you only uploaded one asset, we just added the playback URL to your clipboard.)}`
       );
     } catch (err) {
-      // TODO: make this clearer / separate it out per video for more obvious debugging.
-      console.log(
-        chalk.redBright('Error:') +
-        "\n\n" +
-        err
-      );
-      this.error(err);
+      this.printErrorAndDie(err);
     }
   }
 }
