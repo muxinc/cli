@@ -14,6 +14,7 @@ export abstract class CommandBase extends Command {
 
   static flags: Record<string, IFlag<any>> = {
     profile: flags.string({
+      char: 'p',
       default: process.env.MUX_CLI_ENV ?? 'default',
     }),
   };

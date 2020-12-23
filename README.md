@@ -1,11 +1,16 @@
-# mux-cli
-
-Your friendly neighborhood Mux CLI tool
+# @mux/cli #
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 [![Version](https://img.shields.io/npm/v/@mux/cli.svg)](https://npmjs.org/package/@mux/cli)
 [![Downloads/week](https://img.shields.io/npm/dw/@mux/cli.svg)](https://npmjs.org/package/@mux/cli)
 [![License](https://img.shields.io/npm/l/@mux/cli.svg)](https://github.com/muxinc/cli/blob/master/package.json)
+
+# Important Changes #
+
+## 0.7.0 ##
+- **BREAKING:** `mux assets:create` and `mux assets:upload` no longer accept the `-p` short flag for `--private`. It has been replaced with the `-P` flag.
+- **BREAKING:** `mux init` (now an alias for `mux profiles:init`) will not offer to create a signing key for generating signed asset URLs. This is now the `mux signed-assets:create-signing-key` command. Mux SDK environment variables still work, but create spooky action at a distance and are not recommended.
+- **NEW:** The Mux CLI now supports multiple profiles, controlled by the `MUX_CLI_PROFILE` environment variable _or_ `-p`/`--profile` on (almost) all commands.
 
 <!-- toc -->
 * [mux-cli](#mux-cli)
@@ -13,7 +18,7 @@ Your friendly neighborhood Mux CLI tool
 * [Commands](#commands)
 <!-- tocstop -->
 
-# Usage
+# Usage #
 
 <!-- usage -->
 ```sh-session
@@ -29,7 +34,7 @@ USAGE
 ```
 <!-- usagestop -->
 
-# Commands
+# Commands #
 
 <!-- commands -->
 * [`mux assets:create INPUT`](#mux-assetscreate-input)

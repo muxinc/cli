@@ -6,6 +6,7 @@ export abstract class AssetCommandBase extends CommandBase {
   static flags = {
     ...CommandBase.flags,
     private: flags.boolean({
+      char: 'P',
       description: 'add a private playback policy to the created asset',
     }),
   };
