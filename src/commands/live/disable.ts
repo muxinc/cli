@@ -1,7 +1,8 @@
 import * as Listr from 'listr';
 
-import LiveCommandBase from '../../command-bases/live-base';
 import chalk = require('chalk');
+
+import { LiveCommandBase } from '../../command-bases/live-base';
 
 export default class LiveDisable extends LiveCommandBase {
   static description =

@@ -2,10 +2,12 @@ import { flags } from '@oclif/command';
 import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 
-import MuxBase from '../command-bases/base';
+import { CommandBase } from '../command-bases/base';
+import { JWT } from '@mux/mux-node';
 
-export default class Sign extends MuxBase {
+export default class Sign extends CommandBase {
   static description = 'Creates a new signed URL token for a playback ID';
+  static aliases = ['private-playback:sign-asset'];
 
   static args = [
     {
@@ -16,6 +18,7 @@ export default class Sign extends MuxBase {
   ];
 
   static flags = {
+    ...CommandBase.flags,
     expiresIn: flags.string({
       char: 'e',
       description: 'How long the signature is valid for. If no unit is specified, milliseconds is assumed.',
@@ -25,7 +28,7 @@ export default class Sign extends MuxBase {
       char: 't',
       description: 'What type of token this signature is for.',
       default: 'video',
-      options: ['video', 'thumbnail', 'gif'],
+      options: ['video', 'thumbnail', 'gif', 'storyboard'],
     })
   };
 
@@ -33,8 +36,14 @@ export default class Sign extends MuxBase {
     const { args, flags } = this.parse(Sign);
     const playbackId = args['playback-id'];
 
-    const options = { expiration: flags.expiresIn, type: flags.type }
-    const key = this.JWT.sign(playbackId, options);
+    const options = {
+      expiration: flags.expiresIn,
+      type: flags.type,
+      keyId: this.MuxProfile?.signingKey?.keyId,
+      keySecret: this.MuxProfile?.signingKey?.keySecret,
+    };
+    // I dislike the `as any` here but we're dealing with pre-filtered stuff here
+    const key = JWT.sign(playbackId, options as any);
     const url = `https://stream.mux.com/${playbackId}.m3u8?token=${key}`;
 
     this.log(

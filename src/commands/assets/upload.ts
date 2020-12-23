@@ -8,9 +8,9 @@ import * as Listr from 'listr';
 import * as path from 'path';
 import * as request from 'request';
 
-import Command from '../../command-bases/asset-base';
+import { AssetCommandBase } from '../../command-bases/asset-base';
 
-export default class AssetsCreate extends Command {
+export default class AssetsCreate extends AssetCommandBase {
   static description = 'Create a new asset in Mux via a local file';
 
   static args = [
@@ -22,7 +22,7 @@ export default class AssetsCreate extends Command {
   ];
 
   static flags = {
-    ...Command.flags,
+    ...AssetCommandBase.flags,
     filter: flags.string({
       char: 'f',
       description:

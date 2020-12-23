@@ -1,11 +1,11 @@
 import { Asset } from '@mux/mux-node';
 import { flags } from '@oclif/command';
-import CommandBase from './base';
+import { CommandBase } from './base';
 
-export default abstract class AssetCommandBase extends CommandBase {
+export abstract class AssetCommandBase extends CommandBase {
   static flags = {
+    ...CommandBase.flags,
     private: flags.boolean({
-      char: 'p',
       description: 'add a private playback policy to the created asset',
     }),
   };

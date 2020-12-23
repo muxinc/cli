@@ -91,8 +91,17 @@
       "assets": {
         "description": "tools for managing Mux assets"
       },
+      "profiles": {
+        "description": "tools for managing profiles and user credentials"
+      },
       "live": {
         "description": "tools for managing Mux live streams"
+      },
+      "plugins": {
+        "description": "tools for managing plugins for the Mux CLI"
+      },
+      "signed-assets": {
+        "description": "tools for working with signed assets (for private playback)"
       }
     }
   },

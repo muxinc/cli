@@ -1,49 +1,41 @@
-import Mux, { Video as MuxVideo, Data as MuxData } from '@mux/mux-node';
-import Command from '@oclif/command';
+import Mux, { Video as MuxVideo, Data as MuxData, JWT as MuxJWT } from '@mux/mux-node';
+import Command, { flags } from '@oclif/command';
 import * as chalk from 'chalk';
-import * as fs from 'fs-extra';
-import * as path from 'path';
 
-import { MuxCliConfigV1 } from '../config';
+import { MuxCliConfigProfileLatest } from '../config';
+import { fetchProfile } from '../config/fetcher';
+import { IFlag } from '@oclif/command/lib/flags';
 
-export default abstract class CommandBase extends Command {
-  configFile = path.join(this.config.configDir, 'config.json');
-
-  MuxConfig!: MuxCliConfigV1;
+export abstract class CommandBase extends Command {
+  MuxProfile!: MuxCliConfigProfileLatest | null;
   Video!: MuxVideo;
   Data!: MuxData;
-  JWT: any;
+  JWT!: MuxJWT;
 
-  async readConfigV1(): Promise<MuxCliConfigV1 | null> {
-    try {
-      const configRaw = await fs.readJSON(this.configFile);
+  static flags: Record<string, IFlag<any>> = {
+    profile: flags.string({
+      default: process.env.MUX_CLI_ENV ?? 'default',
+    }),
+  };
 
-      // Mux SDK configuration options
-      configRaw.tokenId = process.env.MUX_TOKEN_ID || configRaw.tokenId;
-      configRaw.tokenSecret = process.env.MUX_TOKEN_SECRET || configRaw.tokenSecret;
-      configRaw.signingKeyId = process.env.MUX_SIGNING_KEY || configRaw.signingKeyId;
-      configRaw.signingKeySecret = process.env.MUX_PRIVATE_KEY || configRaw.signingKeySecret;
+  async readProfile(): Promise<MuxCliConfigProfileLatest | null> {
+    const { flags } = this.parse(this.constructor as any);
 
-      // Mux CLI specific configuration options
-      configRaw.configVersion = configRaw.configVersion || 1;
-      configRaw.baseUrl = process.env.MUX_CLI_BASE_URL || configRaw.baseUrl;
-
-      return MuxCliConfigV1.check(configRaw);
-    } catch (err) {
-      if (err.errno !== -2) {
-        this.error(err);
-      }
-
-      return null;
-    }
+    console.log("PROFILE TO FETCH:");
+    return fetchProfile({
+      oclifConfig: this.config,
+      currentProfile: (flags as any).profile,
+    });
   }
 
   async init() {
     try {
-      const config = await this.readConfigV1();
-      const { Video, Data } = new Mux(config?.tokenId, config?.tokenSecret, {
-        baseUrl: config?.baseUrl,
-      });
+      this.MuxProfile = await this.readProfile();
+
+      const { Video, Data } =
+        this.MuxProfile
+          ? CommandBase.buildMuxClientFromProfile(this.MuxProfile)
+          : new Mux();
 
       this.Video = Video;
       this.Data = Data;
@@ -55,5 +47,9 @@ export default abstract class CommandBase extends Command {
         chalk`{bold.underline.red No Mux config file found!} If you'd like to create one, run the {bold.magenta init} command. Otherwise, make sure to have the {bold.yellow MUX_TOKEN_ID} and {bold.yellow MUX_TOKEN_SECRET} environment variables set. 👋`
       );
     }
+  }
+
+  static buildMuxClientFromProfile(profile: MuxCliConfigProfileLatest): Mux {
+    return new Mux(profile.tokenId, profile.tokenSecret, { baseUrl: profile.baseUrl });
   }
 }

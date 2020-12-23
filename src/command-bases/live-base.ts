@@ -1,9 +1,9 @@
 import { flags } from '@oclif/command';
 import { IFlag } from '@oclif/command/lib/flags';
 
-import CommandBase from './base';
+import { CommandBase } from './base';
 
-export default abstract class LiveCommandBase extends CommandBase {
+export abstract class LiveCommandBase extends CommandBase {
   static argsForSingleLiveStream = [
     {
       name: 'streamName',
@@ -14,6 +14,7 @@ export default abstract class LiveCommandBase extends CommandBase {
   ];
 
   static flagsForSingleLiveStream: Record<string, IFlag<any>> = {
+    ...CommandBase.flags,
     streamId: flags.string({
       name: 'reference-type',
       char: 't',

@@ -2,8 +2,9 @@ import * as Listr from 'listr';
 import { flags } from '@oclif/command';
 import { IFlag } from '@oclif/command/lib/flags';
 
-import LiveCommandBase from '../../command-bases/live-base';
 import chalk = require('chalk');
+
+import { LiveCommandBase } from '../../command-bases/live-base';
 
 export default class LiveComplete extends LiveCommandBase {
   static description =

@@ -1,4 +1,5 @@
 import * as RT from 'runtypes';
+
 export const MuxCliConfigV1 = RT.Record({
   configVersion: RT.Literal(1),
 

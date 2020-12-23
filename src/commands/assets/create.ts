@@ -2,7 +2,7 @@ import * as chalk from 'chalk';
 import * as clipboard from 'clipboardy';
 import * as Listr from 'listr';
 
-import AssetCommandBase from '../../command-bases/asset-base';
+import { AssetCommandBase } from '../../command-bases/asset-base';
 
 export default class AssetsCreate extends AssetCommandBase {
   static description =
