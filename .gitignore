@@ -3,6 +3,8 @@ dist/
 lib/
 tmp/
 
+*.tgz
+
 *.log
 *.tmp
 ~*

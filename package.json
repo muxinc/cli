@@ -1,7 +1,7 @@
 {
   "name": "@mux/cli",
   "description": "Your friendly neighborhood Mux CLI tool!",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "author": {
     "name": "Mux",
     "email": "devex@mux.com",
@@ -45,7 +45,7 @@
     "@types/inquirer": "^7.3.1",
     "@types/listr": "^0.14.2",
     "@types/mocha": "^8.0.4",
-    "@types/node": "^10",
+    "@types/node": "^14.14.37",
     "@types/request": "^2.48.5",
     "chai": "^4",
     "globby": "^11.0.1",
@@ -63,7 +63,8 @@
   "files": [
     "/bin",
     "/lib",
-    "/npm-shrinkwrap.json",
+    "/src",
+    "/yarn.lock",
     "/oclif.manifest.json"
   ],
   "homepage": "https://github.com/muxinc/cli",
@@ -98,9 +99,11 @@
   },
   "repository": "muxinc/cli",
   "scripts": {
+    "clean": "rm -rf lib && rm -rf tsconfig.tsbuildinfo",
+    "build": "tsc -b",
     "postpack": "rm -f oclif.manifest.json",
     "posttest": "tslint -p test -t stylish",
-    "prepack": "rm -rf lib && tsc -b && oclif-dev manifest && oclif-dev readme",
+    "prepack": "yarn run -s clean && yarn run -s build && oclif-dev manifest && oclif-dev readme",
     "test": "nyc --extension .ts mocha --forbid-only \"test/**/*.test.ts\"",
     "version": "oclif-dev readme && git add README.md"
   },
