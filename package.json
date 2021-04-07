@@ -106,6 +106,6 @@
   },
   "types": "lib/index.d.ts",
   "volta": {
-    "node": "8.17.0"
+    "node": "14.16.1"
   }
 }
