@@ -6,6 +6,8 @@ import * as path from 'path';
 
 import { MuxCliConfigV1 } from '../config';
 
+export const MUX_API_BASE_URL = "https://api.mux.com";
+
 export default abstract class CommandBase extends Command {
   configFile = path.join(this.config.configDir, 'config.json');
 
@@ -19,14 +21,14 @@ export default abstract class CommandBase extends Command {
       const configRaw = await fs.readJSON(this.configFile);
 
       // Mux SDK configuration options
-      configRaw.tokenId = process.env.MUX_TOKEN_ID || configRaw.tokenId;
-      configRaw.tokenSecret = process.env.MUX_TOKEN_SECRET || configRaw.tokenSecret;
-      configRaw.signingKeyId = process.env.MUX_SIGNING_KEY || configRaw.signingKeyId;
-      configRaw.signingKeySecret = process.env.MUX_PRIVATE_KEY || configRaw.signingKeySecret;
+      configRaw.tokenId = process.env.MUX_TOKEN_ID ?? configRaw.tokenId;
+      configRaw.tokenSecret = process.env.MUX_TOKEN_SECRET ?? configRaw.tokenSecret;
+      configRaw.signingKeyId = process.env.MUX_SIGNING_KEY ?? configRaw.signingKeyId;
+      configRaw.signingKeySecret = process.env.MUX_PRIVATE_KEY ?? configRaw.signingKeySecret;
 
       // Mux CLI specific configuration options
-      configRaw.configVersion = configRaw.configVersion || 1;
-      configRaw.baseUrl = process.env.MUX_CLI_BASE_URL || configRaw.baseUrl;
+      configRaw.configVersion = configRaw.configVersion ?? 1;
+      configRaw.baseUrl = process.env.MUX_CLI_BASE_URL ?? configRaw.baseUrl ?? MUX_API_BASE_URL;
 
       return MuxCliConfigV1.check(configRaw);
     } catch (err) {
