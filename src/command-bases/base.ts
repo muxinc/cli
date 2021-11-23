@@ -32,7 +32,7 @@ export default abstract class CommandBase extends Command {
 
       return MuxCliConfigV1.check(configRaw);
     } catch (err) {
-      if (err.errno !== -2) {
+      if (err.code !== 'ENOENT') {
         this.error(err);
       }
 

@@ -32,8 +32,15 @@ export default class Sign extends MuxBase {
   async run() {
     const { args, flags } = this.parse(Sign);
     const playbackId = args['playback-id'];
+    const config = await this.readConfigV1();
+    
+    const options = { 
+      expiration: flags.expiresIn,
+      type: flags.type,
+      keyId: config?.signingKeyId,
+      keySecret: config?.signingKeySecret
+    };
 
-    const options = { expiration: flags.expiresIn, type: flags.type }
     const key = this.JWT.sign(playbackId, options);
     const url = `https://stream.mux.com/${playbackId}.m3u8?token=${key}`;
 
