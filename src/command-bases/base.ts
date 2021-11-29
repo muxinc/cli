@@ -18,6 +18,12 @@ export default abstract class CommandBase extends Command {
 
   async readConfigV1(): Promise<MuxCliConfigV1 | null> {
     try {
+      await fs.access(this.configFile, fs.constants.F_OK);
+    } catch(err) {
+      return null;
+    }
+
+    try {
       const configRaw = await fs.readJSON(this.configFile);
 
       // Mux SDK configuration options
@@ -32,11 +38,7 @@ export default abstract class CommandBase extends Command {
 
       return MuxCliConfigV1.check(configRaw);
     } catch (err) {
-      if (err.code !== 'ENOENT') {
-        this.error(err);
-      }
-
-      return null;
+      this.error(err);
     }
   }
 
