@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.6.1 linux-x64 node-v14.16.1
+@mux/cli/0.6.2 darwin-arm64 node-v16.5.0
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -64,7 +64,7 @@ OPTIONS
   -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.6.1/src/commands/assets/create.ts)_
+_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/assets/create.ts)_
 
 ## `mux assets:upload PATH`
 
@@ -83,7 +83,7 @@ OPTIONS
   -p, --private                add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.6.1/src/commands/assets/upload.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/assets/upload.ts)_
 
 ## `mux autocomplete [SHELL]`
 
@@ -161,7 +161,7 @@ ARGUMENTS
   ENVFILE  path to a Mux access token .env file
 ```
 
-_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.6.1/src/commands/init.ts)_
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/init.ts)_
 
 ## `mux live:complete STREAMNAME`
 
@@ -179,7 +179,7 @@ OPTIONS
   -t, --streamId=stream-id      [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.6.1/src/commands/live/complete.ts)_
+_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/live/complete.ts)_
 
 ## `mux live:disable STREAMNAME`
 
@@ -196,7 +196,7 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.6.1/src/commands/live/disable.ts)_
+_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/live/disable.ts)_
 
 ## `mux live:enable STREAMNAME`
 
@@ -213,7 +213,7 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.6.1/src/commands/live/enable.ts)_
+_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/live/enable.ts)_
 
 ## `mux plugins`
 
@@ -350,7 +350,7 @@ OPTIONS
   -t, --type=video|thumbnail|gif  [default: video] What type of token this signature is for.
 ```
 
-_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.6.1/src/commands/sign.ts)_
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/sign.ts)_
 
 ## `mux update [CHANNEL]`
 
