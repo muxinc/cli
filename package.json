@@ -16,7 +16,7 @@
   },
   "bugs": "https://github.com/muxinc/cli/issues",
   "dependencies": {
-    "@mux/mux-node": "^3.1.0",
+    "@mux/mux-node": "^4.0.0",
     "@oclif/command": "^1.8.0",
     "@oclif/config": "^1.17.0",
     "@oclif/plugin-autocomplete": "^0.2.0",
