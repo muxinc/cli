@@ -32,7 +32,8 @@ export default abstract class CommandBase extends Command {
 
       return MuxCliConfigV1.check(configRaw);
     } catch (err) {
-      if (err.errno !== -2) {
+      // TODO: improve error handling type safety here
+      if (err instanceof Error && (err as any).errno !== -2) {
         this.error(err);
       }
 

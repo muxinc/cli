@@ -118,7 +118,12 @@ export default class Init extends MuxBase {
         'utf8'
       );
     } catch (err) {
-      this.error(err);
+      // TODO: improve error handling type safety here
+      if (err instanceof Error) {
+        this.error(err);
+      } else {
+        throw err;
+      }
     }
 
     this.log(

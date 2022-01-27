@@ -8,7 +8,12 @@ import * as Listr from 'listr';
 import * as path from 'path';
 import * as request from 'request';
 
-import Command from '../../command-bases/asset-base';
+import Command, { AssetBaseFlags } from '../../command-bases/asset-base';
+
+export type AssetCreateFlags = AssetBaseFlags & {
+  filter: flags.IOptionFlag<string | undefined>;
+  concurrent: flags.IOptionFlag<number>;
+};
 
 export default class AssetsCreate extends Command {
   static description = 'Create a new asset in Mux via a local file';
@@ -21,7 +26,7 @@ export default class AssetsCreate extends Command {
     },
   ];
 
-  static flags = {
+  static flags: AssetCreateFlags = {
     ...Command.flags,
     filter: flags.string({
       char: 'f',
@@ -33,6 +38,10 @@ export default class AssetsCreate extends Command {
       description: 'max number of files to upload at once',
       default: 3,
     }),
+    private: flags.boolean({
+      char: 'p',
+      default: false,
+    })
   };
 
   getFilePaths(filePath: string, filter = '') {
@@ -46,7 +55,8 @@ export default class AssetsCreate extends Command {
   uploadFile(filePath: string, url: string) {
     return new Promise((resolve, reject) => {
       fs.createReadStream(path.resolve(process.cwd(), filePath)).pipe(
-        request
+        // TODO: fix; this is a types problem, and it's valid but TS disagrees
+        (request as any)
           .put(url)
           .on('response', resolve)
           .on('error', reject)
@@ -172,7 +182,12 @@ export default class AssetsCreate extends Command {
         "\n\n" +
         err
       );
-      this.error(err);
+
+      if (err instanceof Error) {
+        this.error(err);
+      } else {
+        throw err;
+      }
     }
   }
 }

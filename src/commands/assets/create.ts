@@ -63,7 +63,12 @@ export default class AssetsCreate extends AssetCommandBase {
         "\n\n" +
         err
       );
-      this.error(err);
+
+      if (err instanceof Error) {
+        this.error(err);
+      } else {
+        throw err;
+      }
     }
   }
 }
