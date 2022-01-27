@@ -8,14 +8,14 @@ import * as Listr from 'listr';
 import * as path from 'path';
 import * as request from 'request';
 
-import Command, { AssetBaseFlags } from '../../command-bases/asset-base';
+import AssetCommandBase, { AssetBaseFlags } from '../../command-bases/asset-base';
 
 export type AssetCreateFlags = AssetBaseFlags & {
   filter: flags.IOptionFlag<string | undefined>;
   concurrent: flags.IOptionFlag<number>;
 };
 
-export default class AssetsCreate extends Command {
+export default class AssetsCreate extends AssetCommandBase {
   static description = 'Create a new asset in Mux via a local file';
 
   static args = [
@@ -27,7 +27,7 @@ export default class AssetsCreate extends Command {
   ];
 
   static flags: AssetCreateFlags = {
-    ...Command.flags,
+    ...AssetCommandBase.flags,
     filter: flags.string({
       char: 'f',
       description:

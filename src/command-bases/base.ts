@@ -12,13 +12,18 @@ export default abstract class CommandBase extends Command {
   configFile = path.join(this.config.configDir, 'config.json');
 
   MuxConfig!: MuxCliConfigV1;
+  Mux!: Mux;
   Video!: MuxVideo;
   Data!: MuxData;
   JWT: any;
 
   async readConfigV1(): Promise<MuxCliConfigV1 | null> {
+    const configAlreadyExists = await fs.pathExists(this.configFile);
     try {
-      const configRaw = await fs.readJSON(this.configFile);
+      const configRaw =
+        configAlreadyExists
+          ? await fs.readJSON(this.configFile)
+          : {};
 
       // Mux SDK configuration options
       configRaw.tokenId = process.env.MUX_TOKEN_ID ?? configRaw.tokenId;
@@ -29,34 +34,38 @@ export default abstract class CommandBase extends Command {
       // Mux CLI specific configuration options
       configRaw.configVersion = configRaw.configVersion ?? 1;
       configRaw.baseUrl = process.env.MUX_CLI_BASE_URL ?? configRaw.baseUrl ?? MUX_API_BASE_URL;
-
       return MuxCliConfigV1.check(configRaw);
     } catch (err) {
-      // TODO: improve error handling type safety here
-      if (err instanceof Error && (err as any).errno !== -2) {
-        this.error(err);
+      if (configAlreadyExists) {
+        // we have a bad config file, and should say so
+        this.log(
+          chalk`{bold.underline.red Invalid Mux configuration file found at {bold.underline.cyan ${this.configFile}}:}\n\n` +
+          Object.entries((err as any).details).map(tup => " - " + chalk`{cyan ${tup[0]}}` + `: ${tup[1]}`) +
+          chalk`\n\nPlease fix the file or run {bold.magenta mux init --force} to create a new one.`
+        )
+      } else {
+        this.log(
+          chalk`{bold.underline.red No Mux configuration file found!} If you'd like to create ` +
+          chalk`one, run the {bold.magenta init} command. Otherwise, make sure to have the ` +
+          chalk`{bold.yellow MUX_TOKEN_ID} and {bold.yellow MUX_TOKEN_SECRET} environment variables set. 👋`
+        );
       }
 
-      return null;
+      process.exit(1);
     }
   }
 
   async init() {
-    try {
-      const config = await this.readConfigV1();
-      const { Video, Data } = new Mux(config?.tokenId, config?.tokenSecret, {
-        baseUrl: config?.baseUrl,
-      });
+    if (this.id === 'init') return; // If we're initing we don't want any of this!
 
-      this.Video = Video;
-      this.Data = Data;
-      this.JWT = Mux.JWT;
-    } catch {
-      if (this.id === 'init') return; // If we're initing we're trying to fix this, so don't yell :)
+    const config = await this.readConfigV1();
+    const mux = new Mux(config?.tokenId, config?.tokenSecret, {
+      baseUrl: config?.baseUrl,
+    });
 
-      this.log(
-        chalk`{bold.underline.red No Mux config file found!} If you'd like to create one, run the {bold.magenta init} command. Otherwise, make sure to have the {bold.yellow MUX_TOKEN_ID} and {bold.yellow MUX_TOKEN_SECRET} environment variables set. 👋`
-      );
-    }
+    this.Mux = mux;
+    this.Video = this.Mux.Video;
+    this.Data = this.Mux.Data;
+    this.JWT = Mux.JWT;
   }
 }
