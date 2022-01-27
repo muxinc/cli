@@ -55,8 +55,7 @@ export default class AssetsCreate extends Command {
   uploadFile(filePath: string, url: string) {
     return new Promise((resolve, reject) => {
       fs.createReadStream(path.resolve(process.cwd(), filePath)).pipe(
-        // TODO: fix; this is a types problem, and it's valid but TS disagrees
-        (request as any)
+        request
           .put(url)
           .on('response', resolve)
           .on('error', reject)
