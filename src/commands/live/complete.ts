@@ -52,7 +52,12 @@ export default class LiveComplete extends LiveCommandBase {
         "\n\n" +
         err
       );
-      this.error(err);
+
+      if (err instanceof Error) {
+        this.error(err);
+      } else {
+        throw err;
+      }
     }
   }
 }

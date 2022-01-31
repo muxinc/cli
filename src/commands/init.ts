@@ -1,4 +1,6 @@
 import Mux from '@mux/mux-node';
+import { flags } from '@oclif/command';
+import * as Parser from '@oclif/parser';
 import * as chalk from 'chalk';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs-extra';
@@ -6,6 +8,11 @@ import * as inquirer from 'inquirer';
 import * as path from 'path';
 
 import MuxBase from '../command-bases/base';
+import { MuxCliConfigV1 } from '../config';
+
+export type InitFlags = {
+  force: Parser.flags.IBooleanFlag<boolean>;
+};
 
 export default class Init extends MuxBase {
   static description = 'set up a user-level config';
@@ -19,18 +26,22 @@ export default class Init extends MuxBase {
     },
   ];
 
+  static flags: InitFlags = {
+    force: flags.boolean({
+      name: 'force',
+      char: 'f',
+      description: 'Will initialize a new file even if one already exists.',
+      default: false,
+    }),
+  };
+
   Video: any;
   JWT: any;
 
-  muxConfig: {
-    tokenId?: string;
-    tokenSecret?: string;
-    signingKeyId?: string;
-    signingKeySecret?: string;
-  } = {};
+  muxConfig: Partial<MuxCliConfigV1> = {};
 
   async run() {
-    const { args } = this.parse(Init);
+    const { args, flags } = this.parse(Init);
 
     let prompts: {
       name: string;
@@ -70,7 +81,12 @@ export default class Init extends MuxBase {
       ];
     }
 
-    await this.readConfigV1();
+    if (!flags.force && (await fs.pathExists(this.configFile))) {
+      this.log(
+        chalk`{bold.underline.red You are attempting to initialize with an existing configuration file!} If this is intentional, please pass {bold.yellow --force}.`
+      );
+      process.exit(1);
+    }
 
     const signingKeyPrompt = {
       name: 'createSigningKey',
@@ -91,6 +107,7 @@ export default class Init extends MuxBase {
 
     // If the token was loaded from an env file they'll already be set in the appropriate environment variables and
     // the prompts themselves will be null.
+    this.muxConfig.configVersion = 1;
     this.muxConfig.tokenId = process.env.MUX_TOKEN_ID = tokenId || process.env.MUX_TOKEN_ID;
     this.muxConfig.tokenSecret = process.env.MUX_TOKEN_SECRET = tokenSecret || process.env.MUX_TOKEN_SECRET;
 
@@ -118,7 +135,12 @@ export default class Init extends MuxBase {
         'utf8'
       );
     } catch (err) {
-      this.error(err);
+      // TODO: improve error handling type safety here
+      if (err instanceof Error) {
+        this.error(err);
+      } else {
+        throw err;
+      }
     }
 
     this.log(

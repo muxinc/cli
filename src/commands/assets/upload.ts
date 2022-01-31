@@ -8,9 +8,14 @@ import * as Listr from 'listr';
 import * as path from 'path';
 import * as request from 'request';
 
-import Command from '../../command-bases/asset-base';
+import AssetCommandBase, { AssetBaseFlags } from '../../command-bases/asset-base';
 
-export default class AssetsCreate extends Command {
+export type AssetCreateFlags = AssetBaseFlags & {
+  filter: flags.IOptionFlag<string | undefined>;
+  concurrent: flags.IOptionFlag<number>;
+};
+
+export default class AssetsCreate extends AssetCommandBase {
   static description = 'Create a new asset in Mux via a local file';
 
   static args = [
@@ -21,8 +26,8 @@ export default class AssetsCreate extends Command {
     },
   ];
 
-  static flags = {
-    ...Command.flags,
+  static flags: AssetCreateFlags = {
+    ...AssetCommandBase.flags,
     filter: flags.string({
       char: 'f',
       description:
@@ -33,6 +38,10 @@ export default class AssetsCreate extends Command {
       description: 'max number of files to upload at once',
       default: 3,
     }),
+    private: flags.boolean({
+      char: 'p',
+      default: false,
+    })
   };
 
   getFilePaths(filePath: string, filter = '') {
@@ -172,7 +181,12 @@ export default class AssetsCreate extends Command {
         "\n\n" +
         err
       );
-      this.error(err);
+
+      if (err instanceof Error) {
+        this.error(err);
+      } else {
+        throw err;
+      }
     }
   }
 }

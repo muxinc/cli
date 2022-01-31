@@ -1,6 +1,6 @@
 # mux-cli
 
-Your friendly neighborhood Mux CLI tool
+Your friendly neighborhood Mux CLI tool. **Requires Node 14 or newer.**
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 [![Version](https://img.shields.io/npm/v/@mux/cli.svg)](https://npmjs.org/package/@mux/cli)
