@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.6.2 darwin-arm64 node-v16.5.0
+@mux/cli/0.7.0 linux-x64 node-v14.18.3
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -42,6 +42,7 @@ USAGE
 * [`mux live:disable STREAMNAME`](#mux-livedisable-streamname)
 * [`mux live:enable STREAMNAME`](#mux-liveenable-streamname)
 * [`mux plugins`](#mux-plugins)
+* [`mux plugins:inspect PLUGIN...`](#mux-pluginsinspect-plugin)
 * [`mux plugins:install PLUGIN...`](#mux-pluginsinstall-plugin)
 * [`mux plugins:link PLUGIN`](#mux-pluginslink-plugin)
 * [`mux plugins:uninstall PLUGIN...`](#mux-pluginsuninstall-plugin)
@@ -64,7 +65,7 @@ OPTIONS
   -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/assets/create.ts)_
+_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/assets/create.ts)_
 
 ## `mux assets:upload PATH`
 
@@ -80,10 +81,10 @@ ARGUMENTS
 OPTIONS
   -c, --concurrent=concurrent  [default: 3] max number of files to upload at once
   -f, --filter=filter          regex that filters the selected destination if the provided path is a folder
-  -p, --private                add a private playback policy to the created asset
+  -p, --private
 ```
 
-_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/assets/upload.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/assets/upload.ts)_
 
 ## `mux autocomplete [SHELL]`
 
@@ -106,7 +107,7 @@ EXAMPLES
   $ mux autocomplete --refresh-cache
 ```
 
-_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v0.2.0/src/commands/autocomplete/index.ts)_
+_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v1.1.1/src/commands/autocomplete/index.ts)_
 
 ## `mux commands`
 
@@ -117,20 +118,20 @@ USAGE
   $ mux commands
 
 OPTIONS
-  -h, --help              show CLI help
-  -j, --json              display unfiltered api data in json format
+  -h, --help              Show CLI help.
   -x, --extended          show extra columns
   --columns=columns       only show provided columns (comma-separated)
   --csv                   output is csv format [alias: --output=csv]
   --filter=filter         filter property by partial string matching, ex: name=foo
   --hidden                show hidden commands
+  --json                  Format output as json.
   --no-header             hide table header from output
   --no-truncate           do not truncate output to fit screen
   --output=csv|json|yaml  output in a more machine friendly format
   --sort=sort             property to sort by (prepend '-' for descending)
 ```
 
-_See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/v1.3.0/src/commands/commands.ts)_
+_See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/v2.0.2/src/commands/commands.ts)_
 
 ## `mux help [COMMAND]`
 
@@ -147,7 +148,7 @@ OPTIONS
   --all  see all commands in CLI
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.0/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.18/src/commands/help.ts)_
 
 ## `mux init [ENVFILE]`
 
@@ -159,9 +160,12 @@ USAGE
 
 ARGUMENTS
   ENVFILE  path to a Mux access token .env file
+
+OPTIONS
+  -f, --force  Will initialize a new file even if one already exists.
 ```
 
-_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/init.ts)_
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/init.ts)_
 
 ## `mux live:complete STREAMNAME`
 
@@ -179,7 +183,7 @@ OPTIONS
   -t, --streamId=stream-id      [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/live/complete.ts)_
+_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/live/complete.ts)_
 
 ## `mux live:disable STREAMNAME`
 
@@ -196,7 +200,7 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/live/disable.ts)_
+_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/live/disable.ts)_
 
 ## `mux live:enable STREAMNAME`
 
@@ -213,39 +217,60 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/live/enable.ts)_
+_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/live/enable.ts)_
 
 ## `mux plugins`
 
-list installed plugins
+List installed plugins.
 
 ```
 USAGE
   $ mux plugins
 
 OPTIONS
-  --core  show core plugins
+  --core  Show core plugins.
 
 EXAMPLE
   $ mux plugins
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/index.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/index.ts)_
+
+## `mux plugins:inspect PLUGIN...`
+
+Displays installation properties of a plugin.
+
+```
+USAGE
+  $ mux plugins:inspect PLUGIN...
+
+ARGUMENTS
+  PLUGIN  [default: .] Plugin to inspect.
+
+OPTIONS
+  -h, --help     Show CLI help.
+  -v, --verbose
+
+EXAMPLE
+  $ mux plugins:inspect myplugin
+```
+
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/inspect.ts)_
 
 ## `mux plugins:install PLUGIN...`
 
-installs a plugin into the CLI
+Installs a plugin into the CLI.
 
 ```
 USAGE
   $ mux plugins:install PLUGIN...
 
 ARGUMENTS
-  PLUGIN  plugin to install
+  PLUGIN  Plugin to install.
 
 OPTIONS
-  -f, --force    yarn install with force flag
-  -h, --help     show CLI help
+  -f, --force    Run yarn install with force flag.
+  -h, --help     Show CLI help.
   -v, --verbose
 
 DESCRIPTION
@@ -266,11 +291,11 @@ EXAMPLES
   $ mux plugins:install someuser/someplugin
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/install.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/install.ts)_
 
 ## `mux plugins:link PLUGIN`
 
-links a plugin into the CLI for development
+Links a plugin into the CLI for development.
 
 ```
 USAGE
@@ -280,24 +305,24 @@ ARGUMENTS
   PATH  [default: .] path to plugin
 
 OPTIONS
-  -h, --help     show CLI help
+  -h, --help     Show CLI help.
   -v, --verbose
 
 DESCRIPTION
   Installation of a linked plugin will override a user-installed or core plugin.
 
-  e.g. If you have a user-installed or core plugin that has a 'hello' command, installing a linked plugin with a 'hello' 
-  command will override the user-installed or core plugin implementation. This is useful for development work.
+  e.g. If you have a user-installed or core plugin that has a 'hello' command, installing a linked plugin with a 'hello'
+   command will override the user-installed or core plugin implementation. This is useful for development work.
 
 EXAMPLE
   $ mux plugins:link myplugin
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/link.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/link.ts)_
 
 ## `mux plugins:uninstall PLUGIN...`
 
-removes a plugin from the CLI
+Removes a plugin from the CLI.
 
 ```
 USAGE
@@ -307,7 +332,7 @@ ARGUMENTS
   PLUGIN  plugin to uninstall
 
 OPTIONS
-  -h, --help     show CLI help
+  -h, --help     Show CLI help.
   -v, --verbose
 
 ALIASES
@@ -315,22 +340,22 @@ ALIASES
   $ mux plugins:remove
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/uninstall.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/uninstall.ts)_
 
 ## `mux plugins:update`
 
-update installed plugins
+Update installed plugins.
 
 ```
 USAGE
   $ mux plugins:update
 
 OPTIONS
-  -h, --help     show CLI help
+  -h, --help     Show CLI help.
   -v, --verbose
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v1.9.4/src/commands/plugins/update.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/update.ts)_
 
 ## `mux sign PLAYBACK-ID`
 
@@ -350,7 +375,7 @@ OPTIONS
   -t, --type=video|thumbnail|gif  [default: video] What type of token this signature is for.
 ```
 
-_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.6.2/src/commands/sign.ts)_
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/sign.ts)_
 
 ## `mux update [CHANNEL]`
 
@@ -359,7 +384,10 @@ update the mux CLI
 ```
 USAGE
   $ mux update [CHANNEL]
+
+OPTIONS
+  --from-local  interactively choose an already installed version
 ```
 
-_See code: [@oclif/plugin-update](https://github.com/oclif/plugin-update/blob/v1.3.10/src/commands/update.ts)_
+_See code: [@oclif/plugin-update](https://github.com/oclif/plugin-update/blob/v2.1.5/src/commands/update.ts)_
 <!-- commandsstop -->
