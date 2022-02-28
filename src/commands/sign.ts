@@ -25,7 +25,7 @@ export default class Sign extends MuxBase {
       char: 't',
       description: 'What type of token this signature is for.',
       default: 'video',
-      options: ['video', 'thumbnail', 'gif'],
+      options: ['video', 'thumbnail', 'gif', 'storyboard'],
     })
   };
 

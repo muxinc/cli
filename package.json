@@ -1,7 +1,7 @@
 {
   "name": "@mux/cli",
   "description": "Your friendly neighborhood Mux CLI tool!",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "author": {
     "name": "Mux",
     "email": "devex@mux.com",
