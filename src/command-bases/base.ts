@@ -1,4 +1,4 @@
-import Mux, { Video as MuxVideo, Data as MuxData } from '@mux/mux-node';
+import Mux, { Video as MuxVideo, Data as MuxData, JWT as MuxJWT } from '@mux/mux-node';
 import Command from '@oclif/command';
 import * as chalk from 'chalk';
 import * as fs from 'fs-extra';
@@ -15,9 +15,9 @@ export default abstract class CommandBase extends Command {
   Mux!: Mux;
   Video!: MuxVideo;
   Data!: MuxData;
-  JWT: any;
+  JWT!: typeof MuxJWT;
 
-  async readConfigV1(): Promise<MuxCliConfigV1 | null> {
+  async readConfigV1(): Promise<MuxCliConfigV1> {
     const configAlreadyExists = await fs.pathExists(this.configFile);
     try {
       const configRaw =
@@ -64,6 +64,7 @@ export default abstract class CommandBase extends Command {
     });
 
     this.Mux = mux;
+    this.MuxConfig = config;
     this.Video = this.Mux.Video;
     this.Data = this.Mux.Data;
     this.JWT = Mux.JWT;
