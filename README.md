@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.7.0 linux-x64 node-v14.18.3
+@mux/cli/0.8.0 linux-x64 node-v14.18.3
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -48,6 +48,7 @@ USAGE
 * [`mux plugins:uninstall PLUGIN...`](#mux-pluginsuninstall-plugin)
 * [`mux plugins:update`](#mux-pluginsupdate)
 * [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
+* [`mux spaces:sign SPACE-ID`](#mux-spacessign-space-id)
 * [`mux update [CHANNEL]`](#mux-update-channel)
 
 ## `mux assets:create INPUT`
@@ -65,7 +66,7 @@ OPTIONS
   -p, --private  add a private playback policy to the created asset
 ```
 
-_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/assets/create.ts)_
+_See code: [src/commands/assets/create.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/assets/create.ts)_
 
 ## `mux assets:upload PATH`
 
@@ -84,7 +85,7 @@ OPTIONS
   -p, --private
 ```
 
-_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/assets/upload.ts)_
+_See code: [src/commands/assets/upload.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/assets/upload.ts)_
 
 ## `mux autocomplete [SHELL]`
 
@@ -165,7 +166,7 @@ OPTIONS
   -f, --force  Will initialize a new file even if one already exists.
 ```
 
-_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/init.ts)_
+_See code: [src/commands/init.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/init.ts)_
 
 ## `mux live:complete STREAMNAME`
 
@@ -183,7 +184,7 @@ OPTIONS
   -t, --streamId=stream-id      [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/live/complete.ts)_
+_See code: [src/commands/live/complete.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/live/complete.ts)_
 
 ## `mux live:disable STREAMNAME`
 
@@ -200,7 +201,7 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/live/disable.ts)_
+_See code: [src/commands/live/disable.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/live/disable.ts)_
 
 ## `mux live:enable STREAMNAME`
 
@@ -217,7 +218,7 @@ OPTIONS
   -t, --streamId=stream-id  [default: stream-id] the type of the provided reference name
 ```
 
-_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/live/enable.ts)_
+_See code: [src/commands/live/enable.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/live/enable.ts)_
 
 ## `mux plugins`
 
@@ -369,13 +370,39 @@ ARGUMENTS
   PLAYBACK-ID  Playback ID to create a signed URL token for.
 
 OPTIONS
-  -e, --expiresIn=expiresIn       [default: 7d] How long the signature is valid for. If no unit is specified,
-                                  milliseconds is assumed.
+  -e, --expiresIn=expiresIn                  [default: 7d] How long the signature is valid for. If no unit is specified,
+                                             milliseconds is assumed.
 
-  -t, --type=video|thumbnail|gif  [default: video] What type of token this signature is for.
+  -r, --raw                                  If set, emits only the URL+JWT. Defaults to true for non-TTY.
+
+  -t, --type=video|thumbnail|gif|storyboard  [default: video] What type of token this signature is for.
 ```
 
-_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.7.0/src/commands/sign.ts)_
+_See code: [src/commands/sign.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/sign.ts)_
+
+## `mux spaces:sign SPACE-ID`
+
+Creates a new signed token for a Mux Space
+
+```
+USAGE
+  $ mux spaces:sign SPACE-ID
+
+ARGUMENTS
+  SPACE-ID  Space ID for which a token shall be generated.
+
+OPTIONS
+  -R, --role=role                    [default: publisher] One of 'publisher' or 'subscriber'.
+
+  -e, --expiresIn=expiresIn          [default: 7d] How long the signature is valid for. If no unit is specified,
+                                     milliseconds is assumed.
+
+  -p, --participantId=participantId  Optional, user-specified participant ID.
+
+  -r, --raw                          prints a raw JWT to stdout (default if not tty)
+```
+
+_See code: [src/commands/spaces/sign.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/spaces/sign.ts)_
 
 ## `mux update [CHANNEL]`
 
