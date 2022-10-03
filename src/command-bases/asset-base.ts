@@ -23,9 +23,7 @@ export default abstract class AssetCommandBase extends CommandBase {
       return 'No public playback policies found!';
     }
 
-    return `https://mux-playground.now.sh/videojs?playback_id=${
-      publicPlaybackId.id
-    }`;
+    return `https://stream.new/v/${publicPlaybackId.id}`;
   }
 
   pollAsset(assetId: string): Promise<Asset> {
