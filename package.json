@@ -24,7 +24,6 @@
     "@oclif/plugin-help": "^5.1.10",
     "@oclif/plugin-not-found": "^2.2.4",
     "@oclif/plugin-plugins": "^2.0.12",
-    "@oclif/plugin-update": "^2.1.5",
     "@oclif/plugin-warn-if-update-available": "^2.0.4",
     "chalk": "4.1.2",
     "clipboardy": "^2.3.0",
@@ -33,6 +32,7 @@
     "inquirer": "^8.2.0",
     "jsonwebtoken": "^8.5.1",
     "listr": "^0.14.3",
+    "pkg": "^5.8.0",
     "request": "^2.88.2",
     "runtypes": "^6.5.0",
     "rxjs": "^7.5.2"
@@ -103,6 +103,7 @@
   "scripts": {
     "clean": "rm -rf lib && rm -rf tsconfig.tsbuildinfo",
     "build": "tsc -b",
+    "pkg": "pkg .",
     "postpack": "rm -f oclif.manifest.json",
     "posttest": "tslint -p test -t stylish",
     "prepack": "yarn run -s clean && yarn run -s build && oclif-dev manifest && oclif-dev readme",
@@ -112,5 +113,9 @@
   "types": "lib/index.d.ts",
   "volta": {
     "node": "14.16.1"
+  },
+  "pkg": {
+    "scripts": "src/**/*.js",
+    "outputPath": "dist"
   }
 }
