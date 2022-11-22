@@ -116,6 +116,8 @@
   },
   "pkg": {
     "scripts": "src/**/*.js",
+    "assets": "lib/**/*.js",
+    "targets": ["node18-linux-x64","node18-macos-arm64","node18-macos-x64","node18-macos-arm64","node18-windows-x64"],
     "outputPath": "dist"
   }
 }
