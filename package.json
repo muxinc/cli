@@ -83,7 +83,6 @@
       "@oclif/plugin-not-found",
       "@oclif/plugin-autocomplete",
       "@oclif/plugin-commands",
-      "@oclif/plugin-update",
       "@oclif/plugin-warn-if-update-available",
       "@oclif/plugin-plugins"
     ],
@@ -101,9 +100,9 @@
   },
   "repository": "muxinc/cli",
   "scripts": {
-    "clean": "rm -rf lib && rm -rf tsconfig.tsbuildinfo",
+    "clean": "rm -rf dist && rm -rf lib && rm -rf tsconfig.tsbuildinfo",
     "build": "tsc -b",
-    "pkg": "pkg .",
+    "pkg": "rm -rf dist/* && pkg . --compress GZip",
     "postpack": "rm -f oclif.manifest.json",
     "posttest": "tslint -p test -t stylish",
     "prepack": "yarn run -s clean && yarn run -s build && oclif-dev manifest && oclif-dev readme",
@@ -116,8 +115,9 @@
   },
   "pkg": {
     "scripts": "src/**/*.js",
-    "assets": "lib/**/*.js",
+    "assets": "package.json,lib/**/*.js",
     "targets": ["node18-linux-x64","node18-macos-arm64","node18-macos-x64","node18-macos-arm64","node18-windows-x64"],
+    "output": "mux-cli",
     "outputPath": "dist"
   }
 }
