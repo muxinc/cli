@@ -49,6 +49,10 @@ export default class SignSpace extends MuxBase {
     if (!signingKeySecret) {
       throw new Error("No signing key found. Re-run `mux init` and generate one!");
     }
+    
+    if (!args['space-id']) {
+      throw new Error("Missing Space ID.");
+    }
 
     // TODO: replace with mux-node-sdk signing when available
     const payload = {
