@@ -51,7 +51,7 @@ export default class SignSpace extends MuxBase {
     }
     
     if (!args['space-id']) {
-      throw new Error("Invalid Space ID.");
+      throw new Error("Missing Space ID.");
     }
 
     // TODO: replace with mux-node-sdk signing when available
