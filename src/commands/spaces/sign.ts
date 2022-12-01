@@ -83,7 +83,7 @@ export default class SignSpace extends MuxBase {
         await clipboard.write(jwt);
         this.log(`👉 Copied your JWT to your system clipboard`);
       } catch {
-        this.error('Unable to copy JWT automatically');
+        this.warn('Unable to copy JWT automatically');
       }
     }
   }

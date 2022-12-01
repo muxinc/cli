@@ -115,7 +115,7 @@
   },
   "pkg": {
     "scripts": "src/**/*.js",
-    "assets": "package.json,lib/**/*.js",
+    "assets": "lib/**/*.js,package.json",
     "targets": ["node18-linux-x64","node18-macos-arm64","node18-macos-x64","node18-macos-arm64","node18-windows-x64"],
     "output": "mux-cli",
     "outputPath": "dist"
