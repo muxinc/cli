@@ -21,7 +21,7 @@ $ npm install -g @mux/cli
 $ mux COMMAND
 running command...
 $ mux (-v|--version|version)
-@mux/cli/0.8.0 linux-x64 node-v14.18.3
+@mux/cli/0.8.0 darwin-arm64 node-v18.11.0
 $ mux --help [COMMAND]
 USAGE
   $ mux COMMAND
@@ -49,7 +49,6 @@ USAGE
 * [`mux plugins:update`](#mux-pluginsupdate)
 * [`mux sign PLAYBACK-ID`](#mux-sign-playback-id)
 * [`mux spaces:sign SPACE-ID`](#mux-spacessign-space-id)
-* [`mux update [CHANNEL]`](#mux-update-channel)
 
 ## `mux assets:create INPUT`
 
@@ -108,7 +107,7 @@ EXAMPLES
   $ mux autocomplete --refresh-cache
 ```
 
-_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v1.1.1/src/commands/autocomplete/index.ts)_
+_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v1.3.6/src/commands/autocomplete/index.ts)_
 
 ## `mux commands`
 
@@ -130,26 +129,27 @@ OPTIONS
   --no-truncate           do not truncate output to fit screen
   --output=csv|json|yaml  output in a more machine friendly format
   --sort=sort             property to sort by (prepend '-' for descending)
+  --tree                  show tree of commands
 ```
 
-_See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/v2.0.2/src/commands/commands.ts)_
+_See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blob/v2.2.1/src/commands/commands.ts)_
 
 ## `mux help [COMMAND]`
 
-display help for mux
+Display help for mux.
 
 ```
 USAGE
   $ mux help [COMMAND]
 
 ARGUMENTS
-  COMMAND  command to show help for
+  COMMAND  Command to show help for.
 
 OPTIONS
-  --all  see all commands in CLI
+  -n, --nested-commands  Include all nested commands in the output.
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.18/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v5.1.19/src/commands/help.ts)_
 
 ## `mux init [ENVFILE]`
 
@@ -235,7 +235,7 @@ EXAMPLE
   $ mux plugins
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/index.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.1.7/src/commands/plugins/index.ts)_
 
 ## `mux plugins:inspect PLUGIN...`
 
@@ -256,7 +256,7 @@ EXAMPLE
   $ mux plugins:inspect myplugin
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/inspect.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.1.7/src/commands/plugins/inspect.ts)_
 
 ## `mux plugins:install PLUGIN...`
 
@@ -292,7 +292,7 @@ EXAMPLES
   $ mux plugins:install someuser/someplugin
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/install.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.1.7/src/commands/plugins/install.ts)_
 
 ## `mux plugins:link PLUGIN`
 
@@ -319,7 +319,7 @@ EXAMPLE
   $ mux plugins:link myplugin
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/link.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.1.7/src/commands/plugins/link.ts)_
 
 ## `mux plugins:uninstall PLUGIN...`
 
@@ -341,7 +341,7 @@ ALIASES
   $ mux plugins:remove
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/uninstall.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.1.7/src/commands/plugins/uninstall.ts)_
 
 ## `mux plugins:update`
 
@@ -356,7 +356,7 @@ OPTIONS
   -v, --verbose
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.0.12/src/commands/plugins/update.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.1.7/src/commands/plugins/update.ts)_
 
 ## `mux sign PLAYBACK-ID`
 
@@ -403,18 +403,4 @@ OPTIONS
 ```
 
 _See code: [src/commands/spaces/sign.ts](https://github.com/muxinc/cli/blob/v0.8.0/src/commands/spaces/sign.ts)_
-
-## `mux update [CHANNEL]`
-
-update the mux CLI
-
-```
-USAGE
-  $ mux update [CHANNEL]
-
-OPTIONS
-  --from-local  interactively choose an already installed version
-```
-
-_See code: [@oclif/plugin-update](https://github.com/oclif/plugin-update/blob/v2.1.5/src/commands/update.ts)_
 <!-- commandsstop -->
