@@ -7,6 +7,7 @@ The goal of this CLI is to create a first class experience of the Mux API. Prima
 The project should use Bun as the JavaScript runtime. It should be written in TypeScript and use Bun's TypeScript compiler. The project should be structured using Bun's module system and should be able to export a binary executable.
 
 ### Guidelines
+- Use professional language and tone for anything that's project or customer facing. This includes documentation, error messages, commit messages, and code comments.
 - Always prefer native fetch over tools like Axios or Superagent for HTTP requests.
 - Use pnpm for package management.
 - Use Bun's module system for importing and exporting modules.
@@ -17,9 +18,12 @@ The project should use Bun as the JavaScript runtime. It should be written in Ty
 - Otherwise, make an effort to limit 3rd party dependencies and prefer std libraries.
 - Always work on features in a branch separate from main/master.
 - Keep commits small and focused.
+- Write tests FIRST, testing the interfaces you plan to build, then let's review those together. You can add tests later for utilities that pop up along the way of implementation.
 
 ### Workflow
-When starting a new task, create a new branch if necessary, and a `PLAN.md` file. Keep that file updated with TODOs and plans as you work. When starting a new session, review an existing `PLAN.md` file if it exists before beginning.
+When starting a new task, create a new branch if necessary, and a `PLAN.md` file. Keep that file updated with TODOs, observations, and plans as you work. When starting a new session, review an existing `PLAN.md` file if it exists before beginning.
+
+When a feature is completely finished, move all notes that should be retained long term to the appropriate section of the `NOTES.md` file.
 
 ## Mux Documentation
 Whenever there are questions about Mux functionality, refer to the [Mux Documentation](https://docs.mux.com/).

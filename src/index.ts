@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 import { Command } from "@cliffy/command";
 import { loginCommand } from "./commands/login.ts";
+import { logoutCommand } from "./commands/logout.ts";
+import { envCommand } from "./commands/env/index.ts";
 import { getDefaultEnvironment } from "./lib/config.ts";
 
 const VERSION = "1.0.0";
@@ -14,7 +16,9 @@ const cli = new Command()
     this.showHelp();
   })
   .allowEmpty(true)
-  .command("login", loginCommand);
+  .command("login", loginCommand)
+  .command("logout", logoutCommand)
+  .command("env", envCommand);
 
 // Run the CLI
 if (import.meta.main) {

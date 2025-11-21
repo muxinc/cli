@@ -3,6 +3,7 @@ import { Input, Secret } from "@cliffy/prompt";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import { setEnvironment, listEnvironments } from "../lib/config.ts";
+import { validateCredentials } from "../lib/mux.ts";
 
 export interface EnvVars {
   MUX_TOKEN_ID?: string;
@@ -104,6 +105,19 @@ export const loginCommand = new Command()
         },
       });
     }
+
+    // Validate credentials
+    console.log("Validating credentials...");
+    const validation = await validateCredentials(
+      tokenId.trim(),
+      tokenSecret.trim()
+    );
+
+    if (!validation.valid) {
+      throw new Error(validation.error || "Invalid credentials");
+    }
+
+    console.log("✅ Credentials validated successfully");
 
     // Save to config
     await setEnvironment(envName, {

@@ -1,0 +1,222 @@
+# Mux CLI
+
+A command-line interface for interacting with the Mux API, designed to provide a first-class development experience for working with Mux services locally.
+
+## Installation
+
+```bash
+# Using pnpm
+pnpm install
+
+# Build the CLI
+pnpm run build
+```
+
+## Getting Started
+
+### Authentication
+
+Before using the Mux CLI, you need to authenticate with your Mux API credentials. You can obtain these from the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens).
+
+#### Interactive Login
+
+The simplest way to authenticate:
+
+```bash
+mux login
+```
+
+You'll be prompted to enter your Mux Token ID and Token Secret. The CLI will validate your credentials before saving them.
+
+#### Login with .env File
+
+If you have your credentials in a `.env` file:
+
+```bash
+mux login --env-file .env
+```
+
+Your `.env` file should contain:
+
+```bash
+MUX_TOKEN_ID=your_token_id
+MUX_TOKEN_SECRET=your_token_secret
+```
+
+#### Named Environments
+
+You can manage multiple environments (e.g., production, staging, development):
+
+```bash
+# Add a production environment
+mux login --name production
+
+# Add a staging environment
+mux login --name staging
+```
+
+The first environment you add becomes the default. You can switch between environments later.
+
+## Commands
+
+### Authentication & Environment Management
+
+#### `mux login`
+
+Authenticate with Mux and save credentials.
+
+**Options:**
+- `-f, --env-file <path>` - Path to .env file containing credentials
+- `-n, --name <name>` - Name for this environment (default: "default")
+
+**Examples:**
+
+```bash
+# Interactive login
+mux login
+
+# Login with .env file
+mux login --env-file .env
+
+# Login with a named environment
+mux login --name production --env-file .env.production
+```
+
+#### `mux logout <name>`
+
+Remove credentials for a specific environment.
+
+**Arguments:**
+- `<name>` - Name of the environment to remove
+
+**Examples:**
+
+```bash
+# Remove the default environment
+mux logout default
+
+# Remove a named environment
+mux logout staging
+```
+
+When you remove the default environment, the CLI automatically selects another environment as the new default.
+
+#### `mux env list`
+
+Display all configured environments.
+
+**Examples:**
+
+```bash
+mux env list
+```
+
+**Output:**
+```
+Configured environments:
+
+* production (default)
+  staging
+  development
+
+3 environments total
+```
+
+#### `mux env switch <name>`
+
+Change the default environment.
+
+**Arguments:**
+- `<name>` - Name of the environment to set as default
+
+**Examples:**
+
+```bash
+# Switch to staging environment
+mux env switch staging
+```
+
+## Configuration
+
+Credentials are stored securely in `~/.config/mux/config.json` with restrictive file permissions (readable/writable only by the owner).
+
+The configuration file structure:
+
+```json
+{
+  "environments": {
+    "production": {
+      "tokenId": "your_token_id",
+      "tokenSecret": "your_token_secret"
+    },
+    "staging": {
+      "tokenId": "your_staging_token_id",
+      "tokenSecret": "your_staging_token_secret"
+    }
+  },
+  "defaultEnvironment": "production"
+}
+```
+
+## Development
+
+This project uses [Bun](https://bun.sh) as the JavaScript runtime and is written in TypeScript.
+
+### Prerequisites
+
+- Bun runtime installed
+- pnpm for package management
+
+### Setup
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run tests
+bun test
+
+# Build the project
+pnpm run build
+```
+
+### Testing
+
+The project includes comprehensive test coverage for core functionality:
+
+```bash
+# Run all tests
+bun test
+
+# Run tests in watch mode
+bun test --watch
+```
+
+### Project Structure
+
+```
+src/
+├── commands/           # CLI command definitions
+│   ├── login.ts       # Login command
+│   ├── logout.ts      # Logout command
+│   └── env/           # Environment management commands
+│       ├── index.ts   # Main env command
+│       ├── list.ts    # List environments
+│       └── switch.ts  # Switch default environment
+├── lib/               # Shared libraries
+│   ├── config.ts      # Configuration management
+│   ├── mux.ts         # Mux API integration
+│   └── xdg.ts         # XDG base directory support
+└── index.ts           # CLI entry point
+```
+
+## License
+
+See LICENSE file for details.
+
+## Support
+
+For issues and questions:
+- File an issue on GitHub
+- Visit [Mux Documentation](https://docs.mux.com/)
+- Contact Mux Support
