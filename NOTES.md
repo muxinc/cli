@@ -66,9 +66,76 @@ When implementin' new features:
 - Keep commits small and focused
 - Main branch be `master` (not `main`)
 
+## Asset Management
+
+### Asset Creation Architecture
+
+**Input Method Design**
+The `mux assets create` command supports three distinct input methods, each mutually exclusive:
+1. **URL ingestion** (`--url`) - Create assets from remote video URLs
+2. **Local file upload** (`--upload`) - Upload local files with glob pattern support (e.g., `*.mp4`, `videos/**/*.mp4`)
+3. **JSON configuration** (`--file`) - Complex asset creation with overlays, subtitles, and advanced options
+
+**Design Rationale:**
+- Direct flags handle 80% of simple use cases (URL ingestion, single file uploads)
+- JSON config files handle complex scenarios (overlay settings, generated subtitles, multiple input tracks)
+- Flag overrides allow mixing both approaches: load a config file and override specific options via flags
+- Each file uploaded via glob patterns creates a separate, independent asset
+- This matches expected behavior from similar CLI tools and keeps the interface predictable
+
+**Multiple File Handling:**
+When using `--upload` with glob patterns matching multiple files:
+- Each file creates a separate asset (not combined into one)
+- User receives a confirmation prompt showing all files and total size (skippable with `-y`)
+- Each upload creates its own direct upload URL and asset
+- This design be simpler and more predictable than trying to combine tracks
+
+**JSON Configuration Philosophy:**
+- CLI validates only file existence and JSON syntax
+- Business rule validation (enum values, required fields, array constraints) be handled by the Mux API
+- This keeps the CLI flexible when Mux adds new features or changes constraints
+- Error messages from the API be passed through to the user
+- The `AssetConfig` interface uses an index signature to allow future Mux API additions
+
+**Wait Flag Implementation:**
+- `--wait` flag polls asset status every 5 seconds
+- Maximum 60 attempts (5 minutes) before timing out
+- Only works with URL ingestion and JSON config modes (returns asset immediately)
+- File upload mode returns upload IDs, not asset IDs, so wait be not applicable
+
+**Progress Reporting Limitation:**
+The `uploadFile()` function uses native fetch, which doesn't provide granular progress updates for PUT requests. Currently reports only 0% and 100%. For large files, the CLI may appear to hang during upload. Future enhancement: implement streaming upload with chunked progress tracking.
+
+### Test Coverage Notes
+
+**Asset Management Tests (101 total):**
+- 62 passing unit tests
+- 2 skipped (require network mocking)
+- 37 todo tests (command integration tests)
+
+**Test Strategy:**
+- Unit tests cover JSON parsing, glob expansion, file validation
+- Command integration tests be marked as `.todo()` because:
+  - Core logic be in well-tested utility functions
+  - Commands be thin wrappers around those utilities
+  - Mocking the Mux SDK would be complex and potentially brittle
+  - Manual end-to-end testing be completed successfully
+- Tests follow project philosophy: no sleep(), human readable, test real code, clean up properly
+
+**Validation Scope:**
+- ✅ Test and validate OUR CLI interface only (file exists, valid JSON, required fields present)
+- ❌ Do NOT validate Mux API constraints (enum values, field length limits, empty arrays, etc.)
+- Let the Mux API handle business rule validation and pass through their error messages
+
 ## Global TODOs
 
 ### Future Enhancements
 - Add unit tests fer `validateCredentials()` with mocked Mux API responses
 - Consider adding integration tests fer CLI commands if complexity increases
 - Evaluate need fer credential refresh/expiration handling
+- **Support custom base URL fer staging/sandbox environments** - Allow users to pass a custom Mux API base URL (e.g., `--base-url https://api.staging.mux.com`) to use the CLI with non-production Mux environments. This would need to be:
+  - Configurable per environment in the config
+  - Passed to the Mux SDK client initialization
+  - Validated during credential setup
+  - Documented in help text
+- **Implement streaming upload with progress tracking** - Replace the current fetch-based upload in `file-upload.ts` with a streaming solution that provides granular progress updates for large file uploads

@@ -59,6 +59,111 @@ The first environment you add becomes the default. You can switch between enviro
 
 ## Commands
 
+### Asset Management
+
+#### `mux assets create`
+
+Create a new Mux video asset from a URL, local file, or JSON configuration.
+
+**Options:**
+- `--url <url>` - Video URL to ingest from the web
+- `--upload <path>` - Local file(s) to upload (supports glob patterns like `*.mp4` or `videos/**/*.mp4`)
+- `--file, -f <path>` - JSON configuration file for complex asset creation
+- `--playback-policy <policy>` - Playback policy: `public` or `signed` (can be specified multiple times)
+- `--test` - Create test asset (watermarked, 10s limit, deleted after 24h)
+- `--passthrough <string>` - User metadata (max 255 characters)
+- `--mp4-support <option>` - MP4 support level: `none`, `capped-1080p`, `audio-only`, `audio-only,capped-1080p`
+- `--encoding-tier <tier>` - Encoding tier: `smart` or `baseline`
+- `--normalize-audio` - Normalize audio loudness level
+- `-y, --yes` - Skip confirmation prompts
+- `--json` - Output JSON instead of pretty format
+- `--wait` - Wait for asset processing to complete (polls until ready)
+
+**Examples:**
+
+```bash
+# Create asset from remote URL
+mux assets create --url https://example.com/video.mp4 --playback-policy public
+
+# Upload a single local file
+mux assets create --upload video.mp4 --playback-policy public --test
+
+# Upload multiple files with glob pattern
+mux assets create --upload ./videos/*.mp4 --playback-policy public
+# Shows confirmation prompt with file list and total size
+
+# Skip confirmation for multiple files
+mux assets create --upload ./videos/*.mp4 --playback-policy public -y
+
+# Create asset with complex configuration from JSON file
+mux assets create --file asset-config.json
+
+# Override config file options with flags
+mux assets create --file asset-config.json --test --playback-policy signed
+
+# Wait for asset to be ready
+mux assets create --url https://example.com/video.mp4 --playback-policy public --wait
+
+# Get JSON output for scripting
+mux assets create --url https://example.com/video.mp4 --playback-policy public --json
+```
+
+**JSON Configuration File:**
+
+For complex asset creation (overlays, subtitles, multiple input tracks), use a JSON configuration file:
+
+```json
+{
+  "input": [
+    {
+      "url": "https://example.com/video.mp4",
+      "overlay_settings": {
+        "url": "https://example.com/logo.png",
+        "vertical_align": "bottom",
+        "horizontal_align": "right",
+        "vertical_margin": "5%",
+        "horizontal_margin": "5%",
+        "opacity": "80%"
+      },
+      "generated_subtitles": [
+        {
+          "language_code": "en",
+          "name": "English"
+        }
+      ]
+    }
+  ],
+  "playback_policy": ["signed"],
+  "encoding_tier": "smart",
+  "mp4_support": "capped-1080p",
+  "normalize_audio": true,
+  "passthrough": "my-video-123"
+}
+```
+
+Then create the asset:
+
+```bash
+mux assets create --file asset-config.json
+```
+
+**Multiple File Uploads:**
+
+When using glob patterns, each file creates a separate asset:
+
+```bash
+mux assets create --upload ./videos/*.mp4 --playback-policy public
+# Creates 3 separate assets if 3 files match
+
+# Output:
+# Found 3 files to upload:
+#   - intro.mp4 (45.2 MB)
+#   - main.mp4 (128.7 MB)
+#   - outro.mp4 (23.1 MB)
+# Total size: 197.1 MB
+# Continue with upload? (y/n):
+```
+
 ### Authentication & Environment Management
 
 #### `mux login`

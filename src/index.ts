@@ -3,6 +3,7 @@ import { Command } from "@cliffy/command";
 import { loginCommand } from "./commands/login.ts";
 import { logoutCommand } from "./commands/logout.ts";
 import { envCommand } from "./commands/env/index.ts";
+import { assetsCommand } from "./commands/assets/index.ts";
 import { getDefaultEnvironment } from "./lib/config.ts";
 
 const VERSION = "1.0.0";
@@ -18,7 +19,8 @@ const cli = new Command()
   .allowEmpty(true)
   .command("login", loginCommand)
   .command("logout", logoutCommand)
-  .command("env", envCommand);
+  .command("env", envCommand)
+  .command("assets", assetsCommand);
 
 // Run the CLI
 if (import.meta.main) {
