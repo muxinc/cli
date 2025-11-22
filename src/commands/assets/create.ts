@@ -314,12 +314,12 @@ export const createCommand = new Command()
         }
       }
     } catch (error) {
-      if (error instanceof Error) {
-        if (options.json) {
-          console.error(JSON.stringify({ error: error.message }, null, 2));
-        } else {
-          console.error(`Error: ${error.message}`);
-        }
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (options.json) {
+        console.error(JSON.stringify({ error: errorMessage }, null, 2));
+      } else {
+        console.error(`Error: ${errorMessage}`);
       }
       process.exit(1);
     }
