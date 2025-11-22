@@ -4,6 +4,7 @@ import { loginCommand } from "./commands/login.ts";
 import { logoutCommand } from "./commands/logout.ts";
 import { envCommand } from "./commands/env/index.ts";
 import { assetsCommand } from "./commands/assets/index.ts";
+import { liveCommand } from "./commands/live/index.ts";
 import { getDefaultEnvironment } from "./lib/config.ts";
 
 const VERSION = "1.0.0";
@@ -20,7 +21,8 @@ const cli = new Command()
   .command("login", loginCommand)
   .command("logout", logoutCommand)
   .command("env", envCommand)
-  .command("assets", assetsCommand);
+  .command("assets", assetsCommand)
+  .command("live", liveCommand);
 
 // Run the CLI
 if (import.meta.main) {

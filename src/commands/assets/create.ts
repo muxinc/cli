@@ -1,6 +1,7 @@
 import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
 import Mux from "@mux/mux-node";
+import type { Video } from "@mux/mux-node/resources";
 import { createAuthenticatedMuxClient } from "../../lib/mux.ts";
 import { parseAssetConfig } from "../../lib/json-config.ts";
 import { expandGlobPattern, uploadFile } from "../../lib/file-upload.ts";
@@ -18,6 +19,12 @@ interface CreateOptions {
   yes?: boolean;
   json?: boolean;
   wait?: boolean;
+}
+
+interface UploadResult {
+  file: string;
+  uploadId: string;
+  status: string;
 }
 
 /**
@@ -38,28 +45,28 @@ async function createFromUrl(
   mux: Mux,
   url: string,
   options: CreateOptions
-): Promise<any> {
-  const params: any = {
+): Promise<Video.Asset> {
+  const params: Video.AssetCreateParams = {
     input: [{ url }],
   };
 
   // Add optional parameters from flags
-  if (options.playbackPolicy) {
-    params.playback_policy = options.playbackPolicy;
+  if (options.playbackPolicy !== undefined) {
+    params.playback_policy = options.playbackPolicy as Array<"public" | "signed">;
   }
-  if (options.test) {
+  if (options.test !== undefined) {
     params.test = true;
   }
-  if (options.passthrough) {
+  if (options.passthrough !== undefined) {
     params.passthrough = options.passthrough;
   }
-  if (options.mp4Support) {
-    params.mp4_support = options.mp4Support;
+  if (options.mp4Support !== undefined) {
+    params.mp4_support = options.mp4Support as Video.AssetCreateParams["mp4_support"];
   }
-  if (options.encodingTier) {
-    params.encoding_tier = options.encodingTier;
+  if (options.encodingTier !== undefined) {
+    params.encoding_tier = options.encodingTier as "smart" | "baseline";
   }
-  if (options.normalizeAudio) {
+  if (options.normalizeAudio !== undefined) {
     params.normalize_audio = true;
   }
 
@@ -74,7 +81,7 @@ async function createFromUploads(
   mux: Mux,
   pattern: string,
   options: CreateOptions
-): Promise<any[]> {
+): Promise<UploadResult[]> {
   // Expand glob pattern
   const files = await expandGlobPattern(pattern);
 
@@ -104,7 +111,7 @@ async function createFromUploads(
     }
   }
 
-  const results: any[] = [];
+  const results: UploadResult[] = [];
 
   // Upload each file
   for (const file of files) {
@@ -113,29 +120,29 @@ async function createFromUploads(
     }
 
     // Create direct upload
-    const uploadParams: any = {
+    const uploadParams: Video.UploadCreateParams = {
       cors_origin: "*",
       new_asset_settings: {},
     };
 
     // Add asset settings from flags
-    if (options.playbackPolicy) {
-      uploadParams.new_asset_settings.playback_policy = options.playbackPolicy;
+    if (options.playbackPolicy !== undefined) {
+      uploadParams.new_asset_settings!.playback_policy = options.playbackPolicy as Array<"public" | "signed">;
     }
-    if (options.test) {
+    if (options.test !== undefined) {
       uploadParams.test = true;
     }
-    if (options.passthrough) {
-      uploadParams.new_asset_settings.passthrough = options.passthrough;
+    if (options.passthrough !== undefined) {
+      uploadParams.new_asset_settings!.passthrough = options.passthrough;
     }
-    if (options.mp4Support) {
-      uploadParams.new_asset_settings.mp4_support = options.mp4Support;
+    if (options.mp4Support !== undefined) {
+      uploadParams.new_asset_settings!.mp4_support = options.mp4Support as Video.AssetCreateParams["mp4_support"];
     }
-    if (options.encodingTier) {
-      uploadParams.new_asset_settings.encoding_tier = options.encodingTier;
+    if (options.encodingTier !== undefined) {
+      uploadParams.new_asset_settings!.encoding_tier = options.encodingTier as "smart" | "baseline";
     }
-    if (options.normalizeAudio) {
-      uploadParams.new_asset_settings.normalize_audio = true;
+    if (options.normalizeAudio !== undefined) {
+      uploadParams.new_asset_settings!.normalize_audio = true;
     }
 
     const upload = await mux.video.uploads.create(uploadParams);
@@ -164,24 +171,24 @@ async function createFromConfig(
   mux: Mux,
   configPath: string,
   options: CreateOptions
-): Promise<any> {
+): Promise<Video.Asset> {
   // Parse config file
   const config = await parseAssetConfig(configPath);
 
   // Merge with flag overrides
-  if (options.playbackPolicy) {
+  if (options.playbackPolicy !== undefined) {
     config.playback_policy = options.playbackPolicy;
   }
   if (options.test !== undefined) {
     config.test = options.test;
   }
-  if (options.passthrough) {
+  if (options.passthrough !== undefined) {
     config.passthrough = options.passthrough;
   }
-  if (options.mp4Support) {
+  if (options.mp4Support !== undefined) {
     config.mp4_support = options.mp4Support;
   }
-  if (options.encodingTier) {
+  if (options.encodingTier !== undefined) {
     config.encoding_tier = options.encodingTier;
   }
   if (options.normalizeAudio !== undefined) {
@@ -200,15 +207,70 @@ export const createCommand = new Command()
   .option(
     "--playback-policy <policy:string>",
     "Playback policy (public or signed). Can be specified multiple times.",
-    { collect: true }
+    {
+      collect: true,
+      value: (value: string): string => {
+        const validPolicies = ["public", "signed"];
+        if (!validPolicies.includes(value)) {
+          throw new Error(
+            `Invalid playback policy: ${value}. Must be one of: ${validPolicies.join(", ")}`
+          );
+        }
+        return value;
+      },
+    }
   )
   .option("--test", "Create test asset (watermarked, 10s limit, deleted after 24h)")
-  .option("--passthrough <string:string>", "User metadata (max 255 characters)")
+  .option(
+    "--passthrough <string:string>",
+    "User metadata (max 255 characters)",
+    {
+      value: (value: string): string => {
+        if (value.length > 255) {
+          throw new Error(
+            `Passthrough metadata exceeds maximum length of 255 characters (provided: ${value.length})`
+          );
+        }
+        return value;
+      },
+    }
+  )
   .option(
     "--mp4-support <option:string>",
-    "MP4 support level (none, capped-1080p, audio-only, audio-only,capped-1080p)"
+    "MP4 support level (none, capped-1080p, audio-only, audio-only,capped-1080p, standard)",
+    {
+      value: (value: string): string => {
+        const validOptions = [
+          "none",
+          "capped-1080p",
+          "audio-only",
+          "audio-only,capped-1080p",
+          "standard",
+        ];
+        if (!validOptions.includes(value)) {
+          throw new Error(
+            `Invalid mp4-support value: ${value}. Must be one of: ${validOptions.join(", ")}`
+          );
+        }
+        return value;
+      },
+    }
   )
-  .option("--encoding-tier <tier:string>", "Encoding tier (smart or baseline)")
+  .option(
+    "--encoding-tier <tier:string>",
+    "Encoding tier (smart or baseline)",
+    {
+      value: (value: string): string => {
+        const validTiers = ["smart", "baseline"];
+        if (!validTiers.includes(value)) {
+          throw new Error(
+            `Invalid encoding tier: ${value}. Must be one of: ${validTiers.join(", ")}`
+          );
+        }
+        return value;
+      },
+    }
+  )
   .option("--normalize-audio", "Normalize audio loudness level")
   .option("-y, --yes", "Skip confirmation prompts")
   .option("--json", "Output JSON instead of pretty format")
@@ -231,7 +293,7 @@ export const createCommand = new Command()
       // Initialize authenticated Mux client
       const mux = await createAuthenticatedMuxClient();
 
-      let result: any;
+      let result: Video.Asset | UploadResult[];
 
       // Execute appropriate creation method
       if (options.url) {
@@ -272,7 +334,7 @@ export const createCommand = new Command()
       }
 
       // Wait for asset processing if requested
-      if (options.wait && result.id) {
+      if (options.wait && !Array.isArray(result) && result.id) {
         if (!options.json) {
           console.log("\nWaiting for asset to be ready...");
         }

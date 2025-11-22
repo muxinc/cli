@@ -294,6 +294,178 @@ Are you sure you want to delete asset abc123xyz? (y/n): y
 Asset abc123xyz deleted successfully
 ```
 
+### Live Stream Management
+
+#### `mux live create`
+
+Create a new Mux live stream for broadcasting.
+
+**Options:**
+- `--playback-policy <policy>` - Playback policy: `public` or `signed` (can be specified multiple times)
+- `--new-asset-settings <settings>` - Automatically create an asset from this live stream. Use `none` to disable, or provide a JSON string with asset settings (e.g., `'{"playback_policy": ["public"]}'`)
+- `--reconnect-window <seconds>` - Time in seconds a stream can be disconnected before being considered finished (default: 60)
+- `--latency-mode <mode>` - Latency mode: `low` or `standard` (default: `low`)
+- `--test` - Create test live stream (deleted after 24h)
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Create a basic live stream with public playback
+mux live create --playback-policy public
+
+# Create a low-latency live stream
+mux live create --playback-policy public --latency-mode low
+
+# Create a stream that automatically saves to an asset
+mux live create --playback-policy public --new-asset-settings '{"playback_policy": ["public"]}'
+
+# Create a test stream (deleted after 24 hours)
+mux live create --playback-policy public --test
+
+# Create with extended reconnect window (5 minutes)
+mux live create --playback-policy public --reconnect-window 300
+
+# Get JSON output for scripting
+mux live create --playback-policy public --json
+```
+
+**Output:**
+
+```
+Live stream created: abc123xyz
+  Status: idle
+  Stream Key: your-secret-stream-key
+  Playback URL: https://stream.mux.com/playback123.m3u8
+
+WARNING: This is a test stream (will be deleted after 24 hours)
+```
+
+**Using the Stream:**
+
+Once created, you can stream to your live stream using the RTMP URL and stream key:
+- **RTMP URL:** `rtmp://global-live.mux.com/app`
+- **Stream Key:** The `stream_key` returned in the response
+
+Configure your streaming software (OBS, Wirecast, etc.) with these values to start broadcasting.
+
+#### `mux live list`
+
+List all live streams with pagination.
+
+**Options:**
+- `--limit <number>` - Number of results to return (default: 25)
+- `--page <number>` - Page number for pagination (default: 1)
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# List live streams with default settings
+mux live list
+
+# List first 10 streams
+mux live list --limit 10
+
+# List second page of results
+mux live list --page 2
+
+# Get JSON output for scripting
+mux live list --json
+```
+
+**Output:**
+
+```
+Found 3 live stream(s):
+
+Stream ID: abc123xyz
+  Status: active
+  Created: 1234567890
+  Stream Key: your-stream-key
+  Playback URL: https://stream.mux.com/playback123.m3u8
+
+Stream ID: def456uvw
+  Status: idle
+  Created: 1234567891
+  Stream Key: another-stream-key
+  Playback URL: https://stream.mux.com/playback456.m3u8
+```
+
+#### `mux live get <stream-id>`
+
+Get detailed information about a specific live stream.
+
+**Arguments:**
+- `<stream-id>` - The ID of the live stream to retrieve
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Get live stream details
+mux live get abc123xyz
+
+# Get live stream details as JSON
+mux live get abc123xyz --json
+```
+
+**Output:**
+
+```
+Live Stream ID: abc123xyz
+Status: active
+Created: 1234567890
+Stream Key: your-secret-stream-key
+Latency Mode: low
+Reconnect Window: 60s
+
+Playback IDs:
+  - playback123 (public)
+    URL: https://stream.mux.com/playback123.m3u8
+
+New Asset Settings:
+  Playback Policy: public
+  Recording enabled: Yes
+
+WARNING: This is a test stream (will be deleted after 24 hours)
+```
+
+#### `mux live delete <stream-id>`
+
+Delete a live stream permanently.
+
+**Arguments:**
+- `<stream-id>` - The ID of the live stream to delete
+
+**Options:**
+- `-f, --force` - Skip confirmation prompt
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Delete stream with confirmation prompt
+mux live delete abc123xyz
+
+# Delete stream without confirmation
+mux live delete abc123xyz --force
+
+# Delete stream with JSON output (requires --force for safety)
+mux live delete abc123xyz --json --force
+```
+
+**Important:** When using `--json` output mode, you must also provide the `--force` flag. This safety feature prevents accidental deletions in automated scripts.
+
+**Output:**
+
+```
+Are you sure you want to delete live stream abc123xyz? (y/n): y
+Live stream abc123xyz deleted successfully
+```
+
 ### Authentication & Environment Management
 
 #### `mux login`
@@ -438,6 +610,12 @@ src/
 │   │   ├── list.ts    # List assets
 │   │   ├── get.ts     # Get asset details
 │   │   └── delete.ts  # Delete assets
+│   ├── live/          # Live stream management commands
+│   │   ├── index.ts   # Main live command
+│   │   ├── create.ts  # Create live streams
+│   │   ├── list.ts    # List live streams
+│   │   ├── get.ts     # Get live stream details
+│   │   └── delete.ts  # Delete live streams
 │   ├── env/           # Environment management commands
 │   │   ├── index.ts   # Main env command
 │   │   ├── list.ts    # List environments

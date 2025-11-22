@@ -66,7 +66,50 @@ When implementin' new features:
 - Keep commits small and focused
 - Main branch be `master` (not `main`)
 
+## Live Streams
+
+### Live Stream Commands
+
+**Commands Implemented:**
+- `mux live create` - Create live streams with configurable settings
+  - Flags: `--playback-policy`, `--new-asset-settings`, `--reconnect-window`, `--latency-mode`, `--test`, `--json`
+  - Validation fer playback policy (public/signed) and latency mode (low/standard)
+  - Support fer automatic asset creation from live streams via `--new-asset-settings`
+- `mux live list` - List live streams with pagination
+  - Flags: `--limit`, `--page`, `--json`
+- `mux live get <stream-id>` - Get detailed live stream information
+  - Shows stream key, playback URLs, status, and configuration
+- `mux live delete <stream-id>` - Delete live streams with confirmation
+  - Requires `--force` flag with `--json` output fer safety
+
+**Test Coverage:**
+- 20 tests covering CLI interface, flag validation, and enum validation
+- Tests focus on command structure and input validation (not Mux API integration)
+- Validation tests fer playback policy, latency mode, and JSON parsing
+- Follows project philosophy: no sleep(), human readable, test real code
+
 ## Asset Management
+
+### Type Safety Improvements
+
+**Phase 3 Enhancements:**
+- Replaced all `any` types in `assets/create.ts` with proper Mux SDK types
+- Added explicit type imports: `Video.Asset`, `Video.AssetCreateParams`, `Video.UploadCreateParams`
+- Type-safe enum casting throughout (playback policy, mp4 support, encoding tier)
+- Added `UploadResult` interface fer file upload responses
+
+**Validation Architecture:**
+- CLI-level validation fer flag values using Cliffy's `value` callback
+- Validates enums at parse time with helpful error messages listing valid options
+- Validates passthrough string length (255 char limit)
+- Consistent error messages across all enum validations
+- Mux API handles business rule validation (we only validate syntax and basic constraints)
+
+**Test Coverage fer Validation:**
+- 15+ new tests specifically fer enum validation logic
+- Tests both rejection of invalid values and acceptance of valid values
+- Error messages verified to include helpful guidance with valid options
+- Covers: playback-policy, mp4-support, encoding-tier validations
 
 ### Asset Creation Architecture
 

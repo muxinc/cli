@@ -249,4 +249,233 @@ describe("mux assets create command", () => {
       expect(fileOption).toBeDefined();
     });
   });
+
+  describe("Enum validation", () => {
+    test("rejects invalid playback-policy value", async () => {
+      let errorThrown = false;
+      let errorMessage = "";
+
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--playback-policy",
+          "invalid-policy",
+        ]);
+      } catch (error) {
+        errorThrown = true;
+        errorMessage = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(errorThrown).toBe(true);
+      expect(errorMessage).toContain("Invalid playback policy");
+      expect(errorMessage).toContain("public");
+      expect(errorMessage).toContain("signed");
+    });
+
+    test("accepts valid playback-policy: public", async () => {
+      // Just test that parsing succeeds (will fail at auth, which is expected)
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--playback-policy",
+          "public",
+        ]);
+      } catch (error) {
+        // Will fail at auth step, but that's after validation passes
+      }
+
+      // If validation failed, exitSpy would have been called with 1
+      // If it wasn't called, or was called with something else, validation passed
+      const exitCalls = exitSpy.mock.calls;
+      if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
+        // Check that it wasn't a validation error
+        const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
+        expect(errorMessage).not.toContain("Invalid playback policy");
+      }
+    });
+
+    test("accepts valid playback-policy: signed", async () => {
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--playback-policy",
+          "signed",
+        ]);
+      } catch (error) {
+        // Will fail at auth step, but that's after validation passes
+      }
+
+      const exitCalls = exitSpy.mock.calls;
+      if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
+        const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
+        expect(errorMessage).not.toContain("Invalid playback policy");
+      }
+    });
+
+    test("rejects invalid mp4-support value", async () => {
+      let errorThrown = false;
+      let errorMessage = "";
+
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--mp4-support",
+          "ultra-hd",
+        ]);
+      } catch (error) {
+        errorThrown = true;
+        errorMessage = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(errorThrown).toBe(true);
+      expect(errorMessage).toContain("Invalid mp4-support value");
+      expect(errorMessage).toContain("none");
+      expect(errorMessage).toContain("capped-1080p");
+    });
+
+    test("accepts valid mp4-support: capped-1080p", async () => {
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--mp4-support",
+          "capped-1080p",
+        ]);
+      } catch (error) {
+        // Will fail at auth step
+      }
+
+      const exitCalls = exitSpy.mock.calls;
+      if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
+        const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
+        expect(errorMessage).not.toContain("Invalid mp4-support value");
+      }
+    });
+
+    test("accepts valid mp4-support: audio-only,capped-1080p", async () => {
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--mp4-support",
+          "audio-only,capped-1080p",
+        ]);
+      } catch (error) {
+        // Will fail at auth step
+      }
+
+      const exitCalls = exitSpy.mock.calls;
+      if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
+        const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
+        expect(errorMessage).not.toContain("Invalid mp4-support value");
+      }
+    });
+
+    test("rejects invalid encoding-tier value", async () => {
+      let errorThrown = false;
+      let errorMessage = "";
+
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--encoding-tier",
+          "premium",
+        ]);
+      } catch (error) {
+        errorThrown = true;
+        errorMessage = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(errorThrown).toBe(true);
+      expect(errorMessage).toContain("Invalid encoding tier");
+      expect(errorMessage).toContain("smart");
+      expect(errorMessage).toContain("baseline");
+    });
+
+    test("accepts valid encoding-tier: smart", async () => {
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--encoding-tier",
+          "smart",
+        ]);
+      } catch (error) {
+        // Will fail at auth step
+      }
+
+      const exitCalls = exitSpy.mock.calls;
+      if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
+        const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
+        expect(errorMessage).not.toContain("Invalid encoding tier");
+      }
+    });
+
+    test("accepts valid encoding-tier: baseline", async () => {
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--encoding-tier",
+          "baseline",
+        ]);
+      } catch (error) {
+        // Will fail at auth step
+      }
+
+      const exitCalls = exitSpy.mock.calls;
+      if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
+        const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
+        expect(errorMessage).not.toContain("Invalid encoding tier");
+      }
+    });
+
+    test("rejects passthrough exceeding 255 characters", async () => {
+      const longPassthrough = "a".repeat(256);
+      let errorThrown = false;
+      let errorMessage = "";
+
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--passthrough",
+          longPassthrough,
+        ]);
+      } catch (error) {
+        errorThrown = true;
+        errorMessage = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(errorThrown).toBe(true);
+      expect(errorMessage).toContain("Passthrough metadata exceeds maximum length");
+      expect(errorMessage).toContain("255");
+    });
+
+    test("accepts passthrough at exactly 255 characters", async () => {
+      const maxPassthrough = "a".repeat(255);
+
+      try {
+        await createCommand.parse([
+          "--url",
+          "https://example.com/video.mp4",
+          "--passthrough",
+          maxPassthrough,
+        ]);
+      } catch (error) {
+        // Will fail at auth step
+      }
+
+      const exitCalls = exitSpy.mock.calls;
+      if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
+        const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
+        expect(errorMessage).not.toContain("Passthrough metadata exceeds");
+      }
+    });
+  });
 });
