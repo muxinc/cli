@@ -108,18 +108,27 @@ The `uploadFile()` function uses native fetch, which doesn't provide granular pr
 
 ### Test Coverage Notes
 
-**Asset Management Tests (101 total):**
-- 62 passing unit tests
+**Asset Management Tests (85 total):**
+- 81 passing tests
 - 2 skipped (require network mocking)
-- 37 todo tests (command integration tests)
+- 2 todo tests (network-dependent upload tests)
+
+**Test Breakdown:**
+- `json-config.test.ts`: JSON parsing and validation tests
+- `file-upload.test.ts`: Glob expansion and file validation tests
+- `create.test.ts`: 19 CLI interface tests covering:
+  - Flag combinations and mutual exclusivity validation
+  - JSON config file error handling
+  - File upload error handling
+  - Output formatting flags verification
+  - Optional flags verification
+  - Command metadata verification
 
 **Test Strategy:**
 - Unit tests cover JSON parsing, glob expansion, file validation
-- Command integration tests be marked as `.todo()` because:
-  - Core logic be in well-tested utility functions
-  - Commands be thin wrappers around those utilities
-  - Mocking the Mux SDK would be complex and potentially brittle
-  - Manual end-to-end testing be completed successfully
+- Command tests focus on CLI interface layer (flag parsing, validation, error messages)
+- Command tests use `spyOn` to mock `process.exit` and `console.error`
+- Tests do NOT mock the Mux SDK - API integration verified via manual E2E testing
 - Tests follow project philosophy: no sleep(), human readable, test real code, clean up properly
 
 **Validation Scope:**
