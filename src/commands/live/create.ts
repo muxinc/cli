@@ -1,11 +1,16 @@
 import { Command } from "@cliffy/command";
+import Mux from "@mux/mux-node";
 import { createAuthenticatedMuxClient } from "../../lib/mux.ts";
+
+// Extract types from Mux SDK
+type LatencyMode = NonNullable<Mux.Video.LiveStreamCreateParams['latency_mode']>;
+type PlaybackPolicy = Mux.PlaybackPolicy;
 
 interface CreateOptions {
   playbackPolicy?: string[];
   newAssetSettings?: string;
   reconnectWindow?: number;
-  latencyMode?: string;
+  latencyMode?: LatencyMode;
   test?: boolean;
   json?: boolean;
 }
@@ -31,7 +36,7 @@ export const createCommand = new Command()
   )
   .option("--test", "Create test live stream (deleted after 24h)")
   .option("--json", "Output JSON instead of pretty format")
-  .action(async (options: CreateOptions) => {
+  .action(async (options) => {
     try {
       // Initialize authenticated Mux client
       const mux = await createAuthenticatedMuxClient();
@@ -50,25 +55,25 @@ export const createCommand = new Command()
 
       // Validate latency mode
       if (options.latencyMode) {
-        const validLatencyModes = ["low", "standard"];
+        const validLatencyModes = ["low", "standard", "reduced"];
         if (!validLatencyModes.includes(options.latencyMode)) {
           throw new Error(
-            `Invalid latency mode: ${options.latencyMode}. Must be 'low' or 'standard'.`
+            `Invalid latency mode: ${options.latencyMode}. Must be 'low', 'standard', or 'reduced'.`
           );
         }
       }
 
       // Build API parameters
       const params: {
-        playback_policy?: string[];
+        playback_policy?: PlaybackPolicy[];
         new_asset_settings?: Record<string, unknown>;
         reconnect_window?: number;
-        latency_mode?: string;
+        latency_mode?: LatencyMode;
         test?: boolean;
       } = {};
 
       if (options.playbackPolicy !== undefined) {
-        params.playback_policy = options.playbackPolicy;
+        params.playback_policy = options.playbackPolicy as PlaybackPolicy[];
       }
 
       if (options.newAssetSettings !== undefined) {
@@ -89,7 +94,7 @@ export const createCommand = new Command()
       }
 
       if (options.latencyMode !== undefined) {
-        params.latency_mode = options.latencyMode;
+        params.latency_mode = options.latencyMode as LatencyMode;
       }
 
       if (options.test !== undefined) {
@@ -97,7 +102,9 @@ export const createCommand = new Command()
       }
 
       // Create live stream
-      const liveStream = await mux.video.liveStreams.create(params);
+      const liveStream = await mux.video.liveStreams.create(
+        params as Mux.Video.LiveStreamCreateParams
+      );
 
       if (options.json) {
         console.log(JSON.stringify(liveStream, null, 2));

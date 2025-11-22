@@ -1,16 +1,20 @@
 import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
 import Mux from "@mux/mux-node";
-import type { Video } from "@mux/mux-node/resources";
 import { createAuthenticatedMuxClient } from "../../lib/mux.ts";
 import { parseAssetConfig } from "../../lib/json-config.ts";
 import { expandGlobPattern, uploadFile } from "../../lib/file-upload.ts";
+
+// Extract types from Mux SDK
+type PlaybackPolicy = Mux.PlaybackPolicy;
+type EncodingTier = NonNullable<Mux.Video.AssetCreateParams['encoding_tier']>;
+type Mp4Support = NonNullable<Mux.Video.AssetCreateParams['mp4_support']>;
 
 interface CreateOptions {
   url?: string;
   upload?: string;
   file?: string;
-  playbackPolicy?: string[];
+  playbackPolicy?: string | string[];
   test?: boolean;
   passthrough?: string;
   mp4Support?: string;
@@ -45,14 +49,17 @@ async function createFromUrl(
   mux: Mux,
   url: string,
   options: CreateOptions
-): Promise<Video.Asset> {
-  const params: Video.AssetCreateParams = {
+): Promise<Mux.Video.Asset> {
+  const params: Mux.Video.AssetCreateParams = {
     input: [{ url }],
   };
 
   // Add optional parameters from flags
   if (options.playbackPolicy !== undefined) {
-    params.playback_policy = options.playbackPolicy as Array<"public" | "signed">;
+    const policies = Array.isArray(options.playbackPolicy)
+      ? options.playbackPolicy
+      : [options.playbackPolicy];
+    params.playback_policy = policies as PlaybackPolicy[];
   }
   if (options.test !== undefined) {
     params.test = true;
@@ -61,10 +68,10 @@ async function createFromUrl(
     params.passthrough = options.passthrough;
   }
   if (options.mp4Support !== undefined) {
-    params.mp4_support = options.mp4Support as Video.AssetCreateParams["mp4_support"];
+    params.mp4_support = options.mp4Support as Mp4Support;
   }
   if (options.encodingTier !== undefined) {
-    params.encoding_tier = options.encodingTier as "smart" | "baseline";
+    params.encoding_tier = options.encodingTier as EncodingTier;
   }
   if (options.normalizeAudio !== undefined) {
     params.normalize_audio = true;
@@ -120,14 +127,17 @@ async function createFromUploads(
     }
 
     // Create direct upload
-    const uploadParams: Video.UploadCreateParams = {
+    const uploadParams: Mux.Video.UploadCreateParams = {
       cors_origin: "*",
       new_asset_settings: {},
     };
 
     // Add asset settings from flags
     if (options.playbackPolicy !== undefined) {
-      uploadParams.new_asset_settings!.playback_policy = options.playbackPolicy as Array<"public" | "signed">;
+      const policies = Array.isArray(options.playbackPolicy)
+        ? options.playbackPolicy
+        : [options.playbackPolicy];
+      uploadParams.new_asset_settings!.playback_policy = policies as PlaybackPolicy[];
     }
     if (options.test !== undefined) {
       uploadParams.test = true;
@@ -136,10 +146,10 @@ async function createFromUploads(
       uploadParams.new_asset_settings!.passthrough = options.passthrough;
     }
     if (options.mp4Support !== undefined) {
-      uploadParams.new_asset_settings!.mp4_support = options.mp4Support as Video.AssetCreateParams["mp4_support"];
+      uploadParams.new_asset_settings!.mp4_support = options.mp4Support as Mp4Support;
     }
     if (options.encodingTier !== undefined) {
-      uploadParams.new_asset_settings!.encoding_tier = options.encodingTier as "smart" | "baseline";
+      uploadParams.new_asset_settings!.encoding_tier = options.encodingTier as EncodingTier;
     }
     if (options.normalizeAudio !== undefined) {
       uploadParams.new_asset_settings!.normalize_audio = true;
@@ -171,13 +181,15 @@ async function createFromConfig(
   mux: Mux,
   configPath: string,
   options: CreateOptions
-): Promise<Video.Asset> {
+): Promise<Mux.Video.Asset> {
   // Parse config file
   const config = await parseAssetConfig(configPath);
 
   // Merge with flag overrides
   if (options.playbackPolicy !== undefined) {
-    config.playback_policy = options.playbackPolicy;
+    config.playback_policy = Array.isArray(options.playbackPolicy)
+      ? options.playbackPolicy
+      : [options.playbackPolicy];
   }
   if (options.test !== undefined) {
     config.test = options.test;
@@ -195,7 +207,7 @@ async function createFromConfig(
     config.normalize_audio = options.normalizeAudio;
   }
 
-  const asset = await mux.video.assets.create(config);
+  const asset = await mux.video.assets.create(config as Mux.Video.AssetCreateParams);
   return asset;
 }
 
@@ -293,7 +305,7 @@ export const createCommand = new Command()
       // Initialize authenticated Mux client
       const mux = await createAuthenticatedMuxClient();
 
-      let result: Video.Asset | UploadResult[];
+      let result: Mux.Video.Asset | UploadResult[];
 
       // Execute appropriate creation method
       if (options.url) {
@@ -331,6 +343,9 @@ export const createCommand = new Command()
             console.log(`  Playback URL: https://stream.mux.com/${result.playback_ids[0].id}.m3u8`);
           }
         }
+      } else {
+        // This should never happen due to validation above
+        throw new Error("No input method provided");
       }
 
       // Wait for asset processing if requested

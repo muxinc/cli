@@ -98,6 +98,19 @@ When implementin' new features:
 - Type-safe enum casting throughout (playback policy, mp4 support, encoding tier)
 - Added `UploadResult` interface fer file upload responses
 
+**Extracting Types from Mux SDK:**
+- All type definitions fer enums and constraints be extracted directly from the Mux SDK rather than hardcoded
+- Uses TypeScript utility types to extract from SDK interfaces:
+  - `type LatencyMode = NonNullable<Mux.Video.LiveStreamCreateParams['latency_mode']>`
+  - `type PlaybackPolicy = Mux.PlaybackPolicy`
+  - `type EncodingTier = NonNullable<Mux.Video.AssetCreateParams['encoding_tier']>`
+  - `type Mp4Support = NonNullable<Mux.Video.AssetCreateParams['mp4_support']>`
+- Benefits:
+  - CLI types automatically stay in sync when the Mux SDK updates
+  - Single source of truth fer all Mux API types
+  - No risk of the CLI types driftin' out of sync with the SDK
+- Implemented in `assets/create.ts` and `live/create.ts`
+
 **Validation Architecture:**
 - CLI-level validation fer flag values using Cliffy's `value` callback
 - Validates enums at parse time with helpful error messages listing valid options

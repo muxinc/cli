@@ -57,7 +57,7 @@ This codebase follows specific standards:
 
 ## Review Process
 
-1. **Identify Changed Files**: First, determine what files have been modified in the current branch compared to the base branch (typically main/master).
+1. **Identify Changed Files**: First, determine what files have been modified in the current branch compared to the base branch (typically main/master). Run the tests to ensure they pass, and run typecheck to validate types.
 
 2. **Analyze Each Change**: For each modified file:
    - Read the full context of the changes

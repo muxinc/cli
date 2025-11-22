@@ -98,7 +98,7 @@ describe("expandGlobPattern", () => {
 });
 
 describe("uploadFile", () => {
-  test.todo("uploads file to direct upload URL and returns upload info");
+  test.todo("uploads file to direct upload URL and returns upload info", () => {});
 
   test.skip("uploads file to direct upload URL and returns upload info (needs mocking)", async () => {
     // Create a mock file
@@ -129,7 +129,7 @@ describe("uploadFile", () => {
     }
   });
 
-  test.todo("calls progress callback during upload");
+  test.todo("calls progress callback during upload", () => {});
 
   test.skip("calls progress callback during upload (needs mocking)", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "mux-cli-test-"));
