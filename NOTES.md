@@ -106,16 +106,33 @@ When using `--upload` with glob patterns matching multiple files:
 **Progress Reporting Limitation:**
 The `uploadFile()` function uses native fetch, which doesn't provide granular progress updates for PUT requests. Currently reports only 0% and 100%. For large files, the CLI may appear to hang during upload. Future enhancement: implement streaming upload with chunked progress tracking.
 
+### Commands Implemented
+
+**Phase 1: Asset Creation**
+- `mux assets create` - Create assets via URL, file upload, or JSON config
+  - Supports multiple input methods with glob patterns
+  - Confirmation prompts and progress reporting
+  - Wait flag for polling asset status
+
+**Phase 2: Asset Management**
+- `mux assets list` - List assets with pagination and filtering
+  - Flags: `--limit`, `--page`, `--upload-id`, `--live-stream-id`, `--json`
+- `mux assets get <asset-id>` - Get detailed asset information
+  - Shows tracks, playback IDs, resolution, encoding tier, errors
+- `mux assets delete <asset-id>` - Delete assets with confirmation
+  - Requires `--force` flag when using `--json` output for safety
+  - Interactive confirmation prompt in non-JSON mode
+
 ### Test Coverage Notes
 
-**Asset Management Tests (85 total):**
-- 81 passing tests
+**Asset Management Tests (100 total):**
+- 96 passing tests
 - 2 skipped (require network mocking)
 - 2 todo tests (network-dependent upload tests)
 
 **Test Breakdown:**
 - `json-config.test.ts`: JSON parsing and validation tests
-- `file-upload.test.ts`: Glob expansion and file validation tests
+- `file-upload.test.ts`: Glob expansion and file validation tests (2 skipped network tests)
 - `create.test.ts`: 19 CLI interface tests covering:
   - Flag combinations and mutual exclusivity validation
   - JSON config file error handling
@@ -123,6 +140,9 @@ The `uploadFile()` function uses native fetch, which doesn't provide granular pr
   - Output formatting flags verification
   - Optional flags verification
   - Command metadata verification
+- `list.test.ts`: 5 tests for command structure and flag parsing
+- `get.test.ts`: 4 tests for command structure and argument validation
+- `delete.test.ts`: 4 tests for command structure and confirmation behavior
 
 **Test Strategy:**
 - Unit tests cover JSON parsing, glob expansion, file validation
@@ -135,6 +155,36 @@ The `uploadFile()` function uses native fetch, which doesn't provide granular pr
 - ✅ Test and validate OUR CLI interface only (file exists, valid JSON, required fields present)
 - ❌ Do NOT validate Mux API constraints (enum values, field length limits, empty arrays, etc.)
 - Let the Mux API handle business rule validation and pass through their error messages
+
+### Code Quality Improvements (Phase 2)
+
+**Authentication Pattern:**
+- Extracted `createAuthenticatedMuxClient()` helper in `lib/mux.ts`
+- Eliminates code duplication across all asset commands
+- Centralizes authentication logic for easier maintenance
+
+**Type Safety:**
+- Replaced `any` types with explicit type definitions
+- Better compile-time safety and IDE support
+
+**Error Handling:**
+- Consistent error handling across all commands
+- Handles both Error and non-Error exceptions gracefully
+- Proper JSON error formatting for `--json` mode
+
+**Professional Output:**
+- Removed all emojis per project guidelines
+- Professional language in all user-facing messages
+- Consistent formatting between commands
+
+**Safety Features:**
+- Delete command requires `--force` flag with `--json` output
+- Prevents accidental deletions in automated scripts
+- Interactive confirmation prompts for destructive operations
+
+**Defensive Programming:**
+- Optional chaining for API responses (`response.data?.length ?? 0`)
+- Null-safe operations throughout
 
 ## Global TODOs
 

@@ -1,9 +1,15 @@
 import { Command } from "@cliffy/command";
 import { createCommand } from "./create.ts";
+import { listCommand } from "./list.ts";
+import { getCommand } from "./get.ts";
+import { deleteCommand } from "./delete.ts";
 
 export const assetsCommand = new Command()
   .description("Manage Mux video assets")
   .action(function () {
     this.showHelp();
   })
-  .command("create", createCommand);
+  .command("create", createCommand)
+  .command("list", listCommand)
+  .command("get", getCommand)
+  .command("delete", deleteCommand);

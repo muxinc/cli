@@ -1,7 +1,7 @@
 import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
 import Mux from "@mux/mux-node";
-import { getDefaultEnvironment } from "../../lib/config.ts";
+import { createAuthenticatedMuxClient } from "../../lib/mux.ts";
 import { parseAssetConfig } from "../../lib/json-config.ts";
 import { expandGlobPattern, uploadFile } from "../../lib/file-upload.ts";
 
@@ -143,7 +143,7 @@ async function createFromUploads(
     // Upload the file
     await uploadFile(file.path, upload.url, upload.id, (percent) => {
       if (!options.json && percent === 100) {
-        console.log(`✓ ${file.name} uploaded`);
+        console.log(`${file.name} uploaded`);
       }
     });
 
@@ -228,19 +228,8 @@ export const createCommand = new Command()
         );
       }
 
-      // Check authentication
-      const env = await getDefaultEnvironment();
-      if (!env) {
-        throw new Error(
-          "Not logged in. Please run 'mux login' to authenticate."
-        );
-      }
-
-      // Initialize Mux client
-      const mux = new Mux({
-        tokenId: env.environment.tokenId,
-        tokenSecret: env.environment.tokenSecret,
-      });
+      // Initialize authenticated Mux client
+      const mux = await createAuthenticatedMuxClient();
 
       let result: any;
 
@@ -251,7 +240,7 @@ export const createCommand = new Command()
         if (options.json) {
           console.log(JSON.stringify(result, null, 2));
         } else {
-          console.log(`✓ Asset created: ${result.id}`);
+          console.log(`Asset created: ${result.id}`);
           console.log(`  Status: ${result.status}`);
           if (result.playback_ids && result.playback_ids.length > 0) {
             console.log(`  Playback URL: https://stream.mux.com/${result.playback_ids[0].id}.m3u8`);
@@ -263,7 +252,7 @@ export const createCommand = new Command()
         if (options.json) {
           console.log(JSON.stringify(result, null, 2));
         } else {
-          console.log(`\n✓ ${result.length} file(s) uploaded successfully`);
+          console.log(`\n${result.length} file(s) uploaded successfully`);
           for (const upload of result) {
             console.log(`  - ${upload.file}: Upload ID ${upload.uploadId}`);
           }
@@ -274,7 +263,7 @@ export const createCommand = new Command()
         if (options.json) {
           console.log(JSON.stringify(result, null, 2));
         } else {
-          console.log(`✓ Asset created: ${result.id}`);
+          console.log(`Asset created: ${result.id}`);
           console.log(`  Status: ${result.status}`);
           if (result.playback_ids && result.playback_ids.length > 0) {
             console.log(`  Playback URL: https://stream.mux.com/${result.playback_ids[0].id}.m3u8`);
@@ -308,7 +297,7 @@ export const createCommand = new Command()
 
         if (asset.status === "ready") {
           if (!options.json) {
-            console.log("✓ Asset is ready!");
+            console.log("Asset is ready!");
           }
         } else if (asset.status === "errored") {
           throw new Error(
@@ -316,7 +305,7 @@ export const createCommand = new Command()
           );
         } else {
           if (!options.json) {
-            console.log("⚠ Asset is still processing. Check status later.");
+            console.log("WARNING: Asset is still processing. Check status later.");
           }
         }
 

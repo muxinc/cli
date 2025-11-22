@@ -1,4 +1,23 @@
 import Mux from "@mux/mux-node";
+import { getDefaultEnvironment } from "./config.ts";
+
+/**
+ * Create an authenticated Mux client using stored credentials
+ * Throws an error if not logged in
+ */
+export async function createAuthenticatedMuxClient(): Promise<Mux> {
+  const env = await getDefaultEnvironment();
+  if (!env) {
+    throw new Error(
+      "Not logged in. Please run 'mux login' to authenticate."
+    );
+  }
+
+  return new Mux({
+    tokenId: env.environment.tokenId,
+    tokenSecret: env.environment.tokenSecret,
+  });
+}
 
 /**
  * Validate Mux credentials by making a simple API call
