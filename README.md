@@ -164,6 +164,136 @@ mux assets create --upload ./videos/*.mp4 --playback-policy public
 # Continue with upload? (y/n):
 ```
 
+#### `mux assets list`
+
+List all video assets with pagination and filtering options.
+
+**Options:**
+- `--limit <number>` - Number of results to return (default: 25)
+- `--page <number>` - Page number for pagination (default: 1)
+- `--upload-id <id>` - Filter assets by upload ID
+- `--live-stream-id <id>` - Filter assets by live stream ID
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# List assets with default settings (25 assets, page 1)
+mux assets list
+
+# List first 10 assets
+mux assets list --limit 10
+
+# List second page of results
+mux assets list --page 2
+
+# Filter by upload ID
+mux assets list --upload-id abc123xyz
+
+# Get JSON output for scripting
+mux assets list --json
+```
+
+**Output:**
+
+```
+Found 3 asset(s):
+
+Asset ID: abc123xyz
+  Status: ready
+  Duration: 120.45s
+  Created: 1234567890
+  Playback URL: https://stream.mux.com/playback123.m3u8
+  Passthrough: my-video-metadata
+
+Asset ID: def456uvw
+  Status: preparing
+  Duration: N/A
+  Created: 1234567891
+  Playback URL: https://stream.mux.com/playback456.m3u8
+```
+
+#### `mux assets get <asset-id>`
+
+Get detailed information about a specific video asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset to retrieve
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Get asset details
+mux assets get abc123xyz
+
+# Get asset details as JSON
+mux assets get abc123xyz --json
+```
+
+**Output:**
+
+```
+Asset ID: abc123xyz
+Status: ready
+Duration: 120.45s
+Created: 1234567890
+Aspect Ratio: 16:9
+Resolution Tier: 1080p
+Encoding Tier: smart
+Max Resolution: HD
+Max Frame Rate: 30.00 fps
+
+Playback IDs:
+  - playback123 (public)
+    URL: https://stream.mux.com/playback123.m3u8
+
+Tracks:
+  - audio: audio_track_id
+    Duration: 120.45s
+  - video: video_track_id
+    Duration: 120.45s
+
+Passthrough: my-video-metadata
+
+WARNING: This is a test asset (will be deleted after 24 hours)
+```
+
+#### `mux assets delete <asset-id>`
+
+Delete a video asset permanently.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset to delete
+
+**Options:**
+- `-f, --force` - Skip confirmation prompt
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Delete asset with confirmation prompt
+mux assets delete abc123xyz
+
+# Delete asset without confirmation
+mux assets delete abc123xyz --force
+
+# Delete asset with JSON output (requires --force for safety)
+mux assets delete abc123xyz --json --force
+```
+
+**Important:** When using `--json` output mode, you must also provide the `--force` flag. This safety feature prevents accidental deletions in automated scripts.
+
+**Output:**
+
+```
+Are you sure you want to delete asset abc123xyz? (y/n): y
+Asset abc123xyz deleted successfully
+```
+
 ### Authentication & Environment Management
 
 #### `mux login`
@@ -302,15 +432,23 @@ bun test --watch
 ```
 src/
 ├── commands/           # CLI command definitions
+│   ├── assets/        # Asset management commands
+│   │   ├── index.ts   # Main assets command
+│   │   ├── create.ts  # Create assets
+│   │   ├── list.ts    # List assets
+│   │   ├── get.ts     # Get asset details
+│   │   └── delete.ts  # Delete assets
+│   ├── env/           # Environment management commands
+│   │   ├── index.ts   # Main env command
+│   │   ├── list.ts    # List environments
+│   │   └── switch.ts  # Switch default environment
 │   ├── login.ts       # Login command
-│   ├── logout.ts      # Logout command
-│   └── env/           # Environment management commands
-│       ├── index.ts   # Main env command
-│       ├── list.ts    # List environments
-│       └── switch.ts  # Switch default environment
+│   └── logout.ts      # Logout command
 ├── lib/               # Shared libraries
 │   ├── config.ts      # Configuration management
-│   ├── mux.ts         # Mux API integration
+│   ├── mux.ts         # Mux API integration and auth helpers
+│   ├── json-config.ts # JSON configuration parsing
+│   ├── file-upload.ts # File upload utilities
 │   └── xdg.ts         # XDG base directory support
 └── index.ts           # CLI entry point
 ```
