@@ -192,6 +192,10 @@ The `uploadFile()` function uses native fetch, which doesn't provide granular pr
 - Add unit tests fer `validateCredentials()` with mocked Mux API responses
 - Consider adding integration tests fer CLI commands if complexity increases
 - Evaluate need fer credential refresh/expiration handling
+- **Update README.md installation instructions fer end users** - Current instructions be fer developers (pnpm install, pnpm run build). Need to add end-user installation methods:
+  - Global install via npm/pnpm (`npm install -g @mux/cli`)
+  - Homebrew installation (`brew install mux/tap/mux-cli`)
+  - Keep developer setup in a separate "Development" section
 - **Support custom base URL fer staging/sandbox environments** - Allow users to pass a custom Mux API base URL (e.g., `--base-url https://api.staging.mux.com`) to use the CLI with non-production Mux environments. This would need to be:
   - Configurable per environment in the config
   - Passed to the Mux SDK client initialization
