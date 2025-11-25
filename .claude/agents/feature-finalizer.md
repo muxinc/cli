@@ -22,6 +22,8 @@ Your mission when a feature is complete and approved:
      * Test real code, not mocks (except for third-party services)
      * Tests are self-contained and clean up after themselves
    - If gaps are found, clearly enumerate what additional tests are needed
+   - Run typecheck and make sure there are no type errors
+   - Run lint and check to ensure code style and formatting are consistent
 
 2. **Migrate Notes from PLAN.md to NOTES.md**:
    - Review PLAN.md for observations, decisions, and insights worth preserving
