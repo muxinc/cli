@@ -40,12 +40,10 @@ export async function writeConfig(config: Config): Promise<void> {
 	const configPath = getConfigPath();
 	const configDir = dirname(configPath);
 
-	// Create directory if it doesn't exist
-	if (!existsSync(configDir)) {
-		await mkdir(configDir, { recursive: true, mode: 0o700 });
-	}
-
 	try {
+		// Create directory if needed - recursive: true makes this idempotent
+		await mkdir(configDir, { recursive: true, mode: 0o700 });
+
 		await writeFile(configPath, JSON.stringify(config, null, 2), {
 			mode: 0o600, // Only readable/writable by owner
 		});

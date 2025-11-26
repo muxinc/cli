@@ -453,6 +453,166 @@ Implemented complete signing key management and JWT-based playback ID signing fe
 - Integration with `mux login` to optionally capture signing keys during auth
 - Key rotation helper command (`mux signing-keys rotate`) that creates new, updates config, and optionally deletes old after delay
 
+## Interactive TUI for Asset Management
+
+### Overview
+Implemented an interactive Terminal User Interface using OpenTUI fer managin' Mux assets directly from the terminal. This complements the existing CLI commands by providin' a visual, interactive alternative fer asset management tasks.
+
+### Architecture Decisions
+
+**Command Separation:**
+- `mux assets manage` - Interactive TUI fer visual asset management
+- `mux assets list` - Non-interactive command fer scripting and piping
+- Clear separation keeps both use cases optimal fer their respective purposes
+- TUI checks fer TTY presence and falls back with helpful error message
+
+**Shared Utilities Philosophy:**
+- All business logic extracted to reusable lib functions (`src/lib/`)
+- Both TUI and CLI commands use the same underlying utilities
+- This ensures consistent behavior across interactive and non-interactive modes
+- Shared functions: `playback-ids.ts`, `urls.ts`, `signing.ts`, `clipboard.ts`
+
+**Reusable TUI Components:**
+- Built generic components in `src/lib/tui/` fer future reuse
+- `SelectList` - Keyboard-navigable list with scrolling
+- `ActionMenu` - Action selection with highlighting
+- `ConfirmDialog` - Confirmation prompts fer destructive operations
+- `clipboard.ts` - Cross-platform clipboard support (macOS, Linux, Windows)
+- These components can be reused fer future TUI commands (live streams, signing keys, etc.)
+
+### Technology Stack
+
+**OpenTUI Framework:**
+- Uses `@opentui/core` and `@opentui/react` fer TUI rendering
+- React-based component model fer familiar development experience
+- Built on Yoga layout engine (Flexbox-like layout fer terminals)
+- React 19 fer modern hooks and concurrent features
+
+**TypeScript Configuration:**
+- Added `"jsxImportSource": "@opentui/react"` to tsconfig fer proper JSX handling
+- TUI components use `.tsx` extension fer React components
+- Type safety maintained throughout with proper Mux SDK types
+
+### Key Features Implemented
+
+**Asset Browsing:**
+- Paginated asset list with keyboard navigation
+- Shows asset ID, status, duration, and passthrough/title
+- Loading states and error handling
+- Empty state fer accounts with no assets
+
+**Action Menu:**
+- View asset details
+- Copy stream URL (HLS .m3u8) - automatically signed if policy requires it
+- Copy player URL - automatically signed if policy requires it
+- Create new playback ID (choose public or signed)
+- Delete existing playback ID
+- Delete asset (with confirmation)
+
+**Automatic URL Signing:**
+- Detects if playback ID has `signed` policy
+- Automatically generates JWT token using configured signing keys
+- Seamlessly appends token to URLs before clipboard copy
+- Falls back gracefully if signing keys not configured
+
+**Clipboard Integration:**
+- Cross-platform clipboard support
+- macOS: Uses `pbcopy`
+- Linux: Uses `xclip` (with `xsel` fallback)
+- Windows: Uses `clip`
+- Helpful error messages if clipboard tools not available
+
+### Playback ID CLI Commands
+
+Added complete playback ID management fer both assets and live streams:
+
+**Asset Playback IDs:**
+- `mux assets playback-ids list <asset-id>` - List all playback IDs
+- `mux assets playback-ids create <asset-id>` - Create new playback ID
+- `mux assets playback-ids delete <asset-id> <playback-id>` - Delete playback ID
+
+**Live Stream Playback IDs:**
+- `mux live playback-ids list <stream-id>` - List all playback IDs
+- `mux live playback-ids create <stream-id>` - Create new playback ID
+- `mux live playback-ids delete <stream-id> <playback-id>` - Delete playback ID
+
+All commands support `--json` output and follow consistent patterns with other CLI commands.
+
+### Test Coverage
+
+**Shared Utilities:**
+- `urls.test.ts` - 6 tests fer URL generation functions
+- `signing.test.ts` - 5 tests fer signing key detection
+- `playback-ids.test.ts` - 9 tests fer playback ID operations with mocked Mux client
+
+**CLI Commands:**
+- Comprehensive test coverage fer all playback-id commands (list, create, delete)
+- Tests cover command structure, flag parsing, and validation
+- Follow project philosophy: no sleep(), human readable, test real code
+
+**TUI Components:**
+- No test coverage fer TUI components (AssetManageApp, SelectList, ActionMenu, ConfirmDialog)
+- TUI components be UI-focused and difficult to test without E2E framework
+- Verified through manual testing instead
+- Future consideration: Add E2E tests with terminal automation if needed
+
+### Design Patterns
+
+**Dynamic Imports:**
+- TUI dependencies loaded only when `mux assets manage` command is invoked
+- Keeps CLI startup fast fer non-TUI commands
+- Uses dynamic imports: `await import("@opentui/core")`
+
+**Error Handling:**
+- TTY check prevents errors in non-interactive environments
+- Graceful fallbacks fer missing clipboard tools
+- User-friendly error messages throughout
+- Loading states prevent confusion during API calls
+
+**State Management:**
+- React hooks fer local component state
+- View-based state machine (`list`, `actions`, `confirm-delete`, etc.)
+- Clear state transitions fer predictable UX
+
+### Integration Notes
+
+**Command Registration:**
+- TUI command NOT registered in assets index to avoid accidental discovery
+- Available through `mux assets manage` but not listed in base help
+- This keeps the CLI focused on scripting use cases by default
+- Users discover TUI through documentation or explicit search
+
+**SDK Usage:**
+- Uses same Mux SDK client as CLI commands
+- Authenticates using existing config management
+- Consistent credential handling across TUI and CLI
+
+### Known Limitations
+
+**Terminal Requirements:**
+- Requires interactive terminal (TTY)
+- No support fer piping or scripting
+- Falls back with helpful error message if run non-interactively
+
+**Clipboard Dependencies:**
+- Linux users must have `xclip` or `xsel` installed
+- Windows users must have `clip` available (usually present by default)
+- macOS works out of box with `pbcopy`
+
+**Pagination:**
+- Currently loads first page of assets only
+- Future enhancement: Add "load more" action fer pagination
+
+### Future Enhancements
+
+**Potential Improvements:**
+- Live stream management TUI using same reusable components
+- Signing key management TUI
+- Search/filter functionality in asset list
+- Pagination support fer large asset libraries
+- Asset creation through TUI interface
+- Batch operations (select multiple assets)
+
 ## Global TODOs
 
 ### Future Enhancements

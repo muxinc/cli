@@ -47,11 +47,18 @@ export const createCommand = new Command()
 			const createdAt = signingKey.created_at;
 
 			// Store the signing key in the current environment config
-			await setEnvironment(currentEnv.name, {
-				...currentEnv.environment,
-				signingKeyId: keyId,
-				signingPrivateKey: privateKey,
-			});
+			// Wrap in try-catch to prevent privateKey from leaking in error messages
+			try {
+				await setEnvironment(currentEnv.name, {
+					...currentEnv.environment,
+					signingKeyId: keyId,
+					signingPrivateKey: privateKey,
+				});
+			} catch (err) {
+				throw new Error(
+					`Failed to save signing key to config: ${err instanceof Error ? err.message : "Unknown error"}`,
+				);
+			}
 
 			if (options.json) {
 				console.log(

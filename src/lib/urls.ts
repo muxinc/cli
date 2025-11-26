@@ -18,7 +18,7 @@ export function getStreamUrl(playbackId: string, token?: string): string {
 export function getPlayerUrl(playbackId: string, token?: string): string {
 	const url = `${PLAYER_BASE_URL}/${playbackId}`;
 	if (token) {
-		return `${url}?token=${token}`;
+		return `${url}?playback-token=${token}`;
 	}
 	return url;
 }

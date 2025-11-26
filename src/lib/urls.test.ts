@@ -24,9 +24,11 @@ describe("getPlayerUrl", () => {
 		expect(url).toBe("https://player.mux.com/abc123");
 	});
 
-	test("appends token as query param when provided", () => {
+	test("appends playback-token as query param when provided", () => {
 		const url = getPlayerUrl("abc123", "my-jwt-token");
-		expect(url).toBe("https://player.mux.com/abc123?token=my-jwt-token");
+		expect(url).toBe(
+			"https://player.mux.com/abc123?playback-token=my-jwt-token",
+		);
 	});
 
 	test("handles playback IDs with special characters", () => {

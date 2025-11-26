@@ -1,6 +1,7 @@
 import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
 import { createAuthenticatedMuxClient } from "../../../lib/mux.ts";
+import { deleteLiveStreamPlaybackId } from "../../../lib/playback-ids.ts";
 
 interface DeleteOptions {
 	force?: boolean;
@@ -39,7 +40,7 @@ export const deleteCommand = new Command()
 					}
 				}
 
-				await mux.video.liveStreams.deletePlaybackId(liveStreamId, playbackId);
+				await deleteLiveStreamPlaybackId(mux, liveStreamId, playbackId);
 
 				if (options.json) {
 					console.log(

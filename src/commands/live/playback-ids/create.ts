@@ -1,6 +1,9 @@
 import { Command } from "@cliffy/command";
 import { createAuthenticatedMuxClient } from "../../../lib/mux.ts";
-import type { PlaybackIdPolicy } from "../../../lib/playback-ids.ts";
+import {
+	createLiveStreamPlaybackId,
+	type PlaybackIdPolicy,
+} from "../../../lib/playback-ids.ts";
 import { getStreamUrl, getPlayerUrl } from "../../../lib/urls.ts";
 
 interface CreateOptions {
@@ -32,15 +35,11 @@ export const createCommand = new Command()
 			const mux = await createAuthenticatedMuxClient();
 			const policy = options.policy ?? "public";
 
-			const result = await mux.video.liveStreams.createPlaybackId(
+			const playbackId = await createLiveStreamPlaybackId(
+				mux,
 				liveStreamId,
-				{ policy },
+				policy,
 			);
-
-			const playbackId = {
-				id: result.id as string,
-				policy: result.policy as PlaybackIdPolicy,
-			};
 
 			if (options.json) {
 				console.log(

@@ -294,6 +294,138 @@ Are you sure you want to delete asset abc123xyz? (y/n): y
 Asset abc123xyz deleted successfully
 ```
 
+#### `mux assets manage`
+
+Interactively manage Mux video assets using a terminal user interface (TUI). This command provides a visual interface to browse assets, view details, manage playback IDs, and copy URLs directly from your terminal.
+
+**Examples:**
+
+```bash
+# Launch the interactive asset management TUI
+mux assets manage
+```
+
+**Features:**
+
+- Browse all video assets with pagination
+- View detailed asset information
+- Create and delete playback IDs
+- Copy stream URLs (HLS) to clipboard
+- Copy player URLs to clipboard
+- Delete assets with confirmation
+- Automatic URL signing for signed playback policies
+
+**Navigation:**
+
+- **Arrow keys** - Navigate through assets and menu options
+- **Enter** - Select an asset or action
+- **q** - Quit or go back to previous view
+- **Escape** - Cancel current operation
+
+**Note:** This command requires an interactive terminal (TTY). For scripting and non-interactive use cases, use `mux assets list`, `mux assets get`, and related commands instead.
+
+#### Playback ID Management
+
+Playback IDs control access to your video assets. Each asset can have multiple playback IDs with different policies (public or signed).
+
+##### `mux assets playback-ids list <asset-id>`
+
+List all playback IDs for a specific asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# List playback IDs for an asset
+mux assets playback-ids list abc123xyz
+
+# Get JSON output
+mux assets playback-ids list abc123xyz --json
+```
+
+**Output:**
+
+```
+Found 2 playback ID(s) for asset abc123xyz:
+
+Playback ID: playback123
+  Policy: public
+  URL: https://stream.mux.com/playback123.m3u8
+
+Playback ID: playback456
+  Policy: signed
+  URL: https://stream.mux.com/playback456.m3u8
+```
+
+##### `mux assets playback-ids create <asset-id>`
+
+Create a new playback ID for an asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+
+**Options:**
+- `--policy <policy>` - Playback policy: `public` or `signed` (default: `public`)
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Create a public playback ID
+mux assets playback-ids create abc123xyz
+
+# Create a signed playback ID
+mux assets playback-ids create abc123xyz --policy signed
+
+# Get JSON output
+mux assets playback-ids create abc123xyz --policy public --json
+```
+
+**Output:**
+
+```
+Playback ID created: playback123
+  Policy: public
+  URL: https://stream.mux.com/playback123.m3u8
+```
+
+##### `mux assets playback-ids delete <asset-id> <playback-id>`
+
+Delete a playback ID from an asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+- `<playback-id>` - The ID of the playback ID to delete
+
+**Options:**
+- `-f, --force` - Skip confirmation prompt
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Delete a playback ID with confirmation
+mux assets playback-ids delete abc123xyz playback123
+
+# Delete without confirmation
+mux assets playback-ids delete abc123xyz playback123 --force
+
+# Delete with JSON output
+mux assets playback-ids delete abc123xyz playback123 --force --json
+```
+
+**Output:**
+
+```
+Are you sure you want to delete playback ID playback123 from asset abc123xyz? (y/n): y
+Playback ID playback123 deleted successfully
+```
+
 ### Live Stream Management
 
 #### `mux live create`
@@ -464,6 +596,108 @@ mux live delete abc123xyz --json --force
 ```
 Are you sure you want to delete live stream abc123xyz? (y/n): y
 Live stream abc123xyz deleted successfully
+```
+
+#### Playback ID Management
+
+Manage playback IDs for live streams. Each live stream can have multiple playback IDs with different policies (public or signed).
+
+##### `mux live playback-ids list <stream-id>`
+
+List all playback IDs for a specific live stream.
+
+**Arguments:**
+- `<stream-id>` - The ID of the live stream
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# List playback IDs for a live stream
+mux live playback-ids list abc123xyz
+
+# Get JSON output
+mux live playback-ids list abc123xyz --json
+```
+
+**Output:**
+
+```
+Found 2 playback ID(s) for live stream abc123xyz:
+
+Playback ID: playback123
+  Policy: public
+  URL: https://stream.mux.com/playback123.m3u8
+
+Playback ID: playback456
+  Policy: signed
+  URL: https://stream.mux.com/playback456.m3u8
+```
+
+##### `mux live playback-ids create <stream-id>`
+
+Create a new playback ID for a live stream.
+
+**Arguments:**
+- `<stream-id>` - The ID of the live stream
+
+**Options:**
+- `--policy <policy>` - Playback policy: `public` or `signed` (default: `public`)
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Create a public playback ID
+mux live playback-ids create abc123xyz
+
+# Create a signed playback ID
+mux live playback-ids create abc123xyz --policy signed
+
+# Get JSON output
+mux live playback-ids create abc123xyz --policy public --json
+```
+
+**Output:**
+
+```
+Playback ID created: playback123
+  Policy: public
+  URL: https://stream.mux.com/playback123.m3u8
+```
+
+##### `mux live playback-ids delete <stream-id> <playback-id>`
+
+Delete a playback ID from a live stream.
+
+**Arguments:**
+- `<stream-id>` - The ID of the live stream
+- `<playback-id>` - The ID of the playback ID to delete
+
+**Options:**
+- `-f, --force` - Skip confirmation prompt
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Delete a playback ID with confirmation
+mux live playback-ids delete abc123xyz playback123
+
+# Delete without confirmation
+mux live playback-ids delete abc123xyz playback123 --force
+
+# Delete with JSON output
+mux live playback-ids delete abc123xyz playback123 --force --json
+```
+
+**Output:**
+
+```
+Are you sure you want to delete playback ID playback123 from live stream abc123xyz? (y/n): y
+Playback ID playback123 deleted successfully
 ```
 
 ### Signing Keys & Secure Playback
@@ -791,39 +1025,62 @@ bun test --watch
 
 ```
 src/
-├── commands/              # CLI command definitions
-│   ├── assets/           # Asset management commands
-│   │   ├── index.ts      # Main assets command
-│   │   ├── create.ts     # Create assets
-│   │   ├── list.ts       # List assets
-│   │   ├── get.ts        # Get asset details
-│   │   └── delete.ts     # Delete assets
-│   ├── live/             # Live stream management commands
-│   │   ├── index.ts      # Main live command
-│   │   ├── create.ts     # Create live streams
-│   │   ├── list.ts       # List live streams
-│   │   ├── get.ts        # Get live stream details
-│   │   └── delete.ts     # Delete live streams
-│   ├── signing-keys/     # Signing key management commands
-│   │   ├── index.ts      # Main signing-keys command
-│   │   ├── create.ts     # Create signing keys
-│   │   ├── list.ts       # List signing keys
-│   │   ├── get.ts        # Get signing key details
-│   │   └── delete.ts     # Delete signing keys
-│   ├── env/              # Environment management commands
-│   │   ├── index.ts      # Main env command
-│   │   ├── list.ts       # List environments
-│   │   └── switch.ts     # Switch default environment
-│   ├── login.ts          # Login command
-│   ├── logout.ts         # Logout command
-│   └── sign.ts           # Sign playback IDs command
-├── lib/                  # Shared libraries
-│   ├── config.ts         # Configuration management
-│   ├── mux.ts            # Mux API integration and auth helpers
-│   ├── json-config.ts    # JSON configuration parsing
-│   ├── file-upload.ts    # File upload utilities
-│   └── xdg.ts            # XDG base directory support
-└── index.ts              # CLI entry point
+├── commands/                 # CLI command definitions
+│   ├── assets/              # Asset management commands
+│   │   ├── manage/          # Interactive TUI for asset management
+│   │   │   ├── index.ts     # TUI command entry point
+│   │   │   └── AssetManageApp.tsx  # Main TUI application
+│   │   ├── playback-ids/    # Playback ID commands for assets
+│   │   │   ├── index.ts     # Main playback-ids command
+│   │   │   ├── create.ts    # Create playback IDs
+│   │   │   ├── list.ts      # List playback IDs
+│   │   │   └── delete.ts    # Delete playback IDs
+│   │   ├── index.ts         # Main assets command
+│   │   ├── create.ts        # Create assets
+│   │   ├── list.ts          # List assets
+│   │   ├── get.ts           # Get asset details
+│   │   └── delete.ts        # Delete assets
+│   ├── live/                # Live stream management commands
+│   │   ├── playback-ids/    # Playback ID commands for live streams
+│   │   │   ├── index.ts     # Main playback-ids command
+│   │   │   ├── create.ts    # Create playback IDs
+│   │   │   ├── list.ts      # List playback IDs
+│   │   │   └── delete.ts    # Delete playback IDs
+│   │   ├── index.ts         # Main live command
+│   │   ├── create.ts        # Create live streams
+│   │   ├── list.ts          # List live streams
+│   │   ├── get.ts           # Get live stream details
+│   │   └── delete.ts        # Delete live streams
+│   ├── signing-keys/        # Signing key management commands
+│   │   ├── index.ts         # Main signing-keys command
+│   │   ├── create.ts        # Create signing keys
+│   │   ├── list.ts          # List signing keys
+│   │   ├── get.ts           # Get signing key details
+│   │   └── delete.ts        # Delete signing keys
+│   ├── env/                 # Environment management commands
+│   │   ├── index.ts         # Main env command
+│   │   ├── list.ts          # List environments
+│   │   └── switch.ts        # Switch default environment
+│   ├── login.ts             # Login command
+│   ├── logout.ts            # Logout command
+│   └── sign.ts              # Sign playback IDs command
+├── lib/                     # Shared libraries
+│   ├── tui/                 # Reusable TUI components
+│   │   ├── index.ts         # TUI exports
+│   │   ├── renderer.tsx     # OpenTUI renderer setup
+│   │   ├── SelectList.tsx   # Reusable selection list component
+│   │   ├── ActionMenu.tsx   # Reusable action menu component
+│   │   ├── ConfirmDialog.tsx # Reusable confirmation dialog
+│   │   └── clipboard.ts     # Clipboard utilities
+│   ├── config.ts            # Configuration management
+│   ├── mux.ts               # Mux API integration and auth helpers
+│   ├── json-config.ts       # JSON configuration parsing
+│   ├── file-upload.ts       # File upload utilities
+│   ├── urls.ts              # URL generation (stream, player)
+│   ├── signing.ts           # JWT signing utilities
+│   ├── playback-ids.ts      # Playback ID operations
+│   └── xdg.ts               # XDG base directory support
+└── index.ts                 # CLI entry point
 ```
 
 ## License
