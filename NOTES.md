@@ -242,6 +242,217 @@ The `uploadFile()` function uses native fetch, which doesn't provide granular pr
 - Optional chaining for API responses (`response.data?.length ?? 0`)
 - Null-safe operations throughout
 
+## Signing Keys & Secure Playback
+
+### Overview
+Implemented complete signing key management and JWT-based playback ID signing fer secure video playback. The feature consists of two main command groups:
+
+1. **Signing Key Management** (`mux signing-keys`) - Manage RSA signing keys via the Mux API
+2. **Playback ID Signing** (`mux sign`) - Sign playback IDs to generate secure URLs
+
+### Architecture
+
+**Config Storage:**
+- Signing keys stored in the Environment interface with optional fields:
+  - `signingKeyId?: string` - The signing key ID from Mux
+  - `signingPrivateKey?: string` - Base64-encoded RSA private key (2048-bit)
+- One signing key per environment (design follows Mux's recommendation)
+- Keys stored securely in config with 0o600 file permissions
+
+**SDK Integration:**
+- Signing key management uses `mux.system.signingKeys` API:
+  - `create()` - Returns private key ONLY ONCE during creation
+  - `list()` - Returns all keys (without private keys)
+  - `retrieve(id)` - Gets specific key details (without private key)
+  - `delete(id)` - Deletes a key and invalidates all signatures
+- JWT signing uses `Mux.JWT.sign()` with explicit credentials:
+  - Takes `keyId` and `keySecret` from environment config
+  - Supports type ('video', 'thumbnail', 'gif', 'storyboard')
+  - Supports expiration duration strings ('7d', '1h', etc.)
+
+### Commands Implemented
+
+**Signing Key Management (`mux signing-keys`):**
+- `mux signing-keys create` - Creates a new signing key and automatically stores it in the current environment
+  - No required arguments
+  - Flag: `--json` fer JSON output
+  - Automatic config update with returned private key
+  - Private key only returned once by API, must be captured immediately
+
+- `mux signing-keys list` - Lists all signing keys with local environment indicators
+  - Shows which keys are configured in local environments
+  - Flag: `--json` fer JSON output
+  - Displays created_at timestamps and active environment names
+
+- `mux signing-keys get <key-id>` - Gets details about a specific signing key
+  - Required argument: `signing-key-id`
+  - Flag: `--json` fer JSON output
+  - Shows if key is active in any local environment
+
+- `mux signing-keys delete <key-id>` - Deletes a signing key with safety checks
+  - Required argument: `signing-key-id`
+  - Flag: `-f, --force` to skip confirmation prompt
+  - Warns if key is in use by any local environment
+  - Automatically removes from affected environment configs
+  - Requires explicit confirmation unless --force is provided
+
+**Playback ID Signing (`mux sign`):**
+- `mux sign <playback-id>` - Signs a playback ID fer secure playback
+  - Required argument: `playback-id`
+  - Flags:
+    - `-e, --expiration <duration>` - Expiration duration (default: '7d')
+    - `-t, --type <type>` - Token type: video, thumbnail, gif, storyboard (default: 'video')
+    - `--json` - Output JSON format with all details
+    - `--token-only` - Output only the JWT token (no URL)
+  - Default output: Full signed URL (https://stream.mux.com/{id}.m3u8?token={jwt})
+  - Validates signing keys are configured before attempting to sign
+  - Helpful error message directs users to `mux signing-keys create` if not configured
+
+### Test Coverage
+
+**Total: 48 new tests, all passing**
+
+- `signing-keys/create.test.ts`: 4 tests
+  - Command metadata (description, flags, arguments)
+  - JSON flag validation
+  - Auth requirement verification
+
+- `signing-keys/list.test.ts`: 4 tests
+  - Command metadata
+  - JSON flag validation
+  - Auth requirement verification
+
+- `signing-keys/get.test.ts`: 4 tests
+  - Command metadata
+  - Argument validation (signing-key-id required)
+  - JSON flag validation
+  - Auth requirement verification
+
+- `signing-keys/delete.test.ts`: 4 tests
+  - Command metadata
+  - Argument validation
+  - Force flag validation
+  - Auth requirement verification
+
+- `sign.test.ts`: 12 tests
+  - Command metadata (description, arguments, flags)
+  - Default values (expiration='7d', type='video')
+  - Type validation (video, thumbnail, gif, storyboard)
+  - Invalid type rejection with helpful error message
+  - Signing key configuration requirement
+
+**Test Strategy:**
+- Tests focus on CLI interface layer (command structure, flag parsing, validation)
+- Do NOT test actual Mux API integration (verified via manual testing)
+- Use spyOn to mock process.exit and console methods
+- Follow project philosophy: no sleep(), human readable, test real code
+
+### Design Decisions
+
+**1. Automatic Key Storage on Creation:**
+- Private keys are only returned once by the Mux API during creation
+- CLI automatically stores key in current environment to prevent loss
+- Users don't have to manually edit config files
+- Reduces friction and potential fer user error
+
+**2. One Key Per Environment:**
+- Mux documentation states "you probably only need one active at a time"
+- Creating a new key automatically replaces the old one in config
+- Simpler mental model fer users
+- Still supports key rotation (create new, delete old after URLs expire)
+
+**3. Top-Level Sign Command:**
+- Using `mux sign` instead of `mux assets sign` or `mux live sign`
+- Signing works identically fer both asset and live stream playback IDs
+- Simpler UX with fewer nested commands
+- Playback ID is agnostic to source type
+
+**4. Default Output Format:**
+- Sign command defaults to outputting full signed URL
+- Most common use case is copy/paste the URL fer testing
+- `--token-only` flag available fer scripts that need just the JWT
+- `--json` flag provides structured output with all details
+
+**5. Environment Indicators in List:**
+- `mux signing-keys list` shows which keys are configured locally
+- Helps users understand which keys are in use
+- Cross-references Mux API data with local config
+- Useful fer key rotation and cleanup
+
+**6. Safety Features in Delete:**
+- Delete command warns if key is in use by any environment
+- Requires explicit confirmation (unless --force)
+- Automatically cleans up affected environment configs
+- Prevents accidental deletion of keys in active use
+
+### Type Safety
+
+**Using Mux SDK Types:**
+- All signing key types extracted from `@mux/mux-node`
+- Uses SDK's `SigningKey` interface directly
+- JWT signing uses `Mux.JWT.sign()` method
+- Token types defined as const array with type extraction:
+  ```typescript
+  const VALID_TYPES = ["video", "thumbnail", "gif", "storyboard"] as const;
+  type TokenType = (typeof VALID_TYPES)[number];
+  ```
+- Ensures CLI types stay in sync with SDK updates
+
+**Benefits:**
+- Single source of truth fer all signing-related types
+- Compile-time safety fer token types and options
+- No risk of CLI types driftin' out of sync with SDK
+
+### Error Handling
+
+**Helpful Error Messages:**
+- Sign command checks fer configured signing keys before attempting to sign
+- If keys not configured, provides actionable guidance:
+  ```
+  Signing keys not configured for this environment.
+
+  To create and configure a signing key, run:
+    mux signing-keys create
+
+  This will create a new signing key and automatically configure it for your current environment.
+  ```
+- Delete command warns about invalidating signed URLs
+- All errors support both pretty and JSON output formats
+
+**Validation:**
+- Token type validated at parse time with helpful error listing valid options
+- Auth requirement validated before any API calls
+- Consistent error handling across all commands
+
+### Integration Notes
+
+**Command Registration:**
+- Signing keys commands registered as command group in `src/index.ts`
+- Sign command registered as top-level command
+- Both commands visible in main CLI help
+
+**Dependencies:**
+- Uses existing `getDefaultEnvironment()` and `setEnvironment()` from `lib/config.ts`
+- No new dependencies required (uses existing Mux SDK and Cliffy)
+- JWT signing handled entirely by Mux SDK
+
+### Known Limitations
+
+**Bun Runtime Compatibility (RESOLVED):**
+- Previous issue with CryptoKey/KeyObject type mismatch in Bun has been resolved
+- The `mux sign` command now works properly in Bun runtime
+- Fix merged in Mux Node SDK PR: https://github.com/muxinc/mux-node-sdk/pull/585
+- All commands now fully compatible with Bun runtime
+
+### Future Enhancements
+
+**Potential Improvements:**
+- Support fer multiple token types in one call (SDK supports arrays)
+- Thumbnail parameters (`--time`, `--width`) fer thumbnail tokens
+- Playback restriction ID support fer domain/user-agent validation
+- Integration with `mux login` to optionally capture signing keys during auth
+- Key rotation helper command (`mux signing-keys rotate`) that creates new, updates config, and optionally deletes old after delay
+
 ## Global TODOs
 
 ### Future Enhancements

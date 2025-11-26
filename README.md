@@ -466,6 +466,194 @@ Are you sure you want to delete live stream abc123xyz? (y/n): y
 Live stream abc123xyz deleted successfully
 ```
 
+### Signing Keys & Secure Playback
+
+#### `mux signing-keys create`
+
+Create a new signing key for secure video playback and automatically save it to the current environment.
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Create a new signing key
+mux signing-keys create
+
+# Create a signing key with JSON output
+mux signing-keys create --json
+```
+
+**Output:**
+
+```
+Signing key created and saved to environment: default
+Key ID: qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
+```
+
+**Important:** The private key is only returned once during creation. The CLI automatically stores it in your current environment configuration, so you don't need to manually save it.
+
+#### `mux signing-keys list`
+
+List all signing keys with indicators showing which keys are configured in local environments.
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# List all signing keys
+mux signing-keys list
+
+# List signing keys with JSON output
+mux signing-keys list --json
+```
+
+**Output:**
+
+```
+Found 2 signing key(s):
+
+Key ID: qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
+  Created: 1234567890
+  Active in environments: production, staging
+
+Key ID: abc123def456ghi789jkl012mno345pq
+  Created: 1234567891
+  Active in environments: development
+```
+
+#### `mux signing-keys get <key-id>`
+
+Get detailed information about a specific signing key.
+
+**Arguments:**
+- `<key-id>` - The ID of the signing key to retrieve
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Get signing key details
+mux signing-keys get qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
+
+# Get signing key details as JSON
+mux signing-keys get qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ --json
+```
+
+**Output:**
+
+```
+Signing Key ID: qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
+Created: 1234567890
+Active in environments: production
+```
+
+#### `mux signing-keys delete <key-id>`
+
+Delete a signing key permanently. This will invalidate all signed URLs created with this key.
+
+**Arguments:**
+- `<key-id>` - The ID of the signing key to delete
+
+**Options:**
+- `-f, --force` - Skip confirmation prompt
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Delete signing key with confirmation prompt
+mux signing-keys delete qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
+
+# Delete signing key without confirmation
+mux signing-keys delete qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ --force
+
+# Delete signing key with JSON output
+mux signing-keys delete qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ --force --json
+```
+
+**Important:** Deleting a signing key will invalidate all tokens and signed URLs created with that key. If the key is configured in any local environment, it will be automatically removed from those environment configurations.
+
+**Output:**
+
+```
+WARNING: This signing key is configured in the following environments: production
+
+Deleting this key will invalidate all signed URLs created with it.
+Are you sure you want to delete signing key qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ? (y/n): y
+
+Signing key qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ deleted successfully
+Removed from environment: production
+```
+
+#### `mux sign <playback-id>`
+
+Sign a playback ID to generate a secure URL for video playback. This is used with assets or live streams that have a `signed` playback policy.
+
+**Arguments:**
+- `<playback-id>` - The playback ID to sign
+
+**Options:**
+- `-e, --expiration <duration>` - Token expiration duration (default: '7d')
+  - Examples: '7d', '24h', '1h', '30m'
+- `-t, --type <type>` - Token type: `video`, `thumbnail`, `gif`, `storyboard` (default: 'video')
+- `--json` - Output JSON instead of pretty format
+- `--token-only` - Output only the JWT token (no URL)
+
+**Examples:**
+
+```bash
+# Sign a playback ID with default settings (7 day expiration, video type)
+mux sign abc123playbackid
+
+# Sign with custom expiration
+mux sign abc123playbackid --expiration 24h
+
+# Sign for thumbnail access
+mux sign abc123playbackid --type thumbnail
+
+# Get JSON output with full details
+mux sign abc123playbackid --json
+
+# Get only the JWT token for scripting
+mux sign abc123playbackid --token-only
+```
+
+**Output:**
+
+```bash
+# Default output (full signed URL)
+https://stream.mux.com/abc123playbackid.m3u8?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...
+
+# Token-only output
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...
+
+# JSON output
+{
+  "playback_id": "abc123playbackid",
+  "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...",
+  "url": "https://stream.mux.com/abc123playbackid.m3u8?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...",
+  "type": "video",
+  "expiration": "7d"
+}
+```
+
+**Prerequisites:**
+
+Before using `mux sign`, you must have a signing key configured in your current environment:
+
+```bash
+# Create and configure a signing key
+mux signing-keys create
+```
+
+If no signing keys are configured, the command will provide helpful instructions on how to set one up.
+
 ### Authentication & Environment Management
 
 #### `mux login`
@@ -603,32 +791,39 @@ bun test --watch
 
 ```
 src/
-├── commands/           # CLI command definitions
-│   ├── assets/        # Asset management commands
-│   │   ├── index.ts   # Main assets command
-│   │   ├── create.ts  # Create assets
-│   │   ├── list.ts    # List assets
-│   │   ├── get.ts     # Get asset details
-│   │   └── delete.ts  # Delete assets
-│   ├── live/          # Live stream management commands
-│   │   ├── index.ts   # Main live command
-│   │   ├── create.ts  # Create live streams
-│   │   ├── list.ts    # List live streams
-│   │   ├── get.ts     # Get live stream details
-│   │   └── delete.ts  # Delete live streams
-│   ├── env/           # Environment management commands
-│   │   ├── index.ts   # Main env command
-│   │   ├── list.ts    # List environments
-│   │   └── switch.ts  # Switch default environment
-│   ├── login.ts       # Login command
-│   └── logout.ts      # Logout command
-├── lib/               # Shared libraries
-│   ├── config.ts      # Configuration management
-│   ├── mux.ts         # Mux API integration and auth helpers
-│   ├── json-config.ts # JSON configuration parsing
-│   ├── file-upload.ts # File upload utilities
-│   └── xdg.ts         # XDG base directory support
-└── index.ts           # CLI entry point
+├── commands/              # CLI command definitions
+│   ├── assets/           # Asset management commands
+│   │   ├── index.ts      # Main assets command
+│   │   ├── create.ts     # Create assets
+│   │   ├── list.ts       # List assets
+│   │   ├── get.ts        # Get asset details
+│   │   └── delete.ts     # Delete assets
+│   ├── live/             # Live stream management commands
+│   │   ├── index.ts      # Main live command
+│   │   ├── create.ts     # Create live streams
+│   │   ├── list.ts       # List live streams
+│   │   ├── get.ts        # Get live stream details
+│   │   └── delete.ts     # Delete live streams
+│   ├── signing-keys/     # Signing key management commands
+│   │   ├── index.ts      # Main signing-keys command
+│   │   ├── create.ts     # Create signing keys
+│   │   ├── list.ts       # List signing keys
+│   │   ├── get.ts        # Get signing key details
+│   │   └── delete.ts     # Delete signing keys
+│   ├── env/              # Environment management commands
+│   │   ├── index.ts      # Main env command
+│   │   ├── list.ts       # List environments
+│   │   └── switch.ts     # Switch default environment
+│   ├── login.ts          # Login command
+│   ├── logout.ts         # Logout command
+│   └── sign.ts           # Sign playback IDs command
+├── lib/                  # Shared libraries
+│   ├── config.ts         # Configuration management
+│   ├── mux.ts            # Mux API integration and auth helpers
+│   ├── json-config.ts    # JSON configuration parsing
+│   ├── file-upload.ts    # File upload utilities
+│   └── xdg.ts            # XDG base directory support
+└── index.ts              # CLI entry point
 ```
 
 ## License

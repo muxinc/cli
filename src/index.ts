@@ -5,6 +5,8 @@ import { envCommand } from "./commands/env/index.ts";
 import { liveCommand } from "./commands/live/index.ts";
 import { loginCommand } from "./commands/login.ts";
 import { logoutCommand } from "./commands/logout.ts";
+import { signCommand } from "./commands/sign.ts";
+import { signingKeysCommand } from "./commands/signing-keys/index.ts";
 
 const VERSION = "1.0.0";
 
@@ -21,7 +23,9 @@ const cli = new Command()
 	.command("logout", logoutCommand)
 	.command("env", envCommand)
 	.command("assets", assetsCommand)
-	.command("live", liveCommand);
+	.command("live", liveCommand)
+	.command("signing-keys", signingKeysCommand)
+	.command("sign", signCommand);
 
 // Run the CLI
 if (import.meta.main) {

@@ -7,7 +7,7 @@ import { readFile } from "fs/promises";
  * The index signature allows any additional properties that Mux may support.
  */
 export interface AssetConfig {
-  input?: Array<{
+  inputs?: Array<{
     url?: string;
     type?: string;
     text_type?: string;

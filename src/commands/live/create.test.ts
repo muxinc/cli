@@ -19,7 +19,20 @@ describe("mux live create command", () => {
 	let exitSpy: Mock<typeof process.exit>;
 	let consoleErrorSpy: Mock<typeof console.error>;
 	let consoleLogSpy: Mock<typeof console.log>;
-	let mockMuxClient: Partial<Mux>;
+	let mockMuxClient: {
+		video: {
+			liveStreams: {
+				create: Mock<
+					() => Promise<{
+						id: string;
+						status: string;
+						stream_key: string;
+						playback_ids: { id: string; policy: string }[];
+					}>
+				>;
+			};
+		};
+	};
 
 	beforeEach(() => {
 		// Mock process.exit to prevent it from killing the test runner
@@ -44,12 +57,12 @@ describe("mux live create command", () => {
 						}),
 					),
 				},
-			} as Partial<Mux["video"]>,
+			},
 		};
 
 		// Mock createAuthenticatedMuxClient
 		spyOn(muxModule, "createAuthenticatedMuxClient").mockResolvedValue(
-			mockMuxClient as Mux,
+			mockMuxClient as unknown as Mux,
 		);
 	});
 

@@ -51,7 +51,7 @@ async function createFromUrl(
 	options: CreateOptions,
 ): Promise<Mux.Video.Asset> {
 	const params: Mux.Video.AssetCreateParams = {
-		input: [{ url }],
+		inputs: [{ url }],
 	};
 
 	// Add optional parameters from flags
