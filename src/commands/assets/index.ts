@@ -3,6 +3,7 @@ import { createCommand } from "./create.ts";
 import { deleteCommand } from "./delete.ts";
 import { getCommand } from "./get.ts";
 import { listCommand } from "./list.ts";
+import { playbackIdsCommand } from "./playback-ids/index.ts";
 
 export const assetsCommand = new Command()
 	.description("Manage Mux video assets")
@@ -12,4 +13,5 @@ export const assetsCommand = new Command()
 	.command("create", createCommand)
 	.command("list", listCommand)
 	.command("get", getCommand)
-	.command("delete", deleteCommand);
+	.command("delete", deleteCommand)
+	.command("playback-ids", playbackIdsCommand);
