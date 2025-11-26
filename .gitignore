@@ -19,4 +19,5 @@ package-lock.json
 
 *.tsbuildinfo
 
-oclif.manifest.json
+screenshots/
+.DS_Store
