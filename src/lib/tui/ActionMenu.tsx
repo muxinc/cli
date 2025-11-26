@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/react */
 import type { SelectOption } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 
 export interface Action<T = string> {
 	id: T;

@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { getConfigDir, getConfigPath } from "./xdg.ts";
-import { homedir } from "os";
-import { join } from "path";
 
 describe("XDG config utilities", () => {
 	let originalXdgConfigHome: string | undefined;

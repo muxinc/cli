@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import { existsSync } from "fs";
-import { dirname } from "path";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { getConfigPath } from "./xdg.ts";
 
 export interface Environment {

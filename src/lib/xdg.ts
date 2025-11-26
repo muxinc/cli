@@ -1,5 +1,5 @@
-import { join } from "path";
-import { homedir } from "os";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 /**
  * Get the XDG config directory path for Mux CLI

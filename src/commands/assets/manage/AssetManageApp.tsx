@@ -2,22 +2,22 @@
 import type Mux from "@mux/mux-node";
 import type { Asset } from "@mux/mux-node/resources/video/assets";
 import { useKeyboard, useRenderer } from "@opentui/react";
-import { useState, useEffect, useCallback } from "react";
-import {
-	SelectList,
-	ActionMenu,
-	ConfirmDialog,
-	copyToClipboard,
-	type SelectListItem,
-	type Action,
-} from "../../../lib/tui/index.ts";
-import { getStreamUrl, getPlayerUrl } from "../../../lib/urls.ts";
+import { useCallback, useEffect, useState } from "react";
+import { getDefaultEnvironment } from "../../../lib/config.ts";
 import {
 	createPlaybackId,
 	deletePlaybackId,
 } from "../../../lib/playback-ids.ts";
-import { signPlaybackId, hasSigningKeys } from "../../../lib/signing.ts";
-import { getDefaultEnvironment } from "../../../lib/config.ts";
+import { hasSigningKeys, signPlaybackId } from "../../../lib/signing.ts";
+import {
+	type Action,
+	ActionMenu,
+	ConfirmDialog,
+	copyToClipboard,
+	SelectList,
+	type SelectListItem,
+} from "../../../lib/tui/index.ts";
+import { getPlayerUrl, getStreamUrl } from "../../../lib/urls.ts";
 
 type View =
 	| "list"
@@ -53,10 +53,47 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 	const [hasMore, setHasMore] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 
-	// Load assets on mount
-	useEffect(() => {
-		loadAssets();
-	}, []);
+	// Define showMessage first since other hooks depend on it
+	const showMessage = useCallback(
+		(msg: string, type: "success" | "error" = "success") => {
+			setMessage(msg);
+			setMessageType(type);
+			setView("message");
+		},
+		[],
+	);
+
+	// getSignedToken wrapped in useCallback since copyUrl depends on it
+	const getSignedToken = useCallback(
+		async (playbackId: string): Promise<string | null> => {
+			try {
+				const env = await getDefaultEnvironment();
+				if (!env) return null;
+
+				const credentials = {
+					signingKeyId: env.environment.signingKeyId,
+					signingPrivateKey: env.environment.signingPrivateKey,
+				};
+
+				if (!hasSigningKeys(credentials)) {
+					return null;
+				}
+
+				return await signPlaybackId(
+					playbackId,
+					credentials,
+					{
+						tokenId: env.environment.tokenId,
+						tokenSecret: env.environment.tokenSecret,
+					},
+					{ expiration: "7d" },
+				);
+			} catch {
+				return null;
+			}
+		},
+		[],
+	);
 
 	const loadAssets = useCallback(
 		async (pageNum = 1) => {
@@ -87,17 +124,13 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 				);
 			}
 		},
-		[mux],
+		[mux, showMessage],
 	);
 
-	const showMessage = useCallback(
-		(msg: string, type: "success" | "error" = "success") => {
-			setMessage(msg);
-			setMessageType(type);
-			setView("message");
-		},
-		[],
-	);
+	// Load assets on mount
+	useEffect(() => {
+		loadAssets();
+	}, [loadAssets]);
 
 	const handleAssetSelect = useCallback(
 		(item: SelectListItem<Asset | null>) => {
@@ -142,7 +175,7 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 				);
 			}
 		},
-		[showMessage],
+		[showMessage, getSignedToken],
 	);
 
 	const handleAction = useCallback(
@@ -207,36 +240,8 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 					break;
 			}
 		},
-		[selectedAsset],
+		[selectedAsset, copyUrl, showMessage],
 	);
-
-	const getSignedToken = async (playbackId: string): Promise<string | null> => {
-		try {
-			const env = await getDefaultEnvironment();
-			if (!env) return null;
-
-			const credentials = {
-				signingKeyId: env.environment.signingKeyId,
-				signingPrivateKey: env.environment.signingPrivateKey,
-			};
-
-			if (!hasSigningKeys(credentials)) {
-				return null;
-			}
-
-			return await signPlaybackId(
-				playbackId,
-				credentials,
-				{
-					tokenId: env.environment.tokenId,
-					tokenSecret: env.environment.tokenSecret,
-				},
-				{ expiration: "7d" },
-			);
-		} catch {
-			return null;
-		}
-	};
 
 	const handleCreatePlaybackId = useCallback(
 		async (policy: "public" | "signed") => {
@@ -260,7 +265,7 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 				);
 			}
 		},
-		[mux, selectedAsset],
+		[mux, selectedAsset, showMessage],
 	);
 
 	const handleDeletePlaybackId = useCallback(async () => {
@@ -286,7 +291,7 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 				"error",
 			);
 		}
-	}, [mux, selectedAsset, selectedPlaybackId]);
+	}, [mux, selectedAsset, selectedPlaybackId, showMessage]);
 
 	const handleCopyPlaybackId = useCallback(
 		async (playbackId: NonNullable<Asset["playback_ids"]>[0]) => {
@@ -312,7 +317,7 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 				"error",
 			);
 		}
-	}, [mux, selectedAsset]);
+	}, [mux, selectedAsset, showMessage]);
 
 	// Global keyboard handler
 	useKeyboard((key) => {

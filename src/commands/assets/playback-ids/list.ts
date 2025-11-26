@@ -1,6 +1,6 @@
 import { Command } from "@cliffy/command";
 import { createAuthenticatedMuxClient } from "../../../lib/mux.ts";
-import { getStreamUrl, getPlayerUrl } from "../../../lib/urls.ts";
+import { getPlayerUrl, getStreamUrl } from "../../../lib/urls.ts";
 
 interface ListOptions {
 	json?: boolean;

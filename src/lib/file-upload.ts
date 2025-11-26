@@ -1,7 +1,6 @@
+import { readFile, stat } from "node:fs/promises";
+import { basename } from "node:path";
 import { glob } from "glob";
-import { stat } from "fs/promises";
-import { readFile } from "fs/promises";
-import { basename } from "path";
 
 export interface FileInfo {
 	name: string;

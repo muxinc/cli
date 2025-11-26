@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!!**/dist", "!/.claude/settings.local.json"]
+		"includes": ["**", "!!**/dist", "!.claude/settings.local.json"]
 	},
 	"formatter": {
 		"enabled": true,

@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
-	readConfig,
-	writeConfig,
-	getEnvironment,
-	setEnvironment,
-	getDefaultEnvironment,
-	setDefaultEnvironment,
-	listEnvironments,
-	removeEnvironment,
 	type Config,
 	type Environment,
+	getDefaultEnvironment,
+	getEnvironment,
+	listEnvironments,
+	readConfig,
+	removeEnvironment,
+	setDefaultEnvironment,
+	setEnvironment,
+	writeConfig,
 } from "./config.ts";
-import { mkdtemp, rm } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
 import { getConfigPath } from "./xdg.ts";
 
 describe("Config manager", () => {

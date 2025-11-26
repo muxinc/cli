@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getStreamUrl, getPlayerUrl } from "./urls.ts";
+import { getPlayerUrl, getStreamUrl } from "./urls.ts";
 
 describe("getStreamUrl", () => {
 	test("returns HLS URL for playback ID", () => {

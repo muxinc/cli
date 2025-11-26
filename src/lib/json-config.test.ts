@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, writeFile, rm } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseAssetConfig } from "./json-config.ts";
 
 describe("parseAssetConfig", () => {

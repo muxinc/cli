@@ -4,7 +4,7 @@ import {
 	createLiveStreamPlaybackId,
 	type PlaybackIdPolicy,
 } from "../../../lib/playback-ids.ts";
-import { getStreamUrl, getPlayerUrl } from "../../../lib/urls.ts";
+import { getPlayerUrl, getStreamUrl } from "../../../lib/urls.ts";
 
 interface CreateOptions {
 	policy?: PlaybackIdPolicy;
