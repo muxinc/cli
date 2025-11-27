@@ -58,7 +58,7 @@ export const createCommand = new Command()
 
 			// Build API parameters
 			const params: {
-				playback_policy?: PlaybackPolicy[];
+				playback_policies?: PlaybackPolicy[];
 				new_asset_settings?: Record<string, unknown>;
 				reconnect_window?: number;
 				latency_mode?: LatencyMode;
@@ -66,7 +66,7 @@ export const createCommand = new Command()
 			} = {};
 
 			if (options.playbackPolicy !== undefined) {
-				params.playback_policy = options.playbackPolicy as PlaybackPolicy[];
+				params.playback_policies = options.playbackPolicy as PlaybackPolicy[];
 			}
 
 			if (options.newAssetSettings !== undefined) {

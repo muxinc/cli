@@ -223,18 +223,18 @@ describe("mux assets create command", () => {
 			expect(passthroughOption).toBeDefined();
 		});
 
-		test("has --mp4-support flag", () => {
-			const mp4Option = createCommand
+		test("has --static-renditions flag", () => {
+			const renditionsOption = createCommand
 				.getOptions()
-				.find((opt) => opt.name === "mp4-support");
-			expect(mp4Option).toBeDefined();
+				.find((opt) => opt.name === "static-renditions");
+			expect(renditionsOption).toBeDefined();
 		});
 
-		test("has --encoding-tier flag", () => {
-			const encodingOption = createCommand
+		test("has --video-quality flag", () => {
+			const qualityOption = createCommand
 				.getOptions()
-				.find((opt) => opt.name === "encoding-tier");
-			expect(encodingOption).toBeDefined();
+				.find((opt) => opt.name === "video-quality");
+			expect(qualityOption).toBeDefined();
 		});
 
 		test("has --normalize-audio flag", () => {
@@ -336,7 +336,7 @@ describe("mux assets create command", () => {
 			}
 		});
 
-		test("rejects invalid mp4-support value", async () => {
+		test("rejects invalid static-renditions value", async () => {
 			let errorThrown = false;
 			let errorMessage = "";
 
@@ -344,7 +344,7 @@ describe("mux assets create command", () => {
 				await createCommand.parse([
 					"--url",
 					"https://example.com/video.mp4",
-					"--mp4-support",
+					"--static-renditions",
 					"ultra-hd",
 				]);
 			} catch (error) {
@@ -353,18 +353,18 @@ describe("mux assets create command", () => {
 			}
 
 			expect(errorThrown).toBe(true);
-			expect(errorMessage).toContain("Invalid mp4-support value");
-			expect(errorMessage).toContain("none");
-			expect(errorMessage).toContain("capped-1080p");
+			expect(errorMessage).toContain("Invalid static-renditions value");
+			expect(errorMessage).toContain("highest");
+			expect(errorMessage).toContain("1080p");
 		});
 
-		test("accepts valid mp4-support: capped-1080p", async () => {
+		test("accepts valid static-renditions: 1080p", async () => {
 			try {
 				await createCommand.parse([
 					"--url",
 					"https://example.com/video.mp4",
-					"--mp4-support",
-					"capped-1080p",
+					"--static-renditions",
+					"1080p",
 				]);
 			} catch (_error) {
 				// Will fail at auth step
@@ -373,17 +373,17 @@ describe("mux assets create command", () => {
 			const exitCalls = exitSpy.mock.calls;
 			if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
 				const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
-				expect(errorMessage).not.toContain("Invalid mp4-support value");
+				expect(errorMessage).not.toContain("Invalid static-renditions value");
 			}
 		});
 
-		test("accepts valid mp4-support: audio-only,capped-1080p", async () => {
+		test("accepts valid static-renditions: audio-only", async () => {
 			try {
 				await createCommand.parse([
 					"--url",
 					"https://example.com/video.mp4",
-					"--mp4-support",
-					"audio-only,capped-1080p",
+					"--static-renditions",
+					"audio-only",
 				]);
 			} catch (_error) {
 				// Will fail at auth step
@@ -392,11 +392,11 @@ describe("mux assets create command", () => {
 			const exitCalls = exitSpy.mock.calls;
 			if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
 				const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
-				expect(errorMessage).not.toContain("Invalid mp4-support value");
+				expect(errorMessage).not.toContain("Invalid static-renditions value");
 			}
 		});
 
-		test("rejects invalid encoding-tier value", async () => {
+		test("rejects invalid video-quality value", async () => {
 			let errorThrown = false;
 			let errorMessage = "";
 
@@ -404,8 +404,8 @@ describe("mux assets create command", () => {
 				await createCommand.parse([
 					"--url",
 					"https://example.com/video.mp4",
-					"--encoding-tier",
-					"premium",
+					"--video-quality",
+					"ultra",
 				]);
 			} catch (error) {
 				errorThrown = true;
@@ -413,18 +413,18 @@ describe("mux assets create command", () => {
 			}
 
 			expect(errorThrown).toBe(true);
-			expect(errorMessage).toContain("Invalid encoding tier");
-			expect(errorMessage).toContain("smart");
-			expect(errorMessage).toContain("baseline");
+			expect(errorMessage).toContain("Invalid video quality");
+			expect(errorMessage).toContain("basic");
+			expect(errorMessage).toContain("plus");
 		});
 
-		test("accepts valid encoding-tier: smart", async () => {
+		test("accepts valid video-quality: basic", async () => {
 			try {
 				await createCommand.parse([
 					"--url",
 					"https://example.com/video.mp4",
-					"--encoding-tier",
-					"smart",
+					"--video-quality",
+					"basic",
 				]);
 			} catch (_error) {
 				// Will fail at auth step
@@ -433,17 +433,17 @@ describe("mux assets create command", () => {
 			const exitCalls = exitSpy.mock.calls;
 			if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
 				const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
-				expect(errorMessage).not.toContain("Invalid encoding tier");
+				expect(errorMessage).not.toContain("Invalid video quality");
 			}
 		});
 
-		test("accepts valid encoding-tier: baseline", async () => {
+		test("accepts valid video-quality: plus", async () => {
 			try {
 				await createCommand.parse([
 					"--url",
 					"https://example.com/video.mp4",
-					"--encoding-tier",
-					"baseline",
+					"--video-quality",
+					"plus",
 				]);
 			} catch (_error) {
 				// Will fail at auth step
@@ -452,7 +452,7 @@ describe("mux assets create command", () => {
 			const exitCalls = exitSpy.mock.calls;
 			if (exitCalls.length > 0 && exitCalls[0][0] === 1) {
 				const errorMessage = consoleErrorSpy.mock.calls[0]?.[0] || "";
-				expect(errorMessage).not.toContain("Invalid encoding tier");
+				expect(errorMessage).not.toContain("Invalid video quality");
 			}
 		});
 

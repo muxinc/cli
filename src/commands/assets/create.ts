@@ -7,8 +7,10 @@ import { createAuthenticatedMuxClient } from "../../lib/mux.ts";
 
 // Extract types from Mux SDK
 type PlaybackPolicy = Mux.PlaybackPolicy;
-type EncodingTier = NonNullable<Mux.Video.AssetCreateParams["encoding_tier"]>;
-type Mp4Support = NonNullable<Mux.Video.AssetCreateParams["mp4_support"]>;
+type VideoQuality = NonNullable<Mux.Video.AssetCreateParams["video_quality"]>;
+type StaticRendition = NonNullable<
+	Mux.Video.AssetCreateParams["static_renditions"]
+>[number];
 
 interface CreateOptions {
 	url?: string;
@@ -17,8 +19,8 @@ interface CreateOptions {
 	playbackPolicy?: string | string[];
 	test?: boolean;
 	passthrough?: string;
-	mp4Support?: string;
-	encodingTier?: string;
+	staticRenditions?: string | string[];
+	videoQuality?: string;
 	normalizeAudio?: boolean;
 	yes?: boolean;
 	json?: boolean;
@@ -59,7 +61,7 @@ async function createFromUrl(
 		const policies = Array.isArray(options.playbackPolicy)
 			? options.playbackPolicy
 			: [options.playbackPolicy];
-		params.playback_policy = policies as PlaybackPolicy[];
+		params.playback_policies = policies as PlaybackPolicy[];
 	}
 	if (options.test !== undefined) {
 		params.test = true;
@@ -67,11 +69,16 @@ async function createFromUrl(
 	if (options.passthrough !== undefined) {
 		params.passthrough = options.passthrough;
 	}
-	if (options.mp4Support !== undefined) {
-		params.mp4_support = options.mp4Support as Mp4Support;
+	if (options.staticRenditions !== undefined) {
+		const renditions = Array.isArray(options.staticRenditions)
+			? options.staticRenditions
+			: [options.staticRenditions];
+		params.static_renditions = renditions.map((r) => ({
+			resolution: r as StaticRendition["resolution"],
+		}));
 	}
-	if (options.encodingTier !== undefined) {
-		params.encoding_tier = options.encodingTier as EncodingTier;
+	if (options.videoQuality !== undefined) {
+		params.video_quality = options.videoQuality as VideoQuality;
 	}
 	if (options.normalizeAudio !== undefined) {
 		params.normalize_audio = true;
@@ -134,16 +141,21 @@ async function createFromUploads(
 			const policies = Array.isArray(options.playbackPolicy)
 				? options.playbackPolicy
 				: [options.playbackPolicy];
-			newAssetSettings.playback_policy = policies as PlaybackPolicy[];
+			newAssetSettings.playback_policies = policies as PlaybackPolicy[];
 		}
 		if (options.passthrough !== undefined) {
 			newAssetSettings.passthrough = options.passthrough;
 		}
-		if (options.mp4Support !== undefined) {
-			newAssetSettings.mp4_support = options.mp4Support as Mp4Support;
+		if (options.staticRenditions !== undefined) {
+			const renditions = Array.isArray(options.staticRenditions)
+				? options.staticRenditions
+				: [options.staticRenditions];
+			newAssetSettings.static_renditions = renditions.map((r) => ({
+				resolution: r as StaticRendition["resolution"],
+			}));
 		}
-		if (options.encodingTier !== undefined) {
-			newAssetSettings.encoding_tier = options.encodingTier as EncodingTier;
+		if (options.videoQuality !== undefined) {
+			newAssetSettings.video_quality = options.videoQuality as VideoQuality;
 		}
 		if (options.normalizeAudio !== undefined) {
 			newAssetSettings.normalize_audio = true;
@@ -190,7 +202,7 @@ async function createFromConfig(
 
 	// Merge with flag overrides
 	if (options.playbackPolicy !== undefined) {
-		config.playback_policy = Array.isArray(options.playbackPolicy)
+		config.playback_policies = Array.isArray(options.playbackPolicy)
 			? options.playbackPolicy
 			: [options.playbackPolicy];
 	}
@@ -200,11 +212,14 @@ async function createFromConfig(
 	if (options.passthrough !== undefined) {
 		config.passthrough = options.passthrough;
 	}
-	if (options.mp4Support !== undefined) {
-		config.mp4_support = options.mp4Support;
+	if (options.staticRenditions !== undefined) {
+		const renditions = Array.isArray(options.staticRenditions)
+			? options.staticRenditions
+			: [options.staticRenditions];
+		config.static_renditions = renditions.map((r) => ({ resolution: r }));
 	}
-	if (options.encodingTier !== undefined) {
-		config.encoding_tier = options.encodingTier;
+	if (options.videoQuality !== undefined) {
+		config.video_quality = options.videoQuality;
 	}
 	if (options.normalizeAudio !== undefined) {
 		config.normalize_audio = options.normalizeAudio;
@@ -259,20 +274,26 @@ export const createCommand = new Command()
 		},
 	)
 	.option(
-		"--mp4-support <option:string>",
-		"MP4 support level (none, capped-1080p, audio-only, audio-only,capped-1080p, standard)",
+		"--static-renditions <resolution:string>",
+		"Static rendition resolutions (highest, audio-only, 2160p, 1440p, 1080p, 720p, 540p, 480p, 360p, 270p). Can be specified multiple times.",
 		{
+			collect: true,
 			value: (value: string): string => {
 				const validOptions = [
-					"none",
-					"capped-1080p",
+					"highest",
 					"audio-only",
-					"audio-only,capped-1080p",
-					"standard",
+					"2160p",
+					"1440p",
+					"1080p",
+					"720p",
+					"540p",
+					"480p",
+					"360p",
+					"270p",
 				];
 				if (!validOptions.includes(value)) {
 					throw new Error(
-						`Invalid mp4-support value: ${value}. Must be one of: ${validOptions.join(", ")}`,
+						`Invalid static-renditions value: ${value}. Must be one of: ${validOptions.join(", ")}`,
 					);
 				}
 				return value;
@@ -280,14 +301,14 @@ export const createCommand = new Command()
 		},
 	)
 	.option(
-		"--encoding-tier <tier:string>",
-		"Encoding tier (smart or baseline)",
+		"--video-quality <quality:string>",
+		"Video quality level (basic, plus, or premium)",
 		{
 			value: (value: string): string => {
-				const validTiers = ["smart", "baseline"];
-				if (!validTiers.includes(value)) {
+				const validQualities = ["basic", "plus", "premium"];
+				if (!validQualities.includes(value)) {
 					throw new Error(
-						`Invalid encoding tier: ${value}. Must be one of: ${validTiers.join(", ")}`,
+						`Invalid video quality: ${value}. Must be one of: ${validQualities.join(", ")}`,
 					);
 				}
 				return value;

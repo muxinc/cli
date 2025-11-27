@@ -72,8 +72,8 @@ Create a new Mux video asset from a URL, local file, or JSON configuration.
 - `--playback-policy <policy>` - Playback policy: `public` or `signed` (can be specified multiple times)
 - `--test` - Create test asset (watermarked, 10s limit, deleted after 24h)
 - `--passthrough <string>` - User metadata (max 255 characters)
-- `--mp4-support <option>` - MP4 support level: `none`, `capped-1080p`, `audio-only`, `audio-only,capped-1080p`
-- `--encoding-tier <tier>` - Encoding tier: `smart` or `baseline`
+- `--static-renditions <resolution>` - Static rendition resolutions: `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p` (can be specified multiple times)
+- `--video-quality <quality>` - Video quality level: `basic`, `plus`, or `premium`
 - `--normalize-audio` - Normalize audio loudness level
 - `-y, --yes` - Skip confirmation prompts
 - `--json` - Output JSON instead of pretty format
@@ -133,9 +133,9 @@ For complex asset creation (overlays, subtitles, multiple input tracks), use a J
       ]
     }
   ],
-  "playback_policy": ["signed"],
-  "encoding_tier": "smart",
-  "mp4_support": "capped-1080p",
+  "playback_policies": ["signed"],
+  "video_quality": "plus",
+  "static_renditions": [{ "resolution": "1080p" }],
   "normalize_audio": true,
   "passthrough": "my-video-123"
 }
@@ -242,7 +242,7 @@ Duration: 120.45s
 Created: 1234567890
 Aspect Ratio: 16:9
 Resolution Tier: 1080p
-Encoding Tier: smart
+Video Quality: plus
 Max Resolution: HD
 Max Frame Rate: 30.00 fps
 
@@ -434,7 +434,7 @@ Create a new Mux live stream for broadcasting.
 
 **Options:**
 - `--playback-policy <policy>` - Playback policy: `public` or `signed` (can be specified multiple times)
-- `--new-asset-settings <settings>` - Automatically create an asset from this live stream. Use `none` to disable, or provide a JSON string with asset settings (e.g., `'{"playback_policy": ["public"]}'`)
+- `--new-asset-settings <settings>` - Automatically create an asset from this live stream. Use `none` to disable, or provide a JSON string with asset settings (e.g., `'{"playback_policies": ["public"]}'`)
 - `--reconnect-window <seconds>` - Time in seconds a stream can be disconnected before being considered finished (default: 60)
 - `--latency-mode <mode>` - Latency mode: `low` or `standard` (default: `low`)
 - `--test` - Create test live stream (deleted after 24h)
@@ -450,7 +450,7 @@ mux live create --playback-policy public
 mux live create --playback-policy public --latency-mode low
 
 # Create a stream that automatically saves to an asset
-mux live create --playback-policy public --new-asset-settings '{"playback_policy": ["public"]}'
+mux live create --playback-policy public --new-asset-settings '{"playback_policies": ["public"]}'
 
 # Create a test stream (deleted after 24 hours)
 mux live create --playback-policy public --test

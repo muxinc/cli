@@ -22,7 +22,7 @@ describe("parseAssetConfig", () => {
 					url: "https://example.com/video.mp4",
 				},
 			],
-			playback_policy: ["public"],
+			playback_policies: ["public"],
 		};
 
 		const configPath = join(tempDir, "config.json");
@@ -40,10 +40,10 @@ describe("parseAssetConfig", () => {
 					url: "https://example.com/video.mp4",
 				},
 			],
-			playback_policy: ["public"],
+			playback_policies: ["public"],
 			test: true,
-			encoding_tier: "smart",
-			mp4_support: "capped-1080p",
+			video_quality: "plus",
+			static_renditions: [{ resolution: "1080p" }],
 			max_resolution_tier: "1080p",
 			normalize_audio: true,
 			passthrough: "my-video-123",
@@ -78,8 +78,8 @@ describe("parseAssetConfig", () => {
 					],
 				},
 			],
-			playback_policy: ["signed"],
-			encoding_tier: "baseline",
+			playback_policies: ["signed"],
+			video_quality: "basic",
 		};
 
 		const configPath = join(tempDir, "config.json");
@@ -106,7 +106,7 @@ describe("parseAssetConfig", () => {
 					closed_captions: false,
 				},
 			],
-			playback_policy: ["public"],
+			playback_policies: ["public"],
 		};
 
 		const configPath = join(tempDir, "config.json");
@@ -134,7 +134,7 @@ describe("parseAssetConfig", () => {
 		}).toThrow(/invalid json/i);
 	});
 
-	test("parses config without playback_policy", async () => {
+	test("parses config without playback_policies", async () => {
 		const config = {
 			input: [
 				{

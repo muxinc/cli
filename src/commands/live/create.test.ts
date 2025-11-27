@@ -207,7 +207,7 @@ describe("mux live create command", () => {
 		test("accepts valid JSON for new-asset-settings", async () => {
 			await createCommand.parse([
 				"--new-asset-settings",
-				'{"playback_policy": ["public"]}',
+				'{"playback_policies": ["public"]}',
 			]);
 			expect(mockMuxClient.video.liveStreams.create).toHaveBeenCalled();
 		});

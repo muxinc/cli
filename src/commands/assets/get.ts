@@ -36,8 +36,8 @@ export const getCommand = new Command()
 					console.log(`Resolution Tier: ${asset.resolution_tier}`);
 				}
 
-				if (asset.encoding_tier) {
-					console.log(`Encoding Tier: ${asset.encoding_tier}`);
+				if (asset.video_quality) {
+					console.log(`Video Quality: ${asset.video_quality}`);
 				}
 
 				if (asset.max_stored_resolution) {

@@ -32,16 +32,18 @@ export interface AssetConfig {
 		start_time?: number;
 		end_time?: number;
 	}>;
-	playback_policy?: string[];
+	playback_policies?: string[];
 	test?: boolean;
-	encoding_tier?: string;
-	mp4_support?: string;
+	video_quality?: string;
+	static_renditions?: Array<{
+		resolution: string;
+		passthrough?: string;
+	}>;
 	max_resolution_tier?: string;
 	master_access?: string;
 	normalize_audio?: boolean;
 	passthrough?: string;
-	per_title_encode?: boolean;
-	advanced_playback_policy?: Array<{
+	advanced_playback_policies?: Array<{
 		policy?: string;
 		drm_configuration_id?: string;
 	}>;

@@ -103,8 +103,8 @@ When implementin' new features:
 - Uses TypeScript utility types to extract from SDK interfaces:
   - `type LatencyMode = NonNullable<Mux.Video.LiveStreamCreateParams['latency_mode']>`
   - `type PlaybackPolicy = Mux.PlaybackPolicy`
-  - `type EncodingTier = NonNullable<Mux.Video.AssetCreateParams['encoding_tier']>`
-  - `type Mp4Support = NonNullable<Mux.Video.AssetCreateParams['mp4_support']>`
+  - `type VideoQuality = NonNullable<Mux.Video.AssetCreateParams['video_quality']>`
+  - `type StaticRendition = NonNullable<Mux.Video.AssetCreateParams['static_renditions']>[number]`
 - Benefits:
   - CLI types automatically stay in sync when the Mux SDK updates
   - Single source of truth fer all Mux API types
@@ -122,7 +122,7 @@ When implementin' new features:
 - 15+ new tests specifically fer enum validation logic
 - Tests both rejection of invalid values and acceptance of valid values
 - Error messages verified to include helpful guidance with valid options
-- Covers: playback-policy, mp4-support, encoding-tier validations
+- Covers: playback-policy, static-renditions, video-quality validations
 
 ### Asset Creation Architecture
 
