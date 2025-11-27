@@ -19,6 +19,7 @@ The project should use Bun as the JavaScript runtime. It should be written in Ty
 - Always work on features in a branch separate from main/master.
 - Keep commits small and focused.
 - Write tests FIRST, testing the interfaces you plan to build, then let's review those together. You can add tests later for utilities that pop up along the way of implementation.
+- Run `pnpm exec check` consistently to check for code quality, etc.
 
 ### Workflow
 When starting a new task, create a new branch if necessary, and a `PLAN.md` file. Keep that file updated with TODOs, observations, and plans as you work. When starting a new session, review an existing `PLAN.md` file if it exists before beginning.
