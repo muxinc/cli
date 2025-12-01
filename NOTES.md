@@ -629,3 +629,159 @@ All commands support `--json` output and follow consistent patterns with other C
   - Validated during credential setup
   - Documented in help text
 - **Implement streaming upload with progress tracking** - Replace the current fetch-based upload in `file-upload.ts` with a streaming solution that provides granular progress updates for large file uploads
+- **Extract formatting utilities** - The `formatBitrate()` and `formatFilesize()` functions be duplicated across static-renditions commands and TUI. Should extract to shared utility module `src/lib/format-utils.ts` fer consistency and maintainability.
+
+## Static Renditions Management
+
+### Overview
+Implemented complete static renditions management fer downloadable MP4 versions of video assets. The feature provides both CLI commands and TUI integration fer creating, listing, and deleting static renditions at various resolutions.
+
+### Architecture
+
+**API Integration:**
+- Uses Mux Node SDK methods on `mux.video.assets`:
+  - `createStaticRendition(assetId, { resolution, passthrough? })` - Creates new rendition
+  - `deleteStaticRendition(assetId, staticRenditionId)` - Deletes specific rendition
+  - Asset's `static_renditions` field contains current state with status and files array
+- Resolution options extracted directly from SDK types:
+  ```typescript
+  type Resolution = NonNullable<Mux.Video.AssetCreateStaticRenditionParams["resolution"]>;
+  ```
+- Supported resolutions: `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p`
+
+**Rendition File Statuses:**
+- `ready` - MP4 is generated and available fer download
+- `preparing` - Still being generated
+- `skipped` - Resolution conflicts with asset attributes
+- `errored` - Generation failed
+
+### Commands Implemented
+
+**CLI Commands (`mux assets static-renditions`):**
+- `list <asset-id>` - Lists all static renditions with details (resolution, status, dimensions, bitrate, filesize)
+  - Flag: `--json` fer JSON output
+  - Shows ID, name, status, and file metadata fer each rendition
+
+- `create <asset-id>` - Creates new static rendition
+  - Required flag: `-r, --resolution <resolution>`
+  - Optional flags: `-p, --passthrough <string>` (metadata), `-w, --wait` (poll until ready), `--json`
+  - Default behavior: Returns immediately with message explaining async generation
+  - With `--wait`: Polls every 5 seconds until rendition is ready/errored/skipped
+
+- `delete <asset-id> <rendition-id>` - Deletes static rendition
+  - Flags: `-f, --force` (skip confirmation), `--json`
+  - Includes confirmation prompt fer safety (consistent with playback-ids pattern)
+  - Requires `--force` flag when using `--json` output
+
+**TUI Integration:**
+- Added to existing `mux assets manage` TUI
+- New actions in asset action menu:
+  - "View static renditions" - Shows detailed renditions view with formatted output
+  - "Create static rendition" - Interactive resolution picker
+  - "Delete static rendition" - Select and delete with confirmation
+  - "Copy rendition download URL" - Copies download URL fer ready renditions
+- Color-coded status display (green=ready, yellow=preparing, gray=skipped, red=errored)
+- Automatic asset refresh after create/delete operations
+
+### Type Safety
+
+**SDK Type Extraction:**
+- All types imported directly from Mux SDK to stay in sync:
+  ```typescript
+  import type { Asset } from "@mux/mux-node/resources/video/assets";
+  import type Mux from "@mux/mux-node";
+
+  type Resolution = NonNullable<Mux.Video.AssetCreateStaticRenditionParams["resolution"]>;
+  type StaticRenditionFile = NonNullable<Asset["static_renditions"]>["files"][number];
+  type CreateStaticRenditionResponse = Mux.Video.AssetCreateStaticRenditionResponse;
+  ```
+- No hardcoded enum values - resolution options extracted from SDK
+- Ensures CLI types automatically update with SDK changes
+
+### Test Coverage
+
+**Total: 15 tests, all passing**
+
+- `list.test.ts` - 9 tests:
+  - Command metadata (description, arguments, flags)
+  - Argument validation (asset-id required)
+  - JSON flag validation
+
+- `create.test.ts` - 12 tests:
+  - Command metadata
+  - Required flags (resolution)
+  - Optional flags (passthrough, wait, json)
+  - Input validation (missing asset-id, missing resolution, invalid resolution)
+  - Resolution option marked as required
+
+- `delete.test.ts` - 9 tests:
+  - Command metadata
+  - Argument validation (both asset-id and rendition-id required)
+  - Force flag validation
+  - JSON flag validation
+
+**Test Strategy:**
+- Focus on CLI interface layer (command structure, flag parsing, validation)
+- Do NOT test Mux API integration (verified via manual testing)
+- Follow project philosophy: no sleep(), human readable, test real code
+
+### Design Decisions
+
+**1. Immediate Return vs. Polling:**
+- Default behavior: Return immediately after initiating rendition creation
+- Helpful message explains that generation be async
+- Optional `--wait` flag polls until ready fer users who want synchronous behavior
+- Similar pattern to asset creation with `--wait` flag
+
+**2. Confirmation Prompt on Delete:**
+- Consistent with `playback-ids delete` pattern
+- Requires explicit confirmation unless `--force` flag provided
+- Safety feature prevents accidental deletions
+- When using `--json` output, must provide `--force` flag
+
+**3. Download URL Format:**
+- Static rendition URLs use playback ID: `https://stream.mux.com/{PLAYBACK_ID}/{RENDITION_NAME}`
+- TUI automatically constructs and copies these URLs
+- Simpler than requiring separate API call fer download URL
+
+**4. TUI Color Coding:**
+- Visual status indicators use background colors fer quick scanning
+- Green (ready), yellow (preparing), gray (skipped), red (errored)
+- Improves UX over plain text status labels
+
+**5. Status Field Handling:**
+- The asset-level `static_renditions.status` field be deprecated (related to old `mp4_support`)
+- New static renditions API uses per-rendition status in files array
+- CLI and TUI show per-rendition status only, ignore asset-level status field
+
+### Known Code Duplication
+
+**Formatting Utilities:**
+- `formatBitrate()` and `formatFilesize()` duplicated in 3 places:
+  - `src/commands/assets/static-renditions/create.ts`
+  - `src/commands/assets/static-renditions/list.ts`
+  - `src/commands/assets/manage/AssetManageApp.tsx`
+- Should be extracted to `src/lib/format-utils.ts` in future refactor
+- Left as-is fer now to ship feature, marked as technical debt
+
+### Integration Notes
+
+**Command Registration:**
+- Registered as command group in `src/commands/assets/index.ts`
+- Full command path: `mux assets static-renditions <command>`
+- Visible in assets help output
+- Documented in README.md with examples
+
+**Dependencies:**
+- Uses existing Mux SDK client (no new dependencies)
+- Leverages existing TUI components (SelectList, ActionMenu, ConfirmDialog)
+- Consistent with existing command patterns (playback-ids, signing-keys)
+
+### Future Enhancements
+
+**Potential Improvements:**
+- Show static renditions summary in `mux assets get` output
+- Display download URLs directly in TUI renditions view (currently requires separate action)
+- Add edge case tests fer passthrough validation (>255 chars)
+- Extract formatting utilities to shared module
+- Support bulk rendition creation (multiple resolutions at once)

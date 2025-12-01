@@ -27,10 +27,31 @@ type View =
 	| "select-playback-id"
 	| "select-playback-policy"
 	| "select-playback-for-copy"
+	| "view-static-renditions"
+	| "select-resolution"
+	| "select-rendition-for-delete"
+	| "confirm-delete-rendition"
+	| "select-rendition-for-copy"
 	| "loading"
 	| "message";
 
 type CopyType = "stream" | "player";
+
+type StaticRenditionFile = NonNullable<
+	NonNullable<Asset["static_renditions"]>["files"]
+>[number];
+
+type Resolution =
+	| "highest"
+	| "audio-only"
+	| "2160p"
+	| "1440p"
+	| "1080p"
+	| "720p"
+	| "540p"
+	| "480p"
+	| "360p"
+	| "270p";
 
 interface AssetManageAppProps {
 	mux: Mux;
@@ -44,6 +65,8 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 	const [selectedPlaybackId, setSelectedPlaybackId] = useState<string | null>(
 		null,
 	);
+	const [selectedRendition, setSelectedRendition] =
+		useState<StaticRenditionFile | null>(null);
 	const [copyType, setCopyType] = useState<CopyType | null>(null);
 	const [message, setMessage] = useState<string>("");
 	const [messageType, setMessageType] = useState<"success" | "error">(
@@ -178,6 +201,29 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 		[showMessage, getSignedToken],
 	);
 
+	const copyRenditionUrl = useCallback(
+		async (file: StaticRenditionFile) => {
+			if (!selectedAsset) return;
+			try {
+				const playbackId = selectedAsset.playback_ids?.[0]?.id;
+				if (!playbackId) {
+					showMessage("No playback ID available for download URL", "error");
+					return;
+				}
+				// Static rendition URL format: https://stream.mux.com/{PLAYBACK_ID}/{RENDITION_NAME}
+				const url = `https://stream.mux.com/${playbackId}/${file.name}`;
+				await copyToClipboard(url);
+				showMessage(`Download URL for ${file.name} copied to clipboard!`);
+			} catch (error) {
+				showMessage(
+					`Failed to copy: ${error instanceof Error ? error.message : "Unknown error"}`,
+					"error",
+				);
+			}
+		},
+		[selectedAsset, showMessage],
+	);
+
 	const handleAction = useCallback(
 		async (actionId: string) => {
 			if (!selectedAsset) return;
@@ -234,13 +280,52 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 					setView("confirm-delete");
 					break;
 
+				case "view-renditions":
+					setView("view-static-renditions");
+					break;
+
+				case "create-rendition":
+					setView("select-resolution");
+					break;
+
+				case "delete-rendition": {
+					const files = selectedAsset.static_renditions?.files ?? [];
+					const readyFiles = files.filter((f) => f.id);
+					if (readyFiles.length === 0) {
+						showMessage("No static renditions to delete", "error");
+						return;
+					}
+					if (readyFiles.length === 1) {
+						setSelectedRendition(readyFiles[0]);
+						setView("confirm-delete-rendition");
+					} else {
+						setView("select-rendition-for-delete");
+					}
+					break;
+				}
+
+				case "copy-rendition-url": {
+					const files = selectedAsset.static_renditions?.files ?? [];
+					const readyFiles = files.filter((f) => f.status === "ready" && f.id);
+					if (readyFiles.length === 0) {
+						showMessage("No ready static renditions available", "error");
+						return;
+					}
+					if (readyFiles.length === 1) {
+						await copyRenditionUrl(readyFiles[0]);
+					} else {
+						setView("select-rendition-for-copy");
+					}
+					break;
+				}
+
 				case "back":
 					setSelectedAsset(null);
 					setView("list");
 					break;
 			}
 		},
-		[selectedAsset, copyUrl, showMessage],
+		[selectedAsset, copyUrl, copyRenditionUrl, showMessage],
 	);
 
 	const handleCreatePlaybackId = useCallback(
@@ -319,6 +404,60 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 		}
 	}, [mux, selectedAsset, showMessage]);
 
+	const handleCreateStaticRendition = useCallback(
+		async (resolution: Resolution) => {
+			if (!selectedAsset) return;
+			try {
+				setView("loading");
+				await mux.video.assets.createStaticRendition(
+					selectedAsset.id as string,
+					{ resolution },
+				);
+				// Refresh asset data
+				const updated = await mux.video.assets.retrieve(
+					selectedAsset.id as string,
+				);
+				setSelectedAsset(updated);
+				setAssets((prev) =>
+					prev.map((a) => (a.id === updated.id ? updated : a)),
+				);
+				showMessage(
+					`Static rendition (${resolution}) creation started! It may take a few moments to be ready.`,
+				);
+			} catch (error) {
+				showMessage(
+					`Failed to create static rendition: ${error instanceof Error ? error.message : "Unknown error"}`,
+					"error",
+				);
+			}
+		},
+		[mux, selectedAsset, showMessage],
+	);
+
+	const handleDeleteStaticRendition = useCallback(async () => {
+		if (!selectedAsset || !selectedRendition?.id) return;
+		try {
+			setView("loading");
+			await mux.video.assets.deleteStaticRendition(
+				selectedAsset.id as string,
+				selectedRendition.id,
+			);
+			// Refresh asset data
+			const updated = await mux.video.assets.retrieve(
+				selectedAsset.id as string,
+			);
+			setSelectedAsset(updated);
+			setAssets((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+			setSelectedRendition(null);
+			showMessage("Static rendition deleted!");
+		} catch (error) {
+			showMessage(
+				`Failed to delete static rendition: ${error instanceof Error ? error.message : "Unknown error"}`,
+				"error",
+			);
+		}
+	}, [mux, selectedAsset, selectedRendition, showMessage]);
+
 	// Global keyboard handler
 	useKeyboard((key) => {
 		if (
@@ -357,6 +496,10 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 		{ id: "copy-player", label: "Copy player URL" },
 		{ id: "create-playback", label: "Create playback ID" },
 		{ id: "delete-playback", label: "Delete playback ID" },
+		{ id: "view-renditions", label: "View static renditions" },
+		{ id: "create-rendition", label: "Create static rendition" },
+		{ id: "copy-rendition-url", label: "Copy rendition download URL" },
+		{ id: "delete-rendition", label: "Delete static rendition" },
 		{ id: "delete-asset", label: "Delete asset", dangerous: true },
 		{ id: "back", label: "Back to list" },
 	];
@@ -465,6 +608,87 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
 					onAction={(policy) =>
 						handleCreatePlaybackId(policy as "public" | "signed")
 					}
+					onCancel={() => setView("actions")}
+				/>
+			)}
+
+			{view === "view-static-renditions" && selectedAsset && (
+				<StaticRenditionsView
+					asset={selectedAsset}
+					onBack={() => setView("actions")}
+				/>
+			)}
+
+			{view === "select-resolution" && (
+				<ActionMenu
+					title="Select Resolution"
+					actions={[
+						{
+							id: "highest",
+							label: "Highest",
+							description: "Best quality based on source",
+						},
+						{ id: "1080p", label: "1080p", description: "Full HD (1920x1080)" },
+						{ id: "720p", label: "720p", description: "HD (1280x720)" },
+						{ id: "480p", label: "480p", description: "SD (854x480)" },
+						{ id: "360p", label: "360p", description: "Low (640x360)" },
+						{
+							id: "audio-only",
+							label: "Audio Only",
+							description: "Audio track only (m4a)",
+						},
+					]}
+					onAction={(res) => handleCreateStaticRendition(res as Resolution)}
+					onCancel={() => setView("actions")}
+				/>
+			)}
+
+			{view === "select-rendition-for-delete" && selectedAsset && (
+				<SelectList
+					title="Select Static Rendition to Delete"
+					items={(selectedAsset.static_renditions?.files ?? [])
+						.filter((f) => f.id)
+						.map((f) => ({
+							id: f.id as string,
+							label: `${f.name ?? "unknown"} [${f.status ?? "unknown"}]`,
+							description: formatRenditionDescription(f),
+							value: f,
+						}))}
+					onSelect={(item) => {
+						setSelectedRendition(item.value);
+						setView("confirm-delete-rendition");
+					}}
+					onCancel={() => setView("actions")}
+				/>
+			)}
+
+			{view === "confirm-delete-rendition" && selectedRendition && (
+				<ConfirmDialog
+					title="Delete Static Rendition"
+					message={`Are you sure you want to delete static rendition ${selectedRendition.name}?`}
+					dangerous
+					onConfirm={handleDeleteStaticRendition}
+					onCancel={() => {
+						setSelectedRendition(null);
+						setView("actions");
+					}}
+				/>
+			)}
+
+			{view === "select-rendition-for-copy" && selectedAsset && (
+				<SelectList
+					title="Select Static Rendition to Copy URL"
+					items={(selectedAsset.static_renditions?.files ?? [])
+						.filter((f) => f.status === "ready" && f.id)
+						.map((f) => ({
+							id: f.id as string,
+							label: `${f.name ?? "unknown"}`,
+							description: formatRenditionDescription(f),
+							value: f,
+						}))}
+					onSelect={(item) => {
+						copyRenditionUrl(item.value);
+					}}
 					onCancel={() => setView("actions")}
 				/>
 			)}
@@ -582,4 +806,138 @@ function formatDuration(seconds: number): string {
 	const mins = Math.floor(seconds / 60);
 	const secs = Math.floor(seconds % 60);
 	return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function formatRenditionDescription(file: StaticRenditionFile): string {
+	const parts: string[] = [];
+	if (file.width && file.height) {
+		parts.push(`${file.width}x${file.height}`);
+	}
+	if (file.bitrate) {
+		parts.push(formatBitrate(file.bitrate));
+	}
+	if (file.filesize) {
+		parts.push(formatFilesize(file.filesize));
+	}
+	return parts.join(" | ");
+}
+
+function formatBitrate(bps: number): string {
+	if (bps >= 1_000_000) {
+		return `${(bps / 1_000_000).toFixed(1)} Mbps`;
+	}
+	if (bps >= 1_000) {
+		return `${(bps / 1_000).toFixed(0)} kbps`;
+	}
+	return `${bps} bps`;
+}
+
+function formatFilesize(bytes: string): string {
+	const size = Number.parseInt(bytes, 10);
+	if (Number.isNaN(size)) return bytes;
+
+	if (size >= 1_000_000_000) {
+		return `${(size / 1_000_000_000).toFixed(1)} GB`;
+	}
+	if (size >= 1_000_000) {
+		return `${(size / 1_000_000).toFixed(1)} MB`;
+	}
+	if (size >= 1_000) {
+		return `${(size / 1_000).toFixed(1)} KB`;
+	}
+	return `${size} B`;
+}
+
+function getStatusColor(status: string | undefined): {
+	bg: string;
+	fg: string;
+} {
+	switch (status) {
+		case "ready":
+			return { bg: "#006600", fg: "#FFFFFF" };
+		case "preparing":
+			return { bg: "#666600", fg: "#FFFFFF" };
+		case "skipped":
+			return { bg: "#444444", fg: "#FFFFFF" };
+		case "errored":
+			return { bg: "#660000", fg: "#FFFFFF" };
+		default:
+			return { bg: "#333333", fg: "#FFFFFF" };
+	}
+}
+
+// Component to display static renditions
+function StaticRenditionsView({
+	asset,
+	onBack,
+}: {
+	asset: Asset;
+	onBack: () => void;
+}) {
+	const files = asset.static_renditions?.files ?? [];
+
+	useKeyboard((key) => {
+		if (key.name === "escape" || key.name === "q") {
+			onBack();
+		}
+	});
+
+	return (
+		<box style={{ flexDirection: "column", flexGrow: 1 }}>
+			<box style={{ border: true, padding: 1 }}>
+				<box style={{ flexDirection: "column" }}>
+					<text style={{ fg: "#00FFFF", marginBottom: 1 }}>
+						Static Renditions for Asset: {asset.id}
+					</text>
+
+					{files.length === 0 ? (
+						<text style={{ fg: "#888888" }}>No static renditions</text>
+					) : (
+						<box style={{ flexDirection: "column" }}>
+							{/* Header */}
+							<text style={{ fg: "#888888", marginBottom: 1 }}>
+								{"Name".padEnd(16)} {"Status".padEnd(12)}{" "}
+								{"Dimensions".padEnd(12)} {"Bitrate".padEnd(10)} Size
+							</text>
+							{/* Rendition rows */}
+							{files.map((file) => {
+								const colors = getStatusColor(file.status);
+								const name = (file.name ?? "unknown").padEnd(16);
+								const dimensions =
+									file.width && file.height
+										? `${file.width}x${file.height}`.padEnd(12)
+										: "-".padEnd(12);
+								const bitrate = file.bitrate
+									? formatBitrate(file.bitrate).padEnd(10)
+									: "-".padEnd(10);
+								const filesize = file.filesize
+									? formatFilesize(file.filesize)
+									: "-";
+
+								return (
+									<box
+										key={file.id ?? file.name}
+										style={{ flexDirection: "row" }}
+									>
+										<text>{name} </text>
+										<text style={{ bg: colors.bg, fg: colors.fg }}>
+											{` ${file.status ?? "unknown"} `}
+										</text>
+										<text>
+											{" ".padEnd(12 - (file.status?.length ?? 7) - 2)}
+											{dimensions} {bitrate} {filesize}
+										</text>
+									</box>
+								);
+							})}
+						</box>
+					)}
+
+					<text style={{ fg: "#888888", marginTop: 2 }}>
+						Press Esc or q to go back
+					</text>
+				</box>
+			</box>
+		</box>
+	);
 }

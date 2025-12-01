@@ -426,6 +426,114 @@ Are you sure you want to delete playback ID playback123 from asset abc123xyz? (y
 Playback ID playback123 deleted successfully
 ```
 
+#### Static Renditions Management
+
+Static renditions are downloadable MP4 versions of your video assets at specific resolutions. Unlike streaming playback, these are complete files that can be downloaded.
+
+##### `mux assets static-renditions list <asset-id>`
+
+List all static renditions for a specific asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# List static renditions for an asset
+mux assets static-renditions list abc123xyz
+
+# Get JSON output
+mux assets static-renditions list abc123xyz --json
+```
+
+**Output:**
+
+```
+Static renditions for asset abc123xyz:
+
+  1080p.mp4        [ready]      1920x1080    5.2 Mbps   42.3 MB
+    ID: rendition123
+  720p.mp4         [preparing]  1280x720     -          -
+    ID: rendition456
+```
+
+##### `mux assets static-renditions create <asset-id>`
+
+Create a new static rendition for an asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+
+**Options:**
+- `-r, --resolution <resolution>` - Target resolution (required): `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p`
+- `-p, --passthrough <string>` - Custom metadata for the rendition (max 255 characters)
+- `-w, --wait` - Wait for the rendition to be ready instead of returning immediately
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Create a 1080p rendition
+mux assets static-renditions create abc123xyz --resolution 1080p
+
+# Create and wait for completion
+mux assets static-renditions create abc123xyz --resolution 720p --wait
+
+# Create with custom metadata
+mux assets static-renditions create abc123xyz --resolution 1080p --passthrough "web-download"
+
+# Get JSON output
+mux assets static-renditions create abc123xyz --resolution 1080p --json
+```
+
+**Output:**
+
+```
+Static rendition created:
+  ID: rendition123
+  Name: 1080p.mp4
+  Resolution: 1080p
+  Status: preparing
+
+Note: Static rendition generation is asynchronous. Use 'mux assets static-renditions list <asset-id>' to check the status, or use the --wait flag to poll until ready.
+```
+
+##### `mux assets static-renditions delete <asset-id> <rendition-id>`
+
+Delete a static rendition from an asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+- `<rendition-id>` - The ID of the rendition to delete
+
+**Options:**
+- `-f, --force` - Skip confirmation prompt
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Delete a static rendition with confirmation
+mux assets static-renditions delete abc123xyz rendition123
+
+# Delete without confirmation
+mux assets static-renditions delete abc123xyz rendition123 --force
+
+# Delete with JSON output
+mux assets static-renditions delete abc123xyz rendition123 --force --json
+```
+
+**Output:**
+
+```
+Are you sure you want to delete static rendition rendition123? (y/n): y
+Static rendition rendition123 deleted from asset abc123xyz
+```
+
 ### Live Stream Management
 
 #### `mux live create`
