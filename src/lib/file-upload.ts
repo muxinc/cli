@@ -1,11 +1,11 @@
-import { readFile, stat } from "node:fs/promises";
-import { basename } from "node:path";
-import { glob } from "glob";
+import { readFile, stat } from 'node:fs/promises';
+import { basename } from 'node:path';
+import { glob } from 'glob';
 
 export interface FileInfo {
-	name: string;
-	path: string;
-	size: number;
+  name: string;
+  path: string;
+  size: number;
 }
 
 /**
@@ -16,49 +16,49 @@ export interface FileInfo {
  * @throws Error if pattern points to a directory
  */
 export async function expandGlobPattern(pattern: string): Promise<FileInfo[]> {
-	// Find all matching files
-	const matches = await glob(pattern, {
-		nodir: true, // Exclude directories
-		absolute: true, // Return absolute paths
-	});
+  // Find all matching files
+  const matches = await glob(pattern, {
+    nodir: true, // Exclude directories
+    absolute: true, // Return absolute paths
+  });
 
-	// If the pattern is a single path and it's a directory, throw error
-	if (matches.length === 0) {
-		try {
-			const stats = await stat(pattern);
-			if (stats.isDirectory()) {
-				throw new Error(
-					`Pattern points to a directory: ${pattern}. Please specify files or use a glob pattern like ${pattern}/*.mp4`,
-				);
-			}
-		} catch (error) {
-			// If stat fails, it's just no matches - return empty array
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-				throw error;
-			}
-		}
-	}
+  // If the pattern is a single path and it's a directory, throw error
+  if (matches.length === 0) {
+    try {
+      const stats = await stat(pattern);
+      if (stats.isDirectory()) {
+        throw new Error(
+          `Pattern points to a directory: ${pattern}. Please specify files or use a glob pattern like ${pattern}/*.mp4`,
+        );
+      }
+    } catch (error) {
+      // If stat fails, it's just no matches - return empty array
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
 
-	// Get file info for each match
-	const fileInfos: FileInfo[] = [];
-	for (const filePath of matches) {
-		const stats = await stat(filePath);
-		const name = basename(filePath);
+  // Get file info for each match
+  const fileInfos: FileInfo[] = [];
+  for (const filePath of matches) {
+    const stats = await stat(filePath);
+    const name = basename(filePath);
 
-		fileInfos.push({
-			name,
-			path: filePath,
-			size: stats.size,
-		});
-	}
+    fileInfos.push({
+      name,
+      path: filePath,
+      size: stats.size,
+    });
+  }
 
-	return fileInfos;
+  return fileInfos;
 }
 
 export interface UploadResult {
-	uploadId: string;
-	success: boolean;
-	assetId?: string;
+  uploadId: string;
+  success: boolean;
+  assetId?: string;
 }
 
 /**
@@ -76,50 +76,50 @@ export interface UploadResult {
  * Future enhancement: implement streaming upload with granular progress tracking.
  */
 export async function uploadFile(
-	filePath: string,
-	uploadUrl: string,
-	uploadId: string,
-	onProgress: (percent: number) => void,
+  filePath: string,
+  uploadUrl: string,
+  uploadId: string,
+  onProgress: (percent: number) => void,
 ): Promise<UploadResult> {
-	try {
-		// Report upload starting
-		onProgress(0);
+  try {
+    // Report upload starting
+    onProgress(0);
 
-		// Read the file
-		const fileContent = await readFile(filePath);
+    // Read the file
+    const fileContent = await readFile(filePath);
 
-		// Upload to the signed URL
-		const response = await fetch(uploadUrl, {
-			method: "PUT",
-			body: fileContent,
-			headers: {
-				"Content-Type": "application/octet-stream",
-				"Content-Length": fileContent.length.toString(),
-			},
-		});
+    // Upload to the signed URL
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: fileContent,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': fileContent.length.toString(),
+      },
+    });
 
-		if (!response.ok) {
-			throw new Error(
-				`Upload failed with status ${response.status}: ${response.statusText}`,
-			);
-		}
+    if (!response.ok) {
+      throw new Error(
+        `Upload failed with status ${response.status}: ${response.statusText}`,
+      );
+    }
 
-		// Report upload complete
-		onProgress(100);
+    // Report upload complete
+    onProgress(100);
 
-		return {
-			uploadId,
-			success: true,
-		};
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-			throw new Error(`File not found: ${filePath}`);
-		}
+    return {
+      uploadId,
+      success: true,
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error(`File not found: ${filePath}`);
+    }
 
-		if (error instanceof TypeError && error.message.includes("fetch")) {
-			throw new Error(`Upload failed: Invalid upload URL`);
-		}
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error(`Upload failed: Invalid upload URL`);
+    }
 
-		throw error;
-	}
+    throw error;
+  }
 }

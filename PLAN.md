@@ -1,77 +1,52 @@
-# Prettier Asset List
+# Update live/list to match assets/list format
 
 ## Goal
-Improve the `mux assets list` output to display assets in a readable card-style format.
+Update `mux live list` to use the same card-style format as `mux assets list` for consistency.
 
 ## Final Output Format
 
 **Pretty (default):**
 ```
-sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16
+Found 2 live stream(s):
+
+waWxn5KIZCYmILAOWgXW9dFBPnOXq00JM  idle  08/18 16:43
   Details:
-    ├─ Aspect Ratio: 240:427
-    ├─ Resolution: 720p
-    └─ Quality: plus
-  Meta:
-    └─ Title: golf-swing
+    ├─ Stream Key: c3eb...1724
+    ├─ Latency Mode: standard
+    ├─ Reconnect Window: 60s
+    └─ Max Duration: 12h
+  Recent Assets:
+    └─ 00QNOSkxzBdlASP3iIvTfvqxDN3u74hUX
   Playback IDs:
-    ├─ 🔓 rFHdcXSf95EHT32qYnf6ZnBz01D7VyKR4
-    └─ 🔒 qo5Y6CpYtdZBgQlI6VskadqdNcQQVdPh
+    └─ 🔒 EIyqm8p4VwGj5sO9rNBtykFbbKFFSNWA
 ```
 
 **Compact (`--compact`):**
 ```
-sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16  720p  "golf-swing"  public,signed  -
+waWxn5KIZCYmILAOWgXW9dFBPnOXq00JM  idle  08/18 16:43  standard  60s  signed  1 assets
 ```
 
-## Features
-- Asset ID on its own line (easy to copy)
-- Colored status: green=ready, yellow=preparing, red=errored
-- Duration in m:ss format
-- Short date format (MM/DD HH:MM)
-- Details section: aspect ratio, resolution, max stored, quality, passthrough
-- Meta section: title, creator_id, external_id
-- Static renditions shown only if present
-- Playback IDs with tree connectors (├─ / └─)
-- Policy icons in pretty mode: 🔓 = public, 🔒 = signed
-- `--compact` flag for grep-friendly one-line output (text policies, no emojis)
-
 ## Implementation
-- [x] Add `@cliffy/ansi` dependency for colors
-- [x] Refactor to card-style output
-- [x] Add colored status
-- [x] Add tree connectors for playback IDs
-- [x] Add Details section (resolution, quality, etc.)
-- [x] Add Meta section (title, creator_id, external_id)
-- [x] Add `--compact` flag for grep-friendly output
-- [x] Run checks and tests
 
-## Notes
-- `--json` output unchanged (raw JSON for scripting)
-- Playback IDs are full length (not truncated) for easy copying
+### Phase 1: Extract shared formatters
+- [x] Create shared functions in `src/lib/formatters.ts`
+- [x] Update assets/list.ts to use shared formatters
 
----
+### Phase 2: Update live/list.ts
+- [x] Import shared formatters
+- [x] Add `--compact` flag
+- [x] Implement `printStreamCard()` for pretty output
+- [x] Implement `printStreamCompact()` for compact output
+- [x] Add live-specific status colors (idle=dim, active=green, disabled=red)
 
-# Follow-up: Update live/list to match
+### Phase 3: Tests & Polish
+- [x] Add test for `--compact` flag
+- [x] Run checks and test manually
 
-## Goal
-Update `mux live list` to use the same card-style format as `mux assets list` for consistency.
-
-## Tasks
-- [ ] Update `src/commands/live/list.ts` to use card-style output
-- [ ] Add `--compact` flag to live/list
-- [ ] Extract shared formatters to `src/lib/formatters.ts`:
-  - `formatStatus(status)` - colored status
-  - `formatDuration(duration)` - m:ss format
-  - `formatCreatedAt(timestamp)` - MM/DD HH:MM format
-- [ ] Update live/list to use shared formatters
-- [ ] Consider updating assets/list to use shared formatters too
-
-## Live stream specific fields to show
-- Stream ID
-- Status (colored)
-- Created date
-- Playback IDs with policy icons
-- Stream key (maybe truncated or hidden by default?)
-- Latency mode
-- Reconnect window
+## Shared Formatters Added
+- `formatCreatedAt(timestamp)` - MM/DD HH:MM format
+- `formatDuration(duration)` - m:ss format
+- `formatAssetStatus(status)` - colored asset status
+- `formatLiveStreamStatus(status)` - colored live stream status
+- `formatSeconds(seconds)` - human readable (e.g., "12h", "60s")
+- `truncateMiddle(str)` - truncate showing first/last chars (e.g., "c3eb...1724")

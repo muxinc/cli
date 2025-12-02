@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir ./dist --target bun --format esm",
-    "build:binary": "bun build src/index.ts --compile --outfile ./dist/mux",
+    "build:binary": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile ./dist/mux",
     "dev": "bun run src/index.ts",
     "format": "pnpm exec biome format --write",
     "lint": "pnpm exec biome format",

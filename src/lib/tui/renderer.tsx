@@ -1,10 +1,10 @@
 /** @jsxImportSource @opentui/react */
-import { createCliRenderer } from "@opentui/core";
-import { createRoot } from "@opentui/react";
-import type { ReactNode } from "react";
+import { createCliRenderer } from '@opentui/core';
+import { createRoot } from '@opentui/react';
+import type { ReactNode } from 'react';
 
 export interface TUIOptions {
-	exitOnCtrlC?: boolean;
+  exitOnCtrlC?: boolean;
 }
 
 /**
@@ -12,19 +12,19 @@ export interface TUIOptions {
  * Returns a cleanup function to unmount the app
  */
 export async function renderTUI(
-	element: ReactNode,
-	options: TUIOptions = {},
+  element: ReactNode,
+  options: TUIOptions = {},
 ): Promise<() => void> {
-	const renderer = await createCliRenderer({
-		exitOnCtrlC: options.exitOnCtrlC ?? true,
-	});
+  const renderer = await createCliRenderer({
+    exitOnCtrlC: options.exitOnCtrlC ?? true,
+  });
 
-	const root = createRoot(renderer);
-	root.render(element);
+  const root = createRoot(renderer);
+  root.render(element);
 
-	return () => {
-		renderer.destroy();
-	};
+  return () => {
+    renderer.destroy();
+  };
 }
 
 /**
@@ -32,15 +32,15 @@ export async function renderTUI(
  * Useful for commands that should block until the TUI is closed
  */
 export async function runTUI(
-	element: ReactNode,
-	options: TUIOptions = {},
+  element: ReactNode,
+  options: TUIOptions = {},
 ): Promise<void> {
-	const cleanup = await renderTUI(element, options);
+  const cleanup = await renderTUI(element, options);
 
-	// Keep the process running until explicitly exited
-	await new Promise<void>(() => {
-		// This promise never resolves - the TUI will call process.exit when done
-	});
+  // Keep the process running until explicitly exited
+  await new Promise<void>(() => {
+    // This promise never resolves - the TUI will call process.exit when done
+  });
 
-	cleanup();
+  cleanup();
 }
