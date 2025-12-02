@@ -1,4 +1,5 @@
 import { Command } from "@cliffy/command";
+import { formatLiveStream } from "../../lib/formatters.ts";
 import { createAuthenticatedMuxClient } from "../../lib/mux.ts";
 
 interface GetOptions {
@@ -20,42 +21,7 @@ export const getCommand = new Command()
 			if (options.json) {
 				console.log(JSON.stringify(stream, null, 2));
 			} else {
-				// Pretty output
-				console.log(`Stream ID: ${stream.id}`);
-				console.log(`Status: ${stream.status}`);
-				console.log(`Created: ${stream.created_at}`);
-				console.log(`Stream Key: ${stream.stream_key}`);
-
-				if (stream.latency_mode) {
-					console.log(`Latency Mode: ${stream.latency_mode}`);
-				}
-
-				if (stream.reconnect_window) {
-					console.log(`Reconnect Window: ${stream.reconnect_window}s`);
-				}
-
-				if (stream.playback_ids && stream.playback_ids.length > 0) {
-					console.log("\nPlayback IDs:");
-					for (const playbackId of stream.playback_ids) {
-						console.log(`  - ${playbackId.id} (${playbackId.policy})`);
-						console.log(
-							`    URL: https://stream.mux.com/${playbackId.id}.m3u8`,
-						);
-					}
-				}
-
-				if (stream.recent_asset_ids && stream.recent_asset_ids.length > 0) {
-					console.log("\nRecent Assets:");
-					for (const assetId of stream.recent_asset_ids) {
-						console.log(`  - ${assetId}`);
-					}
-				}
-
-				if (stream.test) {
-					console.log(
-						"\nWARNING: This is a test stream (will be deleted after 24 hours)",
-					);
-				}
+				formatLiveStream(stream);
 			}
 		} catch (error) {
 			const errorMessage =

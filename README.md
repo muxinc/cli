@@ -808,6 +808,47 @@ Are you sure you want to delete playback ID playback123 from live stream abc123x
 Playback ID playback123 deleted successfully
 ```
 
+### Playback ID Lookup
+
+#### `mux playback-ids <playback-id>`
+
+Look up which asset or live stream a playback ID belongs to. This is useful when you have a playback ID and need to find the associated resource.
+
+**Arguments:**
+- `<playback-id>` - The playback ID to look up
+
+**Options:**
+- `--expand` - Fetch and return the full asset or live stream object instead of just the reference
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Look up a playback ID (returns basic info)
+mux playback-ids abc123playbackid
+
+# Look up and fetch the full asset or live stream object
+mux playback-ids abc123playbackid --expand
+
+# Get JSON output
+mux playback-ids abc123playbackid --json
+```
+
+**Output (basic lookup):**
+
+```
+Playback ID: abc123playbackid
+Policy: public
+Type: asset
+ID: abc123xyz
+```
+
+**Output (with --expand):**
+
+When using `--expand`, the output will be the full asset or live stream object, formatted the same as `mux assets get` or `mux live get` commands.
+
+**Note:** The nested `playback-ids` commands under `assets` and `live` (e.g., `mux assets playback-ids list`) are for managing playback IDs on known resources. This top-level command is for discovering what resource a playback ID belongs to.
+
 ### Signing Keys & Secure Playback
 
 #### `mux signing-keys create`

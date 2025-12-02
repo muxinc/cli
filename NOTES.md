@@ -785,3 +785,114 @@ Implemented complete static renditions management fer downloadable MP4 versions 
 - Add edge case tests fer passthrough validation (>255 chars)
 - Extract formatting utilities to shared module
 - Support bulk rendition creation (multiple resolutions at once)
+
+## Playback ID Lookup
+
+### Overview
+Implemented a top-level `mux playback-ids <playback-id>` command fer lookin' up which asset or live stream a playback ID belongs to. This be a cross-cutting lookup feature separate from the nested playback-ids commands under `assets` and `live`.
+
+### Architecture
+
+**Command Design:**
+- Top-level command path: `mux playback-ids <playback-id>` (not nested)
+- No subcommands (like `get`) since there's only one operation fer this resource
+- Uses Mux API endpoint: `GET /video/v1/playback-ids/{PLAYBACK_ID}`
+- API returns: `{ "data": { "object": { "id": "...", "type": "asset" | "live_stream" } } }`
+
+**Shared Formatters:**
+- Extracted common formatting logic to `src/lib/formatters.ts`:
+  - `formatAsset()` - Formats asset objects fer pretty output
+  - `formatLiveStream()` - Formats live stream objects fer pretty output
+- Both `assets/get.ts` and `live/get.ts` refactored to use shared formatters
+- Eliminates code duplication and ensures consistent formatting across commands
+
+### Commands Implemented
+
+**Playback ID Lookup (`mux playback-ids`):**
+- `mux playback-ids <playback-id>` - Look up asset or live stream fer a playback ID
+  - Required argument: `playback-id`
+  - Flags:
+    - `--expand` - Fetch and return full asset or live stream object
+    - `--json` - Output JSON instead of pretty format
+  - Default behavior: Returns playback ID info (id, policy, type, object.id, object.type)
+  - With `--expand`: Makes secondary API call to fetch full resource object
+
+**Basic Output:**
+```
+Playback ID: abc123playbackid
+Policy: public
+Type: asset
+ID: abc123xyz
+```
+
+**Expanded Output:**
+When using `--expand`, output matches the format from `mux assets get` or `mux live get` depending on the resource type.
+
+### Design Decisions
+
+**1. Top-Level Command:**
+- Chose `mux playback-ids` over `mux assets playback-ids lookup` or `mux live playback-ids lookup`
+- Rationale: A playback ID could belong to either an asset or live stream - it's a cross-cutting concern
+- Keeps UX simple when you don't know what resource a playback ID belongs to
+
+**2. No `get` Subcommand:**
+- Just `mux playback-ids <id>` instead of `mux playback-ids get <id>`
+- Only one operation available fer this resource type (lookup)
+- Simpler command syntax
+
+**3. Optional Expand Flag:**
+- Default: Returns lightweight playback ID info only
+- With `--expand`: Makes additional API call to fetch full resource object
+- Gives users control over whether they need full details or just basic info
+
+**4. Explicit Type Checking:**
+- Code explicitly checks fer `asset` and `live_stream` types
+- Throws error fer unknown types (future-proofing against API changes)
+- Better error messages than implicit handling
+
+### Code Extraction
+
+**Shared Formatters Module:**
+Created `src/lib/formatters.ts` with:
+- `formatAsset(asset: Asset): void` - Extracted from `assets/get.ts`
+- `formatLiveStream(stream: LiveStream): void` - Extracted from `live/get.ts`
+
+Benefits:
+- DRY principle - single source of truth fer formatting
+- Consistency - all commands format resources identically
+- Maintainability - changes to format apply everywhere
+- Reusability - can be used by future commands or TUI
+
+### Test Coverage
+
+**Total: 7 tests, all passing**
+
+- `index.test.ts` - 7 tests:
+  - Command metadata (description)
+  - Required argument validation (playback-id)
+  - Flag validation (--json, --expand)
+  - Input validation (error when playback-id missing)
+
+**Test Strategy:**
+- Focus on CLI interface layer (command structure, flags, arguments)
+- Do NOT test Mux API integration (verified via manual testing)
+- Follow project philosophy: no sleep(), human readable, test real code
+
+### Integration Notes
+
+**Command Registration:**
+- Registered as top-level command in `src/index.ts`
+- Visible in main CLI help output
+- Listed separately from asset/live stream management commands
+
+**SDK Usage:**
+- Uses `mux.video.playbackIds.retrieve(playbackId)` fer lookup
+- Uses existing `mux.video.assets.retrieve(assetId)` fer expanded asset fetch
+- Uses existing `mux.video.liveStreams.retrieve(streamId)` fer expanded stream fetch
+
+### Future Enhancements
+
+**Potential Improvements:**
+- Expand pattern could become reusable across CLI
+- Example: `mux assets get <id> --expand "live_stream,upload"` to expand nested references
+- Could be implemented as a general expansion system fer any resource with references

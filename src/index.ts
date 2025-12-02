@@ -5,6 +5,7 @@ import { envCommand } from "./commands/env/index.ts";
 import { liveCommand } from "./commands/live/index.ts";
 import { loginCommand } from "./commands/login.ts";
 import { logoutCommand } from "./commands/logout.ts";
+import { playbackIdsCommand } from "./commands/playback-ids/index.ts";
 import { signCommand } from "./commands/sign.ts";
 import { signingKeysCommand } from "./commands/signing-keys/index.ts";
 
@@ -24,6 +25,7 @@ const cli = new Command()
 	.command("env", envCommand)
 	.command("assets", assetsCommand)
 	.command("live", liveCommand)
+	.command("playback-ids", playbackIdsCommand)
 	.command("signing-keys", signingKeysCommand)
 	.command("sign", signCommand);
 
