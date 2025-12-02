@@ -1,6 +1,10 @@
-import { colors } from "@cliffy/ansi/colors";
 import { Command } from "@cliffy/command";
 import type { Asset } from "@mux/mux-node/resources/video/assets";
+import {
+	formatAssetStatus,
+	formatCreatedAt,
+	formatDuration,
+} from "../../lib/formatters.ts";
 import { createAuthenticatedMuxClient } from "../../lib/mux.ts";
 
 interface ListOptions {
@@ -124,7 +128,7 @@ function printAssetCompact(asset: Asset): void {
 function printAssetCard(asset: Asset): void {
 	// Line 1: Asset ID, colored status, duration, created date
 	const id = asset.id ?? "unknown";
-	const status = formatStatus(asset.status);
+	const status = formatAssetStatus(asset.status);
 	const duration = formatDuration(asset.duration);
 	const created = formatCreatedAt(asset.created_at);
 
@@ -220,53 +224,6 @@ function collectMeta(asset: Asset): string[] {
 	}
 
 	return meta;
-}
-
-/**
- * Format status with color
- */
-function formatStatus(status: string | undefined): string {
-	switch (status) {
-		case "ready":
-			return colors.green(status);
-		case "preparing":
-			return colors.yellow(status);
-		case "errored":
-			return colors.red(status);
-		default:
-			return colors.dim(status ?? "unknown");
-	}
-}
-
-/**
- * Format duration as m:ss
- */
-function formatDuration(duration: number | undefined): string {
-	if (!duration) return "-";
-	const mins = Math.floor(duration / 60);
-	const secs = Math.floor(duration % 60);
-	return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-/**
- * Format created_at timestamp to short format
- * Mux API returns Unix timestamp as a string
- */
-function formatCreatedAt(createdAt: string | undefined): string {
-	if (!createdAt) return "-";
-	const timestamp = Number.parseInt(createdAt, 10);
-	if (Number.isNaN(timestamp)) return "-";
-	const date = new Date(timestamp * 1000);
-
-	// Check if date is valid
-	if (Number.isNaN(date.getTime())) return "-";
-
-	const month = (date.getMonth() + 1).toString().padStart(2, "0");
-	const day = date.getDate().toString().padStart(2, "0");
-	const hours = date.getHours().toString().padStart(2, "0");
-	const minutes = date.getMinutes().toString().padStart(2, "0");
-
-	return `${month}/${day} ${hours}:${minutes}`;
 }
 
 /**

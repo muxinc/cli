@@ -1,5 +1,108 @@
+import { colors } from "@cliffy/ansi/colors";
 import type { Asset } from "@mux/mux-node/resources/video/assets";
 import type { LiveStream } from "@mux/mux-node/resources/video/live-streams";
+
+/**
+ * Format created_at timestamp to short format (MM/DD HH:MM)
+ * Mux API returns Unix timestamp as a string
+ */
+export function formatCreatedAt(createdAt: string | undefined): string {
+	if (!createdAt) return "-";
+	const timestamp = Number.parseInt(createdAt, 10);
+	if (Number.isNaN(timestamp)) return "-";
+	const date = new Date(timestamp * 1000);
+
+	// Check if date is valid
+	if (Number.isNaN(date.getTime())) return "-";
+
+	const month = (date.getMonth() + 1).toString().padStart(2, "0");
+	const day = date.getDate().toString().padStart(2, "0");
+	const hours = date.getHours().toString().padStart(2, "0");
+	const minutes = date.getMinutes().toString().padStart(2, "0");
+
+	return `${month}/${day} ${hours}:${minutes}`;
+}
+
+/**
+ * Format duration as m:ss
+ */
+export function formatDuration(duration: number | undefined): string {
+	if (!duration) return "-";
+	const mins = Math.floor(duration / 60);
+	const secs = Math.floor(duration % 60);
+	return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Format asset status with color
+ */
+export function formatAssetStatus(status: string | undefined): string {
+	switch (status) {
+		case "ready":
+			return colors.green(status);
+		case "preparing":
+			return colors.yellow(status);
+		case "errored":
+			return colors.red(status);
+		default:
+			return colors.dim(status ?? "unknown");
+	}
+}
+
+/**
+ * Format live stream status with color
+ */
+export function formatLiveStreamStatus(status: string | undefined): string {
+	switch (status) {
+		case "active":
+			return colors.green(status);
+		case "idle":
+			return colors.dim(status);
+		case "disabled":
+			return colors.red(status);
+		default:
+			return colors.dim(status ?? "unknown");
+	}
+}
+
+/**
+ * Format seconds into a human-readable duration (e.g., "12h", "60s", "2h 30m")
+ */
+export function formatSeconds(seconds: number | undefined): string {
+	if (!seconds) return "-";
+
+	const hours = Math.floor(seconds / 3600);
+	const mins = Math.floor((seconds % 3600) / 60);
+	const secs = seconds % 60;
+
+	if (hours > 0 && mins === 0) {
+		return `${hours}h`;
+	}
+	if (hours > 0) {
+		return `${hours}h ${mins}m`;
+	}
+	if (mins > 0 && secs === 0) {
+		return `${mins}m`;
+	}
+	if (mins > 0) {
+		return `${mins}m ${secs}s`;
+	}
+	return `${secs}s`;
+}
+
+/**
+ * Truncate a string showing first and last N characters
+ * e.g., "c3eb0bad-a691-0d1d-f07c-286e65b41724" -> "c3eb...1724"
+ */
+export function truncateMiddle(
+	str: string | undefined,
+	startChars = 4,
+	endChars = 4,
+): string {
+	if (!str) return "-";
+	if (str.length <= startChars + endChars + 3) return str;
+	return `${str.slice(0, startChars)}...${str.slice(-endChars)}`;
+}
 
 /**
  * Format an asset for pretty console output

@@ -605,6 +605,7 @@ List all live streams with pagination.
 - `--limit <number>` - Number of results to return (default: 25)
 - `--page <number>` - Page number for pagination (default: 1)
 - `--json` - Output JSON instead of pretty format
+- `--compact` - Output one line per stream in grep-friendly format
 
 **Examples:**
 
@@ -620,24 +621,32 @@ mux live list --page 2
 
 # Get JSON output for scripting
 mux live list --json
+
+# Get compact output for grep and parsing
+mux live list --compact
 ```
 
-**Output:**
+**Output (default pretty format):**
 
 ```
-Found 3 live stream(s):
+Found 2 live stream(s):
 
-Stream ID: abc123xyz
-  Status: active
-  Created: 1234567890
-  Stream Key: your-stream-key
-  Playback URL: https://stream.mux.com/playback123.m3u8
+waWxn5KIZCYmILAOWgXW9dFBPnOXq00JM  idle  08/18 16:43
+  Details:
+    ├─ Stream Key: c3eb...1724
+    ├─ Latency Mode: standard
+    ├─ Reconnect Window: 60s
+    └─ Max Duration: 12h
+  Recent Assets:
+    └─ 00QNOSkxzBdlASP3iIvTfvqxDN3u74hUX
+  Playback IDs:
+    └─ 🔒 EIyqm8p4VwGj5sO9rNBtykFbbKFFSNWA
+```
 
-Stream ID: def456uvw
-  Status: idle
-  Created: 1234567891
-  Stream Key: another-stream-key
-  Playback URL: https://stream.mux.com/playback456.m3u8
+**Output (with --compact flag):**
+
+```
+waWxn5KIZCYmILAOWgXW9dFBPnOXq00JM  idle  08/18 16:43  standard  60s  signed  1 assets
 ```
 
 #### `mux live get <stream-id>`
