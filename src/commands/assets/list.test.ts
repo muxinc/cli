@@ -46,5 +46,12 @@ describe("mux assets list command", () => {
 				.find((opt) => opt.name === "json");
 			expect(jsonOption).toBeDefined();
 		});
+
+		test("has --compact flag for grep-friendly output", () => {
+			const compactOption = listCommand
+				.getOptions()
+				.find((opt) => opt.name === "compact");
+			expect(compactOption).toBeDefined();
+		});
 	});
 });

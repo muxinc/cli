@@ -1,173 +1,77 @@
-# Static Renditions Management
+# Prettier Asset List
 
 ## Goal
-Add the ability to manage static renditions (downloadable MP4s) on assets, both through the asset management TUI and via CLI commands.
+Improve the `mux assets list` output to display assets in a readable card-style format.
 
-## API Endpoints (Mux SDK)
-The Mux Node SDK provides these methods on `mux.video.assets`:
+## Final Output Format
 
-- `createStaticRendition(assetId, { resolution, passthrough? })` - Create a new rendition
-- `deleteStaticRendition(assetId, staticRenditionId)` - Delete a specific rendition
-- Asset's `static_renditions` field contains the current state:
-  - `status`: 'ready' | 'preparing' | 'disabled' | 'errored'
-  - `files`: Array of rendition files with id, resolution, status, bitrate, dimensions, etc.
-
-### Resolution Options
-- `highest` - Highest quality based on source
-- `audio-only` - Audio only (m4a)
-- `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p`
-
-### Rendition File Statuses
-- `ready` - MP4 is generated and available
-- `preparing` - Still being generated
-- `skipped` - Resolution conflicts with asset attributes
-- `errored` - Generation failed
-
-## Implementation Plan
-
-### Phase 1: CLI Commands
-New subcommand group: `mux assets static-renditions <command>`
-
-**File Structure:**
+**Pretty (default):**
 ```
-src/commands/assets/static-renditions/
-├── index.ts          (command group)
-├── list.ts           (list renditions for an asset)
-├── create.ts         (create a new rendition)
-├── delete.ts         (delete a specific rendition)
-├── list.test.ts
-├── create.test.ts
-└── delete.test.ts
+sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16
+  Details:
+    ├─ Aspect Ratio: 240:427
+    ├─ Resolution: 720p
+    └─ Quality: plus
+  Meta:
+    └─ Title: golf-swing
+  Playback IDs:
+    ├─ 🔓 rFHdcXSf95EHT32qYnf6ZnBz01D7VyKR4
+    └─ 🔒 qo5Y6CpYtdZBgQlI6VskadqdNcQQVdPh
 ```
 
-**Commands:**
-
-1. **`mux assets static-renditions list <asset-id>`**
-   - Retrieves asset and displays static_renditions info
-   - Shows each file: resolution, status, dimensions, bitrate, filesize
-   - Supports `--json` for machine output
-
-2. **`mux assets static-renditions create <asset-id>`**
-   - `--resolution <res>` (required) - One of the valid resolution options
-   - `--passthrough <string>` (optional) - Custom metadata (max 255 chars)
-   - `--wait` (optional) - Poll until rendition is ready instead of returning immediately
-   - Supports `--json` for machine output
-   - Default: Returns immediately with message explaining async generation
-   - With `--wait`: Polls and returns when rendition is ready/errored/skipped
-
-3. **`mux assets static-renditions delete <asset-id> <rendition-id>`**
-   - Deletes a specific static rendition by ID
-   - Shows confirmation of deletion
-
-### Phase 2: TUI Integration
-Add static renditions management to the existing `mux assets manage` TUI.
-
-**New TUI Views:**
-- `view-static-renditions` - Display list of current static renditions
-- `select-static-rendition` - Select a rendition for deletion
-- `select-resolution` - Select resolution when creating a rendition
-- `confirm-delete-rendition` - Confirm deletion of a rendition
-
-**New Actions in Asset Action Menu:**
-- "View static renditions" - Shows current renditions with status info
-- "Create static rendition" - Create a new MP4 rendition
-- "Delete static rendition" - Remove an existing rendition
-- "Copy rendition URL" - Copy download URL for a ready rendition
-
-**Display Format for Renditions:**
+**Compact (`--compact`):**
 ```
-Static Renditions:
-  1080p.mp4  [ready]     1920x1080  5.2 Mbps  42.3 MB
-  720p.mp4   [preparing] 1280x720   -         -
-  audio.m4a  [ready]     -          128 kbps  1.2 MB
-```
-Status labels use background colors in TUI:
-- `ready` - green background
-- `preparing` - yellow background
-- `skipped` - gray background
-- `errored` - red background
-
-### Phase 3: Enhance Asset Display
-- Show static renditions summary in asset list view (e.g., "3 renditions")
-- Show static renditions in asset details panel
-- Consider adding rendition count to asset label in TUI
-
-## Technical Notes
-
-### Types from SDK
-All types are imported directly from the Mux SDK - no mirroring in CLI code:
-
-```typescript
-import type { Asset } from "@mux/mux-node/resources/video/assets";
-import type Mux from "@mux/mux-node";
-
-// Resolution type extracted from SDK
-type Resolution = NonNullable<Mux.Video.AssetCreateStaticRenditionParams["resolution"]>;
-
-// Rendition file type from asset
-type StaticRenditionFile = NonNullable<Asset["static_renditions"]>["files"][number];
-
-// Create response type
-type CreateStaticRenditionResponse = Mux.Video.AssetCreateStaticRenditionResponse;
+sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16  720p  "golf-swing"  public,signed  -
 ```
 
-### Display Helpers Needed
-- `formatBitrate(bps)` - Convert bits/sec to human readable (e.g., "5.2 Mbps")
-- `formatFilesize(bytes)` - Convert bytes to human readable (e.g., "42.3 MB")
-- `formatRenditionStatus(status)` - Text label with background color for TUI
+## Features
+- Asset ID on its own line (easy to copy)
+- Colored status: green=ready, yellow=preparing, red=errored
+- Duration in m:ss format
+- Short date format (MM/DD HH:MM)
+- Details section: aspect ratio, resolution, max stored, quality, passthrough
+- Meta section: title, creator_id, external_id
+- Static renditions shown only if present
+- Playback IDs with tree connectors (├─ / └─)
+- Policy icons in pretty mode: 🔓 = public, 🔒 = signed
+- `--compact` flag for grep-friendly one-line output (text policies, no emojis)
 
-## Decisions Made
+## Implementation
+- [x] Add `@cliffy/ansi` dependency for colors
+- [x] Refactor to card-style output
+- [x] Add colored status
+- [x] Add tree connectors for playback IDs
+- [x] Add Details section (resolution, quality, etc.)
+- [x] Add Meta section (title, creator_id, external_id)
+- [x] Add `--compact` flag for grep-friendly output
+- [x] Run checks and tests
 
-1. **Download URLs for ready renditions** - Yes, include "Copy download URL" action for renditions with `ready` status. Static rendition URLs are accessible via the playback ID.
+## Notes
+- `--json` output unchanged (raw JSON for scripting)
+- Playback IDs are full length (not truncated) for easy copying
 
-2. **Create command behavior** - Return immediately by default with a helpful message explaining that rendition generation is async. Add `--wait` flag to optionally poll until the rendition is ready.
+---
 
-## Testing Strategy
+# Follow-up: Update live/list to match
 
-- Unit tests for CLI commands with mocked Mux client
-- Test validation of resolution options
-- Test error handling for invalid asset IDs, rendition IDs
-- Test JSON vs pretty output formats
-- TUI components are tested via manual verification
+## Goal
+Update `mux live list` to use the same card-style format as `mux assets list` for consistency.
 
-## TODO
+## Tasks
+- [ ] Update `src/commands/live/list.ts` to use card-style output
+- [ ] Add `--compact` flag to live/list
+- [ ] Extract shared formatters to `src/lib/formatters.ts`:
+  - `formatStatus(status)` - colored status
+  - `formatDuration(duration)` - m:ss format
+  - `formatCreatedAt(timestamp)` - MM/DD HH:MM format
+- [ ] Update live/list to use shared formatters
+- [ ] Consider updating assets/list to use shared formatters too
 
-- [x] Write tests for static-renditions list command
-- [x] Implement static-renditions list command
-- [x] Write tests for static-renditions create command
-- [x] Implement static-renditions create command
-- [x] Write tests for static-renditions delete command
-- [x] Implement static-renditions delete command
-- [x] Wire up static-renditions command group to assets
-- [x] Add static renditions views to TUI
-- [x] Add static renditions actions to TUI action menu
-- [ ] Test end-to-end with real Mux account
-
-## Code Review Findings
-
-### Must Fix Before Merging
-
-1. ~~**Missing README documentation** - The new `mux assets static-renditions` commands need to be documented in README.md, similar to the playback-ids documentation.~~ **FIXED**
-
-2. ~~**Missing confirmation prompt on delete** - The `static-renditions delete` command has no `--force` flag or confirmation prompt, unlike `playback-ids delete`. Need to add for consistency and safety.~~ **FIXED**
-
-### Should Fix Soon
-
-3. **Code duplication** - `formatBitrate()` and `formatFilesize()` are duplicated in 3 places:
-   - `src/commands/assets/static-renditions/create.ts`
-   - `src/commands/assets/static-renditions/list.ts`
-   - `src/commands/assets/manage/AssetManageApp.tsx`
-
-   Should extract to a shared utility module like `src/lib/format-utils.ts`.
-
-### Nice to Have
-
-4. **Enhance `mux assets get`** - Show static renditions summary in asset details output.
-
-5. **TUI download URLs** - Show download URLs directly in the static renditions view for ready renditions.
-
-6. **Additional test coverage** - Add edge case tests for passthrough validation (>255 chars).
-
-## Observations
-
-- The `static_renditions.status` field on the asset is related to the deprecated `mp4_support` feature. With the new static renditions API, status is per-rendition, not overall. Removed "overall status" display from both CLI and TUI.
+## Live stream specific fields to show
+- Stream ID
+- Status (colored)
+- Created date
+- Playback IDs with policy icons
+- Stream key (maybe truncated or hidden by default?)
+- Latency mode
+- Reconnect window

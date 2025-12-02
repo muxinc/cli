@@ -19,6 +19,7 @@
 		"test:watch": "bun test --watch"
 	},
 	"dependencies": {
+		"@cliffy/ansi": "jsr:1.0.0-rc.8",
 		"@cliffy/command": "jsr:1.0.0-rc.8",
 		"@cliffy/prompt": "npm:@jsr/cliffy__prompt@1.0.0-rc.8",
 		"@opentui/core": "^0.1.50",

@@ -162,6 +162,34 @@ When using `--upload` with glob patterns matching multiple files:
 **Progress Reporting Limitation:**
 The `uploadFile()` function uses native fetch, which doesn't provide granular progress updates for PUT requests. Currently reports only 0% and 100%. For large files, the CLI may appear to hang during upload. Future enhancement: implement streaming upload with chunked progress tracking.
 
+### Output Formatting
+
+**Pretty Asset List Format:**
+- Default output uses card-style format with visual hierarchy
+- Asset ID displayed prominently on first line fer easy copying
+- Colored status indicators: green (ready), yellow (preparing), red (errored), dim (unknown)
+- Duration formatted as m:ss fer readability
+- Created date in short format: MM/DD HH:MM
+- Tree connectors (├─, └─) fer visual structure in Details, Meta, and Playback IDs sections
+- Policy icons in pretty mode: 🔓 (public), 🔒 (signed)
+- Full-length playback IDs (not truncated) fer easy copying
+- Static renditions shown only when present
+
+**Compact Output Flag:**
+- Added `--compact` flag to `mux assets list` fer grep-friendly output
+- One line per asset with space-separated fields
+- Text-only (no colors, no emojis) fer parsing reliability
+- Fields: id, status, duration, created, resolution, title (quoted), policies (comma-separated), renditions
+- Missing values represented with "-" fer consistent column alignment
+- Useful fer scripting, filtering with grep, and parsing with awk/sed
+
+**Shared Formatters:**
+- `formatStatus()` - Colored status display
+- `formatDuration()` - Converts seconds to m:ss format
+- `formatCreatedAt()` - Converts Unix timestamp to MM/DD HH:MM
+- `formatStaticRenditions()` - Comma-separated list of ready rendition names
+- These formatters be internal to assets/list.ts - could be extracted to shared lib if needed by other commands
+
 ### Commands Implemented
 
 **Phase 1: Asset Creation**
@@ -630,6 +658,7 @@ All commands support `--json` output and follow consistent patterns with other C
   - Documented in help text
 - **Implement streaming upload with progress tracking** - Replace the current fetch-based upload in `file-upload.ts` with a streaming solution that provides granular progress updates for large file uploads
 - **Extract formatting utilities** - The `formatBitrate()` and `formatFilesize()` functions be duplicated across static-renditions commands and TUI. Should extract to shared utility module `src/lib/format-utils.ts` fer consistency and maintainability.
+- **Update live/list to match assets/list format** - Consider applyin' the same card-style format with colored status and tree connectors to `mux live list` fer visual consistency across the CLI.
 
 ## Static Renditions Management
 

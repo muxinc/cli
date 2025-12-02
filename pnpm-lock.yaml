@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@cliffy/ansi':
+        specifier: jsr:1.0.0-rc.8
+        version: '@jsr/cliffy__ansi@1.0.0-rc.8'
       '@cliffy/command':
         specifier: jsr:1.0.0-rc.8
         version: '@jsr/cliffy__command@1.0.0-rc.8'

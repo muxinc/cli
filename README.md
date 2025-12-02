@@ -174,6 +174,7 @@ List all video assets with pagination and filtering options.
 - `--upload-id <id>` - Filter assets by upload ID
 - `--live-stream-id <id>` - Filter assets by live stream ID
 - `--json` - Output JSON instead of pretty format
+- `--compact` - Output one line per asset in grep-friendly format
 
 **Examples:**
 
@@ -192,25 +193,32 @@ mux assets list --upload-id abc123xyz
 
 # Get JSON output for scripting
 mux assets list --json
+
+# Get compact output for grep and parsing
+mux assets list --compact
 ```
 
-**Output:**
+**Output (default pretty format):**
 
 ```
 Found 3 asset(s):
 
-Asset ID: abc123xyz
-  Status: ready
-  Duration: 120.45s
-  Created: 1234567890
-  Playback URL: https://stream.mux.com/playback123.m3u8
-  Passthrough: my-video-metadata
+sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16
+  Details:
+    ├─ Aspect Ratio: 240:427
+    ├─ Resolution: 720p
+    └─ Quality: plus
+  Meta:
+    └─ Title: golf-swing
+  Playback IDs:
+    ├─ 🔓 rFHdcXSf95EHT32qYnf6ZnBz01D7VyKR4
+    └─ 🔒 qo5Y6CpYtdZBgQlI6VskadqdNcQQVdPh
+```
 
-Asset ID: def456uvw
-  Status: preparing
-  Duration: N/A
-  Created: 1234567891
-  Playback URL: https://stream.mux.com/playback456.m3u8
+**Output (with --compact flag):**
+
+```
+sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16  720p  "golf-swing"  public,signed  -
 ```
 
 #### `mux assets get <asset-id>`
