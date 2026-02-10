@@ -1,7 +1,7 @@
 import { Command } from '@cliffy/command';
-import { Confirm } from '@cliffy/prompt';
 import { getDefaultEnvironment, setEnvironment } from '../../lib/config.ts';
 import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { confirmPrompt } from '../../lib/prompt.ts';
 
 interface CreateOptions {
   json?: boolean;
@@ -27,7 +27,7 @@ export const createCommand = new Command()
 
       // Check if a signing key already exists
       if (currentEnv.environment.signingKeyId && !options.json) {
-        const confirmed = await Confirm.prompt({
+        const confirmed = await confirmPrompt({
           message: `Environment '${currentEnv.name}' already has a signing key (${currentEnv.environment.signingKeyId}). Replace it?`,
           default: false,
         });

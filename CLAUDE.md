@@ -22,7 +22,7 @@ The project should use Bun as the JavaScript runtime. It should be written in Ty
 - Run `pnpm exec check` consistently to check for code quality, etc.
 
 ### Workflow
-When starting a new task, create a new branch if necessary, and a `PLAN.md` file. Keep that file updated with TODOs, observations, and plans as you work. When starting a new session, review an existing `PLAN.md` file if it exists before beginning.
+When starting a new task, create a new branch if necessary, and a plan file in the `plans/` directory named with a date prefix (e.g. `plans/2025-01-15-feature-name.md`). Keep that file updated with TODOs, observations, and plans as you work. When starting a new session, review the most recent plan file in `plans/` if one exists before beginning.
 
 Ask me to review your plan before starting work.
 

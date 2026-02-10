@@ -1,9 +1,9 @@
 import { Command } from '@cliffy/command';
-import { Confirm } from '@cliffy/prompt';
 import type Mux from '@mux/mux-node';
 import { expandGlobPattern, uploadFile } from '../../lib/file-upload.ts';
 import { parseAssetConfig } from '../../lib/json-config.ts';
 import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { confirmPrompt } from '../../lib/prompt.ts';
 
 // Extract types from Mux SDK
 type PlaybackPolicy = Mux.PlaybackPolicy;
@@ -115,7 +115,7 @@ async function createFromUploads(
       console.log();
     }
 
-    const confirmed = await Confirm.prompt({
+    const confirmed = await confirmPrompt({
       message: 'Continue with upload?',
       default: true,
     });

@@ -32,8 +32,12 @@ type View =
   | 'select-rendition-for-delete'
   | 'confirm-delete-rendition'
   | 'select-rendition-for-copy'
+  | 'edit-meta'
+  | 'edit-meta-field'
   | 'loading'
   | 'message';
+
+type MetaField = 'title' | 'creator_id' | 'external_id' | 'passthrough';
 
 type CopyType = 'stream' | 'player';
 
@@ -55,9 +59,10 @@ type Resolution =
 
 interface AssetManageAppProps {
   mux: Mux;
+  onPrompt?: (message: string, currentValue?: string) => Promise<string>;
 }
 
-export function AssetManageApp({ mux }: AssetManageAppProps) {
+export function AssetManageApp({ mux, onPrompt }: AssetManageAppProps) {
   const renderer = useRenderer();
   const [view, setView] = useState<View>('loading');
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -67,6 +72,9 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
   );
   const [selectedRendition, setSelectedRendition] =
     useState<StaticRenditionFile | null>(null);
+  const [selectedMetaField, setSelectedMetaField] = useState<MetaField | null>(
+    null,
+  );
   const [copyType, setCopyType] = useState<CopyType | null>(null);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'success' | 'error'>(
@@ -276,6 +284,10 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
           }
           break;
 
+        case 'edit-meta':
+          setView('edit-meta');
+          break;
+
         case 'delete-asset':
           setView('confirm-delete');
           break;
@@ -458,6 +470,48 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
     }
   }, [mux, selectedAsset, selectedRendition, showMessage]);
 
+  const handleEditMetaField = useCallback(
+    async (field: MetaField, value: string) => {
+      if (!selectedAsset) return;
+      try {
+        setView('loading');
+        const updateParams: Record<string, unknown> = {};
+        if (field === 'passthrough') {
+          updateParams.passthrough = value;
+        } else {
+          updateParams.meta = { [field]: value };
+        }
+        await mux.video.assets.update(selectedAsset.id as string, updateParams);
+        const updated = await mux.video.assets.retrieve(
+          selectedAsset.id as string,
+        );
+        setSelectedAsset(updated);
+        setAssets((prev) =>
+          prev.map((a) => (a.id === updated.id ? updated : a)),
+        );
+        const fieldLabel =
+          field === 'title'
+            ? 'Title'
+            : field === 'creator_id'
+              ? 'Creator ID'
+              : field === 'external_id'
+                ? 'External ID'
+                : 'Passthrough';
+        showMessage(
+          value
+            ? `${fieldLabel} updated to "${value}"`
+            : `${fieldLabel} cleared`,
+        );
+      } catch (error) {
+        showMessage(
+          `Failed to update field: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'error',
+        );
+      }
+    },
+    [mux, selectedAsset, showMessage],
+  );
+
   // Global keyboard handler
   useKeyboard((key) => {
     if (
@@ -494,6 +548,7 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
   const actions: Action[] = [
     { id: 'copy-stream', label: 'Copy stream URL (HLS)' },
     { id: 'copy-player', label: 'Copy player URL' },
+    { id: 'edit-meta', label: 'Edit metadata' },
     { id: 'create-playback', label: 'Create playback ID' },
     { id: 'delete-playback', label: 'Delete playback ID' },
     { id: 'view-renditions', label: 'View static renditions' },
@@ -693,6 +748,33 @@ export function AssetManageApp({ mux }: AssetManageAppProps) {
         />
       )}
 
+      {view === 'edit-meta' && selectedAsset && (
+        <EditMetaView
+          asset={selectedAsset}
+          onSelectField={(field) => {
+            setSelectedMetaField(field);
+            setView('edit-meta-field');
+          }}
+          onBack={() => setView('actions')}
+        />
+      )}
+
+      {view === 'edit-meta-field' && selectedAsset && selectedMetaField && (
+        <EditMetaFieldView
+          asset={selectedAsset}
+          field={selectedMetaField}
+          onPrompt={onPrompt}
+          onUpdate={async (value) => {
+            await handleEditMetaField(selectedMetaField, value);
+            setSelectedMetaField(null);
+          }}
+          onBack={() => {
+            setSelectedMetaField(null);
+            setView('edit-meta');
+          }}
+        />
+      )}
+
       {view === 'message' && (
         <box
           style={{
@@ -744,10 +826,33 @@ function AssetActionPanel({
             {asset.aspect_ratio && <text>Aspect: {asset.aspect_ratio}</text>}
             {asset.resolution_tier && <text>Res: {asset.resolution_tier}</text>}
           </box>
-          {asset.passthrough && (
-            <text style={{ fg: '#888888' }}>
-              Passthrough: {asset.passthrough}
-            </text>
+          {(asset.passthrough ||
+            asset.meta?.title ||
+            asset.meta?.creator_id ||
+            asset.meta?.external_id) && (
+            <box style={{ flexDirection: 'column', marginTop: 1 }}>
+              <text style={{ fg: '#FFFF00' }}>Metadata:</text>
+              {asset.meta?.title && (
+                <text style={{ fg: '#888888' }}>
+                  {'  '}Title: {asset.meta.title}
+                </text>
+              )}
+              {asset.meta?.creator_id && (
+                <text style={{ fg: '#888888' }}>
+                  {'  '}Creator ID: {asset.meta.creator_id}
+                </text>
+              )}
+              {asset.meta?.external_id && (
+                <text style={{ fg: '#888888' }}>
+                  {'  '}External ID: {asset.meta.external_id}
+                </text>
+              )}
+              {asset.passthrough && (
+                <text style={{ fg: '#888888' }}>
+                  {'  '}Passthrough: {asset.passthrough}
+                </text>
+              )}
+            </box>
           )}
           {asset.playback_ids && asset.playback_ids.length > 0 && (
             <box style={{ flexDirection: 'column', marginTop: 1 }}>
@@ -917,16 +1022,28 @@ function StaticRenditionsView({
                 return (
                   <box
                     key={file.id ?? file.name}
-                    style={{ flexDirection: 'row' }}
+                    style={{ flexDirection: 'column', marginBottom: 1 }}
                   >
-                    <text>{name} </text>
-                    <text style={{ bg: colors.bg, fg: colors.fg }}>
-                      {` ${file.status ?? 'unknown'} `}
-                    </text>
-                    <text>
-                      {' '.padEnd(12 - (file.status?.length ?? 7) - 2)}
-                      {dimensions} {bitrate} {filesize}
-                    </text>
+                    <box style={{ flexDirection: 'row' }}>
+                      <text>{name} </text>
+                      <text style={{ bg: colors.bg, fg: colors.fg }}>
+                        {` ${file.status ?? 'unknown'} `}
+                      </text>
+                      <text>
+                        {' '.padEnd(12 - (file.status?.length ?? 7) - 2)}
+                        {dimensions} {bitrate} {filesize}
+                      </text>
+                    </box>
+                    {file.id && (
+                      <text style={{ fg: '#888888' }}>
+                        {'  '}ID: {file.id}
+                      </text>
+                    )}
+                    {file.passthrough && (
+                      <text style={{ fg: '#888888' }}>
+                        {'  '}Passthrough: {file.passthrough}
+                      </text>
+                    )}
                   </box>
                 );
               })}
@@ -938,6 +1055,185 @@ function StaticRenditionsView({
           </text>
         </box>
       </box>
+    </box>
+  );
+}
+
+// Component to select a metadata field to edit
+function EditMetaView({
+  asset,
+  onSelectField,
+  onBack,
+}: {
+  asset: Asset;
+  onSelectField: (field: MetaField) => void;
+  onBack: () => void;
+}) {
+  const fields: Action<MetaField>[] = [
+    {
+      id: 'title',
+      label: 'Title',
+      description: asset.meta?.title
+        ? `Current: ${asset.meta.title}`
+        : 'Not set',
+    },
+    {
+      id: 'creator_id',
+      label: 'Creator ID',
+      description: asset.meta?.creator_id
+        ? `Current: ${asset.meta.creator_id}`
+        : 'Not set',
+    },
+    {
+      id: 'external_id',
+      label: 'External ID',
+      description: asset.meta?.external_id
+        ? `Current: ${asset.meta.external_id}`
+        : 'Not set',
+    },
+    {
+      id: 'passthrough',
+      label: 'Passthrough',
+      description: asset.passthrough
+        ? `Current: ${asset.passthrough}`
+        : 'Not set',
+    },
+  ];
+
+  return (
+    <ActionMenu
+      title="Select metadata field to edit"
+      actions={fields}
+      onAction={(field) => onSelectField(field)}
+      onCancel={onBack}
+    />
+  );
+}
+
+// Component to edit a specific metadata field
+function EditMetaFieldView({
+  asset,
+  field,
+  onPrompt,
+  onUpdate,
+  onBack,
+}: {
+  asset: Asset;
+  field: MetaField;
+  onPrompt?: (message: string, currentValue?: string) => Promise<string>;
+  onUpdate: (value: string) => Promise<void>;
+  onBack: () => void;
+}) {
+  const fieldLabel =
+    field === 'title'
+      ? 'Title'
+      : field === 'creator_id'
+        ? 'Creator ID'
+        : field === 'external_id'
+          ? 'External ID'
+          : 'Passthrough';
+
+  const currentValue =
+    field === 'passthrough'
+      ? asset.passthrough
+      : asset.meta?.[field as keyof NonNullable<Asset['meta']>];
+
+  const [isPrompting, setIsPrompting] = useState(false);
+
+  const handleSetValue = useCallback(async () => {
+    if (!onPrompt) return;
+    setIsPrompting(true);
+    try {
+      const value = await onPrompt(
+        `Enter new value for ${fieldLabel}:`,
+        currentValue as string | undefined,
+      );
+      await onUpdate(value);
+    } catch {
+      onBack();
+    } finally {
+      setIsPrompting(false);
+    }
+  }, [onPrompt, fieldLabel, currentValue, onUpdate, onBack]);
+
+  const actions: Action[] = [];
+
+  if (onPrompt) {
+    actions.push({
+      id: 'set',
+      label: 'Set value',
+      description: 'Enter a new value',
+    });
+  }
+
+  if (currentValue) {
+    actions.push({
+      id: 'clear',
+      label: 'Clear field',
+      description: `Remove current value: "${currentValue}"`,
+    });
+  }
+
+  if (!onPrompt && !currentValue) {
+    return (
+      <box style={{ flexDirection: 'column', flexGrow: 1 }}>
+        <box style={{ border: true, padding: 1 }}>
+          <box style={{ flexDirection: 'column' }}>
+            <text style={{ fg: '#00FFFF', marginBottom: 1 }}>
+              Edit {fieldLabel}
+            </text>
+            <text style={{ fg: '#888888' }}>
+              No value set. Use the CLI command to set a value:
+            </text>
+            <text style={{ fg: '#FFFF00', marginTop: 1 }}>
+              mux assets update {asset.id}{' '}
+              {field === 'passthrough'
+                ? '--passthrough'
+                : field === 'title'
+                  ? '--title'
+                  : field === 'creator_id'
+                    ? '--creator-id'
+                    : '--external-id'}{' '}
+              "value"
+            </text>
+          </box>
+        </box>
+      </box>
+    );
+  }
+
+  if (isPrompting) {
+    return (
+      <box style={{ border: true, padding: 1 }}>
+        <text style={{ fg: '#888888' }}>Editing {fieldLabel}...</text>
+      </box>
+    );
+  }
+
+  return (
+    <box style={{ flexDirection: 'column', flexGrow: 1 }}>
+      <box style={{ border: true, padding: 1, marginBottom: 1 }}>
+        <box style={{ flexDirection: 'column' }}>
+          <text style={{ fg: '#00FFFF', marginBottom: 1 }}>
+            Edit {fieldLabel}
+          </text>
+          <text style={{ fg: '#888888' }}>
+            Current value: {currentValue ? `"${currentValue}"` : '(not set)'}
+          </text>
+        </box>
+      </box>
+      <ActionMenu
+        title={`${fieldLabel} Actions`}
+        actions={actions}
+        onAction={async (actionId) => {
+          if (actionId === 'set') {
+            await handleSetValue();
+          } else if (actionId === 'clear') {
+            await onUpdate('');
+          }
+        }}
+        onCancel={onBack}
+      />
     </box>
   );
 }

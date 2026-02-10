@@ -269,6 +269,52 @@ Passthrough: my-video-metadata
 WARNING: This is a test asset (will be deleted after 24 hours)
 ```
 
+#### `mux assets update <asset-id>`
+
+Update metadata fields on a video asset.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset to update
+
+**Options:**
+- `--title <string>` - Set `meta.title` (max 512 characters)
+- `--creator-id <string>` - Set `meta.creator_id` (max 128 characters)
+- `--external-id <string>` - Set `meta.external_id` (max 128 characters)
+- `--passthrough <string>` - Set `passthrough` (max 255 characters)
+- `--json` - Output JSON instead of pretty format
+
+At least one field flag must be provided.
+
+**Examples:**
+
+```bash
+# Set a title on an asset
+mux assets update abc123xyz --title "My Video"
+
+# Set multiple fields at once
+mux assets update abc123xyz --title "My Video" --creator-id "user-42" --external-id "vid-001"
+
+# Update passthrough metadata
+mux assets update abc123xyz --passthrough "my-custom-metadata"
+
+# Clear a field by passing an empty string
+mux assets update abc123xyz --title ""
+
+# Get JSON output
+mux assets update abc123xyz --title "My Video" --json
+```
+
+**Output:**
+
+```
+Asset updated successfully.
+
+Asset ID: abc123xyz
+Status: ready
+Duration: 120.45s
+...
+```
+
 #### `mux assets delete <asset-id>`
 
 Delete a video asset permanently.
@@ -552,7 +598,7 @@ Create a new Mux live stream for broadcasting.
 - `--playback-policy <policy>` - Playback policy: `public` or `signed` (can be specified multiple times)
 - `--new-asset-settings <settings>` - Automatically create an asset from this live stream. Use `none` to disable, or provide a JSON string with asset settings (e.g., `'{"playback_policies": ["public"]}'`)
 - `--reconnect-window <seconds>` - Time in seconds a stream can be disconnected before being considered finished (default: 60)
-- `--latency-mode <mode>` - Latency mode: `low` or `standard` (default: `low`)
+- `--latency-mode <mode>` - Latency mode: `low`, `reduced`, or `standard` (default: `low`)
 - `--test` - Create test live stream (deleted after 24h)
 - `--json` - Output JSON instead of pretty format
 
@@ -1205,6 +1251,7 @@ src/
 │   │   ├── create.ts        # Create assets
 │   │   ├── list.ts          # List assets
 │   │   ├── get.ts           # Get asset details
+│   │   ├── update.ts        # Update asset metadata
 │   │   └── delete.ts        # Delete assets
 │   ├── live/                # Live stream management commands
 │   │   ├── playback-ids/    # Playback ID commands for live streams
@@ -1239,6 +1286,7 @@ src/
 │   │   ├── ConfirmDialog.tsx # Reusable confirmation dialog
 │   │   └── clipboard.ts     # Clipboard utilities
 │   ├── config.ts            # Configuration management
+│   ├── formatters.ts        # Shared output formatting (timestamps, durations, statuses)
 │   ├── mux.ts               # Mux API integration and auth helpers
 │   ├── json-config.ts       # JSON configuration parsing
 │   ├── file-upload.ts       # File upload utilities
