@@ -30,7 +30,7 @@ export default class Sign extends MuxBase {
       options: ['video', 'thumbnail', 'gif', 'storyboard'],
     }),
     time: flags.string({
-      description: 'Time offset for thumbnail/gif/storyboard in seconds (e.g. "10.5"). Only used when type is thumbnail, gif, or storyboard.',
+      description: 'Time offset for thumbnail/gif in seconds (e.g. "10.5"). Only used when type is thumbnail or gif.',
     }),
     raw: flags.boolean({
       char: 'r',
@@ -53,8 +53,8 @@ export default class Sign extends MuxBase {
       keySecret: this.MuxConfig.signingKeySecret,
     };
 
-    // Add time parameter for thumbnail/gif/storyboard types
-    if (flags.time && ['thumbnail', 'gif', 'storyboard'].includes(flags.type)) {
+    // Add time parameter for thumbnail/gif types
+    if (flags.time && ['thumbnail', 'gif'].includes(flags.type)) {
       options.params = { time: flags.time };
     }
 
