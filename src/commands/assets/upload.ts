@@ -40,6 +40,7 @@ export default class AssetsCreate extends AssetCommandBase {
     }),
     private: flags.boolean({
       char: 'p',
+      description: 'add a private playback policy to the created asset',
       default: false,
     })
   };

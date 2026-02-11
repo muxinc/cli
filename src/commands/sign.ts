@@ -29,6 +29,9 @@ export default class Sign extends MuxBase {
       default: 'video',
       options: ['video', 'thumbnail', 'gif', 'storyboard'],
     }),
+    time: flags.string({
+      description: 'Time offset for thumbnail/gif/storyboard in seconds (e.g. "10.5"). Only used when type is thumbnail, gif, or storyboard.',
+    }),
     raw: flags.boolean({
       char: 'r',
       description: 'If set, emits only the URL+JWT. Defaults to true for non-TTY.',
@@ -43,14 +46,35 @@ export default class Sign extends MuxBase {
 
     const playbackId = args['playback-id'];
 
-    const options = {
+    const options: Record<string, any> = {
       expiration: flags.expiresIn,
       type: flags.type as any, // TODO: is better checked in SDK, but this is ugly.
       keyId: this.MuxConfig.signingKeyId,
       keySecret: this.MuxConfig.signingKeySecret,
     };
+
+    // Add time parameter for thumbnail/gif/storyboard types
+    if (flags.time && ['thumbnail', 'gif', 'storyboard'].includes(flags.type)) {
+      options.params = { time: flags.time };
+    }
+
     const key = this.JWT.sign(playbackId, options);
-    const url = `https://stream.mux.com/${playbackId}.m3u8?token=${key}`;
+
+    // Generate appropriate URL based on type
+    let url: string;
+    switch (flags.type) {
+      case 'thumbnail':
+        url = `https://image.mux.com/${playbackId}/thumbnail.jpg?token=${key}`;
+        break;
+      case 'gif':
+        url = `https://image.mux.com/${playbackId}/animated.gif?token=${key}`;
+        break;
+      case 'storyboard':
+        url = `https://image.mux.com/${playbackId}/storyboard.vtt?token=${key}`;
+        break;
+      default:
+        url = `https://stream.mux.com/${playbackId}.m3u8?token=${key}`;
+    }
 
     if (flags.raw) {
       console.log(url);
