@@ -8,6 +8,7 @@ export interface SigningCredentials {
 export interface SigningOptions {
   type?: 'video' | 'thumbnail' | 'gif' | 'storyboard';
   expiration?: string;
+  params?: Record<string, unknown>;
 }
 
 /**
@@ -39,12 +40,20 @@ export async function signPlaybackId(
     tokenSecret: apiCredentials.tokenSecret,
   });
 
-  const token = await mux.jwt.signPlaybackId(playbackId, {
+  // The SDK types params as Record<string, string> but the JWT serializer
+  // handles nested objects (e.g. custom claims) correctly in practice.
+  const signOptions = {
     keyId: credentials.signingKeyId as string,
     keySecret: credentials.signingPrivateKey as string,
     type: options.type ?? 'video',
     expiration: options.expiration ?? '7d',
-  });
+    ...(options.params ? { params: options.params } : {}),
+  };
+
+  const token = (await mux.jwt.signPlaybackId(
+    playbackId,
+    signOptions as unknown as Parameters<typeof mux.jwt.signPlaybackId>[1],
+  )) as string;
 
   return token;
 }

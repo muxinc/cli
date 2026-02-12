@@ -1039,7 +1039,7 @@ Removed from environment: production
 
 #### `mux sign <playback-id>`
 
-Sign a playback ID to generate a secure URL for video playback. This is used with assets or live streams that have a `signed` playback policy.
+Sign a playback ID to generate a secure URL for video playback, thumbnails, GIFs, or storyboards. This is used with assets or live streams that have a `signed` playback policy.
 
 **Arguments:**
 - `<playback-id>` - The playback ID to sign
@@ -1048,8 +1048,12 @@ Sign a playback ID to generate a secure URL for video playback. This is used wit
 - `-e, --expiration <duration>` - Token expiration duration (default: '7d')
   - Examples: '7d', '24h', '1h', '30m'
 - `-t, --type <type>` - Token type: `video`, `thumbnail`, `gif`, `storyboard` (default: 'video')
+- `-p, --param <key=value>` - JWT claim as key=value (repeatable). Used to embed parameters like `time`, `width`, or `height` directly in the signed token.
+- `--params-json <json>` - JWT claims as a JSON object. Useful for complex claims including nested values like `custom`.
 - `--json` - Output JSON instead of pretty format
 - `--token-only` - Output only the JWT token (no URL)
+
+When `--param` and `--params-json` are both provided, `--params-json` is applied first as a base layer and `--param` values override on top.
 
 **Examples:**
 
@@ -1060,8 +1064,17 @@ mux sign abc123playbackid
 # Sign with custom expiration
 mux sign abc123playbackid --expiration 24h
 
-# Sign for thumbnail access
-mux sign abc123playbackid --type thumbnail
+# Sign for thumbnail access at a specific time
+mux sign abc123playbackid --type thumbnail --param time=14
+
+# Sign for thumbnail with dimensions
+mux sign abc123playbackid --type thumbnail --param time=14 --param width=100
+
+# Sign for animated GIF
+mux sign abc123playbackid --type gif
+
+# Sign with custom claims for tracking (nested under "custom" in JWT)
+mux sign abc123playbackid --params-json '{"custom": {"session_id": "xxxx-123"}}'
 
 # Get JSON output with full details
 mux sign abc123playbackid --json
@@ -1072,22 +1085,39 @@ mux sign abc123playbackid --token-only
 
 **Output:**
 
+The output URL uses the appropriate domain based on the token type:
+
 ```bash
-# Default output (full signed URL)
-https://stream.mux.com/abc123playbackid.m3u8?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...
+# Video (default) - uses stream.mux.com
+mux sign abc123playbackid
+https://stream.mux.com/abc123playbackid.m3u8?token=eyJ...
 
-# Token-only output
-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...
+# Thumbnail - uses image.mux.com
+mux sign abc123playbackid --type thumbnail --param time=14
+https://image.mux.com/abc123playbackid/thumbnail.png?token=eyJ...
 
-# JSON output
-{
-  "playback_id": "abc123playbackid",
-  "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...",
-  "url": "https://stream.mux.com/abc123playbackid.m3u8?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFyZFNCMTh0WUlUQzdHTlFDRkpXS3IyNU05SlBrTXhKIn0...",
-  "type": "video",
-  "expiration": "7d"
-}
+# GIF - uses image.mux.com
+mux sign abc123playbackid --type gif
+https://image.mux.com/abc123playbackid/animated.gif?token=eyJ...
+
+# Storyboard - uses image.mux.com
+mux sign abc123playbackid --type storyboard
+https://image.mux.com/abc123playbackid/storyboard.vtt?token=eyJ...
 ```
+
+**Thumbnail Parameters:**
+
+When signing thumbnails, parameters like `time` and `width` must be embedded in the JWT claims (not as query parameters). The `--param` flag handles this automatically:
+
+| Parameter | Description |
+|-----------|-------------|
+| `time` | Video timestamp in seconds for the thumbnail |
+| `width` | Thumbnail width in pixels |
+| `height` | Thumbnail height in pixels |
+| `rotate` | Rotate clockwise: 90, 180, or 270 |
+| `fit_mode` | How to fit: `preserve`, `stretch`, `crop`, `smartcrop`, `pad` |
+| `flip_v` | Flip vertically |
+| `flip_h` | Flip horizontally |
 
 **Prerequisites:**
 
@@ -1290,7 +1320,7 @@ src/
 │   ├── mux.ts               # Mux API integration and auth helpers
 │   ├── json-config.ts       # JSON configuration parsing
 │   ├── file-upload.ts       # File upload utilities
-│   ├── urls.ts              # URL generation (stream, player)
+│   ├── urls.ts              # URL generation (stream, player, thumbnail, gif, storyboard)
 │   ├── signing.ts           # JWT signing utilities
 │   ├── playback-ids.ts      # Playback ID operations
 │   └── xdg.ts               # XDG base directory support
