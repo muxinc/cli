@@ -1,12 +1,15 @@
 import { Command } from '@cliffy/command';
 import Mux from '@mux/mux-node';
 import { getDefaultEnvironment } from '../lib/config.ts';
+import { getSignedUrl } from '../lib/urls.ts';
 
 interface SignOptions {
   expiration?: string;
   type?: string;
   json?: boolean;
   tokenOnly?: boolean;
+  param?: string[];
+  paramsJson?: string;
 }
 
 // Valid token types for signing
@@ -16,6 +19,63 @@ type TokenType = (typeof VALID_TYPES)[number];
 // Type guard for validating token types
 function isValidTokenType(type: string): type is TokenType {
   return VALID_TYPES.includes(type as TokenType);
+}
+
+/**
+ * Parse "key=value" strings into a flat record.
+ */
+function parseKeyValuePairs(pairs: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const pair of pairs) {
+    const eqIdx = pair.indexOf('=');
+    if (eqIdx === -1) {
+      throw new Error(
+        `Invalid parameter format: "${pair}". Expected key=value.`,
+      );
+    }
+    result[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+  }
+  return result;
+}
+
+/**
+ * Build the combined params object from --param and --params-json.
+ */
+function buildParams(
+  options: SignOptions,
+): Record<string, unknown> | undefined {
+  const params: Record<string, unknown> = {};
+  let hasParams = false;
+
+  // --params-json takes lowest precedence (base layer)
+  if (options.paramsJson) {
+    try {
+      const parsed = JSON.parse(options.paramsJson);
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
+        throw new Error('--params-json must be a JSON object.');
+      }
+      Object.assign(params, parsed);
+      hasParams = true;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Invalid JSON in --params-json: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  // --param key=value pairs override --params-json
+  if (options.param?.length) {
+    const flatParams = parseKeyValuePairs(options.param);
+    Object.assign(params, flatParams);
+    hasParams = true;
+  }
+
+  return hasParams ? params : undefined;
 }
 
 export const signCommand = new Command()
@@ -35,6 +95,10 @@ export const signCommand = new Command()
       return value;
     },
   })
+  .option('-p, --param <param:string>', 'JWT claim as key=value (repeatable)', {
+    collect: true,
+  })
+  .option('--params-json <json:string>', 'JWT claims as a JSON object')
   .option('--json', 'Output JSON instead of pretty format')
   .option('--token-only', 'Output only the JWT token')
   .action(async (options: SignOptions, playbackId: string) => {
@@ -62,44 +126,52 @@ export const signCommand = new Command()
         );
       }
 
-      // Create Mux client (only need API credentials, not signing keys in constructor)
+      // Create Mux client
       const mux = new Mux({
         tokenId: currentEnv.environment.tokenId,
         tokenSecret: currentEnv.environment.tokenSecret,
       });
 
-      // Sign the playback ID with explicit signing credentials
-      // The SDK handles base64-encoded keys automatically
       const tokenType =
         options.type && isValidTokenType(options.type) ? options.type : 'video';
 
-      const token = await mux.jwt.signPlaybackId(playbackId, {
+      const params = buildParams(options);
+
+      // Build sign options, casting to work around SDK's strict Record<string, string> typing
+      const signOptions = {
         keyId: currentEnv.environment.signingKeyId,
         keySecret: currentEnv.environment.signingPrivateKey,
         type: tokenType,
         expiration: options.expiration || '7d',
-      });
+        ...(params ? { params } : {}),
+      };
+
+      const token = await mux.jwt.signPlaybackId(
+        playbackId,
+        signOptions as unknown as Parameters<typeof mux.jwt.signPlaybackId>[1],
+      );
+
+      const url = getSignedUrl(playbackId, token as string, tokenType);
 
       // Output based on format options
       if (options.tokenOnly) {
         console.log(token);
       } else if (options.json) {
-        const url = `https://stream.mux.com/${playbackId}.m3u8?token=${token}`;
         console.log(
           JSON.stringify(
             {
               playback_id: playbackId,
               token,
               url,
-              type: options.type || 'video',
+              type: tokenType,
               expiration: options.expiration || '7d',
+              ...(params ? { params } : {}),
             },
             null,
             2,
           ),
         );
       } else {
-        const url = `https://stream.mux.com/${playbackId}.m3u8?token=${token}`;
         console.log(url);
       }
     } catch (error) {

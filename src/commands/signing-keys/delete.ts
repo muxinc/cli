@@ -1,7 +1,7 @@
 import { Command } from '@cliffy/command';
-import { Confirm } from '@cliffy/prompt';
 import { readConfig, setEnvironment } from '../../lib/config.ts';
 import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { confirmPrompt } from '../../lib/prompt.ts';
 
 interface DeleteOptions {
   force?: boolean;
@@ -50,7 +50,7 @@ export const deleteCommand = new Command()
           );
         }
 
-        const confirmed = await Confirm.prompt({
+        const confirmed = await confirmPrompt({
           message: `Are you sure you want to delete signing key ${signingKeyId}?`,
           default: false,
         });

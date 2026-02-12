@@ -22,11 +22,9 @@ The project should use Bun as the JavaScript runtime. It should be written in Ty
 - Run `pnpm exec check` consistently to check for code quality, etc.
 
 ### Workflow
-When starting a new task, create a new branch if necessary, and a `PLAN.md` file. Keep that file updated with TODOs, observations, and plans as you work. When starting a new session, review an existing `PLAN.md` file if it exists before beginning.
+When starting a new task, create a new branch if necessary.
 
 Ask me to review your plan before starting work.
-
-When a feature is completely finished, move all notes that should be retained long term to the appropriate section of the `NOTES.md` file.
 
 ## Mux Documentation
 Whenever there are questions about Mux functionality, refer to the [Mux Documentation](https://docs.mux.com/).

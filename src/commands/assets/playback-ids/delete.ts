@@ -1,7 +1,7 @@
 import { Command } from '@cliffy/command';
-import { Confirm } from '@cliffy/prompt';
 import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
 import { deletePlaybackId } from '../../../lib/playback-ids.ts';
+import { confirmPrompt } from '../../../lib/prompt.ts';
 
 interface DeleteOptions {
   force?: boolean;
@@ -25,7 +25,7 @@ export const deleteCommand = new Command()
             );
           }
 
-          const confirmed = await Confirm.prompt({
+          const confirmed = await confirmPrompt({
             message: `Are you sure you want to delete playback ID ${playbackId}?`,
             default: false,
           });

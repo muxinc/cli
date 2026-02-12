@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Command } from '@cliffy/command';
-import { Input, Secret } from '@cliffy/prompt';
 import { listEnvironments, setEnvironment } from '../lib/config.ts';
 import { validateCredentials } from '../lib/mux.ts';
+import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
 
 export interface EnvVars {
   MUX_TOKEN_ID?: string;
@@ -95,25 +95,15 @@ export const loginCommand = new Command()
       // Interactive prompts
       console.log('Enter your Mux API credentials:');
 
-      tokenId = await Input.prompt({
-        message: 'Mux Token ID:',
-        validate: (value: string) => {
-          if (!value || value.trim().length === 0) {
-            return 'Token ID is required';
-          }
-          return true;
-        },
-      });
+      tokenId = await inputPrompt({ message: 'Mux Token ID:' });
+      if (!tokenId.trim()) {
+        throw new Error('Token ID is required');
+      }
 
-      tokenSecret = await Secret.prompt({
-        message: 'Mux Token Secret:',
-        validate: (value: string) => {
-          if (!value || value.trim().length === 0) {
-            return 'Token Secret is required';
-          }
-          return true;
-        },
-      });
+      tokenSecret = await secretPrompt({ message: 'Mux Token Secret:' });
+      if (!tokenSecret.trim()) {
+        throw new Error('Token Secret is required');
+      }
     }
 
     // Validate credentials

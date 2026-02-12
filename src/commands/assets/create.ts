@@ -1,9 +1,9 @@
 import { Command } from '@cliffy/command';
-import { Confirm } from '@cliffy/prompt';
 import type Mux from '@mux/mux-node';
 import { expandGlobPattern, uploadFile } from '../../lib/file-upload.ts';
 import { parseAssetConfig } from '../../lib/json-config.ts';
 import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { confirmPrompt } from '../../lib/prompt.ts';
 
 // Extract types from Mux SDK
 type PlaybackPolicy = Mux.PlaybackPolicy;
@@ -14,7 +14,7 @@ type StaticRendition = NonNullable<
 
 interface CreateOptions {
   url?: string;
-  upload?: string;
+  upload?: string[];
   file?: string;
   playbackPolicy?: string | string[];
   test?: boolean;
@@ -93,14 +93,20 @@ async function createFromUrl(
  */
 async function createFromUploads(
   mux: Mux,
-  pattern: string,
+  patterns: string[],
   options: CreateOptions,
 ): Promise<UploadResult[]> {
-  // Expand glob pattern
-  const files = await expandGlobPattern(pattern);
+  // Expand glob patterns and deduplicate
+  const allFiles = (await Promise.all(patterns.map(expandGlobPattern))).flat();
+  const seen = new Set<string>();
+  const files = allFiles.filter((f) => {
+    if (seen.has(f.path)) return false;
+    seen.add(f.path);
+    return true;
+  });
 
   if (files.length === 0) {
-    throw new Error(`No files found matching pattern: ${pattern}`);
+    throw new Error(`No files found matching pattern: ${patterns.join(', ')}`);
   }
 
   // Show files and confirm (unless -y flag)
@@ -115,7 +121,7 @@ async function createFromUploads(
       console.log();
     }
 
-    const confirmed = await Confirm.prompt({
+    const confirmed = await confirmPrompt({
       message: 'Continue with upload?',
       default: true,
     });
@@ -236,11 +242,12 @@ export const createCommand = new Command()
   .option('--url <url:string>', 'Video URL to ingest from the web')
   .option(
     '--upload <path:string>',
-    'Local file(s) to upload (supports glob patterns)',
+    'Local file(s) to upload (supports glob patterns). Can be specified multiple times.',
+    { collect: true },
   )
   .option('--file, -f <path:string>', 'JSON configuration file')
   .option(
-    '--playback-policy <policy:string>',
+    '-p, --playback-policy <policy:string>',
     'Playback policy (public or signed). Can be specified multiple times.',
     {
       collect: true,
@@ -319,12 +326,20 @@ export const createCommand = new Command()
   .option('-y, --yes', 'Skip confirmation prompts')
   .option('--json', 'Output JSON instead of pretty format')
   .option('--wait', 'Wait for asset processing to complete')
-  .action(async (options: CreateOptions) => {
+  .arguments('[files...:string]')
+  // biome-ignore lint: Cliffy infers upload as string but collect makes it string[]
+  .action(async (options: any, ...args: unknown[]) => {
+    const opts = options as CreateOptions;
+    // Merge positional args (from shell glob expansion) into upload list
+    const extraFiles = args
+      .flat()
+      .filter((a): a is string => typeof a === 'string');
+    if (extraFiles.length > 0) {
+      opts.upload = [...(opts.upload || []), ...extraFiles];
+    }
     try {
       // Validate input method
-      const inputMethods = [options.url, options.upload, options.file].filter(
-        Boolean,
-      );
+      const inputMethods = [opts.url, opts.upload, opts.file].filter(Boolean);
       if (inputMethods.length === 0) {
         throw new Error(
           'Must provide one input method: --url, --upload, or --file',
@@ -342,10 +357,10 @@ export const createCommand = new Command()
       let result: Mux.Video.Asset | UploadResult[];
 
       // Execute appropriate creation method
-      if (options.url) {
-        result = await createFromUrl(mux, options.url, options);
+      if (opts.url) {
+        result = await createFromUrl(mux, opts.url, opts);
 
-        if (options.json) {
+        if (opts.json) {
           console.log(JSON.stringify(result, null, 2));
         } else {
           console.log(`Asset created: ${result.id}`);
@@ -356,10 +371,10 @@ export const createCommand = new Command()
             );
           }
         }
-      } else if (options.upload) {
-        result = await createFromUploads(mux, options.upload, options);
+      } else if (opts.upload) {
+        result = await createFromUploads(mux, opts.upload, opts);
 
-        if (options.json) {
+        if (opts.json) {
           console.log(JSON.stringify(result, null, 2));
         } else {
           console.log(`\n${result.length} file(s) uploaded successfully`);
@@ -367,10 +382,10 @@ export const createCommand = new Command()
             console.log(`  - ${upload.file}: Upload ID ${upload.uploadId}`);
           }
         }
-      } else if (options.file) {
-        result = await createFromConfig(mux, options.file, options);
+      } else if (opts.file) {
+        result = await createFromConfig(mux, opts.file, opts);
 
-        if (options.json) {
+        if (opts.json) {
           console.log(JSON.stringify(result, null, 2));
         } else {
           console.log(`Asset created: ${result.id}`);
@@ -387,8 +402,8 @@ export const createCommand = new Command()
       }
 
       // Wait for asset processing if requested
-      if (options.wait && !Array.isArray(result) && result.id) {
-        if (!options.json) {
+      if (opts.wait && !Array.isArray(result) && result.id) {
+        if (!opts.json) {
           console.log('\nWaiting for asset to be ready...');
         }
 
@@ -401,17 +416,17 @@ export const createCommand = new Command()
           asset = await mux.video.assets.retrieve(result.id);
           attempts++;
 
-          if (!options.json) {
+          if (!opts.json) {
             process.stdout.write('.');
           }
         }
 
-        if (!options.json) {
+        if (!opts.json) {
           console.log();
         }
 
         if (asset.status === 'ready') {
-          if (!options.json) {
+          if (!opts.json) {
             console.log('Asset is ready!');
           }
         } else if (asset.status === 'errored') {
@@ -419,14 +434,14 @@ export const createCommand = new Command()
             `Asset processing failed: ${asset.errors?.messages?.join(', ') || 'Unknown error'}`,
           );
         } else {
-          if (!options.json) {
+          if (!opts.json) {
             console.log(
               'WARNING: Asset is still processing. Check status later.',
             );
           }
         }
 
-        if (options.json) {
+        if (opts.json) {
           console.log(JSON.stringify(asset, null, 2));
         }
       }
@@ -434,7 +449,7 @@ export const createCommand = new Command()
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      if (options.json) {
+      if (opts.json) {
         console.error(JSON.stringify({ error: errorMessage }, null, 2));
       } else {
         console.error(`Error: ${errorMessage}`);
