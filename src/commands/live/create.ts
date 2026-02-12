@@ -11,7 +11,7 @@ type PlaybackPolicy = Mux.PlaybackPolicy;
 export const createCommand = new Command()
   .description('Create a new Mux live stream')
   .option(
-    '--playback-policy <policy:string>',
+    '-p, --playback-policy <policy:string>',
     'Playback policy (public or signed). Can be specified multiple times.',
     { collect: true },
   )

@@ -247,7 +247,7 @@ export const createCommand = new Command()
   )
   .option('--file, -f <path:string>', 'JSON configuration file')
   .option(
-    '--playback-policy <policy:string>',
+    '-p, --playback-policy <policy:string>',
     'Playback policy (public or signed). Can be specified multiple times.',
     {
       collect: true,
