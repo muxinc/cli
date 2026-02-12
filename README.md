@@ -4,31 +4,40 @@ A command-line interface for interacting with the Mux API, designed to provide a
 
 ## Installation
 
-### Prerequisites
+### Download the binary
 
-The Mux CLI requires [Bun](https://bun.sh) to be installed on your system.
+Download the latest binary for your platform from [GitHub Releases](https://github.com/muxinc/cli/releases):
 
 ```bash
-# Install Bun (macOS/Linux)
-curl -fsSL https://bun.sh/install | bash
+# macOS (Apple Silicon)
+curl -L https://github.com/muxinc/cli/releases/latest/download/mux-darwin-arm64 -o mux
+chmod +x mux
+sudo mv mux /usr/local/bin/
+
+# macOS (Intel)
+curl -L https://github.com/muxinc/cli/releases/latest/download/mux-darwin-x64 -o mux
+chmod +x mux
+sudo mv mux /usr/local/bin/
+
+# Linux (x64)
+curl -L https://github.com/muxinc/cli/releases/latest/download/mux-linux-x64 -o mux
+chmod +x mux
+sudo mv mux /usr/local/bin/
+
+# Linux (arm64)
+curl -L https://github.com/muxinc/cli/releases/latest/download/mux-linux-arm64 -o mux
+chmod +x mux
+sudo mv mux /usr/local/bin/
 ```
+
+The binary is self-contained and has no dependencies.
 
 ### Install via npm
 
+Alternatively, install via npm (requires [Bun](https://bun.sh)):
+
 ```bash
 npm install -g @mux/cli
-```
-
-### Or run directly with npx
-
-```bash
-npx @mux/cli --help
-```
-
-### Or install with Bun
-
-```bash
-bun install -g @mux/cli
 ```
 
 ## Getting Started
