@@ -4,12 +4,31 @@ A command-line interface for interacting with the Mux API, designed to provide a
 
 ## Installation
 
-```bash
-# Using pnpm
-pnpm install
+### Prerequisites
 
-# Build the CLI
-pnpm run build
+The Mux CLI requires [Bun](https://bun.sh) to be installed on your system.
+
+```bash
+# Install Bun (macOS/Linux)
+curl -fsSL https://bun.sh/install | bash
+```
+
+### Install via npm
+
+```bash
+npm install -g @mux/cli
+```
+
+### Or run directly with npx
+
+```bash
+npx @mux/cli --help
+```
+
+### Or install with Bun
+
+```bash
+bun install -g @mux/cli
 ```
 
 ## Getting Started
