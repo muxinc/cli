@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+const { platform, arch, env } = process;
+
+const PLATFORMS = {
+  darwin: {
+    x64: "@mux/cli-darwin-x64/mux",
+    arm64: "@mux/cli-darwin-arm64/mux",
+  },
+  linux: {
+    x64: "@mux/cli-linux-x64/mux",
+    arm64: "@mux/cli-linux-arm64/mux",
+  },
+};
+
+const binPath = env.MUX_BINARY || PLATFORMS?.[platform]?.[arch];
+
+if (binPath) {
+  const result = require("child_process").spawnSync(
+    require.resolve(binPath),
+    process.argv.slice(2),
+    { shell: false, stdio: "inherit" },
+  );
+  if (result.error) throw result.error;
+  process.exitCode = result.status;
+} else {
+  console.error(
+    `The Mux CLI doesn't ship prebuilt binaries for your platform (${platform}/${arch}) yet.\n` +
+    "You can build from source: https://github.com/muxinc/cli"
+  );
+  process.exitCode = 1;
+}

@@ -4,6 +4,24 @@ A command-line interface for interacting with the Mux API, designed to provide a
 
 ## Installation
 
+### Install via npm
+
+```bash
+npm install -g @mux/cli
+```
+
+Or run directly with npx:
+
+```bash
+npx @mux/cli@latest
+```
+
+### Shell installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/muxinc/cli/master/install.sh | bash
+```
+
 ### Download the binary
 
 Download the latest binary for your platform from [GitHub Releases](https://github.com/muxinc/cli/releases):
@@ -31,14 +49,6 @@ sudo mv mux /usr/local/bin/
 ```
 
 The binary is self-contained and has no dependencies.
-
-### Install via npm
-
-Alternatively, install via npm (requires [Bun](https://bun.sh)):
-
-```bash
-npm install -g @mux/cli
-```
 
 ## Getting Started
 

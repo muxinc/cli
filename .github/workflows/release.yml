@@ -49,3 +49,32 @@ jobs:
         with:
           generate_release_notes: true
           files: artifacts/*
+
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish platform packages
+        run: |
+          for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            cp ./artifacts/mux-${target} ./packages/@mux/cli-${target}/mux
+            cd ./packages/@mux/cli-${target}
+            npm publish --access public
+            cd ../..
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish main package
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

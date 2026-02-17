@@ -1,0 +1,15 @@
+{
+  "name": "@mux/cli-linux-x64",
+  "version": "1.0.0",
+  "description": "Platform-specific binary for @mux/cli (Linux x64)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muxinc/cli.git"
+  },
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "publishConfig": {
+    "access": "public"
+  }
+}
