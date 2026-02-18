@@ -351,6 +351,20 @@ export const createCommand = new Command()
         );
       }
 
+      // Validate inputs before authenticating
+      if (opts.file) {
+        await parseAssetConfig(opts.file);
+      } else if (opts.upload) {
+        const allFiles = (
+          await Promise.all(opts.upload.map(expandGlobPattern))
+        ).flat();
+        if (allFiles.length === 0) {
+          throw new Error(
+            `No files found matching pattern: ${opts.upload.join(', ')}`,
+          );
+        }
+      }
+
       // Initialize authenticated Mux client
       const mux = await createAuthenticatedMuxClient();
 
