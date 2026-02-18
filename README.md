@@ -7,13 +7,13 @@ A command-line interface for interacting with the Mux API, designed to provide a
 ### Install via npm
 
 ```bash
-npm install -g @mux/cli
+npm install -g @mux/cli@beta
 ```
 
 Or run directly with npx:
 
 ```bash
-npx @mux/cli@latest
+npx @mux/cli@beta
 ```
 
 ### Shell installer
