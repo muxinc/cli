@@ -29,6 +29,8 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: oven-sh/setup-bun@v2
       - run: pnpm install --frozen-lockfile
+      - name: Set version from tag
+        run: node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='${GITHUB_REF_NAME#v}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
       - name: Build binary
         run: bun build --compile --minify --sourcemap ./src/index.ts --target=bun-${{ matrix.target }} --outfile ./dist/mux-${{ matrix.target }}
       - uses: actions/upload-artifact@v4
