@@ -1,6 +1,6 @@
 {
   "name": "@mux/cli",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0",
   "description": "Official Mux CLI for interacting with Mux APIs",
   "author": "Mux",
   "license": "Apache-2.0",
@@ -37,10 +37,10 @@
     "LICENSE"
   ],
   "optionalDependencies": {
-    "@mux/cli-darwin-arm64": "1.0.0-beta.3",
-    "@mux/cli-darwin-x64": "1.0.0-beta.3",
-    "@mux/cli-linux-x64": "1.0.0-beta.3",
-    "@mux/cli-linux-arm64": "1.0.0-beta.3"
+    "@mux/cli-darwin-arm64": "1.0.0",
+    "@mux/cli-darwin-x64": "1.0.0",
+    "@mux/cli-linux-x64": "1.0.0",
+    "@mux/cli-linux-arm64": "1.0.0"
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir ./dist --target bun --format esm",

@@ -14,6 +14,12 @@ VERSION="${1:?Usage: scripts/publish.sh <version> [binary-dir]}"
 BINARY_DIR="${2:-./dist}"
 TARGETS="darwin-arm64 darwin-x64 linux-x64 linux-arm64"
 
+# Use --provenance in CI (requires OIDC token), skip locally
+PROVENANCE=""
+if [ -n "${CI:-}" ]; then
+  PROVENANCE="--provenance"
+fi
+
 # Detect npm tag from version string
 # e.g. 1.0.0-beta.1 -> beta, 1.0.0-rc.1 -> rc, 1.0.0 -> latest
 if echo "$VERSION" | grep -qE '\-'; then
@@ -78,7 +84,7 @@ for target in $TARGETS; do
   pkg_dir="./packages/@mux/cli-${target}"
   cp "$BINARY_DIR/mux-${target}" "${pkg_dir}/mux"
   echo "Publishing @mux/cli-${target}@${VERSION}..."
-  (cd "$pkg_dir" && npm publish --access public --tag "$NPM_TAG")
+  (cd "$pkg_dir" && npm publish --access public --tag "$NPM_TAG" $PROVENANCE)
   rm -f "${pkg_dir}/mux"
   PUBLISHED=$((PUBLISHED + 1))
 done
@@ -109,7 +115,7 @@ cp -r bin "$STAGING/bin"
 cp README.md LICENSE "$STAGING/"
 
 echo "Publishing @mux/cli@${VERSION}..."
-(cd "$STAGING" && npm publish --access public --tag "$NPM_TAG")
+(cd "$STAGING" && npm publish --access public --tag "$NPM_TAG" $PROVENANCE)
 
 echo ""
 echo "Published $PUBLISHED of 4 platform packages."
