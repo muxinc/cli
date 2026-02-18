@@ -80,6 +80,7 @@ for target in $TARGETS; do
 
   pkg_dir="./packages/@mux/cli-${target}"
   cp "$BINARY_DIR/mux-${target}" "${pkg_dir}/mux"
+  chmod +x "${pkg_dir}/mux"
   echo "Publishing @mux/cli-${target}@${VERSION}..."
   (cd "$pkg_dir" && npm publish --access public --tag "$NPM_TAG" $PROVENANCE)
   rm -f "${pkg_dir}/mux"
