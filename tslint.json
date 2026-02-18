@@ -1,6 +1,0 @@
-{
-  "extends": ["@oclif/tslint", "tslint-config-prettier"],
-  "rules": {
-    "no-console": false,
-  }
-}
