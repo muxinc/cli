@@ -64,17 +64,7 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-      - name: Publish platform packages
-        run: |
-          for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            cp ./artifacts/mux-${target} ./packages/@mux/cli-${target}/mux
-            cd ./packages/@mux/cli-${target}
-            npm publish --access public
-            cd ../..
-          done
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Publish main package
-        run: npm publish --access public
+      - name: Publish to npm
+        run: ./scripts/publish.sh "${GITHUB_REF_NAME#v}" ./artifacts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,14 +1,18 @@
 {
   "name": "@mux/cli-darwin-x64",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.3",
   "description": "Platform-specific binary for @mux/cli (macOS x64)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/muxinc/cli.git"
   },
-  "os": ["darwin"],
-  "cpu": ["x64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "publishConfig": {
     "access": "public"
   }
