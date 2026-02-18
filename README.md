@@ -19,7 +19,7 @@ npx @mux/cli@latest
 ### Shell installer
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/muxinc/cli/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/muxinc/cli/main/install.sh | bash
 ```
 
 ### Download the binary

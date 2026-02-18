@@ -64,7 +64,7 @@ When implementin' new features:
 ### Branch Strategy
 - Work on features in separate branches (e.g., `mmcc/revamp`)
 - Keep commits small and focused
-- Main branch be `master` (not `main`)
+- Main branch is `main`
 
 ## Live Streams
 

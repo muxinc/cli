@@ -9,7 +9,7 @@ Make `@mux/cli` installable without requiring Bun, Node.js, or any runtime — j
 | Method | Command | Requires |
 |---|---|---|
 | Homebrew | `brew install muxinc/tap/mux` | Homebrew |
-| Shell script | `curl -fsSL https://raw.githubusercontent.com/muxinc/cli/master/install.sh \| bash` | curl (we can put this behind a vanity cli.mux.dev/install.sh URL) |
+| Shell script | `curl -fsSL https://raw.githubusercontent.com/muxinc/cli/main/install.sh \| bash` | curl (we can put this behind a vanity cli.mux.dev/install.sh URL) |
 | npm | `npm install -g @mux/cli` | Node.js |
 | npx | `npx @mux/cli@latest` | Node.js |
 | Manual | Download from [GitHub Releases](https://github.com/muxinc/cli/releases) | — |

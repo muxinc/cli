@@ -12,7 +12,7 @@ Additionally, we'll provide a shell installer script as an alternative for users
 
 | Method | Requires | Command |
 |---|---|---|
-| Shell installer | curl | `curl -fsSL https://raw.githubusercontent.com/muxinc/cli/master/install.sh \| bash` |
+| Shell installer | curl | `curl -fsSL https://raw.githubusercontent.com/muxinc/cli/main/install.sh \| bash` |
 | npm global | Node.js | `npm install -g @mux/cli` |
 | npx (one-off) | Node.js | `npx @mux/cli@latest` |
 | GitHub Releases | browser | Download binary from Releases page |
@@ -171,7 +171,7 @@ For users who don't want to use npm, provide an `install.sh` script that downloa
 
 **Usage:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/muxinc/cli/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/muxinc/cli/main/install.sh | bash
 ```
 
 **`install.sh`** — A POSIX shell script that:
