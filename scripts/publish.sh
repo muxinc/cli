@@ -59,14 +59,11 @@ for target in $TARGETS; do
   "
 done
 
-# Sync version and optionalDependencies in main package.json
+# Sync version in main package.json
 node -e "
   const fs = require('fs');
   const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
   pkg.version = '$VERSION';
-  for (const dep of Object.keys(pkg.optionalDependencies || {})) {
-    pkg.optionalDependencies[dep] = '$VERSION';
-  }
   fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
 "
 
@@ -109,6 +106,12 @@ node -e "
   delete pkg.peerDependencies;
   delete pkg.scripts;
   delete pkg.type;
+  pkg.optionalDependencies = {
+    '@mux/cli-darwin-arm64': '$VERSION',
+    '@mux/cli-darwin-x64': '$VERSION',
+    '@mux/cli-linux-x64': '$VERSION',
+    '@mux/cli-linux-arm64': '$VERSION',
+  };
   fs.writeFileSync('$STAGING/package.json', JSON.stringify(pkg, null, 2) + '\n');
 "
 cp -r bin "$STAGING/bin"
