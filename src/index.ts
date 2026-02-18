@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from '@cliffy/command';
+import pkg from '../package.json';
 import { assetsCommand } from './commands/assets/index.ts';
 import { envCommand } from './commands/env/index.ts';
 import { liveCommand } from './commands/live/index.ts';
@@ -9,7 +10,7 @@ import { playbackIdsCommand } from './commands/playback-ids/index.ts';
 import { signCommand } from './commands/sign.ts';
 import { signingKeysCommand } from './commands/signing-keys/index.ts';
 
-const VERSION = '1.0.0';
+const VERSION = pkg.version;
 
 // Main CLI command
 const cli = new Command()
