@@ -69,3 +69,87 @@ jobs:
           merge-multiple: true
       - name: Publish to npm
         run: ./scripts/publish.sh "${GITHUB_REF_NAME#v}" ./artifacts
+
+  homebrew:
+    name: Update Homebrew Tap
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Compute SHA256 checksums
+        id: checksums
+        run: |
+          echo "darwin_arm64=$(sha256sum artifacts/mux-darwin-arm64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "darwin_x64=$(sha256sum artifacts/mux-darwin-x64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "linux_arm64=$(sha256sum artifacts/mux-linux-arm64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "linux_x64=$(sha256sum artifacts/mux-linux-x64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HOMEBREW_APP_ID }}
+          private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}
+          owner: muxinc
+          repositories: homebrew-tap
+
+      - uses: actions/checkout@v4
+        with:
+          repository: muxinc/homebrew-tap
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Generate formula
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BASE_URL="https://github.com/muxinc/cli/releases/download/${GITHUB_REF_NAME}"
+
+          mkdir -p Formula
+          cat > Formula/mux.rb << RUBY
+          class Mux < Formula
+            desc "The official Mux CLI"
+            homepage "https://github.com/muxinc/cli"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/mux-darwin-arm64"
+                sha256 "${{ steps.checksums.outputs.darwin_arm64 }}"
+              else
+                url "${BASE_URL}/mux-darwin-x64"
+                sha256 "${{ steps.checksums.outputs.darwin_x64 }}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/mux-linux-arm64"
+                sha256 "${{ steps.checksums.outputs.linux_arm64 }}"
+              else
+                url "${BASE_URL}/mux-linux-x64"
+                sha256 "${{ steps.checksums.outputs.linux_x64 }}"
+              end
+            end
+
+            def install
+              binary = Dir.glob("mux-*").first || "mux"
+              bin.install binary => "mux"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/mux --version")
+            end
+          end
+          RUBY
+
+      - name: Commit and push formula
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/mux.rb
+          git commit -m "mux ${GITHUB_REF_NAME}"
+          git push
