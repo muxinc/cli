@@ -5,41 +5,23 @@ A command-line interface for interacting with the Mux API, designed to provide a
 ## Table of Contents
 
 - [Installation](#installation)
-  - [Install via npm](#install-via-npm)
-  - [Shell installer](#shell-installer)
-  - [Download the binary](#download-the-binary)
+- [Shell Completions](#shell-completions)
 - [Getting Started](#getting-started)
-  - [Authentication](#authentication)
+- [Common Options](#common-options)
 - [Commands](#commands)
   - [Asset Management](#asset-management)
-    - [Create Assets](#mux-assets-create)
-    - [List Assets](#mux-assets-list)
-    - [Get Asset](#mux-assets-get-asset-id)
-    - [Update Asset](#mux-assets-update-asset-id)
-    - [Delete Asset](#mux-assets-delete-asset-id)
-    - [Interactive Management](#mux-assets-manage)
-    - [Playback ID Management](#playback-id-management)
-    - [Static Renditions Management](#static-renditions-management)
   - [Live Stream Management](#live-stream-management)
-    - [Create Live Stream](#mux-live-create)
-    - [List Live Streams](#mux-live-list)
-    - [Get Live Stream](#mux-live-get-stream-id)
-    - [Delete Live Stream](#mux-live-delete-stream-id)
-    - [Playback ID Management (Live)](#playback-id-management-1)
+  - [Uploads](#uploads)
   - [Playback ID Lookup](#playback-id-lookup)
+  - [Playback Restrictions](#playback-restrictions)
   - [Signing Keys & Secure Playback](#signing-keys--secure-playback)
-    - [Create Signing Key](#mux-signing-keys-create)
-    - [List Signing Keys](#mux-signing-keys-list)
-    - [Get Signing Key](#mux-signing-keys-get-key-id)
-    - [Delete Signing Key](#mux-signing-keys-delete-key-id)
-    - [Sign Playback ID](#mux-sign-playback-id)
+  - [Transcription Vocabularies](#transcription-vocabularies)
+  - [Delivery Usage](#delivery-usage)
+  - [DRM Configurations](#drm-configurations)
+  - [Mux Data](#mux-data)
   - [Authentication & Environment Management](#authentication--environment-management)
 - [Configuration](#configuration)
 - [Development](#development)
-  - [Prerequisites](#prerequisites)
-  - [Setup](#setup)
-  - [Testing](#testing)
-  - [Project Structure](#project-structure)
 - [License](#license)
 - [Support](#support)
 
@@ -118,48 +100,37 @@ Restart your shell or source the config file to activate completions.
 
 Before using the Mux CLI, you need to authenticate with your Mux API credentials. You can obtain these from the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens).
 
-#### Interactive Login
-
-The simplest way to authenticate:
-
 ```bash
+# Interactive login (prompts for Token ID and Secret)
 mux login
-```
 
-You'll be prompted to enter your Mux Token ID and Token Secret. The CLI will validate your credentials before saving them.
-
-#### Login with .env File
-
-If you have your credentials in a `.env` file:
-
-```bash
+# Login with .env file (expects MUX_TOKEN_ID and MUX_TOKEN_SECRET)
 mux login --env-file .env
-```
 
-Your `.env` file should contain:
-
-```bash
-MUX_TOKEN_ID=your_token_id
-MUX_TOKEN_SECRET=your_token_secret
-```
-
-#### Named Environments
-
-You can manage multiple environments (e.g., production, staging, development):
-
-```bash
-# Add a production environment
+# Named environments for multi-environment workflows
 mux login --name production
-
-# Add a staging environment
-mux login --name staging
+mux login --name staging --env-file .env.staging
 ```
 
-The first environment you add becomes the default. You can switch between environments later.
+The first environment you add becomes the default. See [Authentication & Environment Management](#authentication--environment-management) for more details.
+
+## Common Options
+
+These options are available on most commands and are not repeated in individual command docs below.
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output raw JSON instead of pretty-printed format. Useful for scripting and piping to `jq`. |
+| `--compact` | One-line-per-item output, grep-friendly. Available on `list` commands. |
+| `--limit <n>` | Number of results to return (default: 25). Available on `list` commands. |
+| `--page <n>` | Page number for pagination (default: 1). Available on `list` commands. |
+| `-f, --force` | Skip confirmation prompts on destructive actions. **Required** when combining `--json` with `delete` commands. |
+| `--wait` | Poll until the resource is ready before returning. Available on `create` commands. |
 
 ## Commands
 
-### Asset Management
+<details open>
+<summary><h3>Asset Management</h3></summary>
 
 #### `mux assets create`
 
@@ -167,45 +138,30 @@ Create a new Mux video asset from a URL, local file, or JSON configuration.
 
 **Options:**
 - `--url <url>` - Video URL to ingest from the web
-- `--upload <path>` - Local file(s) to upload (supports glob patterns like `*.mp4` or `videos/**/*.mp4`)
+- `--upload <path>` - Local file(s) to upload (supports glob patterns like `*.mp4`)
 - `--file, -f <path>` - JSON configuration file for complex asset creation
-- `--playback-policy <policy>` - Playback policy: `public` or `signed` (can be specified multiple times)
+- `--playback-policy <policy>` - `public` or `signed` (repeatable)
 - `--test` - Create test asset (watermarked, 10s limit, deleted after 24h)
 - `--passthrough <string>` - User metadata (max 255 characters)
-- `--static-renditions <resolution>` - Static rendition resolutions: `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p` (can be specified multiple times)
-- `--video-quality <quality>` - Video quality level: `basic`, `plus`, or `premium`
+- `--static-renditions <resolution>` - e.g. `1080p`, `720p`, `highest`, `audio-only` (repeatable)
+- `--video-quality <quality>` - `basic`, `plus`, or `premium`
 - `--normalize-audio` - Normalize audio loudness level
 - `-y, --yes` - Skip confirmation prompts
-- `--json` - Output JSON instead of pretty format
-- `--wait` - Wait for asset processing to complete (polls until ready)
 
 **Examples:**
 
 ```bash
-# Create asset from remote URL
+# Create from URL
 mux assets create --url https://example.com/video.mp4 --playback-policy public
 
-# Upload a single local file
-mux assets create --upload video.mp4 --playback-policy public --test
-
-# Upload multiple files with glob pattern
+# Upload local files (glob supported, each file becomes a separate asset)
 mux assets create --upload ./videos/*.mp4 --playback-policy public
-# Shows confirmation prompt with file list and total size
 
-# Skip confirmation for multiple files
-mux assets create --upload ./videos/*.mp4 --playback-policy public -y
-
-# Create asset with complex configuration from JSON file
+# Complex config from JSON file (overlays, subtitles, multiple inputs)
 mux assets create --file asset-config.json
 
-# Override config file options with flags
-mux assets create --file asset-config.json --test --playback-policy signed
-
-# Wait for asset to be ready
+# Wait for processing to complete
 mux assets create --url https://example.com/video.mp4 --playback-policy public --wait
-
-# Get JSON output for scripting
-mux assets create --url https://example.com/video.mp4 --playback-policy public --json
 ```
 
 **JSON Configuration File:**
@@ -226,10 +182,7 @@ For complex asset creation (overlays, subtitles, multiple input tracks), use a J
         "opacity": "80%"
       },
       "generated_subtitles": [
-        {
-          "language_code": "en",
-          "name": "English"
-        }
+        { "language_code": "en", "name": "English" }
       ]
     }
   ],
@@ -241,1071 +194,671 @@ For complex asset creation (overlays, subtitles, multiple input tracks), use a J
 }
 ```
 
-Then create the asset:
-
 ```bash
 mux assets create --file asset-config.json
 ```
 
-**Multiple File Uploads:**
-
-When using glob patterns, each file creates a separate asset:
-
-```bash
-mux assets create --upload ./videos/*.mp4 --playback-policy public
-# Creates 3 separate assets if 3 files match
-
-# Output:
-# Found 3 files to upload:
-#   - intro.mp4 (45.2 MB)
-#   - main.mp4 (128.7 MB)
-#   - outro.mp4 (23.1 MB)
-# Total size: 197.1 MB
-# Continue with upload? (y/n):
-```
-
 #### `mux assets list`
 
-List all video assets with pagination and filtering options.
+List all video assets with pagination and filtering.
 
-**Options:**
-- `--limit <number>` - Number of results to return (default: 25)
-- `--page <number>` - Page number for pagination (default: 1)
-- `--upload-id <id>` - Filter assets by upload ID
-- `--live-stream-id <id>` - Filter assets by live stream ID
-- `--json` - Output JSON instead of pretty format
-- `--compact` - Output one line per asset in grep-friendly format
-
-**Examples:**
+**Unique options:**
+- `--upload-id <id>` - Filter by upload ID
+- `--live-stream-id <id>` - Filter by live stream ID
 
 ```bash
-# List assets with default settings (25 assets, page 1)
 mux assets list
-
-# List first 10 assets
-mux assets list --limit 10
-
-# List second page of results
-mux assets list --page 2
-
-# Filter by upload ID
-mux assets list --upload-id abc123xyz
-
-# Get JSON output for scripting
-mux assets list --json
-
-# Get compact output for grep and parsing
-mux assets list --compact
-```
-
-**Output (default pretty format):**
-
-```
-Found 3 asset(s):
-
-sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16
-  Details:
-    ├─ Aspect Ratio: 240:427
-    ├─ Resolution: 720p
-    └─ Quality: plus
-  Meta:
-    └─ Title: golf-swing
-  Playback IDs:
-    ├─ 🔓 rFHdcXSf95EHT32qYnf6ZnBz01D7VyKR4
-    └─ 🔒 qo5Y6CpYtdZBgQlI6VskadqdNcQQVdPh
-```
-
-**Output (with --compact flag):**
-
-```
-sRkgb02SMJOjf72PFIkegcrZR3knHPEPG  ready  0:09  07/25 14:16  720p  "golf-swing"  public,signed  -
+mux assets list --limit 10 --page 2
+mux assets list --live-stream-id abc123
 ```
 
 #### `mux assets get <asset-id>`
 
 Get detailed information about a specific video asset.
 
-**Arguments:**
-- `<asset-id>` - The ID of the asset to retrieve
-
-**Options:**
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
-
 ```bash
-# Get asset details
 mux assets get abc123xyz
-
-# Get asset details as JSON
-mux assets get abc123xyz --json
-```
-
-**Output:**
-
-```
-Asset ID: abc123xyz
-Status: ready
-Duration: 120.45s
-Created: 1234567890
-Aspect Ratio: 16:9
-Resolution Tier: 1080p
-Video Quality: plus
-Max Resolution: HD
-Max Frame Rate: 30.00 fps
-
-Playback IDs:
-  - playback123 (public)
-    URL: https://stream.mux.com/playback123.m3u8
-
-Tracks:
-  - audio: audio_track_id
-    Duration: 120.45s
-  - video: video_track_id
-    Duration: 120.45s
-
-Passthrough: my-video-metadata
-
-WARNING: This is a test asset (will be deleted after 24 hours)
 ```
 
 #### `mux assets update <asset-id>`
 
-Update metadata fields on a video asset.
-
-**Arguments:**
-- `<asset-id>` - The ID of the asset to update
+Update metadata fields on a video asset. At least one field flag must be provided.
 
 **Options:**
 - `--title <string>` - Set `meta.title` (max 512 characters)
 - `--creator-id <string>` - Set `meta.creator_id` (max 128 characters)
 - `--external-id <string>` - Set `meta.external_id` (max 128 characters)
 - `--passthrough <string>` - Set `passthrough` (max 255 characters)
-- `--json` - Output JSON instead of pretty format
-
-At least one field flag must be provided.
-
-**Examples:**
 
 ```bash
-# Set a title on an asset
-mux assets update abc123xyz --title "My Video"
-
-# Set multiple fields at once
-mux assets update abc123xyz --title "My Video" --creator-id "user-42" --external-id "vid-001"
-
-# Update passthrough metadata
-mux assets update abc123xyz --passthrough "my-custom-metadata"
-
-# Clear a field by passing an empty string
-mux assets update abc123xyz --title ""
-
-# Get JSON output
-mux assets update abc123xyz --title "My Video" --json
-```
-
-**Output:**
-
-```
-Asset updated successfully.
-
-Asset ID: abc123xyz
-Status: ready
-Duration: 120.45s
-...
+mux assets update abc123xyz --title "My Video" --creator-id "user-42"
+mux assets update abc123xyz --title ""  # clear a field
 ```
 
 #### `mux assets delete <asset-id>`
 
 Delete a video asset permanently.
 
-**Arguments:**
-- `<asset-id>` - The ID of the asset to delete
-
-**Options:**
-- `-f, --force` - Skip confirmation prompt
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
-
 ```bash
-# Delete asset with confirmation prompt
-mux assets delete abc123xyz
-
-# Delete asset without confirmation
-mux assets delete abc123xyz --force
-
-# Delete asset with JSON output (requires --force for safety)
-mux assets delete abc123xyz --json --force
-```
-
-**Important:** When using `--json` output mode, you must also provide the `--force` flag. This safety feature prevents accidental deletions in automated scripts.
-
-**Output:**
-
-```
-Are you sure you want to delete asset abc123xyz? (y/n): y
-Asset abc123xyz deleted successfully
+mux assets delete abc123xyz          # with confirmation prompt
+mux assets delete abc123xyz --force  # skip confirmation
 ```
 
 #### `mux assets manage`
 
-Interactively manage Mux video assets using a terminal user interface (TUI). This command provides a visual interface to browse assets, view details, manage playback IDs, and copy URLs directly from your terminal.
-
-**Examples:**
+Interactive terminal UI (TUI) to browse assets, view details, manage playback IDs, and copy URLs. Navigate with arrow keys, Enter, and `q` to quit.
 
 ```bash
-# Launch the interactive asset management TUI
 mux assets manage
 ```
 
-**Features:**
+**Note:** Requires an interactive terminal (TTY). For scripting, use `mux assets list`, `mux assets get`, etc.
 
-- Browse all video assets with pagination
-- View detailed asset information
-- Create and delete playback IDs
-- Copy stream URLs (HLS) to clipboard
-- Copy player URLs to clipboard
-- Delete assets with confirmation
-- Automatic URL signing for signed playback policies
+#### `mux assets input-info <asset-id>`
 
-**Navigation:**
+Retrieve input info for an asset, including file details, tracks, and encoding settings.
 
-- **Arrow keys** - Navigate through assets and menu options
-- **Enter** - Select an asset or action
-- **q** - Quit or go back to previous view
-- **Escape** - Cancel current operation
+```bash
+mux assets input-info abc123xyz
+```
 
-**Note:** This command requires an interactive terminal (TTY). For scripting and non-interactive use cases, use `mux assets list`, `mux assets get`, and related commands instead.
+#### `mux assets update-master-access <asset-id>`
+
+Update master access settings for an asset (`temporary` or `none`).
+
+```bash
+mux assets update-master-access abc123xyz --master-access temporary
+```
 
 #### Playback ID Management
 
-Playback IDs control access to your video assets. Each asset can have multiple playback IDs with different policies (public or signed).
-
-##### `mux assets playback-ids list <asset-id>`
-
-List all playback IDs for a specific asset.
-
-**Arguments:**
-- `<asset-id>` - The ID of the asset
-
-**Options:**
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+Manage playback IDs on assets. Each asset can have multiple playback IDs with different policies.
 
 ```bash
-# List playback IDs for an asset
-mux assets playback-ids list abc123xyz
-
-# Get JSON output
-mux assets playback-ids list abc123xyz --json
-```
-
-**Output:**
-
-```
-Found 2 playback ID(s) for asset abc123xyz:
-
-Playback ID: playback123
-  Policy: public
-  URL: https://stream.mux.com/playback123.m3u8
-
-Playback ID: playback456
-  Policy: signed
-  URL: https://stream.mux.com/playback456.m3u8
-```
-
-##### `mux assets playback-ids create <asset-id>`
-
-Create a new playback ID for an asset.
-
-**Arguments:**
-- `<asset-id>` - The ID of the asset
-
-**Options:**
-- `--policy <policy>` - Playback policy: `public` or `signed` (default: `public`)
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
-
-```bash
-# Create a public playback ID
-mux assets playback-ids create abc123xyz
-
-# Create a signed playback ID
-mux assets playback-ids create abc123xyz --policy signed
-
-# Get JSON output
-mux assets playback-ids create abc123xyz --policy public --json
-```
-
-**Output:**
-
-```
-Playback ID created: playback123
-  Policy: public
-  URL: https://stream.mux.com/playback123.m3u8
-```
-
-##### `mux assets playback-ids delete <asset-id> <playback-id>`
-
-Delete a playback ID from an asset.
-
-**Arguments:**
-- `<asset-id>` - The ID of the asset
-- `<playback-id>` - The ID of the playback ID to delete
-
-**Options:**
-- `-f, --force` - Skip confirmation prompt
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
-
-```bash
-# Delete a playback ID with confirmation
-mux assets playback-ids delete abc123xyz playback123
-
-# Delete without confirmation
-mux assets playback-ids delete abc123xyz playback123 --force
-
-# Delete with JSON output
-mux assets playback-ids delete abc123xyz playback123 --force --json
-```
-
-**Output:**
-
-```
-Are you sure you want to delete playback ID playback123 from asset abc123xyz? (y/n): y
-Playback ID playback123 deleted successfully
+mux assets playback-ids list <asset-id>
+mux assets playback-ids create <asset-id> [--policy signed]
+mux assets playback-ids delete <asset-id> <playback-id> [--force]
 ```
 
 #### Static Renditions Management
 
-Static renditions are downloadable MP4 versions of your video assets at specific resolutions. Unlike streaming playback, these are complete files that can be downloaded.
-
-##### `mux assets static-renditions list <asset-id>`
-
-List all static renditions for a specific asset.
-
-**Arguments:**
-- `<asset-id>` - The ID of the asset
-
-**Options:**
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+Static renditions are downloadable MP4 versions of your video assets at specific resolutions.
 
 ```bash
-# List static renditions for an asset
-mux assets static-renditions list abc123xyz
-
-# Get JSON output
-mux assets static-renditions list abc123xyz --json
+mux assets static-renditions list <asset-id>
+mux assets static-renditions create <asset-id> --resolution 1080p [--wait]
+mux assets static-renditions delete <asset-id> <rendition-id> [--force]
 ```
 
-**Output:**
+**Resolution options:** `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p`
 
-```
-Static renditions for asset abc123xyz:
+#### Track Management
 
-  1080p.mp4        [ready]      1920x1080    5.2 Mbps   42.3 MB
-    ID: rendition123
-  720p.mp4         [preparing]  1280x720     -          -
-    ID: rendition456
-```
+Manage text and audio tracks (subtitles, captions, audio) on video assets.
 
-##### `mux assets static-renditions create <asset-id>`
+##### `mux assets tracks create <asset-id>`
 
-Create a new static rendition for an asset.
-
-**Arguments:**
-- `<asset-id>` - The ID of the asset
+Add a text or audio track to an asset.
 
 **Options:**
-- `-r, --resolution <resolution>` - Target resolution (required): `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p`
-- `-p, --passthrough <string>` - Custom metadata for the rendition (max 255 characters)
-- `-w, --wait` - Wait for the rendition to be ready instead of returning immediately
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
-
-```bash
-# Create a 1080p rendition
-mux assets static-renditions create abc123xyz --resolution 1080p
-
-# Create and wait for completion
-mux assets static-renditions create abc123xyz --resolution 720p --wait
-
-# Create with custom metadata
-mux assets static-renditions create abc123xyz --resolution 1080p --passthrough "web-download"
-
-# Get JSON output
-mux assets static-renditions create abc123xyz --resolution 1080p --json
-```
-
-**Output:**
-
-```
-Static rendition created:
-  ID: rendition123
-  Name: 1080p.mp4
-  Resolution: 1080p
-  Status: preparing
-
-Note: Static rendition generation is asynchronous. Use 'mux assets static-renditions list <asset-id>' to check the status, or use the --wait flag to poll until ready.
-```
-
-##### `mux assets static-renditions delete <asset-id> <rendition-id>`
-
-Delete a static rendition from an asset.
-
-**Arguments:**
-- `<asset-id>` - The ID of the asset
-- `<rendition-id>` - The ID of the rendition to delete
-
-**Options:**
-- `-f, --force` - Skip confirmation prompt
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+- `--url <url>` - URL of the track file (required)
+- `--type <type>` - Track type: `text` or `audio` (required)
+- `--language-code <code>` - BCP 47 language code, e.g., `en-US` (required)
+- `--name <name>` - Human-readable name for the track
+- `--text-type <type>` - Text track type: `subtitles` or `captions`
+- `--closed-captions` - Indicates the track provides SDH
+- `--passthrough <string>` - Passthrough metadata (max 255 characters)
 
 ```bash
-# Delete a static rendition with confirmation
-mux assets static-renditions delete abc123xyz rendition123
-
-# Delete without confirmation
-mux assets static-renditions delete abc123xyz rendition123 --force
-
-# Delete with JSON output
-mux assets static-renditions delete abc123xyz rendition123 --force --json
+mux assets tracks create abc123xyz --url https://example.com/subs.vtt --type text --language-code en --text-type subtitles
 ```
 
-**Output:**
+##### `mux assets tracks delete <asset-id> <track-id>`
 
-```
-Are you sure you want to delete static rendition rendition123? (y/n): y
-Static rendition rendition123 deleted from asset abc123xyz
+Delete a track from an asset. Supports `--force`.
+
+##### `mux assets tracks generate-subtitles <asset-id> <track-id>`
+
+Generate subtitles for an audio track using automatic speech recognition.
+
+**Options:** `--language-code <code>`, `--name <name>`, `--passthrough <string>`
+
+```bash
+mux assets tracks generate-subtitles abc123xyz track456 --language-code en --name "English (auto)"
 ```
 
-### Live Stream Management
+</details>
+
+<details>
+<summary><h3>Live Stream Management</h3></summary>
 
 #### `mux live create`
 
 Create a new Mux live stream for broadcasting.
 
 **Options:**
-- `--playback-policy <policy>` - Playback policy: `public` or `signed` (can be specified multiple times)
-- `--new-asset-settings <settings>` - Automatically create an asset from this live stream. Use `none` to disable, or provide a JSON string with asset settings (e.g., `'{"playback_policies": ["public"]}'`)
-- `--reconnect-window <seconds>` - Time in seconds a stream can be disconnected before being considered finished (default: 60)
-- `--latency-mode <mode>` - Latency mode: `low`, `reduced`, or `standard` (default: `low`)
-- `--test` - Create test live stream (deleted after 24h)
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+- `--playback-policy <policy>` - `public` or `signed` (repeatable)
+- `--new-asset-settings <settings>` - Auto-create asset from stream. Use `none` to disable, or JSON string (e.g., `'{"playback_policies": ["public"]}'`)
+- `--reconnect-window <seconds>` - Reconnect timeout (default: 60)
+- `--latency-mode <mode>` - `low`, `reduced`, or `standard` (default: `low`)
+- `--test` - Create test stream (deleted after 24h)
 
 ```bash
-# Create a basic live stream with public playback
 mux live create --playback-policy public
-
-# Create a low-latency live stream
-mux live create --playback-policy public --latency-mode low
-
-# Create a stream that automatically saves to an asset
+mux live create --playback-policy public --latency-mode low --test
 mux live create --playback-policy public --new-asset-settings '{"playback_policies": ["public"]}'
-
-# Create a test stream (deleted after 24 hours)
-mux live create --playback-policy public --test
-
-# Create with extended reconnect window (5 minutes)
-mux live create --playback-policy public --reconnect-window 300
-
-# Get JSON output for scripting
-mux live create --playback-policy public --json
 ```
 
-**Output:**
-
-```
-Live stream created: abc123xyz
-  Status: idle
-  Stream Key: your-secret-stream-key
-  Playback URL: https://stream.mux.com/playback123.m3u8
-
-WARNING: This is a test stream (will be deleted after 24 hours)
-```
-
-**Using the Stream:**
-
-Once created, you can stream to your live stream using the RTMP URL and stream key:
+Once created, stream using:
 - **RTMP URL:** `rtmp://global-live.mux.com/app`
-- **Stream Key:** The `stream_key` returned in the response
-
-Configure your streaming software (OBS, Wirecast, etc.) with these values to start broadcasting.
+- **Stream Key:** returned in the response
 
 #### `mux live list`
 
 List all live streams with pagination.
 
-**Options:**
-- `--limit <number>` - Number of results to return (default: 25)
-- `--page <number>` - Page number for pagination (default: 1)
-- `--json` - Output JSON instead of pretty format
-- `--compact` - Output one line per stream in grep-friendly format
-
-**Examples:**
-
 ```bash
-# List live streams with default settings
 mux live list
-
-# List first 10 streams
-mux live list --limit 10
-
-# List second page of results
-mux live list --page 2
-
-# Get JSON output for scripting
-mux live list --json
-
-# Get compact output for grep and parsing
-mux live list --compact
-```
-
-**Output (default pretty format):**
-
-```
-Found 2 live stream(s):
-
-waWxn5KIZCYmILAOWgXW9dFBPnOXq00JM  idle  08/18 16:43
-  Details:
-    ├─ Stream Key: c3eb...1724
-    ├─ Latency Mode: standard
-    ├─ Reconnect Window: 60s
-    └─ Max Duration: 12h
-  Recent Assets:
-    └─ 00QNOSkxzBdlASP3iIvTfvqxDN3u74hUX
-  Playback IDs:
-    └─ 🔒 EIyqm8p4VwGj5sO9rNBtykFbbKFFSNWA
-```
-
-**Output (with --compact flag):**
-
-```
-waWxn5KIZCYmILAOWgXW9dFBPnOXq00JM  idle  08/18 16:43  standard  60s  signed  1 assets
+mux live list --limit 10 --compact
 ```
 
 #### `mux live get <stream-id>`
 
 Get detailed information about a specific live stream.
 
-**Arguments:**
-- `<stream-id>` - The ID of the live stream to retrieve
+```bash
+mux live get abc123xyz
+```
+
+#### `mux live update <stream-id>`
+
+Update configuration on a live stream. At least one option must be provided.
 
 **Options:**
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+- `--latency-mode <mode>` - `low`, `reduced`, or `standard`
+- `--reconnect-window <seconds>` - Reconnect window (0-1800)
+- `--max-continuous-duration <seconds>` - Max continuous duration (60-43200)
+- `--passthrough <string>` - Passthrough metadata (max 255 characters)
+- `--reconnect-slate-url <url>` - Image to display during reconnect
+- `--use-slate-for-standard-latency` - Display slate for standard latency streams
+- `--title <string>` - Title for the live stream
 
 ```bash
-# Get live stream details
-mux live get abc123xyz
-
-# Get live stream details as JSON
-mux live get abc123xyz --json
-```
-
-**Output:**
-
-```
-Live Stream ID: abc123xyz
-Status: active
-Created: 1234567890
-Stream Key: your-secret-stream-key
-Latency Mode: low
-Reconnect Window: 60s
-
-Playback IDs:
-  - playback123 (public)
-    URL: https://stream.mux.com/playback123.m3u8
-
-New Asset Settings:
-  Playback Policy: public
-  Recording enabled: Yes
-
-WARNING: This is a test stream (will be deleted after 24 hours)
+mux live update abc123xyz --latency-mode standard
+mux live update abc123xyz --reconnect-window 300 --title "My Stream"
 ```
 
 #### `mux live delete <stream-id>`
 
 Delete a live stream permanently.
 
-**Arguments:**
-- `<stream-id>` - The ID of the live stream to delete
+```bash
+mux live delete abc123xyz          # with confirmation
+mux live delete abc123xyz --force  # skip confirmation
+```
 
-**Options:**
-- `-f, --force` - Skip confirmation prompt
-- `--json` - Output JSON instead of pretty format
+#### `mux live complete <stream-id>`
 
-**Examples:**
+Signal that a live stream has ended and Mux should complete the recording.
+
+#### `mux live enable <stream-id>`
+
+Enable a disabled live stream, allowing it to accept new connections.
+
+#### `mux live disable <stream-id>`
+
+Disable a live stream, preventing it from accepting new connections.
 
 ```bash
-# Delete stream with confirmation prompt
-mux live delete abc123xyz
-
-# Delete stream without confirmation
-mux live delete abc123xyz --force
-
-# Delete stream with JSON output (requires --force for safety)
-mux live delete abc123xyz --json --force
+mux live complete abc123xyz
+mux live enable abc123xyz
+mux live disable abc123xyz
 ```
 
-**Important:** When using `--json` output mode, you must also provide the `--force` flag. This safety feature prevents accidental deletions in automated scripts.
+#### `mux live reset-stream-key <stream-id>`
 
-**Output:**
-
-```
-Are you sure you want to delete live stream abc123xyz? (y/n): y
-Live stream abc123xyz deleted successfully
-```
-
-#### Playback ID Management
-
-Manage playback IDs for live streams. Each live stream can have multiple playback IDs with different policies (public or signed).
-
-##### `mux live playback-ids list <stream-id>`
-
-List all playback IDs for a specific live stream.
-
-**Arguments:**
-- `<stream-id>` - The ID of the live stream
-
-**Options:**
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+Reset the stream key for a live stream. This invalidates the current key.
 
 ```bash
-# List playback IDs for a live stream
-mux live playback-ids list abc123xyz
-
-# Get JSON output
-mux live playback-ids list abc123xyz --json
+mux live reset-stream-key abc123xyz          # with confirmation
+mux live reset-stream-key abc123xyz --force  # skip confirmation
 ```
 
-**Output:**
+#### Simulcast Targets
 
-```
-Found 2 playback ID(s) for live stream abc123xyz:
-
-Playback ID: playback123
-  Policy: public
-  URL: https://stream.mux.com/playback123.m3u8
-
-Playback ID: playback456
-  Policy: signed
-  URL: https://stream.mux.com/playback456.m3u8
-```
-
-##### `mux live playback-ids create <stream-id>`
-
-Create a new playback ID for a live stream.
-
-**Arguments:**
-- `<stream-id>` - The ID of the live stream
-
-**Options:**
-- `--policy <policy>` - Playback policy: `public` or `signed` (default: `public`)
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+Manage simulcast targets to restream a live stream to third-party platforms (e.g., YouTube, Twitch).
 
 ```bash
-# Create a public playback ID
-mux live playback-ids create abc123xyz
+# Create a simulcast target
+mux live simulcast-targets create <stream-id> --url rtmp://live.twitch.tv/app --stream-key live_xxxxx
 
-# Create a signed playback ID
-mux live playback-ids create abc123xyz --policy signed
+# Get details about a simulcast target
+mux live simulcast-targets get <stream-id> <target-id>
 
-# Get JSON output
-mux live playback-ids create abc123xyz --policy public --json
+# Delete a simulcast target
+mux live simulcast-targets delete <stream-id> <target-id> [--force]
 ```
 
-**Output:**
+#### Embedded & Generated Subtitles
 
-```
-Playback ID created: playback123
-  Policy: public
-  URL: https://stream.mux.com/playback123.m3u8
-```
+##### `mux live update-embedded-subtitles <stream-id>`
 
-##### `mux live playback-ids delete <stream-id> <playback-id>`
+Update embedded subtitle (CEA-608) configuration.
 
-Delete a playback ID from a live stream.
-
-**Arguments:**
-- `<stream-id>` - The ID of the live stream
-- `<playback-id>` - The ID of the playback ID to delete
-
-**Options:**
-- `-f, --force` - Skip confirmation prompt
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+**Options:** `--language-channel <cc1|cc2|cc3|cc4>`, `--language-code <code>`, `--name <name>`, `--passthrough <string>`, `--clear`
 
 ```bash
-# Delete a playback ID with confirmation
-mux live playback-ids delete abc123xyz playback123
-
-# Delete without confirmation
-mux live playback-ids delete abc123xyz playback123 --force
-
-# Delete with JSON output
-mux live playback-ids delete abc123xyz playback123 --force --json
+mux live update-embedded-subtitles abc123xyz --language-channel cc1 --language-code en --name "English CC"
 ```
 
-**Output:**
+##### `mux live update-generated-subtitles <stream-id>`
 
-```
-Are you sure you want to delete playback ID playback123 from live stream abc123xyz? (y/n): y
-Playback ID playback123 deleted successfully
+Update generated subtitle (ASR) configuration.
+
+**Options:** `--language-code <code>`, `--name <name>`, `--passthrough <string>`, `--transcription-vocabulary-ids <id>` (repeatable), `--clear`
+
+```bash
+mux live update-generated-subtitles abc123xyz --language-code en --name "English (auto)"
 ```
 
-### Playback ID Lookup
+#### New Asset Static Renditions
+
+Configure static rendition settings for assets automatically created from a live stream.
+
+```bash
+# Set rendition resolutions
+mux live update-new-asset-static-renditions <stream-id> --resolution 1080p --resolution 720p
+
+# Delete rendition settings
+mux live delete-new-asset-static-renditions <stream-id> [--force]
+```
+
+#### Playback ID Management (Live)
+
+Manage playback IDs on live streams, same interface as asset playback IDs.
+
+```bash
+mux live playback-ids list <stream-id>
+mux live playback-ids create <stream-id> [--policy signed]
+mux live playback-ids delete <stream-id> <playback-id> [--force]
+```
+
+</details>
+
+<details>
+<summary><h3>Uploads</h3></summary>
+
+Manage direct uploads for client-side video uploading. Direct uploads provide a URL that clients can use to upload video files directly to Mux.
+
+#### `mux uploads create`
+
+Create a new direct upload URL.
+
+**Options:**
+- `--cors-origin <origin>` - Allowed CORS origin for the upload (required)
+- `-p, --playback-policy <policy>` - `public` or `signed`
+- `--timeout <seconds>` - Seconds before the upload times out (default: 3600)
+- `--test` - Create a test upload (asset deleted after 24 hours)
+
+```bash
+mux uploads create --cors-origin "https://example.com" --playback-policy public
+```
+
+#### `mux uploads list`
+
+List direct uploads with pagination. Supports `--limit`, `--page`, `--compact`.
+
+#### `mux uploads get <upload-id>`
+
+Get details about a specific direct upload.
+
+#### `mux uploads cancel <upload-id>`
+
+Cancel a waiting direct upload. Supports `--force`.
+
+```bash
+mux uploads cancel abc123xyz --force
+```
+
+</details>
+
+<details>
+<summary><h3>Playback ID Lookup</h3></summary>
 
 #### `mux playback-ids <playback-id>`
 
-Look up which asset or live stream a playback ID belongs to. This is useful when you have a playback ID and need to find the associated resource.
-
-**Arguments:**
-- `<playback-id>` - The playback ID to look up
+Look up which asset or live stream a playback ID belongs to.
 
 **Options:**
-- `--expand` - Fetch and return the full asset or live stream object instead of just the reference
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+- `--expand` - Fetch the full asset or live stream object instead of just the reference
 
 ```bash
-# Look up a playback ID (returns basic info)
 mux playback-ids abc123playbackid
-
-# Look up and fetch the full asset or live stream object
 mux playback-ids abc123playbackid --expand
-
-# Get JSON output
-mux playback-ids abc123playbackid --json
 ```
 
-**Output (basic lookup):**
+**Note:** The nested `playback-ids` commands under `assets` and `live` are for managing playback IDs on known resources. This top-level command is for discovering what resource a playback ID belongs to.
 
-```
-Playback ID: abc123playbackid
-Policy: public
-Type: asset
-ID: abc123xyz
-```
+</details>
 
-**Output (with --expand):**
+<details>
+<summary><h3>Playback Restrictions</h3></summary>
 
-When using `--expand`, the output will be the full asset or live stream object, formatted the same as `mux assets get` or `mux live get` commands.
+Manage playback restrictions to control where and how your content can be played.
 
-**Note:** The nested `playback-ids` commands under `assets` and `live` (e.g., `mux assets playback-ids list`) are for managing playback IDs on known resources. This top-level command is for discovering what resource a playback ID belongs to.
+#### `mux playback-restrictions create`
 
-### Signing Keys & Secure Playback
-
-#### `mux signing-keys create`
-
-Create a new signing key for secure video playback and automatically save it to the current environment.
+Create a new playback restriction.
 
 **Options:**
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
-
-```bash
-# Create a new signing key
-mux signing-keys create
-
-# Create a signing key with JSON output
-mux signing-keys create --json
-```
-
-**Output:**
-
-```
-Signing key created and saved to environment: default
-Key ID: qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
-```
-
-**Important:** The private key is only returned once during creation. The CLI automatically stores it in your current environment configuration, so you don't need to manually save it.
-
-#### `mux signing-keys list`
-
-List all signing keys with indicators showing which keys are configured in local environments.
-
-**Options:**
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
+- `--allowed-domains <domain>` - Allowed referrer domains (required, repeatable)
+- `--allow-no-referrer` - Allow playback when no referrer is sent
+- `--allow-no-user-agent` - Allow playback when no user agent is sent
+- `--allow-high-risk-user-agent` - Allow playback from high-risk user agents
 
 ```bash
-# List all signing keys
-mux signing-keys list
-
-# List signing keys with JSON output
-mux signing-keys list --json
+mux playback-restrictions create --allowed-domains "example.com" --allowed-domains "*.example.com"
 ```
 
-**Output:**
+#### `mux playback-restrictions list`
 
-```
-Found 2 signing key(s):
+List playback restrictions. Supports `--limit`, `--page`, `--compact`.
 
-Key ID: qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
-  Created: 1234567890
-  Active in environments: production, staging
+#### `mux playback-restrictions get <restriction-id>`
 
-Key ID: abc123def456ghi789jkl012mno345pq
-  Created: 1234567891
-  Active in environments: development
-```
+Get details about a playback restriction.
 
-#### `mux signing-keys get <key-id>`
+#### `mux playback-restrictions delete <restriction-id>`
 
-Get detailed information about a specific signing key.
+Delete a playback restriction. Supports `--force`.
 
-**Arguments:**
-- `<key-id>` - The ID of the signing key to retrieve
+#### `mux playback-restrictions update-referrer <restriction-id>`
 
-**Options:**
-- `--json` - Output JSON instead of pretty format
+Update the referrer restriction.
 
-**Examples:**
+**Options:** `--allowed-domains <domain>` (required, repeatable), `--allow-no-referrer`
+
+#### `mux playback-restrictions update-user-agent <restriction-id>`
+
+Update the user agent restriction.
+
+**Options:** `--allow-no-user-agent <boolean>` (required), `--allow-high-risk-user-agent <boolean>` (required)
+
+</details>
+
+<details>
+<summary><h3>Signing Keys & Secure Playback</h3></summary>
+
+#### Signing Key Management
 
 ```bash
-# Get signing key details
-mux signing-keys get qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
-
-# Get signing key details as JSON
-mux signing-keys get qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ --json
+mux signing-keys create              # creates key and saves to current environment
+mux signing-keys list                # lists keys with environment indicators
+mux signing-keys get <key-id>
+mux signing-keys delete <key-id> [--force]
 ```
 
-**Output:**
+The private key is only returned once during creation. The CLI automatically stores it in your current environment configuration.
 
-```
-Signing Key ID: qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
-Created: 1234567890
-Active in environments: production
-```
-
-#### `mux signing-keys delete <key-id>`
-
-Delete a signing key permanently. This will invalidate all signed URLs created with this key.
-
-**Arguments:**
-- `<key-id>` - The ID of the signing key to delete
-
-**Options:**
-- `-f, --force` - Skip confirmation prompt
-- `--json` - Output JSON instead of pretty format
-
-**Examples:**
-
-```bash
-# Delete signing key with confirmation prompt
-mux signing-keys delete qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ
-
-# Delete signing key without confirmation
-mux signing-keys delete qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ --force
-
-# Delete signing key with JSON output
-mux signing-keys delete qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ --force --json
-```
-
-**Important:** Deleting a signing key will invalidate all tokens and signed URLs created with that key. If the key is configured in any local environment, it will be automatically removed from those environment configurations.
-
-**Output:**
-
-```
-WARNING: This signing key is configured in the following environments: production
-
-Deleting this key will invalidate all signed URLs created with it.
-Are you sure you want to delete signing key qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ? (y/n): y
-
-Signing key qrdSB18tYITC7GNQCFJWKr25M9JPkMxJ deleted successfully
-Removed from environment: production
-```
+Deleting a signing key invalidates all tokens and signed URLs created with it and removes it from any local environment configurations.
 
 #### `mux sign <playback-id>`
 
-Sign a playback ID to generate a secure URL for video playback, thumbnails, GIFs, or storyboards. This is used with assets or live streams that have a `signed` playback policy.
-
-**Arguments:**
-- `<playback-id>` - The playback ID to sign
+Sign a playback ID to generate a secure URL for video playback, thumbnails, GIFs, or storyboards. Used with assets or live streams that have a `signed` playback policy.
 
 **Options:**
-- `-e, --expiration <duration>` - Token expiration duration (default: '7d')
-  - Examples: '7d', '24h', '1h', '30m'
-- `-t, --type <type>` - Token type: `video`, `thumbnail`, `gif`, `storyboard` (default: 'video')
-- `-p, --param <key=value>` - JWT claim as key=value (repeatable). Used to embed parameters like `time`, `width`, or `height` directly in the signed token.
-- `--params-json <json>` - JWT claims as a JSON object. Useful for complex claims including nested values like `custom`.
-- `--json` - Output JSON instead of pretty format
+- `-e, --expiration <duration>` - Token expiration (default: `7d`). Examples: `7d`, `24h`, `30m`
+- `-t, --type <type>` - `video` (default), `thumbnail`, `gif`, `storyboard`
+- `-p, --param <key=value>` - JWT claim as key=value (repeatable)
+- `--params-json <json>` - JWT claims as JSON object
 - `--token-only` - Output only the JWT token (no URL)
 
-When `--param` and `--params-json` are both provided, `--params-json` is applied first as a base layer and `--param` values override on top.
+When both `--param` and `--params-json` are provided, `--params-json` is applied first and `--param` values override on top.
 
 **Examples:**
 
 ```bash
-# Sign a playback ID with default settings (7 day expiration, video type)
 mux sign abc123playbackid
-
-# Sign with custom expiration
 mux sign abc123playbackid --expiration 24h
-
-# Sign for thumbnail access at a specific time
-mux sign abc123playbackid --type thumbnail --param time=14
-
-# Sign for thumbnail with dimensions
 mux sign abc123playbackid --type thumbnail --param time=14 --param width=100
-
-# Sign for animated GIF
 mux sign abc123playbackid --type gif
-
-# Sign with custom claims for tracking (nested under "custom" in JWT)
 mux sign abc123playbackid --params-json '{"custom": {"session_id": "xxxx-123"}}'
-
-# Get JSON output with full details
-mux sign abc123playbackid --json
-
-# Get only the JWT token for scripting
 mux sign abc123playbackid --token-only
 ```
 
-**Output:**
+**Output URLs by type:**
 
-The output URL uses the appropriate domain based on the token type:
+| Type | Domain | Example path |
+|------|--------|-------------|
+| `video` | `stream.mux.com` | `/{id}.m3u8?token=...` |
+| `thumbnail` | `image.mux.com` | `/{id}/thumbnail.png?token=...` |
+| `gif` | `image.mux.com` | `/{id}/animated.gif?token=...` |
+| `storyboard` | `image.mux.com` | `/{id}/storyboard.vtt?token=...` |
 
-```bash
-# Video (default) - uses stream.mux.com
-mux sign abc123playbackid
-https://stream.mux.com/abc123playbackid.m3u8?token=eyJ...
-
-# Thumbnail - uses image.mux.com
-mux sign abc123playbackid --type thumbnail --param time=14
-https://image.mux.com/abc123playbackid/thumbnail.png?token=eyJ...
-
-# GIF - uses image.mux.com
-mux sign abc123playbackid --type gif
-https://image.mux.com/abc123playbackid/animated.gif?token=eyJ...
-
-# Storyboard - uses image.mux.com
-mux sign abc123playbackid --type storyboard
-https://image.mux.com/abc123playbackid/storyboard.vtt?token=eyJ...
-```
-
-**Thumbnail Parameters:**
-
-When signing thumbnails, parameters like `time` and `width` must be embedded in the JWT claims (not as query parameters). The `--param` flag handles this automatically:
+**Thumbnail parameters** (embedded in JWT via `--param`):
 
 | Parameter | Description |
 |-----------|-------------|
-| `time` | Video timestamp in seconds for the thumbnail |
-| `width` | Thumbnail width in pixels |
-| `height` | Thumbnail height in pixels |
-| `rotate` | Rotate clockwise: 90, 180, or 270 |
-| `fit_mode` | How to fit: `preserve`, `stretch`, `crop`, `smartcrop`, `pad` |
+| `time` | Video timestamp in seconds |
+| `width` | Width in pixels |
+| `height` | Height in pixels |
+| `rotate` | Clockwise rotation: 90, 180, or 270 |
+| `fit_mode` | `preserve`, `stretch`, `crop`, `smartcrop`, `pad` |
 | `flip_v` | Flip vertically |
 | `flip_h` | Flip horizontally |
 
-**Prerequisites:**
+**Prerequisite:** You must have a signing key in your current environment. Run `mux signing-keys create` to set one up.
 
-Before using `mux sign`, you must have a signing key configured in your current environment:
+</details>
+
+<details>
+<summary><h3>Transcription Vocabularies</h3></summary>
+
+Manage custom transcription vocabularies to improve automatic speech recognition accuracy for domain-specific terms.
+
+#### `mux transcription-vocabularies create`
+
+**Options:**
+- `--phrase <phrase>` - Phrase to include (required, repeatable)
+- `--name <name>` - Name for the vocabulary
+- `--passthrough <string>` - Passthrough metadata (max 255 characters)
 
 ```bash
-# Create and configure a signing key
-mux signing-keys create
+mux transcription-vocabularies create --phrase "Mux" --phrase "HLS" --phrase "RTMP" --name "Streaming Terms"
 ```
 
-If no signing keys are configured, the command will provide helpful instructions on how to set one up.
+#### `mux transcription-vocabularies list`
 
-### Authentication & Environment Management
+List vocabularies. Supports `--limit`, `--page`, `--compact`.
+
+#### `mux transcription-vocabularies get <vocabulary-id>`
+
+Get details about a vocabulary.
+
+#### `mux transcription-vocabularies update <vocabulary-id>`
+
+Update a vocabulary. This replaces all existing phrases.
+
+**Options:** `--phrase <phrase>` (required, repeatable), `--name <name>`, `--passthrough <string>`
+
+#### `mux transcription-vocabularies delete <vocabulary-id>`
+
+Delete a vocabulary. Supports `--force`.
+
+</details>
+
+<details>
+<summary><h3>Delivery Usage</h3></summary>
+
+#### `mux delivery-usage list`
+
+List delivery usage reports for video assets and live streams.
+
+**Options:**
+- `--asset-id <id>` - Filter by asset ID
+- `--live-stream-id <id>` - Filter by live stream ID
+- `--timeframe <timeframe>` - Timeframe as Unix epoch timestamps (specify twice for start and end)
+
+```bash
+mux delivery-usage list
+mux delivery-usage list --asset-id abc123xyz
+```
+
+Supports `--limit`, `--page`, `--compact`.
+
+</details>
+
+<details>
+<summary><h3>DRM Configurations</h3></summary>
+
+View DRM configurations for your Mux environment. DRM configurations are provisioned by Mux and are read-only.
+
+```bash
+mux drm-configurations list
+mux drm-configurations get <drm-configuration-id>
+```
+
+</details>
+
+<details>
+<summary><h3>Mux Data</h3></summary>
+
+Commands for video analytics, monitoring, and incident tracking via the Mux Data API.
+
+#### Video Views
+
+```bash
+mux video-views list [--filters "country:US"] [--timeframe "24:hours"] [--viewer-id <id>] [--error-id <id>]
+mux video-views get <view-id>
+```
+
+**List options:** `--filters`, `--metric-filters`, `--timeframe`, `--viewer-id`, `--error-id`, `--order-direction`, `--limit`, `--page`, `--compact`
+
+#### Metrics
+
+```bash
+# List available metrics
+mux metrics list [--dimension <dimension>] [--value <value>]
+
+# Breakdown by dimension
+mux metrics breakdown <metric-id> --group-by country --measurement median
+
+# Overall metric values
+mux metrics overall <metric-id> [--measurement avg]
+
+# Timeseries data
+mux metrics timeseries <metric-id> [--group-by hour]
+
+# Performance insights
+mux metrics insights <metric-id> [--measurement 95th]
+```
+
+**Common options:** `--measurement <95th|median|avg|count|sum>`, `--filters`, `--metric-filters`, `--timeframe`
+
+**Breakdown/timeseries also support:** `--group-by`, `--order-by`, `--order-direction`, `--limit`, `--page`, `--compact`
+
+#### Monitoring
+
+Real-time monitoring data from Mux Data.
+
+```bash
+mux monitoring dimensions                              # list available dimensions
+mux monitoring metrics                                  # list available metrics
+mux monitoring breakdown <metric-id> [--dimension <d>] [--timestamp <ts>]
+mux monitoring breakdown-timeseries <metric-id> [--dimension <d>]
+mux monitoring histogram-timeseries [--filters ...]
+mux monitoring timeseries <metric-id> [--timestamp <ts>]
+```
+
+#### Incidents
+
+```bash
+mux incidents list [--status open] [--severity alert]
+mux incidents get <incident-id>
+mux incidents related <incident-id>
+```
+
+**List options:** `--status <open|closed|expired>`, `--severity <warning|alert>`, `--order-by`, `--order-direction`, `--limit`, `--page`, `--compact`
+
+#### Annotations
+
+Mark significant events (deployments, config changes, etc.) on your analytics timeline.
+
+```bash
+# Create annotation
+mux annotations create --date 1700000000 --note "Deployed v2.1.0" [--sub-property-id <id>]
+
+# List, get, update, delete
+mux annotations list [--timeframe ...]
+mux annotations get <annotation-id>
+mux annotations update <annotation-id> --date <timestamp> --note <text>
+mux annotations delete <annotation-id> [--force]
+```
+
+#### Dimensions
+
+```bash
+mux dimensions list                                    # list available dimensions
+mux dimensions values <dimension-id> [--timeframe "24:hours"]
+```
+
+#### Errors
+
+```bash
+mux errors list [--filters ...] [--timeframe ...]
+```
+
+#### Exports
+
+```bash
+mux exports list                                       # list video view export files
+```
+
+</details>
+
+<details>
+<summary><h3>Authentication & Environment Management</h3></summary>
 
 #### `mux login`
 
 Authenticate with Mux and save credentials.
 
 **Options:**
-- `-f, --env-file <path>` - Path to .env file containing credentials
-- `-n, --name <name>` - Name for this environment (default: "default")
-
-**Examples:**
+- `-f, --env-file <path>` - Path to .env file containing `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET`
+- `-n, --name <name>` - Name for this environment (default: `default`)
 
 ```bash
-# Interactive login
-mux login
-
-# Login with .env file
-mux login --env-file .env
-
-# Login with a named environment
-mux login --name production --env-file .env.production
+mux login                                        # interactive
+mux login --env-file .env                         # from .env file
+mux login --name production --env-file .env.prod  # named environment
 ```
 
 #### `mux logout <name>`
 
-Remove credentials for a specific environment.
-
-**Arguments:**
-- `<name>` - Name of the environment to remove
-
-**Examples:**
+Remove credentials for a specific environment. When you remove the default environment, the CLI automatically selects another as the new default.
 
 ```bash
-# Remove the default environment
 mux logout default
-
-# Remove a named environment
 mux logout staging
 ```
-
-When you remove the default environment, the CLI automatically selects another environment as the new default.
 
 #### `mux env list`
 
 Display all configured environments.
 
-**Examples:**
-
 ```bash
 mux env list
-```
-
-**Output:**
-```
-Configured environments:
-
-* production (default)
-  staging
-  development
-
-3 environments total
 ```
 
 #### `mux env switch <name>`
 
 Change the default environment.
 
-**Arguments:**
-- `<name>` - Name of the environment to set as default
-
-**Examples:**
-
 ```bash
-# Switch to staging environment
 mux env switch staging
 ```
+
+</details>
 
 ## Configuration
 
@@ -1353,8 +906,6 @@ pnpm run build
 
 ### Testing
 
-The project includes comprehensive test coverage for core functionality:
-
 ```bash
 # Run all tests
 bun test
@@ -1367,64 +918,52 @@ bun test --watch
 
 ```
 src/
-├── commands/                 # CLI command definitions
-│   ├── assets/              # Asset management commands
-│   │   ├── manage/          # Interactive TUI for asset management
-│   │   │   ├── index.ts     # TUI command entry point
-│   │   │   └── AssetManageApp.tsx  # Main TUI application
-│   │   ├── playback-ids/    # Playback ID commands for assets
-│   │   │   ├── index.ts     # Main playback-ids command
-│   │   │   ├── create.ts    # Create playback IDs
-│   │   │   ├── list.ts      # List playback IDs
-│   │   │   └── delete.ts    # Delete playback IDs
-│   │   ├── index.ts         # Main assets command
-│   │   ├── create.ts        # Create assets
-│   │   ├── list.ts          # List assets
-│   │   ├── get.ts           # Get asset details
-│   │   ├── update.ts        # Update asset metadata
-│   │   └── delete.ts        # Delete assets
-│   ├── live/                # Live stream management commands
-│   │   ├── playback-ids/    # Playback ID commands for live streams
-│   │   │   ├── index.ts     # Main playback-ids command
-│   │   │   ├── create.ts    # Create playback IDs
-│   │   │   ├── list.ts      # List playback IDs
-│   │   │   └── delete.ts    # Delete playback IDs
-│   │   ├── index.ts         # Main live command
-│   │   ├── create.ts        # Create live streams
-│   │   ├── list.ts          # List live streams
-│   │   ├── get.ts           # Get live stream details
-│   │   └── delete.ts        # Delete live streams
-│   ├── signing-keys/        # Signing key management commands
-│   │   ├── index.ts         # Main signing-keys command
-│   │   ├── create.ts        # Create signing keys
-│   │   ├── list.ts          # List signing keys
-│   │   ├── get.ts           # Get signing key details
-│   │   └── delete.ts        # Delete signing keys
-│   ├── env/                 # Environment management commands
-│   │   ├── index.ts         # Main env command
-│   │   ├── list.ts          # List environments
-│   │   └── switch.ts        # Switch default environment
-│   ├── login.ts             # Login command
-│   ├── logout.ts            # Logout command
-│   └── sign.ts              # Sign playback IDs command
-├── lib/                     # Shared libraries
-│   ├── tui/                 # Reusable TUI components
-│   │   ├── index.ts         # TUI exports
-│   │   ├── renderer.tsx     # OpenTUI renderer setup
-│   │   ├── SelectList.tsx   # Reusable selection list component
-│   │   ├── ActionMenu.tsx   # Reusable action menu component
-│   │   ├── ConfirmDialog.tsx # Reusable confirmation dialog
-│   │   └── clipboard.ts     # Clipboard utilities
-│   ├── config.ts            # Configuration management
-│   ├── formatters.ts        # Shared output formatting (timestamps, durations, statuses)
-│   ├── mux.ts               # Mux API integration and auth helpers
-│   ├── json-config.ts       # JSON configuration parsing
-│   ├── file-upload.ts       # File upload utilities
-│   ├── urls.ts              # URL generation (stream, player, thumbnail, gif, storyboard)
-│   ├── signing.ts           # JWT signing utilities
-│   ├── playback-ids.ts      # Playback ID operations
-│   └── xdg.ts               # XDG base directory support
-└── index.ts                 # CLI entry point
+├── commands/                          # CLI command definitions
+│   ├── assets/                       # Asset management
+│   │   ├── manage/                   # Interactive TUI
+│   │   ├── playback-ids/             # Playback ID sub-resource
+│   │   ├── static-renditions/        # Static rendition sub-resource
+│   │   ├── tracks/                   # Track management (subtitles, audio)
+│   │   ├── create.ts, list.ts, get.ts, update.ts, delete.ts
+│   │   ├── input-info.ts             # Retrieve input info
+│   │   └── update-master-access.ts   # Update master access settings
+│   ├── live/                         # Live stream management
+│   │   ├── playback-ids/             # Playback ID sub-resource
+│   │   ├── simulcast-targets/        # Simulcast target sub-resource
+│   │   ├── create.ts, list.ts, get.ts, update.ts, delete.ts
+│   │   ├── complete.ts, enable.ts, disable.ts
+│   │   ├── reset-stream-key.ts
+│   │   ├── update-embedded-subtitles.ts
+│   │   ├── update-generated-subtitles.ts
+│   │   ├── update-new-asset-static-renditions.ts
+│   │   └── delete-new-asset-static-renditions.ts
+│   ├── uploads/                      # Direct upload management
+│   ├── playback-restrictions/        # Playback restriction management
+│   ├── transcription-vocabularies/   # Transcription vocabulary management
+│   ├── delivery-usage/               # Delivery usage reports
+│   ├── drm-configurations/          # DRM configuration management
+│   ├── signing-keys/                 # Signing key management
+│   ├── video-views/                  # Mux Data: video view analytics
+│   ├── metrics/                      # Mux Data: metric analytics
+│   ├── monitoring/                   # Mux Data: real-time monitoring
+│   ├── incidents/                    # Mux Data: incident tracking
+│   ├── annotations/                  # Mux Data: annotation management
+│   ├── dimensions/                   # Mux Data: dimension queries
+│   ├── errors/                       # Mux Data: error analytics
+│   ├── exports/                      # Mux Data: export files
+│   ├── env/                          # Environment management
+│   ├── login.ts, logout.ts, sign.ts  # Auth & signing commands
+│   └── playback-ids.ts               # Playback ID lookup
+├── lib/                              # Shared libraries
+│   ├── tui/                          # Reusable TUI components
+│   ├── config.ts                     # Configuration management
+│   ├── formatters.ts                 # Output formatting
+│   ├── data-filters.ts               # Mux Data filter utilities
+│   ├── mux.ts                        # Mux API client
+│   ├── urls.ts                       # URL generation
+│   ├── signing.ts                    # JWT signing
+│   └── ...                           # Other utilities
+└── index.ts                          # CLI entry point
 ```
 
 ## License
