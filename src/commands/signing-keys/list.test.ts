@@ -36,7 +36,9 @@ describe('mux signing-keys list command', () => {
 
   describe('Command metadata', () => {
     test('has correct command description', () => {
-      expect(listCommand.getDescription()).toBe('List all signing keys');
+      expect(listCommand.getDescription()).toBe(
+        'List all signing keys (private keys are not returned; only available at creation)',
+      );
     });
 
     test('has --json flag option', () => {

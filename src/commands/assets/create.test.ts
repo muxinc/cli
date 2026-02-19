@@ -255,7 +255,7 @@ describe('mux assets create command', () => {
   describe('Command metadata', () => {
     test('has correct command description', () => {
       expect(createCommand.getDescription()).toBe(
-        'Create a new Mux video asset',
+        'Create a Mux video asset from a URL, local file upload, or JSON config',
       );
     });
 

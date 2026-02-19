@@ -10,7 +10,7 @@ describe('mux signing-keys create command', () => {
   describe('Command metadata', () => {
     test('has correct command description', () => {
       expect(createCommand.getDescription()).toBe(
-        'Create a new signing key and save it to the current environment',
+        'Create a signing key and save to current environment (private key only available at creation)',
       );
     });
 
