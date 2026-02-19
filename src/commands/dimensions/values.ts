@@ -30,12 +30,12 @@ export const valuesCommand = new Command()
     'Timeframe as Unix timestamps or duration (e.g., "24:hours"). Can be specified multiple times.',
     { collect: true },
   )
-  .option('--limit <limit:number>', 'Number of results per page', {
+  .option('--limit <limit:number>', 'Number of results to return', {
     default: 25,
   })
-  .option('--page <page:number>', 'Page number', { default: 1 })
+  .option('--page <page:number>', 'Page number for pagination', { default: 1 })
   .option('--json', 'Output JSON instead of pretty format')
-  .option('--compact', 'Compact output format (one line per value)')
+  .option('--compact', 'Output one line per value (grep-friendly)')
   .action(async (options: ValuesOptions, dimensionId: string) => {
     try {
       const mux = await createAuthenticatedMuxClient();

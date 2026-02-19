@@ -6,7 +6,9 @@ import { listCommand } from './list.ts';
 import { updateCommand } from './update.ts';
 
 export const annotationsCommand = new Command()
-  .description('Manage annotations in Mux Data')
+  .description(
+    'Manage annotations (event markers for deployments, releases, etc.) in Mux Data',
+  )
   .action(function () {
     this.showHelp();
   })

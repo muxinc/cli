@@ -36,10 +36,7 @@ export const createCommand = new Command()
     '--timeout <timeout:number>',
     'Seconds before the upload times out (default: 3600)',
   )
-  .option(
-    '--test',
-    'Create a test upload (asset will be deleted after 24 hours)',
-  )
+  .option('--test', 'Create a test upload (asset deleted after 24h)')
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: CreateOptions) => {
     try {

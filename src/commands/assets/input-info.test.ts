@@ -27,7 +27,7 @@ describe('mux assets input-info command', () => {
 
   describe('Command metadata', () => {
     test('has correct command description', () => {
-      expect(inputInfoCommand.getDescription()).toMatch(/input.*info/i);
+      expect(inputInfoCommand.getDescription()).toMatch(/input/i);
     });
 
     test('requires asset-id argument', () => {

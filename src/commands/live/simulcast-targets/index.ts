@@ -4,7 +4,9 @@ import { deleteCommand } from './delete.ts';
 import { getCommand } from './get.ts';
 
 export const simulcastTargetsCommand = new Command()
-  .description('Manage simulcast targets for Mux live streams')
+  .description(
+    'Manage simulcast targets (restream to third-party platforms like YouTube or Twitch) for Mux live streams',
+  )
   .action(function () {
     this.showHelp();
   })

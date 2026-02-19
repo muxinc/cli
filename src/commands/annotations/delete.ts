@@ -8,7 +8,9 @@ interface DeleteOptions {
 }
 
 export const deleteCommand = new Command()
-  .description('Delete an annotation from Mux Data')
+  .description(
+    'Permanently delete an annotation from Mux Data (cannot be undone)',
+  )
   .arguments('<annotation-id:string>')
   .option('-f, --force', 'Skip confirmation prompt')
   .option('--json', 'Output JSON instead of pretty format')

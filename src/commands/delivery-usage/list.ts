@@ -17,15 +17,15 @@ export const listCommand = new Command()
   .option('--live-stream-id <liveStreamId:string>', 'Filter by live stream ID')
   .option(
     '--timeframe <timeframe:string>',
-    'Timeframe as Unix epoch timestamps. Specify twice for start and end.',
+    'Timeframe as Unix timestamps or duration (e.g., "24:hours"). Can be specified multiple times.',
     { collect: true },
   )
-  .option('--limit <limit:number>', 'Number of results per page', {
+  .option('--limit <limit:number>', 'Number of results to return', {
     default: 25,
   })
-  .option('--page <page:number>', 'Page number', { default: 1 })
+  .option('--page <page:number>', 'Page number for pagination', { default: 1 })
   .option('--json', 'Output JSON instead of pretty format')
-  .option('--compact', 'Compact output format (one line per report)')
+  .option('--compact', 'Output one line per report (grep-friendly)')
   .action(async (options: ListOptions) => {
     try {
       const mux = await createAuthenticatedMuxClient();

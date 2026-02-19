@@ -10,12 +10,12 @@ interface ListOptions {
 
 export const listCommand = new Command()
   .description('List transcription vocabularies')
-  .option('--limit <limit:number>', 'Number of results per page', {
+  .option('--limit <limit:number>', 'Number of results to return', {
     default: 25,
   })
-  .option('--page <page:number>', 'Page number', { default: 1 })
+  .option('--page <page:number>', 'Page number for pagination', { default: 1 })
   .option('--json', 'Output JSON instead of pretty format')
-  .option('--compact', 'Compact output format (one line per vocabulary)')
+  .option('--compact', 'Output one line per vocabulary (grep-friendly)')
   .action(async (options: ListOptions) => {
     try {
       const mux = await createAuthenticatedMuxClient();

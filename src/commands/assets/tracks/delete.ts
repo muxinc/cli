@@ -8,7 +8,9 @@ interface DeleteOptions {
 }
 
 export const deleteCommand = new Command()
-  .description('Delete a text or audio track from a Mux video asset')
+  .description(
+    'Permanently delete a text or audio track from a Mux video asset (cannot be undone)',
+  )
   .arguments('<asset-id:string> <track-id:string>')
   .option('-f, --force', 'Skip confirmation prompt')
   .option('--json', 'Output JSON instead of pretty format')

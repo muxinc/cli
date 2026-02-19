@@ -15,7 +15,9 @@ export const breakdownTimeseriesCommand = new Command()
   .description('Get monitoring breakdown timeseries for a metric')
   .arguments('<metric-id:string>')
   .option('--dimension <dimension:string>', 'Dimension to break down by')
-  .option('--limit <limit:number>', 'Number of results to return')
+  .option('--limit <limit:number>', 'Number of results to return', {
+    default: 25,
+  })
   .option('--order-by <orderBy:string>', 'Field to order results by')
   .option(
     '--order-direction <orderDirection:string>',
@@ -39,7 +41,7 @@ export const breakdownTimeseriesCommand = new Command()
   )
   .option(
     '--timeframe <timeframe:string>',
-    'Timeframe as Unix epoch timestamps. Specify twice for start and end.',
+    'Timeframe as Unix timestamps or duration (e.g., "24:hours"). Can be specified multiple times.',
     { collect: true },
   )
   .action(async (options: BreakdownTimeseriesOptions, metricId: string) => {

@@ -11,7 +11,9 @@ interface InsightsOptions {
 }
 
 export const insightsCommand = new Command()
-  .description('Get metric insights')
+  .description(
+    'List metric insights (factors with negative impact on performance)',
+  )
   .arguments('<metric-id:string>')
   .option(
     '--filters <filter:string>',

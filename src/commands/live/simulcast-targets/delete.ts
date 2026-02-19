@@ -8,7 +8,9 @@ interface DeleteOptions {
 }
 
 export const deleteCommand = new Command()
-  .description('Delete a simulcast target from a live stream')
+  .description(
+    'Permanently delete a simulcast target from a live stream (cannot be undone)',
+  )
   .arguments('<stream-id:string> <target-id:string>')
   .option('-f, --force', 'Skip confirmation prompt')
   .option('--json', 'Output JSON instead of pretty format')

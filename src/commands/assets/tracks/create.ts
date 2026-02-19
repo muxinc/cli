@@ -15,7 +15,11 @@ interface CreateOptions {
 export const createCommand = new Command()
   .description('Add a text or audio track to a Mux video asset')
   .arguments('<asset-id:string>')
-  .option('--url <url:string>', 'URL of the track file', { required: true })
+  .option(
+    '--url <url:string>',
+    'Publicly accessible URL of the track file (http/https)',
+    { required: true },
+  )
   .option('--type <type:string>', 'Track type (text or audio)', {
     required: true,
     value: (value: string): string => {
@@ -53,7 +57,7 @@ export const createCommand = new Command()
   )
   .option(
     '--passthrough <passthrough:string>',
-    'Passthrough metadata (max 255 characters)',
+    'Arbitrary metadata returned in API responses (max 255 chars)',
   )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: CreateOptions, assetId: string) => {

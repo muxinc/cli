@@ -40,7 +40,7 @@ export const updateCommand = new Command()
   )
   .option(
     '--passthrough <passthrough:string>',
-    'Passthrough metadata (max 255 characters)',
+    'Arbitrary metadata returned in API responses (max 255 chars)',
   )
   .option(
     '--reconnect-slate-url <reconnectSlateUrl:string>',

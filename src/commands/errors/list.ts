@@ -28,7 +28,7 @@ export const listCommand = new Command()
     { collect: true },
   )
   .option('--json', 'Output JSON instead of pretty format')
-  .option('--compact', 'Compact output format (one line per error)')
+  .option('--compact', 'Output one line per error (grep-friendly)')
   .action(async (options: ListOptions) => {
     try {
       const mux = await createAuthenticatedMuxClient();

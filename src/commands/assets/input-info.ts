@@ -6,7 +6,7 @@ interface InputInfoOptions {
 }
 
 export const inputInfoCommand = new Command()
-  .description('Retrieve input info for a Mux video asset')
+  .description('Get input track and file details for a Mux video asset')
   .arguments('<asset-id:string>')
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: InputInfoOptions, assetId: string) => {

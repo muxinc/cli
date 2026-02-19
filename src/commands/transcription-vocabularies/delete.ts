@@ -8,7 +8,9 @@ interface DeleteOptions {
 }
 
 export const deleteCommand = new Command()
-  .description('Delete a transcription vocabulary')
+  .description(
+    'Permanently delete a transcription vocabulary (cannot be undone)',
+  )
   .arguments('<vocabulary-id:string>')
   .option('-f, --force', 'Skip confirmation prompt')
   .option('--json', 'Output JSON instead of pretty format')

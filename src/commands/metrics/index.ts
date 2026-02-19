@@ -6,7 +6,7 @@ import { overallCommand } from './overall.ts';
 import { timeseriesCommand } from './timeseries.ts';
 
 export const metricsCommand = new Command()
-  .description('View metric analytics from Mux Data')
+  .description('View aggregate playback performance metrics from Mux Data')
   .action(function () {
     this.showHelp();
   })

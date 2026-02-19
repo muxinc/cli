@@ -18,7 +18,7 @@ export const createCommand = new Command()
   .option('--name <name:string>', 'Name for the vocabulary')
   .option(
     '--passthrough <passthrough:string>',
-    'Passthrough metadata (max 255 characters)',
+    'Arbitrary metadata returned in API responses (max 255 chars)',
   )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: CreateOptions) => {

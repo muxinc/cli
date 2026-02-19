@@ -35,7 +35,7 @@ export const updateEmbeddedSubtitlesCommand = new Command()
   .option('--name <name:string>', 'Name for the closed caption track')
   .option(
     '--passthrough <passthrough:string>',
-    'Passthrough metadata (max 255 characters)',
+    'Arbitrary metadata returned in API responses (max 255 chars)',
   )
   .option('--clear', 'Remove all embedded subtitle configuration')
   .option('--json', 'Output JSON instead of pretty format')

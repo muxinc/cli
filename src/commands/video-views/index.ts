@@ -3,7 +3,7 @@ import { getCommand } from './get.ts';
 import { listCommand } from './list.ts';
 
 export const videoViewsCommand = new Command()
-  .description('View video view analytics from Mux Data')
+  .description('Query individual playback sessions from Mux Data')
   .action(function () {
     this.showHelp();
   })

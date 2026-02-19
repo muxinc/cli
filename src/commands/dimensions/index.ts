@@ -3,7 +3,9 @@ import { listCommand } from './list.ts';
 import { valuesCommand } from './values.ts';
 
 export const dimensionsCommand = new Command()
-  .description('View dimensions from Mux Data')
+  .description(
+    'View dimensions (filterable attributes like country, browser, OS) from Mux Data',
+  )
   .action(function () {
     this.showHelp();
   })
