@@ -6,6 +6,7 @@ import { annotationsCommand } from './commands/annotations/index.ts';
 import { assetsCommand } from './commands/assets/index.ts';
 import { deliveryUsageCommand } from './commands/delivery-usage/index.ts';
 import { dimensionsCommand } from './commands/dimensions/index.ts';
+import { drmConfigurationsCommand } from './commands/drm-configurations/index.ts';
 import { envCommand } from './commands/env/index.ts';
 import { errorsCommand } from './commands/errors/index.ts';
 import { exportsCommand } from './commands/exports/index.ts';
@@ -46,6 +47,7 @@ const cli = new Command()
   .command('uploads', uploadsCommand)
   .command('transcription-vocabularies', transcriptionVocabulariesCommand)
   .command('delivery-usage', deliveryUsageCommand)
+  .command('drm-configurations', drmConfigurationsCommand)
   .command('video-views', videoViewsCommand)
   .command('metrics', metricsCommand)
   .command('monitoring', monitoringCommand)

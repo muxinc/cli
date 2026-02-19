@@ -43,6 +43,7 @@ A command-line interface for interacting with the Mux API, designed to provide a
     - [Sign Playback ID](#mux-sign-playback-id)
   - [Transcription Vocabularies](#transcription-vocabularies)
   - [Delivery Usage](#delivery-usage)
+  - [DRM Configurations](#drm-configurations)
   - [Mux Data](#mux-data)
     - [Video Views](#video-views)
     - [Metrics](#metrics)
@@ -1611,6 +1612,18 @@ mux delivery-usage list
 mux delivery-usage list --asset-id abc123xyz
 ```
 
+### DRM Configurations
+
+View DRM configurations for your Mux environment. DRM configurations are provisioned by Mux and are read-only.
+
+#### `mux drm-configurations list`
+
+List DRM configurations. Supports `--limit`, `--page`, `--json`, `--compact`.
+
+#### `mux drm-configurations get <drm-configuration-id>`
+
+Get details about a specific DRM configuration. Supports `--json`.
+
 ### Mux Data
 
 The following commands interact with the Mux Data API for video analytics, monitoring, and incident tracking.
@@ -2011,6 +2024,7 @@ src/
 │   ├── playback-restrictions/        # Playback restriction management
 │   ├── transcription-vocabularies/   # Transcription vocabulary management
 │   ├── delivery-usage/               # Delivery usage reports
+│   ├── drm-configurations/          # DRM configuration management
 │   ├── signing-keys/                 # Signing key management
 │   ├── video-views/                  # Mux Data: video view analytics
 │   ├── metrics/                      # Mux Data: metric analytics
