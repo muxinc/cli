@@ -6,7 +6,9 @@ import { listCommand } from './list.ts';
 import { playbackIdsCommand } from './playback-ids/index.ts';
 
 export const liveCommand = new Command()
-  .description('Manage Mux live streams')
+  .description(
+    'Manage Mux live streams (RTMP/SRT ingest endpoints for broadcasting)',
+  )
   .action(function () {
     this.showHelp();
   })

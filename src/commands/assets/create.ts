@@ -238,14 +238,22 @@ async function createFromConfig(
 }
 
 export const createCommand = new Command()
-  .description('Create a new Mux video asset')
-  .option('--url <url:string>', 'Video URL to ingest from the web')
+  .description(
+    'Create a Mux video asset from a URL, local file upload, or JSON config',
+  )
+  .option(
+    '--url <url:string>',
+    'Publicly accessible video URL to ingest (http/https)',
+  )
   .option(
     '--upload <path:string>',
     'Local file(s) to upload (supports glob patterns). Can be specified multiple times.',
     { collect: true },
   )
-  .option('--file, -f <path:string>', 'JSON configuration file')
+  .option(
+    '--file, -f <path:string>',
+    'JSON config file matching Mux Asset API schema (inputs, playback_policies, etc.)',
+  )
   .option(
     '-p, --playback-policy <policy:string>',
     'Playback policy (public or signed). Can be specified multiple times.',
@@ -268,7 +276,7 @@ export const createCommand = new Command()
   )
   .option(
     '--passthrough <string:string>',
-    'User metadata (max 255 characters)',
+    'Arbitrary metadata stored on asset and returned in API responses (max 255 chars)',
     {
       value: (value: string): string => {
         if (value.length > 255) {
@@ -309,7 +317,7 @@ export const createCommand = new Command()
   )
   .option(
     '--video-quality <quality:string>',
-    'Video quality level (basic, plus, or premium)',
+    'Video quality: basic (720p max), plus (1080p, better encoding), or premium (4K, best quality)',
     {
       value: (value: string): string => {
         const validQualities = ['basic', 'plus', 'premium'];
@@ -325,7 +333,10 @@ export const createCommand = new Command()
   .option('--normalize-audio', 'Normalize audio loudness level')
   .option('-y, --yes', 'Skip confirmation prompts')
   .option('--json', 'Output JSON instead of pretty format')
-  .option('--wait', 'Wait for asset processing to complete')
+  .option(
+    '--wait',
+    'Wait for asset processing to complete (polls up to 5 minutes)',
+  )
   .arguments('[files...:string]')
   // biome-ignore lint: Cliffy infers upload as string but collect makes it string[]
   .action(async (options: any, ...args: unknown[]) => {
@@ -450,7 +461,7 @@ export const createCommand = new Command()
         } else {
           if (!opts.json) {
             console.log(
-              'WARNING: Asset is still processing. Check status later.',
+              `WARNING: Asset is still processing. Run 'mux assets get ${asset.id}' to check status.`,
             );
           }
         }

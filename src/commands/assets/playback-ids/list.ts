@@ -27,7 +27,10 @@ export const listCommand = new Command()
         console.log(JSON.stringify(output, null, 2));
       } else {
         if (playbackIds.length === 0) {
-          console.log(`No playback IDs found for asset ${assetId}`);
+          console.log(`No playback IDs found for asset ${assetId}.`);
+          console.log(
+            `Run 'mux assets playback-ids create ${assetId}' to add one.`,
+          );
           return;
         }
 

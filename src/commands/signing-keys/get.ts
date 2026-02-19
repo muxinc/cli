@@ -7,7 +7,7 @@ interface GetOptions {
 }
 
 export const getCommand = new Command()
-  .description('Get details about a specific signing key')
+  .description('Get details about a signing key (private key is not returned)')
   .arguments('<signing-key-id:string>')
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: GetOptions, signingKeyId: string) => {
@@ -50,7 +50,9 @@ export const getCommand = new Command()
             `Status: Active in environment${activeEnvironments.length > 1 ? 's' : ''} '${activeEnvironments.join("', '")}'`,
           );
         } else {
-          console.log('Status: Not configured in any local environment');
+          console.log(
+            "Status: Not configured in any local environment. Run 'mux signing-keys create' to configure one.",
+          );
         }
       }
     } catch (error) {

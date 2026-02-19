@@ -11,7 +11,9 @@ interface UpdateOptions {
 }
 
 export const updateCommand = new Command()
-  .description('Update a Mux video asset')
+  .description(
+    'Update metadata fields on a Mux video asset (title, passthrough, etc.)',
+  )
   .arguments('<asset-id:string>')
   .option('--title <title:string>', 'Set meta.title (max 512 characters)')
   .option(

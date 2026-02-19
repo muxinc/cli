@@ -5,7 +5,9 @@ import { getCommand } from './get.ts';
 import { listCommand } from './list.ts';
 
 export const signingKeysCommand = new Command()
-  .description('Manage signing keys for secure playback')
+  .description(
+    'Manage signing keys (required to generate signed URLs for assets with "signed" playback policy)',
+  )
   .action(function () {
     this.showHelp();
   })

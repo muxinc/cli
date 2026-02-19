@@ -7,7 +7,9 @@ interface ListOptions {
 }
 
 export const listCommand = new Command()
-  .description('List all signing keys')
+  .description(
+    'List all signing keys (private keys are not returned; only available at creation)',
+  )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: ListOptions) => {
     try {
@@ -55,7 +57,9 @@ export const listCommand = new Command()
         }
 
         if (!hasKeys) {
-          console.log('  No signing keys found');
+          console.log(
+            "  No signing keys found. Run 'mux signing-keys create' to generate one.",
+          );
         }
       }
     } catch (error) {

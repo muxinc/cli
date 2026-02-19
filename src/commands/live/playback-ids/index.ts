@@ -4,7 +4,9 @@ import { deleteCommand } from './delete.ts';
 import { listCommand } from './list.ts';
 
 export const playbackIdsCommand = new Command()
-  .description('Manage playback IDs for Mux live streams')
+  .description(
+    'Manage playback IDs (unique identifiers used in stream.mux.com URLs) for live streams',
+  )
   .action(function () {
     this.showHelp();
   })

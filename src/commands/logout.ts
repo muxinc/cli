@@ -6,7 +6,7 @@ import {
 } from '../lib/config.ts';
 
 export const logoutCommand = new Command()
-  .description('Remove credentials for an environment')
+  .description('Remove stored credentials for an environment by name')
   .arguments('<name:string>')
   .action(async (_options, name: string) => {
     // Check if environment exists

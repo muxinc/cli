@@ -9,7 +9,9 @@ import { staticRenditionsCommand } from './static-renditions/index.ts';
 import { updateCommand } from './update.ts';
 
 export const assetsCommand = new Command()
-  .description('Manage Mux video assets')
+  .description(
+    'Manage Mux video assets (uploaded or ingested videos ready for streaming)',
+  )
   .action(function () {
     this.showHelp();
   })

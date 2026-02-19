@@ -55,10 +55,12 @@ export async function parseEnvFile(filePath: string): Promise<EnvVars> {
 }
 
 export const loginCommand = new Command()
-  .description('Login to Mux and save credentials')
+  .description(
+    'Authenticate with Mux API credentials (Token ID and Secret from dashboard.mux.com)',
+  )
   .option(
     '-f, --env-file <path:string>',
-    'Path to .env file containing credentials',
+    'Path to .env file containing MUX_TOKEN_ID and MUX_TOKEN_SECRET',
   )
   .option(
     '-n, --name <name:string>',
@@ -85,7 +87,8 @@ export const loginCommand = new Command()
 
       if (!envVars.MUX_TOKEN_ID || !envVars.MUX_TOKEN_SECRET) {
         throw new Error(
-          'Missing required variables in .env file. Expected: MUX_TOKEN_ID and MUX_TOKEN_SECRET',
+          'Missing required variables in .env file. Expected: MUX_TOKEN_ID and MUX_TOKEN_SECRET.\n' +
+            'Generate API credentials here: https://dashboard.mux.com/settings/access-tokens',
         );
       }
 
@@ -93,7 +96,10 @@ export const loginCommand = new Command()
       tokenSecret = envVars.MUX_TOKEN_SECRET;
     } else {
       // Interactive prompts
-      console.log('Enter your Mux API credentials:');
+      console.log('Enter your Mux API credentials.');
+      console.log(
+        'Get your Token ID and Secret from https://dashboard.mux.com/settings/access-tokens\n',
+      );
 
       tokenId = await inputPrompt({ message: 'Mux Token ID:' });
       if (!tokenId.trim()) {

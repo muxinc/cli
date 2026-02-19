@@ -46,11 +46,11 @@ export const createCommand = new Command()
   )
   .option(
     '-p, --passthrough <passthrough:string>',
-    'Custom metadata for the rendition (max 255 characters)',
+    'Arbitrary metadata stored on rendition and returned in API responses (max 255 chars)',
   )
   .option(
     '-w, --wait',
-    'Wait for the rendition to be ready instead of returning immediately',
+    'Wait for the rendition to be ready (polls up to 10 minutes, exits with error on timeout)',
   )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: CreateOptions, assetId: string) => {

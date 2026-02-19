@@ -24,7 +24,10 @@ export const listCommand = new Command()
   .option('--page <number:number>', 'Page number for pagination', {
     default: 1,
   })
-  .option('--upload-id <id:string>', 'Filter by upload ID')
+  .option(
+    '--upload-id <id:string>',
+    'Filter by upload ID (returned from mux assets create --upload)',
+  )
   .option('--live-stream-id <id:string>', 'Filter by live stream ID')
   .option('--json', 'Output JSON instead of pretty format')
   .option('--compact', 'Output one line per asset (grep-friendly)')

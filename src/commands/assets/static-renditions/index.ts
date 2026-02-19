@@ -4,7 +4,9 @@ import { deleteCommand } from './delete.ts';
 import { listCommand } from './list.ts';
 
 export const staticRenditionsCommand = new Command()
-  .description('Manage static renditions (MP4s) for Mux video assets')
+  .description(
+    'Manage static renditions (downloadable MP4 files) for Mux video assets',
+  )
   .action(function () {
     this.showHelp();
   })
