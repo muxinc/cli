@@ -27,7 +27,10 @@ export const listCommand = new Command()
         console.log(JSON.stringify(output, null, 2));
       } else {
         if (playbackIds.length === 0) {
-          console.log(`No playback IDs found for live stream ${liveStreamId}`);
+          console.log(`No playback IDs found for live stream ${liveStreamId}.`);
+          console.log(
+            `Run 'mux live playback-ids create ${liveStreamId}' to add one.`,
+          );
           return;
         }
 

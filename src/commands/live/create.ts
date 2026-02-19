@@ -9,7 +9,9 @@ type LatencyMode = NonNullable<
 type PlaybackPolicy = Mux.PlaybackPolicy;
 
 export const createCommand = new Command()
-  .description('Create a new Mux live stream')
+  .description(
+    'Create a Mux live stream, returning stream key and RTMP URL for broadcasting',
+  )
   .option(
     '-p, --playback-policy <policy:string>',
     'Playback policy (public or signed). Can be specified multiple times.',
@@ -17,15 +19,15 @@ export const createCommand = new Command()
   )
   .option(
     '--new-asset-settings <mode:string>',
-    'Automatically create an asset from this live stream (none, or JSON string with settings)',
+    'Record live stream to asset: "none" to disable, or JSON with playback_policies, passthrough, etc.',
   )
   .option(
     '--reconnect-window <seconds:number>',
-    'Time in seconds a stream can be disconnected before being considered finished',
+    'Seconds a stream can be disconnected before finishing (0-1800, default: 60)',
   )
   .option(
     '--latency-mode <mode:string>',
-    'Latency mode: low or standard (default: low)',
+    'Latency mode: low, standard, or reduced (default: low)',
   )
   .option('--test', 'Create test live stream (deleted after 24h)')
   .option('--json', 'Output JSON instead of pretty format')

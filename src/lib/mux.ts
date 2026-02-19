@@ -50,7 +50,8 @@ export async function validateCredentials(
       ) {
         return {
           valid: false,
-          error: 'Invalid credentials. Please check your Token ID and Secret.',
+          error:
+            'Invalid credentials. Verify your Token ID and Secret here: https://dashboard.mux.com/settings/access-tokens',
         };
       }
 

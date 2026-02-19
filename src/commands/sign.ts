@@ -79,28 +79,45 @@ function buildParams(
 }
 
 export const signCommand = new Command()
-  .description('Sign a playback ID for secure video playback')
+  .description(
+    'Sign a playback ID, returning a JWT token and signed playback URL',
+  )
   .arguments('<playback-id:string>')
-  .option('-e, --expiration <duration:string>', 'Token expiration duration', {
-    default: '7d',
-  })
-  .option('-t, --type <type:string>', 'Token type', {
-    default: 'video',
-    value: (value: string): string => {
-      if (!isValidTokenType(value)) {
-        throw new Error(
-          `Invalid type: ${value}. Must be one of: ${VALID_TYPES.join(', ')}`,
-        );
-      }
-      return value;
+  .option(
+    '-e, --expiration <duration:string>',
+    'Token expiration (e.g., 1h, 7d, 30d). Supports s/m/h/d suffixes.',
+    {
+      default: '7d',
     },
-  })
-  .option('-p, --param <param:string>', 'JWT claim as key=value (repeatable)', {
-    collect: true,
-  })
+  )
+  .option(
+    '-t, --type <type:string>',
+    'Token type: video, thumbnail, gif, or storyboard',
+    {
+      default: 'video',
+      value: (value: string): string => {
+        if (!isValidTokenType(value)) {
+          throw new Error(
+            `Invalid type: ${value}. Must be one of: ${VALID_TYPES.join(', ')}`,
+          );
+        }
+        return value;
+      },
+    },
+  )
+  .option(
+    '-p, --param <param:string>',
+    'JWT claim as key=value (repeatable). Common: aud, sub, kid.',
+    {
+      collect: true,
+    },
+  )
   .option('--params-json <json:string>', 'JWT claims as a JSON object')
   .option('--json', 'Output JSON instead of pretty format')
-  .option('--token-only', 'Output only the JWT token')
+  .option(
+    '--token-only',
+    'Output only the JWT token (for custom URL construction)',
+  )
   .action(async (options: SignOptions, playbackId: string) => {
     try {
       // Get current environment to retrieve signing keys

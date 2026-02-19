@@ -9,7 +9,7 @@ interface CreateOptions {
 
 export const createCommand = new Command()
   .description(
-    'Create a new signing key and save it to the current environment',
+    'Create a signing key and save to current environment (private key only available at creation)',
   )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: CreateOptions) => {

@@ -8,7 +8,7 @@ interface DeleteOptions {
 }
 
 export const deleteCommand = new Command()
-  .description('Delete a Mux live stream')
+  .description('Permanently delete a Mux live stream (cannot be undone)')
   .arguments('<stream-id:string>')
   .option('-f, --force', 'Skip confirmation prompt')
   .option('--json', 'Output JSON instead of pretty format')

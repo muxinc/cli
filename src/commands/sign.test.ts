@@ -37,7 +37,7 @@ describe('mux sign command', () => {
   describe('Command metadata', () => {
     test('has correct command description', () => {
       expect(signCommand.getDescription()).toBe(
-        'Sign a playback ID for secure video playback',
+        'Sign a playback ID, returning a JWT token and signed playback URL',
       );
     });
 

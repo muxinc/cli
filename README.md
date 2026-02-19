@@ -2,6 +2,47 @@
 
 A command-line interface for interacting with the Mux API, designed to provide a first-class development experience for working with Mux services locally.
 
+## Table of Contents
+
+- [Installation](#installation)
+  - [Install via npm](#install-via-npm)
+  - [Shell installer](#shell-installer)
+  - [Download the binary](#download-the-binary)
+- [Getting Started](#getting-started)
+  - [Authentication](#authentication)
+- [Commands](#commands)
+  - [Asset Management](#asset-management)
+    - [Create Assets](#mux-assets-create)
+    - [List Assets](#mux-assets-list)
+    - [Get Asset](#mux-assets-get-asset-id)
+    - [Update Asset](#mux-assets-update-asset-id)
+    - [Delete Asset](#mux-assets-delete-asset-id)
+    - [Interactive Management](#mux-assets-manage)
+    - [Playback ID Management](#playback-id-management)
+    - [Static Renditions Management](#static-renditions-management)
+  - [Live Stream Management](#live-stream-management)
+    - [Create Live Stream](#mux-live-create)
+    - [List Live Streams](#mux-live-list)
+    - [Get Live Stream](#mux-live-get-stream-id)
+    - [Delete Live Stream](#mux-live-delete-stream-id)
+    - [Playback ID Management (Live)](#playback-id-management-1)
+  - [Playback ID Lookup](#playback-id-lookup)
+  - [Signing Keys & Secure Playback](#signing-keys--secure-playback)
+    - [Create Signing Key](#mux-signing-keys-create)
+    - [List Signing Keys](#mux-signing-keys-list)
+    - [Get Signing Key](#mux-signing-keys-get-key-id)
+    - [Delete Signing Key](#mux-signing-keys-delete-key-id)
+    - [Sign Playback ID](#mux-sign-playback-id)
+  - [Authentication & Environment Management](#authentication--environment-management)
+- [Configuration](#configuration)
+- [Development](#development)
+  - [Prerequisites](#prerequisites)
+  - [Setup](#setup)
+  - [Testing](#testing)
+  - [Project Structure](#project-structure)
+- [License](#license)
+- [Support](#support)
+
 ## Installation
 
 ### Install via npm

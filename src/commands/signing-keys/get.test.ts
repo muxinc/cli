@@ -37,7 +37,7 @@ describe('mux signing-keys get command', () => {
   describe('Command metadata', () => {
     test('has correct command description', () => {
       expect(getCommand.getDescription()).toBe(
-        'Get details about a specific signing key',
+        'Get details about a signing key (private key is not returned)',
       );
     });
 

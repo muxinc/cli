@@ -2,7 +2,9 @@ import { Command } from '@cliffy/command';
 import { getEnvironment, setDefaultEnvironment } from '../../lib/config.ts';
 
 export const switchCommand = new Command()
-  .description('Switch the default environment')
+  .description(
+    'Switch the default environment (used by all subsequent mux commands)',
+  )
   .arguments('<name:string>')
   .action(async (_options, name: string) => {
     // Check if environment exists
