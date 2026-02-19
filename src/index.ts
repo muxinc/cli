@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from '@cliffy/command';
+import { CompletionsCommand } from '@cliffy/command/completions';
 import pkg from '../package.json';
 import { assetsCommand } from './commands/assets/index.ts';
 import { envCommand } from './commands/env/index.ts';
@@ -28,7 +29,8 @@ const cli = new Command()
   .command('live', liveCommand)
   .command('playback-ids', playbackIdsCommand)
   .command('signing-keys', signingKeysCommand)
-  .command('sign', signCommand);
+  .command('sign', signCommand)
+  .command('completions', new CompletionsCommand());
 
 // Run the CLI
 if (import.meta.main) {

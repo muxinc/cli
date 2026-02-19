@@ -50,6 +50,27 @@ sudo mv mux /usr/local/bin/
 
 The binary is self-contained and has no dependencies.
 
+## Shell Completions
+
+Enable tab completion for commands, subcommands, and options in your shell:
+
+**Bash** (add to `~/.bashrc`):
+```bash
+source <(mux completions bash)
+```
+
+**Zsh** (add to `~/.zshrc`):
+```bash
+source <(mux completions zsh)
+```
+
+**Fish** (add to `~/.config/fish/config.fish`):
+```fish
+source (mux completions fish | psub)
+```
+
+Restart your shell or source the config file to activate completions.
+
 ## Getting Started
 
 ### Authentication
