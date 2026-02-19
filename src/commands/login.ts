@@ -60,7 +60,7 @@ export const loginCommand = new Command()
   )
   .option(
     '-f, --env-file <path:string>',
-    'Path to .env file containing MUX_TOKEN_ID and MUX_TOKEN_SECRET',
+    'Path to .env file containing MUX_TOKEN_ID, MUX_TOKEN_SECRET, and optionally MUX_SIGNING_KEY and MUX_PRIVATE_KEY for signed URLs',
   )
   .option(
     '-n, --name <name:string>',

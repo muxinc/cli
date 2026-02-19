@@ -317,7 +317,7 @@ export const createCommand = new Command()
   )
   .option(
     '--video-quality <quality:string>',
-    'Video quality: basic (720p max), plus (1080p, better encoding), or premium (4K, best quality)',
+    'Video quality level: basic, plus, or premium (all support up to 4K). See https://mux.com/docs/guides/use-video-quality-levels',
     {
       value: (value: string): string => {
         const validQualities = ['basic', 'plus', 'premium'];
