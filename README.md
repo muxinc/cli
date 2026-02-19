@@ -24,15 +24,34 @@ A command-line interface for interacting with the Mux API, designed to provide a
     - [Create Live Stream](#mux-live-create)
     - [List Live Streams](#mux-live-list)
     - [Get Live Stream](#mux-live-get-stream-id)
+    - [Update Live Stream](#mux-live-update-stream-id)
     - [Delete Live Stream](#mux-live-delete-stream-id)
+    - [Complete, Enable, Disable](#mux-live-complete-stream-id)
+    - [Reset Stream Key](#mux-live-reset-stream-key-stream-id)
+    - [Simulcast Targets](#simulcast-targets)
+    - [Embedded & Generated Subtitles](#embedded--generated-subtitles)
+    - [New Asset Static Renditions](#new-asset-static-renditions)
     - [Playback ID Management (Live)](#playback-id-management-1)
+  - [Uploads](#uploads)
   - [Playback ID Lookup](#playback-id-lookup)
+  - [Playback Restrictions](#playback-restrictions)
   - [Signing Keys & Secure Playback](#signing-keys--secure-playback)
     - [Create Signing Key](#mux-signing-keys-create)
     - [List Signing Keys](#mux-signing-keys-list)
     - [Get Signing Key](#mux-signing-keys-get-key-id)
     - [Delete Signing Key](#mux-signing-keys-delete-key-id)
     - [Sign Playback ID](#mux-sign-playback-id)
+  - [Transcription Vocabularies](#transcription-vocabularies)
+  - [Delivery Usage](#delivery-usage)
+  - [Mux Data](#mux-data)
+    - [Video Views](#video-views)
+    - [Metrics](#metrics)
+    - [Monitoring](#monitoring)
+    - [Incidents](#incidents)
+    - [Annotations](#annotations)
+    - [Dimensions](#dimensions)
+    - [Errors](#errors)
+    - [Exports](#exports)
   - [Authentication & Environment Management](#authentication--environment-management)
 - [Configuration](#configuration)
 - [Development](#development)
@@ -688,6 +707,75 @@ Are you sure you want to delete static rendition rendition123? (y/n): y
 Static rendition rendition123 deleted from asset abc123xyz
 ```
 
+#### `mux assets input-info <asset-id>`
+
+Retrieve input info for an asset, including file details, tracks, and encoding settings.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux assets input-info abc123xyz
+```
+
+#### `mux assets update-master-access <asset-id>`
+
+Update master access settings for an asset. When set to `temporary`, a master copy of the asset is available for download.
+
+**Arguments:**
+- `<asset-id>` - The ID of the asset
+
+**Options:**
+- `--master-access <setting>` - Master access setting: `temporary` or `none` (required)
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux assets update-master-access abc123xyz --master-access temporary
+```
+
+#### Track Management
+
+Manage text and audio tracks (subtitles, captions, audio) on video assets.
+
+##### `mux assets tracks create <asset-id>`
+
+Add a text or audio track to an asset.
+
+**Options:**
+- `--url <url>` - URL of the track file (required)
+- `--type <type>` - Track type: `text` or `audio` (required)
+- `--language-code <code>` - BCP 47 language code, e.g., `en-US` (required)
+- `--name <name>` - Human-readable name for the track
+- `--text-type <type>` - Text track type: `subtitles` or `captions`
+- `--closed-captions` - Indicates the track provides SDH (Subtitles for the Deaf or Hard-of-hearing)
+- `--passthrough <string>` - Passthrough metadata (max 255 characters)
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux assets tracks create abc123xyz --url https://example.com/subs.vtt --type text --language-code en --text-type subtitles
+```
+
+##### `mux assets tracks delete <asset-id> <track-id>`
+
+Delete a track from an asset. Supports `-f, --force` and `--json`.
+
+##### `mux assets tracks generate-subtitles <asset-id> <track-id>`
+
+Generate subtitles for an audio track using automatic speech recognition.
+
+**Options:**
+- `--language-code <code>` - Language for subtitles (default: `en`)
+- `--name <name>` - Name for the subtitle track
+- `--passthrough <string>` - Passthrough metadata
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux assets tracks generate-subtitles abc123xyz track456 --language-code en --name "English (auto)"
+```
+
 ### Live Stream Management
 
 #### `mux live create`
@@ -836,6 +924,33 @@ New Asset Settings:
 WARNING: This is a test stream (will be deleted after 24 hours)
 ```
 
+#### `mux live update <stream-id>`
+
+Update configuration on a live stream. At least one option must be provided.
+
+**Arguments:**
+- `<stream-id>` - The ID of the live stream to update
+
+**Options:**
+- `--latency-mode <mode>` - Latency mode: `low`, `reduced`, or `standard`
+- `--reconnect-window <seconds>` - Reconnect window in seconds (0-1800)
+- `--max-continuous-duration <seconds>` - Max continuous duration in seconds (60-43200)
+- `--passthrough <string>` - Passthrough metadata (max 255 characters)
+- `--reconnect-slate-url <url>` - URL of image to display during reconnect
+- `--use-slate-for-standard-latency` - Display slate during reconnect for standard latency streams
+- `--title <string>` - Title for the live stream
+- `--json` - Output JSON instead of pretty format
+
+**Examples:**
+
+```bash
+# Update latency mode
+mux live update abc123xyz --latency-mode standard
+
+# Update multiple settings
+mux live update abc123xyz --reconnect-window 300 --title "My Stream"
+```
+
 #### `mux live delete <stream-id>`
 
 Delete a live stream permanently.
@@ -862,12 +977,123 @@ mux live delete abc123xyz --json --force
 
 **Important:** When using `--json` output mode, you must also provide the `--force` flag. This safety feature prevents accidental deletions in automated scripts.
 
-**Output:**
+#### `mux live complete <stream-id>`
 
+Signal that a live stream has ended and Mux should complete the recording.
+
+```bash
+mux live complete abc123xyz
 ```
-Are you sure you want to delete live stream abc123xyz? (y/n): y
-Live stream abc123xyz deleted successfully
+
+#### `mux live enable <stream-id>`
+
+Enable a disabled live stream, allowing it to accept new connections.
+
+```bash
+mux live enable abc123xyz
 ```
+
+#### `mux live disable <stream-id>`
+
+Disable a live stream, preventing it from accepting new connections.
+
+```bash
+mux live disable abc123xyz
+```
+
+All three commands support `--json` for JSON output.
+
+#### `mux live reset-stream-key <stream-id>`
+
+Reset the stream key for a live stream. This invalidates the current key.
+
+**Options:**
+- `-f, --force` - Skip confirmation prompt (required with `--json`)
+- `--json` - Output JSON instead of pretty format
+
+```bash
+# Reset with confirmation
+mux live reset-stream-key abc123xyz
+
+# Reset without confirmation
+mux live reset-stream-key abc123xyz --force
+```
+
+#### Simulcast Targets
+
+Manage simulcast targets to restream a live stream to third-party platforms (e.g., YouTube, Twitch).
+
+##### `mux live simulcast-targets create <stream-id>`
+
+**Options:**
+- `--url <url>` - RTMP URL to simulcast to (required)
+- `--stream-key <key>` - Stream key for the simulcast target
+- `--passthrough <string>` - Passthrough metadata (max 255 characters)
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux live simulcast-targets create abc123xyz --url rtmp://live.twitch.tv/app --stream-key live_xxxxx
+```
+
+##### `mux live simulcast-targets get <stream-id> <target-id>`
+
+Get details about a simulcast target. Supports `--json`.
+
+##### `mux live simulcast-targets delete <stream-id> <target-id>`
+
+Delete a simulcast target. Supports `-f, --force` and `--json`.
+
+#### Embedded & Generated Subtitles
+
+##### `mux live update-embedded-subtitles <stream-id>`
+
+Update embedded subtitle (CEA-608) configuration for a live stream.
+
+**Options:**
+- `--language-channel <channel>` - Caption channel: `cc1`, `cc2`, `cc3`, or `cc4`
+- `--language-code <code>` - BCP 47 language code
+- `--name <name>` - Name for the caption track
+- `--passthrough <string>` - Passthrough metadata
+- `--clear` - Remove all embedded subtitle configuration
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux live update-embedded-subtitles abc123xyz --language-channel cc1 --language-code en --name "English CC"
+```
+
+##### `mux live update-generated-subtitles <stream-id>`
+
+Update generated subtitle (ASR) configuration for a live stream.
+
+**Options:**
+- `--language-code <code>` - Language for generated subtitles (e.g., `en`, `es`, `fr`)
+- `--name <name>` - Name for the subtitle track
+- `--passthrough <string>` - Passthrough metadata
+- `--transcription-vocabulary-ids <id>` - Transcription vocabulary IDs (can be specified multiple times)
+- `--clear` - Remove all generated subtitle configuration
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux live update-generated-subtitles abc123xyz --language-code en --name "English (auto)"
+```
+
+#### New Asset Static Renditions
+
+Configure static rendition settings for assets automatically created from a live stream.
+
+##### `mux live update-new-asset-static-renditions <stream-id>`
+
+**Options:**
+- `--resolution <resolution>` - Resolution for static renditions (required, can be specified multiple times): `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p`
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux live update-new-asset-static-renditions abc123xyz --resolution 1080p --resolution 720p
+```
+
+##### `mux live delete-new-asset-static-renditions <stream-id>`
+
+Delete static rendition settings. Supports `-f, --force` and `--json`.
 
 #### Playback ID Management
 
@@ -1011,6 +1237,96 @@ ID: abc123xyz
 When using `--expand`, the output will be the full asset or live stream object, formatted the same as `mux assets get` or `mux live get` commands.
 
 **Note:** The nested `playback-ids` commands under `assets` and `live` (e.g., `mux assets playback-ids list`) are for managing playback IDs on known resources. This top-level command is for discovering what resource a playback ID belongs to.
+
+### Uploads
+
+Manage direct uploads for client-side video uploading. Direct uploads provide a URL that clients can use to upload video files directly to Mux.
+
+#### `mux uploads create`
+
+Create a new direct upload URL.
+
+**Options:**
+- `--cors-origin <origin>` - Allowed CORS origin for the upload (required)
+- `-p, --playback-policy <policy>` - Playback policy for the created asset: `public` or `signed`
+- `--timeout <seconds>` - Seconds before the upload times out (default: 3600)
+- `--test` - Create a test upload (asset deleted after 24 hours)
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux uploads create --cors-origin "https://example.com" --playback-policy public
+```
+
+#### `mux uploads list`
+
+List direct uploads with pagination.
+
+**Options:**
+- `--limit <number>` - Number of results per page (default: 25)
+- `--page <number>` - Page number (default: 1)
+- `--json` - Output JSON instead of pretty format
+- `--compact` - Compact output format
+
+#### `mux uploads get <upload-id>`
+
+Get details about a specific direct upload. Supports `--json`.
+
+#### `mux uploads cancel <upload-id>`
+
+Cancel a waiting direct upload. Supports `-f, --force` and `--json`.
+
+```bash
+mux uploads cancel abc123xyz --force
+```
+
+### Playback Restrictions
+
+Manage playback restrictions to control where and how your content can be played. Restrictions can limit playback by referrer domain and user agent.
+
+#### `mux playback-restrictions create`
+
+Create a new playback restriction.
+
+**Options:**
+- `--allowed-domains <domain>` - Allowed referrer domains (required, can be specified multiple times)
+- `--allow-no-referrer` - Allow playback when no referrer is sent
+- `--allow-no-user-agent` - Allow playback when no user agent is sent
+- `--allow-high-risk-user-agent` - Allow playback from high-risk user agents
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux playback-restrictions create --allowed-domains "example.com" --allowed-domains "*.example.com"
+```
+
+#### `mux playback-restrictions list`
+
+List playback restrictions. Supports `--limit`, `--page`, `--json`, `--compact`.
+
+#### `mux playback-restrictions get <restriction-id>`
+
+Get details about a playback restriction. Supports `--json`.
+
+#### `mux playback-restrictions delete <restriction-id>`
+
+Delete a playback restriction. Supports `-f, --force` and `--json`.
+
+#### `mux playback-restrictions update-referrer <restriction-id>`
+
+Update the referrer restriction.
+
+**Options:**
+- `--allowed-domains <domain>` - Allowed referrer domains (required, can be specified multiple times)
+- `--allow-no-referrer` - Allow playback when no referrer is sent
+- `--json` - Output JSON instead of pretty format
+
+#### `mux playback-restrictions update-user-agent <restriction-id>`
+
+Update the user agent restriction.
+
+**Options:**
+- `--allow-no-user-agent <boolean>` - Allow playback when no user agent is sent (required)
+- `--allow-high-risk-user-agent <boolean>` - Allow playback from high-risk user agents (required)
+- `--json` - Output JSON instead of pretty format
 
 ### Signing Keys & Secure Playback
 
@@ -1230,6 +1546,311 @@ mux signing-keys create
 
 If no signing keys are configured, the command will provide helpful instructions on how to set one up.
 
+### Transcription Vocabularies
+
+Manage custom transcription vocabularies to improve automatic speech recognition accuracy for domain-specific terms, names, and jargon.
+
+#### `mux transcription-vocabularies create`
+
+Create a new transcription vocabulary.
+
+**Options:**
+- `--phrase <phrase>` - Phrase to include (required, can be specified multiple times)
+- `--name <name>` - Name for the vocabulary
+- `--passthrough <string>` - Passthrough metadata (max 255 characters)
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux transcription-vocabularies create --phrase "Mux" --phrase "HLS" --phrase "RTMP" --name "Streaming Terms"
+```
+
+#### `mux transcription-vocabularies list`
+
+List transcription vocabularies. Supports `--limit`, `--page`, `--json`, `--compact`.
+
+#### `mux transcription-vocabularies get <vocabulary-id>`
+
+Get details about a vocabulary. Supports `--json`.
+
+#### `mux transcription-vocabularies update <vocabulary-id>`
+
+Update a vocabulary. This replaces all existing phrases.
+
+**Options:**
+- `--phrase <phrase>` - Phrase to include (required, can be specified multiple times)
+- `--name <name>` - Name for the vocabulary
+- `--passthrough <string>` - Passthrough metadata
+- `--json` - Output JSON instead of pretty format
+
+#### `mux transcription-vocabularies delete <vocabulary-id>`
+
+Delete a vocabulary. Supports `-f, --force` and `--json`.
+
+### Delivery Usage
+
+View delivery usage reports for video assets and live streams.
+
+#### `mux delivery-usage list`
+
+List delivery usage reports.
+
+**Options:**
+- `--asset-id <id>` - Filter by asset ID
+- `--live-stream-id <id>` - Filter by live stream ID
+- `--timeframe <timeframe>` - Timeframe as Unix epoch timestamps (specify twice for start and end)
+- `--limit <number>` - Number of results per page (default: 25)
+- `--page <number>` - Page number (default: 1)
+- `--json` - Output JSON instead of pretty format
+- `--compact` - Compact output format
+
+```bash
+# List all delivery usage
+mux delivery-usage list
+
+# Filter by asset
+mux delivery-usage list --asset-id abc123xyz
+```
+
+### Mux Data
+
+The following commands interact with the Mux Data API for video analytics, monitoring, and incident tracking.
+
+#### Video Views
+
+##### `mux video-views list`
+
+List video views with filtering and pagination.
+
+**Options:**
+- `--filters <filter>` - Filter results, e.g., `country:US` (can be specified multiple times)
+- `--metric-filters <filter>` - Filter by metric value, e.g., `aggregate_startup_time>=1000` (can be specified multiple times)
+- `--timeframe <timeframe>` - Timeframe as Unix timestamps or duration, e.g., `24:hours` (can be specified multiple times)
+- `--viewer-id <id>` - Filter by viewer ID
+- `--error-id <id>` - Filter by error ID
+- `--order-direction <dir>` - Order direction: `asc` or `desc`
+- `--limit <number>` - Results per page (default: 25)
+- `--page <number>` - Page number (default: 1)
+- `--json` - Output JSON instead of pretty format
+- `--compact` - Compact output format
+
+```bash
+mux video-views list --filters "country:US" --timeframe "24:hours"
+```
+
+##### `mux video-views get <view-id>`
+
+Get details about a specific video view. Supports `--json`.
+
+#### Metrics
+
+##### `mux metrics list`
+
+List available metrics and their values.
+
+**Options:**
+- `--filters`, `--metric-filters`, `--timeframe` - Standard data filters
+- `--dimension <dimension>` - Filter by dimension
+- `--value <value>` - Filter by value
+- `--json` - Output JSON instead of pretty format
+
+##### `mux metrics breakdown <metric-id>`
+
+List breakdown values for a metric, grouped by a dimension.
+
+**Options:**
+- `--group-by <dimension>` - Dimension to group results by
+- `--measurement <type>` - Measurement type: `95th`, `median`, `avg`, `count`, `sum`
+- `--order-by <field>` - Field to order results by
+- `--order-direction <dir>` - Order direction: `asc` or `desc`
+- `--filters`, `--metric-filters`, `--timeframe` - Standard data filters
+- `--limit`, `--page` - Pagination
+- `--json`, `--compact` - Output format
+
+```bash
+mux metrics breakdown aggregate_startup_time --group-by country --measurement median
+```
+
+##### `mux metrics overall <metric-id>`
+
+Get overall metric values.
+
+**Options:**
+- `--measurement <type>` - Measurement type: `95th`, `median`, `avg`, `count`, `sum`
+- `--filters`, `--metric-filters`, `--timeframe` - Standard data filters
+- `--json` - Output JSON instead of pretty format
+
+##### `mux metrics timeseries <metric-id>`
+
+Get metric timeseries data.
+
+**Options:**
+- `--measurement <type>` - Measurement type: `95th`, `median`, `avg`, `count`, `sum`
+- `--group-by <granularity>` - Time granularity: `minute`, `ten_minutes`, `hour`, `day`
+- `--filters`, `--metric-filters`, `--timeframe` - Standard data filters
+- `--json` - Output JSON instead of pretty format
+
+##### `mux metrics insights <metric-id>`
+
+Get metric insights showing factors with negative impact on performance.
+
+**Options:**
+- `--measurement <type>` - Measurement type: `95th`, `median`, `avg`, `count`, `sum`
+- `--filters`, `--metric-filters`, `--timeframe` - Standard data filters
+- `--json` - Output JSON instead of pretty format
+
+#### Monitoring
+
+Real-time monitoring data from Mux Data.
+
+##### `mux monitoring dimensions`
+
+List available monitoring dimensions. Supports `--json`.
+
+##### `mux monitoring metrics`
+
+List available monitoring metrics. Supports `--json`.
+
+##### `mux monitoring breakdown <metric-id>`
+
+Get monitoring breakdown for a metric.
+
+**Options:**
+- `--dimension <dimension>` - Dimension to break down by
+- `--timestamp <timestamp>` - Unix timestamp for the breakdown
+- `--order-by <field>`, `--order-direction <dir>` - Ordering
+- `--filters` - Filter results
+- `--json` - Output JSON instead of pretty format
+
+##### `mux monitoring breakdown-timeseries <metric-id>`
+
+Get monitoring breakdown timeseries for a metric.
+
+**Options:**
+- `--dimension <dimension>` - Dimension to break down by
+- `--limit <number>` - Number of results to return
+- `--order-by <field>`, `--order-direction <dir>` - Ordering
+- `--filters`, `--timeframe` - Data filters
+- `--json` - Output JSON instead of pretty format
+
+##### `mux monitoring histogram-timeseries`
+
+Get monitoring histogram timeseries for video startup time.
+
+**Options:**
+- `--filters` - Filter results
+- `--json` - Output JSON instead of pretty format
+
+##### `mux monitoring timeseries <metric-id>`
+
+Get monitoring timeseries for a metric.
+
+**Options:**
+- `--timestamp <timestamp>` - Unix timestamp
+- `--filters` - Filter results
+- `--json` - Output JSON instead of pretty format
+
+#### Incidents
+
+View and investigate incidents detected by Mux Data.
+
+##### `mux incidents list`
+
+List incidents.
+
+**Options:**
+- `--status <status>` - Filter by status: `open`, `closed`, or `expired`
+- `--severity <severity>` - Filter by severity: `warning` or `alert`
+- `--order-by <field>`, `--order-direction <dir>` - Ordering
+- `--limit`, `--page` - Pagination
+- `--json`, `--compact` - Output format
+
+```bash
+mux incidents list --status open --severity alert
+```
+
+##### `mux incidents get <incident-id>`
+
+Get details about a specific incident. Supports `--json`.
+
+##### `mux incidents related <incident-id>`
+
+List related incidents. Supports `--order-by`, `--order-direction`, `--limit`, `--page`, `--json`, `--compact`.
+
+#### Annotations
+
+Manage annotations in Mux Data to mark significant events (deployments, config changes, etc.) on your analytics timeline.
+
+##### `mux annotations create`
+
+Create a new annotation.
+
+**Options:**
+- `--date <timestamp>` - Unix timestamp for the annotation date (required)
+- `--note <text>` - Note text for the annotation (required)
+- `--sub-property-id <id>` - Sub-property ID to associate
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux annotations create --date 1700000000 --note "Deployed v2.1.0"
+```
+
+##### `mux annotations list`
+
+List annotations. Supports `--timeframe`, `--order-direction`, `--limit`, `--page`, `--json`, `--compact`.
+
+##### `mux annotations get <annotation-id>`
+
+Get details about an annotation. Supports `--json`.
+
+##### `mux annotations update <annotation-id>`
+
+Update an annotation.
+
+**Options:**
+- `--date <timestamp>` - Unix timestamp (required)
+- `--note <text>` - Note text (required)
+- `--sub-property-id <id>` - Sub-property ID
+- `--json` - Output JSON instead of pretty format
+
+##### `mux annotations delete <annotation-id>`
+
+Delete an annotation. Supports `-f, --force` and `--json`.
+
+#### Dimensions
+
+##### `mux dimensions list`
+
+List available dimensions from Mux Data. Returns both basic and advanced dimensions. Supports `--json`.
+
+##### `mux dimensions values <dimension-id>`
+
+List values for a specific dimension.
+
+**Options:**
+- `--filters`, `--metric-filters`, `--timeframe` - Standard data filters
+- `--limit`, `--page` - Pagination
+- `--json`, `--compact` - Output format
+
+```bash
+mux dimensions values country --timeframe "24:hours"
+```
+
+#### Errors
+
+##### `mux errors list`
+
+List errors from Mux Data.
+
+**Options:**
+- `--filters`, `--metric-filters`, `--timeframe` - Standard data filters
+- `--json`, `--compact` - Output format
+
+#### Exports
+
+##### `mux exports list`
+
+List video view export files from Mux Data. Returns download URLs for export files. Supports `--json`.
+
 ### Authentication & Environment Management
 
 #### `mux login`
@@ -1367,64 +1988,51 @@ bun test --watch
 
 ```
 src/
-├── commands/                 # CLI command definitions
-│   ├── assets/              # Asset management commands
-│   │   ├── manage/          # Interactive TUI for asset management
-│   │   │   ├── index.ts     # TUI command entry point
-│   │   │   └── AssetManageApp.tsx  # Main TUI application
-│   │   ├── playback-ids/    # Playback ID commands for assets
-│   │   │   ├── index.ts     # Main playback-ids command
-│   │   │   ├── create.ts    # Create playback IDs
-│   │   │   ├── list.ts      # List playback IDs
-│   │   │   └── delete.ts    # Delete playback IDs
-│   │   ├── index.ts         # Main assets command
-│   │   ├── create.ts        # Create assets
-│   │   ├── list.ts          # List assets
-│   │   ├── get.ts           # Get asset details
-│   │   ├── update.ts        # Update asset metadata
-│   │   └── delete.ts        # Delete assets
-│   ├── live/                # Live stream management commands
-│   │   ├── playback-ids/    # Playback ID commands for live streams
-│   │   │   ├── index.ts     # Main playback-ids command
-│   │   │   ├── create.ts    # Create playback IDs
-│   │   │   ├── list.ts      # List playback IDs
-│   │   │   └── delete.ts    # Delete playback IDs
-│   │   ├── index.ts         # Main live command
-│   │   ├── create.ts        # Create live streams
-│   │   ├── list.ts          # List live streams
-│   │   ├── get.ts           # Get live stream details
-│   │   └── delete.ts        # Delete live streams
-│   ├── signing-keys/        # Signing key management commands
-│   │   ├── index.ts         # Main signing-keys command
-│   │   ├── create.ts        # Create signing keys
-│   │   ├── list.ts          # List signing keys
-│   │   ├── get.ts           # Get signing key details
-│   │   └── delete.ts        # Delete signing keys
-│   ├── env/                 # Environment management commands
-│   │   ├── index.ts         # Main env command
-│   │   ├── list.ts          # List environments
-│   │   └── switch.ts        # Switch default environment
-│   ├── login.ts             # Login command
-│   ├── logout.ts            # Logout command
-│   └── sign.ts              # Sign playback IDs command
-├── lib/                     # Shared libraries
-│   ├── tui/                 # Reusable TUI components
-│   │   ├── index.ts         # TUI exports
-│   │   ├── renderer.tsx     # OpenTUI renderer setup
-│   │   ├── SelectList.tsx   # Reusable selection list component
-│   │   ├── ActionMenu.tsx   # Reusable action menu component
-│   │   ├── ConfirmDialog.tsx # Reusable confirmation dialog
-│   │   └── clipboard.ts     # Clipboard utilities
-│   ├── config.ts            # Configuration management
-│   ├── formatters.ts        # Shared output formatting (timestamps, durations, statuses)
-│   ├── mux.ts               # Mux API integration and auth helpers
-│   ├── json-config.ts       # JSON configuration parsing
-│   ├── file-upload.ts       # File upload utilities
-│   ├── urls.ts              # URL generation (stream, player, thumbnail, gif, storyboard)
-│   ├── signing.ts           # JWT signing utilities
-│   ├── playback-ids.ts      # Playback ID operations
-│   └── xdg.ts               # XDG base directory support
-└── index.ts                 # CLI entry point
+├── commands/                          # CLI command definitions
+│   ├── assets/                       # Asset management
+│   │   ├── manage/                   # Interactive TUI
+│   │   ├── playback-ids/             # Playback ID sub-resource
+│   │   ├── static-renditions/        # Static rendition sub-resource
+│   │   ├── tracks/                   # Track management (subtitles, audio)
+│   │   ├── create.ts, list.ts, get.ts, update.ts, delete.ts
+│   │   ├── input-info.ts             # Retrieve input info
+│   │   └── update-master-access.ts   # Update master access settings
+│   ├── live/                         # Live stream management
+│   │   ├── playback-ids/             # Playback ID sub-resource
+│   │   ├── simulcast-targets/        # Simulcast target sub-resource
+│   │   ├── create.ts, list.ts, get.ts, update.ts, delete.ts
+│   │   ├── complete.ts, enable.ts, disable.ts
+│   │   ├── reset-stream-key.ts
+│   │   ├── update-embedded-subtitles.ts
+│   │   ├── update-generated-subtitles.ts
+│   │   ├── update-new-asset-static-renditions.ts
+│   │   └── delete-new-asset-static-renditions.ts
+│   ├── uploads/                      # Direct upload management
+│   ├── playback-restrictions/        # Playback restriction management
+│   ├── transcription-vocabularies/   # Transcription vocabulary management
+│   ├── delivery-usage/               # Delivery usage reports
+│   ├── signing-keys/                 # Signing key management
+│   ├── video-views/                  # Mux Data: video view analytics
+│   ├── metrics/                      # Mux Data: metric analytics
+│   ├── monitoring/                   # Mux Data: real-time monitoring
+│   ├── incidents/                    # Mux Data: incident tracking
+│   ├── annotations/                  # Mux Data: annotation management
+│   ├── dimensions/                   # Mux Data: dimension queries
+│   ├── errors/                       # Mux Data: error analytics
+│   ├── exports/                      # Mux Data: export files
+│   ├── env/                          # Environment management
+│   ├── login.ts, logout.ts, sign.ts  # Auth & signing commands
+│   └── playback-ids.ts               # Playback ID lookup
+├── lib/                              # Shared libraries
+│   ├── tui/                          # Reusable TUI components
+│   ├── config.ts                     # Configuration management
+│   ├── formatters.ts                 # Output formatting
+│   ├── data-filters.ts               # Mux Data filter utilities
+│   ├── mux.ts                        # Mux API client
+│   ├── urls.ts                       # URL generation
+│   ├── signing.ts                    # JWT signing
+│   └── ...                           # Other utilities
+└── index.ts                          # CLI entry point
 ```
 
 ## License
