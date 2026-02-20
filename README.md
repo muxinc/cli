@@ -27,16 +27,22 @@ A command-line interface for interacting with the Mux API, designed to provide a
 
 ## Installation
 
+### Homebrew (macOS)
+
+```bash
+brew install muxinc/tap/mux
+```
+
 ### Install via npm
 
 ```bash
-npm install -g @mux/cli@beta
+npm install -g @mux/cli
 ```
 
 Or run directly with npx:
 
 ```bash
-npx @mux/cli@beta
+npx @mux/cli
 ```
 
 ### Shell installer
