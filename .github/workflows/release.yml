@@ -95,11 +95,11 @@ jobs:
           app-id: ${{ secrets.HOMEBREW_APP_ID }}
           private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}
           owner: muxinc
-          repositories: homebrew-tap
+          repositories: tap
 
       - uses: actions/checkout@v4
         with:
-          repository: muxinc/homebrew-tap
+          repository: muxinc/tap
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Generate formula
