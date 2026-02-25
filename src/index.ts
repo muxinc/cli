@@ -23,6 +23,7 @@ import { signingKeysCommand } from './commands/signing-keys/index.ts';
 import { transcriptionVocabulariesCommand } from './commands/transcription-vocabularies/index.ts';
 import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
+import { checkForUpdate } from './lib/update-notifier.ts';
 
 const VERSION = pkg.version;
 
@@ -60,6 +61,8 @@ const cli = new Command()
 
 // Run the CLI
 if (import.meta.main) {
+  const updateCheck = checkForUpdate(VERSION).catch(() => null);
+
   try {
     await cli.parse(Bun.argv.slice(2));
   } catch (error) {
@@ -70,6 +73,9 @@ if (import.meta.main) {
     }
     process.exit(1);
   }
+
+  const notice = await updateCheck;
+  if (notice) console.error(notice);
 }
 
 export { cli };
