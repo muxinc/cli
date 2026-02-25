@@ -1,8 +1,13 @@
 import Mux from '@mux/mux-node';
 import pkg from '../../package.json';
 import { getDefaultEnvironment } from './config.ts';
+import { isAgentMode } from './context.ts';
 
-const USER_AGENT = `Mux CLI/${pkg.version}`;
+function getUserAgent(): string {
+  return isAgentMode()
+    ? `Mux CLI (agent)/${pkg.version}`
+    : `Mux CLI/${pkg.version}`;
+}
 
 /**
  * Create an authenticated Mux client using stored credentials
@@ -17,7 +22,7 @@ export async function createAuthenticatedMuxClient(): Promise<Mux> {
   return new Mux({
     tokenId: env.environment.tokenId,
     tokenSecret: env.environment.tokenSecret,
-    defaultHeaders: { 'User-Agent': USER_AGENT },
+    defaultHeaders: { 'User-Agent': getUserAgent() },
   });
 }
 
@@ -34,7 +39,7 @@ export async function validateCredentials(
     const mux = new Mux({
       tokenId,
       tokenSecret,
-      defaultHeaders: { 'User-Agent': USER_AGENT },
+      defaultHeaders: { 'User-Agent': getUserAgent() },
     });
 
     // Make a simple API call to verify credentials
