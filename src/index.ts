@@ -23,8 +23,8 @@ import { signingKeysCommand } from './commands/signing-keys/index.ts';
 import { transcriptionVocabulariesCommand } from './commands/transcription-vocabularies/index.ts';
 import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
-import { checkForUpdate } from './lib/update-notifier.ts';
 import { setAgentMode } from './lib/context.ts';
+import { checkForUpdate } from './lib/update-notifier.ts';
 
 const VERSION = pkg.version;
 
