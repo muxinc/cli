@@ -23,14 +23,39 @@ import { signingKeysCommand } from './commands/signing-keys/index.ts';
 import { transcriptionVocabulariesCommand } from './commands/transcription-vocabularies/index.ts';
 import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
+import { setAgentMode } from './lib/context.ts';
 
 const VERSION = pkg.version;
+
+/**
+ * Preprocess argv to handle --agent flag before Cliffy parses it.
+ * Strips --agent from args, enables agent mode, and injects --json.
+ */
+function preprocessArgs(argv: string[]): string[] {
+  const agentIndex = argv.indexOf('--agent');
+  if (agentIndex === -1) {
+    return argv;
+  }
+
+  setAgentMode(true);
+  const args = argv.filter((_, i) => i !== agentIndex);
+
+  if (!args.includes('--json')) {
+    args.push('--json');
+  }
+
+  return args;
+}
 
 // Main CLI command
 const cli = new Command()
   .name('mux')
   .version(VERSION)
   .description('Official Mux CLI for interacting with Mux APIs')
+  .globalOption(
+    '--agent',
+    'Agent mode: uses JSON output and identifies as an agent in User-Agent header.',
+  )
   .action(function () {
     this.showHelp();
   })
@@ -61,7 +86,7 @@ const cli = new Command()
 // Run the CLI
 if (import.meta.main) {
   try {
-    await cli.parse(Bun.argv.slice(2));
+    await cli.parse(preprocessArgs(Bun.argv.slice(2)));
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);
