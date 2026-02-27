@@ -17,3 +17,20 @@ export function getConfigDir(): string {
 export function getConfigPath(): string {
   return join(getConfigDir(), 'config.json');
 }
+
+/**
+ * Get the XDG cache directory path for Mux CLI
+ * Follows XDG Base Directory specification
+ */
+export function getCacheDir(): string {
+  const xdgCacheHome = process.env.XDG_CACHE_HOME;
+  const baseDir = xdgCacheHome || join(homedir(), '.cache');
+  return join(baseDir, 'mux');
+}
+
+/**
+ * Get the full path to the update check cache file
+ */
+export function getUpdateCachePath(): string {
+  return join(getCacheDir(), 'update-check.json');
+}

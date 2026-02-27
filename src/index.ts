@@ -24,6 +24,7 @@ import { transcriptionVocabulariesCommand } from './commands/transcription-vocab
 import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
 import { setAgentMode } from './lib/context.ts';
+import { checkForUpdate } from './lib/update-notifier.ts';
 
 const VERSION = pkg.version;
 
@@ -85,6 +86,8 @@ const cli = new Command()
 
 // Run the CLI
 if (import.meta.main) {
+  const updateCheck = checkForUpdate(VERSION).catch(() => null);
+
   try {
     await cli.parse(preprocessArgs(Bun.argv.slice(2)));
   } catch (error) {
@@ -95,6 +98,9 @@ if (import.meta.main) {
     }
     process.exit(1);
   }
+
+  const notice = await updateCheck;
+  if (notice) console.error(notice);
 }
 
 export { cli };
