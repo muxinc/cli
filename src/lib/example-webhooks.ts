@@ -73,8 +73,8 @@ function nowISO(): string {
   return new Date().toISOString().replace('Z', '000Z');
 }
 
-function exampleAsset(status: string): Record<string, unknown> {
-  const assetId = generateId();
+function exampleAsset(status: string, id?: string): Record<string, unknown> {
+  const assetId = id ?? generateId();
   const base: Record<string, unknown> = {
     id: assetId,
     status,
@@ -151,9 +151,9 @@ function exampleAsset(status: string): Record<string, unknown> {
   return base;
 }
 
-function exampleUpload(status: string): Record<string, unknown> {
+function exampleUpload(status: string, id?: string): Record<string, unknown> {
   return {
-    id: generateId(),
+    id: id ?? generateId(),
     status,
     created_at: nowUnix(),
     timeout: 3600,
@@ -165,8 +165,11 @@ function exampleUpload(status: string): Record<string, unknown> {
   };
 }
 
-function exampleLiveStream(status: string): Record<string, unknown> {
-  const streamId = generateId();
+function exampleLiveStream(
+  status: string,
+  id?: string,
+): Record<string, unknown> {
+  const streamId = id ?? generateId();
   return {
     id: streamId,
     status,
@@ -187,9 +190,9 @@ function exampleLiveStream(status: string): Record<string, unknown> {
   };
 }
 
-function exampleTrack(status: string): Record<string, unknown> {
+function exampleTrack(status: string, id?: string): Record<string, unknown> {
   return {
-    id: generateId(),
+    id: id ?? generateId(),
     type: 'text',
     text_type: 'subtitles',
     language_code: 'en',
@@ -207,9 +210,12 @@ function exampleTrack(status: string): Record<string, unknown> {
   };
 }
 
-function exampleStaticRendition(status: string): Record<string, unknown> {
+function exampleStaticRendition(
+  status: string,
+  id?: string,
+): Record<string, unknown> {
   return {
-    id: generateId(),
+    id: id ?? generateId(),
     name: '720p.mp4',
     ext: 'mp4',
     resolution: '720p',
@@ -223,9 +229,12 @@ function exampleStaticRendition(status: string): Record<string, unknown> {
   };
 }
 
-function exampleSimulcastTarget(status: string): Record<string, unknown> {
+function exampleSimulcastTarget(
+  status: string,
+  id?: string,
+): Record<string, unknown> {
   return {
-    id: generateId(),
+    id: id ?? generateId(),
     status,
     url: 'rtmp://live.example.com/app',
     stream_key: generateId(),
@@ -252,11 +261,16 @@ function getObjectType(eventType: string): { type: string; id: string } {
   return { type: 'asset', id: generateId() };
 }
 
-function getDataForEventType(eventType: string): Record<string, unknown> {
+function getDataForEventType(
+  eventType: string,
+  objectId: string,
+): Record<string, unknown> {
   // Asset events
-  if (eventType === 'video.asset.created') return exampleAsset('preparing');
-  if (eventType === 'video.asset.ready') return exampleAsset('ready');
-  if (eventType === 'video.asset.errored') return exampleAsset('errored');
+  if (eventType === 'video.asset.created')
+    return exampleAsset('preparing', objectId);
+  if (eventType === 'video.asset.ready') return exampleAsset('ready', objectId);
+  if (eventType === 'video.asset.errored')
+    return exampleAsset('errored', objectId);
   if (
     eventType === 'video.asset.updated' ||
     eventType === 'video.asset.deleted' ||
@@ -264,53 +278,61 @@ function getDataForEventType(eventType: string): Record<string, unknown> {
     eventType === 'video.asset.warning' ||
     eventType === 'video.asset.non_standard_input_detected'
   )
-    return exampleAsset('ready');
+    return exampleAsset('ready', objectId);
 
   // Static renditions (plural — asset-level)
   if (eventType.startsWith('video.asset.static_renditions.'))
-    return exampleAsset('ready');
+    return exampleAsset('ready', objectId);
 
   // Master events
-  if (eventType.startsWith('video.asset.master.')) return exampleAsset('ready');
+  if (eventType.startsWith('video.asset.master.'))
+    return exampleAsset('ready', objectId);
 
   // Track events
   if (eventType === 'video.asset.track.created')
-    return exampleTrack('preparing');
-  if (eventType === 'video.asset.track.ready') return exampleTrack('ready');
-  if (eventType === 'video.asset.track.errored') return exampleTrack('errored');
-  if (eventType === 'video.asset.track.deleted') return exampleTrack('ready');
+    return exampleTrack('preparing', objectId);
+  if (eventType === 'video.asset.track.ready')
+    return exampleTrack('ready', objectId);
+  if (eventType === 'video.asset.track.errored')
+    return exampleTrack('errored', objectId);
+  if (eventType === 'video.asset.track.deleted')
+    return exampleTrack('ready', objectId);
 
   // Static rendition (singular — individual rendition)
   if (eventType === 'video.asset.static_rendition.created')
-    return exampleStaticRendition('preparing');
+    return exampleStaticRendition('preparing', objectId);
   if (eventType === 'video.asset.static_rendition.ready')
-    return exampleStaticRendition('ready');
+    return exampleStaticRendition('ready', objectId);
   if (eventType === 'video.asset.static_rendition.errored')
-    return exampleStaticRendition('errored');
+    return exampleStaticRendition('errored', objectId);
   if (eventType === 'video.asset.static_rendition.deleted')
-    return exampleStaticRendition('ready');
+    return exampleStaticRendition('ready', objectId);
   if (eventType === 'video.asset.static_rendition.skipped')
-    return exampleStaticRendition('skipped');
+    return exampleStaticRendition('skipped', objectId);
 
   // Upload events
-  if (eventType === 'video.upload.created') return exampleUpload('waiting');
+  if (eventType === 'video.upload.created')
+    return exampleUpload('waiting', objectId);
   if (eventType === 'video.upload.asset_created')
-    return exampleUpload('asset_created');
-  if (eventType === 'video.upload.cancelled') return exampleUpload('cancelled');
-  if (eventType === 'video.upload.errored') return exampleUpload('errored');
+    return exampleUpload('asset_created', objectId);
+  if (eventType === 'video.upload.cancelled')
+    return exampleUpload('cancelled', objectId);
+  if (eventType === 'video.upload.errored')
+    return exampleUpload('errored', objectId);
 
   // Live stream events
   if (eventType === 'video.live_stream.created')
-    return exampleLiveStream('idle');
+    return exampleLiveStream('idle', objectId);
   if (eventType === 'video.live_stream.connected')
-    return exampleLiveStream('connected');
+    return exampleLiveStream('connected', objectId);
   if (eventType === 'video.live_stream.recording')
-    return exampleLiveStream('recording');
+    return exampleLiveStream('recording', objectId);
   if (eventType === 'video.live_stream.active')
-    return exampleLiveStream('active');
+    return exampleLiveStream('active', objectId);
   if (eventType === 'video.live_stream.disconnected')
-    return exampleLiveStream('disconnected');
-  if (eventType === 'video.live_stream.idle') return exampleLiveStream('idle');
+    return exampleLiveStream('disconnected', objectId);
+  if (eventType === 'video.live_stream.idle')
+    return exampleLiveStream('idle', objectId);
   if (
     eventType === 'video.live_stream.updated' ||
     eventType === 'video.live_stream.enabled' ||
@@ -318,26 +340,26 @@ function getDataForEventType(eventType: string): Record<string, unknown> {
     eventType === 'video.live_stream.deleted' ||
     eventType === 'video.live_stream.warning'
   )
-    return exampleLiveStream('idle');
+    return exampleLiveStream('idle', objectId);
 
   // Simulcast target events
   if (eventType === 'video.live_stream.simulcast_target.created')
-    return exampleSimulcastTarget('idle');
+    return exampleSimulcastTarget('idle', objectId);
   if (eventType === 'video.live_stream.simulcast_target.idle')
-    return exampleSimulcastTarget('idle');
+    return exampleSimulcastTarget('idle', objectId);
   if (eventType === 'video.live_stream.simulcast_target.starting')
-    return exampleSimulcastTarget('starting');
+    return exampleSimulcastTarget('starting', objectId);
   if (eventType === 'video.live_stream.simulcast_target.broadcasting')
-    return exampleSimulcastTarget('broadcasting');
+    return exampleSimulcastTarget('broadcasting', objectId);
   if (eventType === 'video.live_stream.simulcast_target.errored')
-    return exampleSimulcastTarget('errored');
+    return exampleSimulcastTarget('errored', objectId);
   if (eventType === 'video.live_stream.simulcast_target.deleted')
-    return exampleSimulcastTarget('deleted');
+    return exampleSimulcastTarget('deleted', objectId);
   if (eventType === 'video.live_stream.simulcast_target.updated')
-    return exampleSimulcastTarget('idle');
+    return exampleSimulcastTarget('idle', objectId);
 
   // Fallback
-  return exampleAsset('ready');
+  return exampleAsset('ready', objectId);
 }
 
 /**
@@ -359,7 +381,7 @@ export function generateExampleWebhook(
       name: envName,
       id: envId,
     },
-    data: getDataForEventType(eventType),
+    data: getDataForEventType(eventType, objectInfo.id),
     request_id: null,
     attempts: [],
     accessor: null,

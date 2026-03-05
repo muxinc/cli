@@ -145,32 +145,43 @@ export const listenCommand = new Command()
           await appendEvent(storedEvent);
           eventCount++;
 
+          let forwardStatus: string | undefined;
+          if (options.forwardTo && signingSecret) {
+            try {
+              const body = JSON.stringify(parsed);
+              const fwdResponse = await fetch(options.forwardTo, {
+                method: 'POST',
+                headers: buildSignedHeaders(body, signingSecret),
+                body,
+              });
+              const status = fwdResponse.status;
+              if (status >= 200 && status < 300) {
+                forwardSuccess++;
+                forwardStatus = `${status}`;
+              } else {
+                forwardFail++;
+                forwardStatus = `${status}`;
+              }
+            } catch {
+              forwardFail++;
+              forwardStatus = 'ERR';
+            }
+          }
+
           if (options.json) {
             console.log(JSON.stringify(parsed));
           } else {
             const time = new Date().toLocaleTimeString();
             let line = `[${time}]  ${eventType.padEnd(30)}  ${eventId}`;
 
-            if (options.forwardTo && signingSecret) {
-              try {
-                const body = JSON.stringify(parsed);
-                const fwdResponse = await fetch(options.forwardTo, {
-                  method: 'POST',
-                  headers: buildSignedHeaders(body, signingSecret),
-                  body,
-                });
-                const status = fwdResponse.status;
-                if (status >= 200 && status < 300) {
-                  forwardSuccess++;
-                  line += `  ${colors.green(`[${status}]`)}`;
-                } else {
-                  forwardFail++;
-                  line += `  ${colors.red(`[${status}]`)}`;
-                }
-              } catch {
-                forwardFail++;
-                line += `  ${colors.red('[ERR]')}`;
-              }
+            if (forwardStatus) {
+              const isSuccess =
+                forwardStatus !== 'ERR' &&
+                Number(forwardStatus) >= 200 &&
+                Number(forwardStatus) < 300;
+              line += isSuccess
+                ? `  ${colors.green(`[${forwardStatus}]`)}`
+                : `  ${colors.red(`[${forwardStatus}]`)}`;
             }
 
             console.log(line);
