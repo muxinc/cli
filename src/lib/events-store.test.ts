@@ -8,7 +8,10 @@ import { join } from 'node:path';
 let testDir: string;
 let testEventsPath: string;
 
+// Provide all exports so the mock doesn't break other modules that import xdg.ts
+const actualXdg = await import('./xdg.ts');
 mock.module('./xdg.ts', () => ({
+  ...actualXdg,
   getEventsPath: () => testEventsPath,
 }));
 
