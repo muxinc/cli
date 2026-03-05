@@ -100,15 +100,23 @@ export const listenCommand = new Command()
         }
 
         if (!response.ok) {
-          console.error(
-            `Unexpected response from ${url}: ${response.status} ${response.statusText}`,
-          );
-          process.exit(1);
+          if (!options.json) {
+            console.log(
+              colors.dim(
+                `Server returned ${response.status} ${response.statusText}.`,
+              ),
+            );
+          }
+          continue;
         }
 
         if (!response.body) {
-          console.error('No response body received from SSE endpoint.');
-          process.exit(1);
+          if (!options.json) {
+            console.log(
+              colors.dim('No response body received from SSE endpoint.'),
+            );
+          }
+          continue;
         }
 
         for await (const sseEvent of parseSSEStream(

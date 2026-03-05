@@ -44,6 +44,7 @@ export async function listEvents(limit = 25): Promise<StoredEvent[]> {
   const path = getEventsPath();
   const events = await readEvents(path);
   // Return most recent events first
+  if (limit <= 0) return [];
   return events.slice(-limit).reverse();
 }
 
