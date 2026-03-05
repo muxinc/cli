@@ -32,7 +32,7 @@ export async function getSigningSecret(envName: string): Promise<string> {
  * Sign a webhook payload using the same scheme as Mux webhooks.
  * Produces a `mux-signature` header value: `t=<timestamp>,v1=<signature>`
  */
-export function signPayload(body: string, secret: string): string {
+function signPayload(body: string, secret: string): string {
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = createHmac('sha256', secret)
     .update(`${timestamp}.${body}`, 'utf8')
