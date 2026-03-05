@@ -790,6 +790,27 @@ mux webhooks events replay --all --forward-to http://localhost:3000/api/webhooks
 mux webhooks events replay abc123-event-id
 ```
 
+#### `mux webhooks trigger <event-type>`
+
+Send a synthetic webhook event to a local URL for testing. No API call is made — the payload is generated locally and signed with the per-environment signing secret. This is useful for testing your webhook handler without creating real resources.
+
+**Options:**
+- `--forward-to <url>` - Local URL to POST the example event to (required)
+- `--json` - Output JSON instead of pretty format
+
+```bash
+# Send an example video.asset.ready event
+mux webhooks trigger video.asset.ready --forward-to http://localhost:3000/api/webhooks/mux
+
+# Send a live stream event
+mux webhooks trigger video.live_stream.active --forward-to http://localhost:3000/api/webhooks/mux
+
+# See the generated payload
+mux webhooks trigger video.asset.created --forward-to http://localhost:3000/api/webhooks/mux --json
+```
+
+Run `mux webhooks trigger <invalid-type>` to see all supported event types.
+
 </details>
 
 <details>
