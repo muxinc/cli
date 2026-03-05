@@ -22,7 +22,9 @@ export const triggerCommand = new Command()
   .option(
     '--forward-to <url:string>',
     'Local URL to POST the example event to',
-    { required: true },
+    {
+      required: true,
+    },
   )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: TriggerOptions, eventType: string) => {
