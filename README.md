@@ -732,6 +732,8 @@ mux drm-configurations get <drm-configuration-id>
 
 Listen for Mux webhook events in real-time and forward them to your local development server. Events are stored locally for replay during development.
 
+> **Important:** These CLI commands are for **local development only**. In production, you must configure a webhook endpoint in the [Mux Dashboard](https://dashboard.mux.com) that points to your deployed server's public URL. The CLI tunnel is not a substitute for a production webhook configuration.
+
 #### `mux webhooks listen`
 
 Connect to Mux's event stream and optionally forward events to a local URL.
