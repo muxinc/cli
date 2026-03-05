@@ -1,5 +1,6 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
+import { getDefaultEnvironment } from '../../../lib/config.ts';
 import { getAllEvents, getEventById } from '../../../lib/events-store.ts';
 import {
   buildSignedHeaders,
@@ -34,6 +35,12 @@ export const replayCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: ReplayOptions, eventId?: string) => {
     try {
+      const env = await getDefaultEnvironment();
+      if (!env) {
+        console.error("Not logged in. Please run 'mux login' to authenticate.");
+        process.exit(1);
+      }
+
       if (!eventId && !options.all) {
         console.error(
           'Provide an event ID or use --all to replay all stored events.',
@@ -64,7 +71,7 @@ export const replayCommand = new Command()
           return;
         }
 
-        const signingSecret = await getSigningSecret();
+        const signingSecret = await getSigningSecret(env.name);
 
         let forwarded = 0;
         let failed = 0;
@@ -122,7 +129,7 @@ export const replayCommand = new Command()
         return;
       }
 
-      const signingSecret = await getSigningSecret();
+      const signingSecret = await getSigningSecret(env.name);
       const { status } = await forwardEvent(
         options.forwardTo,
         event.payload,

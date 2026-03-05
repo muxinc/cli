@@ -58,7 +58,7 @@ export const listenCommand = new Command()
 
       let signingSecret: string | undefined;
       if (options.forwardTo) {
-        signingSecret = await getSigningSecret();
+        signingSecret = await getSigningSecret(env.name);
       }
 
       if (!options.json) {

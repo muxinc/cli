@@ -4,17 +4,17 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { getDataDir } from './xdg.ts';
 
-function getSigningSecretPath(): string {
-  return join(getDataDir(), 'webhook-signing-secret');
+function getSigningSecretPath(envName: string): string {
+  return join(getDataDir(), `webhook-signing-secret-${envName}`);
 }
 
 /**
- * Get or create a persistent webhook signing secret.
- * The secret is stored in the data directory and reused across sessions
- * so users don't have to reconfigure their local dev server each time.
+ * Get or create a persistent webhook signing secret for the given environment.
+ * Each environment gets its own secret so switching environments requires
+ * updating MUX_WEBHOOK_SECRET in the app.
  */
-export async function getSigningSecret(): Promise<string> {
-  const path = getSigningSecretPath();
+export async function getSigningSecret(envName: string): Promise<string> {
+  const path = getSigningSecretPath(envName);
 
   if (existsSync(path)) {
     const secret = (await readFile(path, 'utf-8')).trim();
