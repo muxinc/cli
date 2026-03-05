@@ -100,23 +100,13 @@ export const listenCommand = new Command()
         }
 
         if (!response.ok) {
-          if (!options.json) {
-            console.log(
-              colors.dim(
-                `Server returned ${response.status} ${response.statusText}.`,
-              ),
-            );
-          }
-          continue;
+          throw new Error(
+            `Server returned ${response.status} ${response.statusText}`,
+          );
         }
 
         if (!response.body) {
-          if (!options.json) {
-            console.log(
-              colors.dim('No response body received from SSE endpoint.'),
-            );
-          }
-          continue;
+          throw new Error('No response body received from SSE endpoint');
         }
 
         for await (const sseEvent of parseSSEStream(
@@ -207,17 +197,19 @@ export const listenCommand = new Command()
 
         const errorMessage =
           error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes('ENOTFOUND') ||
+          errorMessage.includes('getaddrinfo')
+        ) {
+          console.error(
+            `Error: Could not resolve hostname for ${baseUrl}\n` +
+              'Check that MUX_BASE_URL is set correctly and the host is reachable.',
+          );
+          process.exit(1);
+        }
+
         if (!options.json) {
           if (
-            errorMessage.includes('ENOTFOUND') ||
-            errorMessage.includes('getaddrinfo') ||
-            errorMessage.includes('resolve')
-          ) {
-            console.error(
-              `Error: Could not resolve hostname for ${baseUrl}\n` +
-                'Check that MUX_BASE_URL is set correctly and the host is reachable.',
-            );
-          } else if (
             errorMessage.includes('ECONNREFUSED') ||
             errorMessage.includes('ECONNRESET') ||
             errorMessage.includes('socket connection was closed')
