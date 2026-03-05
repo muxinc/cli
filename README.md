@@ -18,6 +18,7 @@ A command-line interface for interacting with the Mux API, designed to provide a
   - [Transcription Vocabularies](#transcription-vocabularies)
   - [Delivery Usage](#delivery-usage)
   - [DRM Configurations](#drm-configurations)
+  - [Webhooks](#webhooks)
   - [Mux Data](#mux-data)
   - [Authentication & Environment Management](#authentication--environment-management)
 - [Configuration](#configuration)
@@ -727,6 +728,69 @@ mux drm-configurations get <drm-configuration-id>
 </details>
 
 <details>
+<summary><h3>Webhooks</h3></summary>
+
+Listen for Mux webhook events in real-time and forward them to your local development server. Events are stored locally for replay during development.
+
+#### `mux webhooks listen`
+
+Connect to Mux's event stream and optionally forward events to a local URL.
+
+**Options:**
+- `--forward-to <url>` - POST received events to a local URL in real-time
+- `--json` - Output raw JSON per event
+
+```bash
+# Listen and print events
+mux webhooks listen
+
+# Forward to local dev server
+mux webhooks listen --forward-to http://localhost:3000/api/webhooks/mux
+```
+
+When using `--forward-to`, the CLI displays a webhook signing secret and signs each forwarded request with a `mux-signature` header. Set `MUX_WEBHOOK_SECRET` in your app's environment to verify these signatures using the Mux Node SDK:
+
+```typescript
+const event = mux.webhooks.unwrap(body, headers, process.env.MUX_WEBHOOK_SECRET);
+```
+
+The signing secret is persistent across sessions, so you only need to configure it once.
+
+#### `mux webhooks events list`
+
+List locally stored webhook events captured during `listen` sessions.
+
+**Options:**
+- `--limit <n>` - Maximum number of events to show (default: 25)
+
+```bash
+mux webhooks events list
+mux webhooks events list --limit 50
+```
+
+#### `mux webhooks events replay [event-id]`
+
+Replay stored webhook events. Useful for re-testing your webhook handler without creating new resources.
+
+**Options:**
+- `--forward-to <url>` - POST event(s) to a local URL
+- `--all` - Replay all stored events
+- `--json` - Output JSON instead of pretty format
+
+```bash
+# Replay a specific event to your local server
+mux webhooks events replay abc123-event-id --forward-to http://localhost:3000/api/webhooks/mux
+
+# Replay all stored events
+mux webhooks events replay --all --forward-to http://localhost:3000/api/webhooks/mux
+
+# View event payload without forwarding
+mux webhooks events replay abc123-event-id
+```
+
+</details>
+
+<details>
 <summary><h3>Mux Data</h3></summary>
 
 Commands for video analytics, monitoring, and incident tracking via the Mux Data API.
@@ -957,6 +1021,9 @@ src/
 │   ├── dimensions/                   # Mux Data: dimension queries
 │   ├── errors/                       # Mux Data: error analytics
 │   ├── exports/                      # Mux Data: export files
+│   ├── webhooks/                     # Webhook listening & replay
+│   │   ├── events/                  # Event storage & replay
+│   │   └── listen.ts                # Real-time SSE listener
 │   ├── env/                          # Environment management
 │   ├── login.ts, logout.ts, sign.ts  # Auth & signing commands
 │   └── playback-ids.ts               # Playback ID lookup
@@ -968,6 +1035,9 @@ src/
 │   ├── mux.ts                        # Mux API client
 │   ├── urls.ts                       # URL generation
 │   ├── signing.ts                    # JWT signing
+│   ├── webhook-signing.ts            # Webhook signature generation
+│   ├── events-store.ts               # Local webhook event storage
+│   ├── sse.ts                        # Server-Sent Events parser
 │   └── ...                           # Other utilities
 └── index.ts                          # CLI entry point
 ```

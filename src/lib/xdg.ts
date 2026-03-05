@@ -34,3 +34,20 @@ export function getCacheDir(): string {
 export function getUpdateCachePath(): string {
   return join(getCacheDir(), 'update-check.json');
 }
+
+/**
+ * Get the XDG data directory path for Mux CLI
+ * Follows XDG Base Directory specification
+ */
+export function getDataDir(): string {
+  const xdgDataHome = process.env.XDG_DATA_HOME;
+  const baseDir = xdgDataHome || join(homedir(), '.local', 'share');
+  return join(baseDir, 'mux');
+}
+
+/**
+ * Get the full path to the stored webhook events file
+ */
+export function getEventsPath(): string {
+  return join(getDataDir(), 'events.json');
+}
