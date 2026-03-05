@@ -85,6 +85,11 @@ function exampleAsset(status: string): Record<string, unknown> {
     ingest_type: 'on_demand_url',
     master_access: 'none',
     mp4_support: 'none',
+    meta: { title: '' },
+    progress:
+      status === 'ready'
+        ? { state: 'completed', progress: 100 }
+        : { state: 'ingesting', progress: 0 },
   };
 
   if (status === 'ready') {
@@ -98,6 +103,8 @@ function exampleAsset(status: string): Record<string, unknown> {
         {
           type: 'video',
           id: generateId(),
+          status: 'ready',
+          primary: true,
           max_width: 1920,
           max_height: 1080,
           max_frame_rate: 29.97,
@@ -106,6 +113,10 @@ function exampleAsset(status: string): Record<string, unknown> {
         {
           type: 'audio',
           id: generateId(),
+          status: 'ready',
+          primary: true,
+          name: 'Default',
+          language_code: 'und',
           max_channels: 2,
           duration: 120.5,
         },
