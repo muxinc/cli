@@ -1,2 +1,0 @@
-- [ ] Add support for editing meta fields (both TUI and commands)
-- [ ] Add more static rendition details to the TUI.
