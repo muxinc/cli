@@ -10,10 +10,7 @@ export const WEBHOOK_EVENT_TYPES = [
   'video.asset.updated',
   'video.asset.deleted',
   'video.asset.live_stream_completed',
-  'video.asset.static_renditions.ready',
-  'video.asset.static_renditions.preparing',
-  'video.asset.static_renditions.deleted',
-  'video.asset.static_renditions.errored',
+  'video.asset.non_standard_input_detected',
   'video.asset.master.ready',
   'video.asset.master.preparing',
   'video.asset.master.deleted',
@@ -275,14 +272,36 @@ function getDataForEventType(
     eventType === 'video.asset.updated' ||
     eventType === 'video.asset.deleted' ||
     eventType === 'video.asset.live_stream_completed' ||
-    eventType === 'video.asset.warning' ||
-    eventType === 'video.asset.non_standard_input_detected'
+    eventType === 'video.asset.warning'
   )
     return exampleAsset('ready', objectId);
-
-  // Static renditions (plural — asset-level)
-  if (eventType.startsWith('video.asset.static_renditions.'))
-    return exampleAsset('ready', objectId);
+  if (eventType === 'video.asset.non_standard_input_detected') {
+    const asset = exampleAsset('preparing', objectId);
+    asset.non_standard_input_reasons = { video_codec: 'av1' };
+    asset.aspect_ratio = '16:9';
+    asset.max_stored_resolution = 'HD';
+    asset.max_stored_frame_rate = 30;
+    asset.resolution_tier = '1080p';
+    asset.tracks = [
+      {
+        type: 'audio',
+        primary: true,
+        max_channels: 2,
+        max_channel_layout: 'stereo',
+        id: generateId(),
+        duration: 120.5,
+      },
+      {
+        type: 'video',
+        max_width: 1920,
+        max_height: 1080,
+        max_frame_rate: 30,
+        id: generateId(),
+        duration: 120.5,
+      },
+    ];
+    return asset;
+  }
 
   // Master events
   if (eventType.startsWith('video.asset.master.'))

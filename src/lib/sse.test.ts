@@ -121,4 +121,27 @@ describe('parseSSEStream', () => {
     const events = await collectEvents(stream);
     expect(events).toEqual([{ event: 'valid', data: 'ok' }]);
   });
+
+  test('handles \\r\\n line endings', async () => {
+    const stream = createStream(['event: greeting\r\ndata: hello\r\n\r\n']);
+    const events = await collectEvents(stream);
+    expect(events).toEqual([{ event: 'greeting', data: 'hello' }]);
+  });
+
+  test('handles bare \\r line endings', async () => {
+    const stream = createStream(['event: greeting\rdata: hello\r\r']);
+    const events = await collectEvents(stream);
+    expect(events).toEqual([{ event: 'greeting', data: 'hello' }]);
+  });
+
+  test('handles mixed line endings', async () => {
+    const stream = createStream([
+      'event: a\r\ndata: first\n\nevent: b\rdata: second\r\n\r\n',
+    ]);
+    const events = await collectEvents(stream);
+    expect(events).toEqual([
+      { event: 'a', data: 'first' },
+      { event: 'b', data: 'second' },
+    ]);
+  });
 });
