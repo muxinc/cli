@@ -3,10 +3,37 @@ import pkg from '../../package.json';
 import { getDefaultEnvironment } from './config.ts';
 import { isAgentMode } from './context.ts';
 
+const DEFAULT_BASE_URL = 'https://api.mux.com';
+
 function getUserAgent(): string {
   return isAgentMode()
     ? `Mux CLI (agent)/${pkg.version}`
     : `Mux CLI/${pkg.version}`;
+}
+
+/**
+ * Get the Mux API base URL, respecting MUX_BASE_URL env var
+ */
+export function getMuxBaseUrl(): string {
+  return process.env.MUX_BASE_URL || DEFAULT_BASE_URL;
+}
+
+/**
+ * Get auth headers for raw fetch requests to Mux API
+ */
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const env = await getDefaultEnvironment();
+  if (!env) {
+    throw new Error("Not logged in. Please run 'mux login' to authenticate.");
+  }
+
+  const credentials = btoa(
+    `${env.environment.tokenId}:${env.environment.tokenSecret}`,
+  );
+  return {
+    Authorization: `Basic ${credentials}`,
+    'User-Agent': getUserAgent(),
+  };
 }
 
 /**

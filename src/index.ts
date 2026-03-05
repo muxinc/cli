@@ -23,6 +23,8 @@ import { signingKeysCommand } from './commands/signing-keys/index.ts';
 import { transcriptionVocabulariesCommand } from './commands/transcription-vocabularies/index.ts';
 import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
+import { webhooksCommand } from './commands/webhooks/index.ts';
+import { whoamiCommand } from './commands/whoami.ts';
 import { setAgentMode } from './lib/context.ts';
 import { checkForUpdate } from './lib/update-notifier.ts';
 
@@ -82,6 +84,8 @@ const cli = new Command()
   .command('dimensions', dimensionsCommand)
   .command('errors', errorsCommand)
   .command('exports', exportsCommand)
+  .command('webhooks', webhooksCommand)
+  .command('whoami', whoamiCommand)
   .command('completions', new CompletionsCommand());
 
 // Run the CLI
