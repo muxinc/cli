@@ -85,11 +85,17 @@ function exampleAsset(status: string): Record<string, unknown> {
     ingest_type: 'on_demand_url',
     master_access: 'none',
     mp4_support: 'none',
-    meta: { title: '' },
+    normalize_audio: false,
+    passthrough: '',
+    is_live: false,
+    test: false,
+    meta: { title: '', creator_id: '', external_id: '' },
     progress:
       status === 'ready'
         ? { state: 'completed', progress: 100 }
-        : { state: 'ingesting', progress: 0 },
+        : status === 'errored'
+          ? { state: 'errored', progress: -1 }
+          : { state: 'ingesting', progress: 0 },
   };
 
   if (status === 'ready') {
@@ -127,6 +133,9 @@ function exampleAsset(status: string): Record<string, unknown> {
           policy: 'public',
         },
       ],
+      static_renditions: {
+        status: 'ready',
+      },
     });
   }
 
