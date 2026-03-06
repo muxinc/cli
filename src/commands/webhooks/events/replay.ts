@@ -1,6 +1,6 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment } from '@/lib/config.ts';
+import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
 import { getAllEvents, getEventById } from '@/lib/events-store.ts';
 import {
   buildSignedHeaders,
@@ -53,6 +53,21 @@ export const replayCommand = new Command()
         process.exit(1);
       }
       const environmentId = env.environment.environmentId ?? env.name;
+
+      // Use provided --forward-to, or fall back to the saved URL
+      if (!options.forwardTo && env.environment.forwardUrl) {
+        options.forwardTo = env.environment.forwardUrl;
+      }
+
+      // Save the forward URL if a new one was provided
+      if (
+        options.forwardTo &&
+        options.forwardTo !== env.environment.forwardUrl
+      ) {
+        await updateEnvironment(env.name, {
+          forwardUrl: options.forwardTo,
+        });
+      }
 
       if (options.all) {
         const events = getAllEvents(environmentId);

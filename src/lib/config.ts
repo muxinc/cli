@@ -9,6 +9,7 @@ export interface Environment {
   environmentId?: string;
   signingKeyId?: string;
   signingPrivateKey?: string;
+  forwardUrl?: string;
 }
 
 export interface Config {
@@ -83,6 +84,21 @@ export async function setEnvironment(
     config.defaultEnvironment = name;
   }
 
+  await writeConfig(config);
+}
+
+/**
+ * Update specific fields on an existing environment
+ */
+export async function updateEnvironment(
+  name: string,
+  updates: Partial<Environment>,
+): Promise<void> {
+  const config = await readConfig();
+  if (!config || !config.environments[name]) {
+    throw new Error(`Environment "${name}" does not exist`);
+  }
+  config.environments[name] = { ...config.environments[name], ...updates };
   await writeConfig(config);
 }
 

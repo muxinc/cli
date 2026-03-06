@@ -1,6 +1,6 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment } from '@/lib/config.ts';
+import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
 import { appendEvent, type StoredEvent } from '@/lib/events-store.ts';
 import { getAuthHeaders, getMuxBaseUrl } from '@/lib/mux.ts';
 import { parseSSEStream } from '@/lib/sse.ts';
@@ -50,6 +50,13 @@ export const listenCommand = new Command()
     if (!env) {
       console.error("Not logged in. Please run 'mux login' to authenticate.");
       process.exit(1);
+    }
+
+    // Save the forward URL for use by replay/browse
+    if (options.forwardTo && options.forwardTo !== env.environment.forwardUrl) {
+      await updateEnvironment(env.name, {
+        forwardUrl: options.forwardTo,
+      });
     }
 
     const authHeaders = await getAuthHeaders();

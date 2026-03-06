@@ -1,9 +1,12 @@
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment } from '@/lib/config.ts';
+import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
 
 export const browseCommand = new Command()
   .description('Interactively browse, filter, and replay stored webhook events')
-  .option('--forward-to <url:string>', 'Enable replaying events to a local URL')
+  .option(
+    '--forward-to <url:string>',
+    'Enable replaying events to a local URL (remembered per environment)',
+  )
   .action(async (options) => {
     try {
       if (!process.stdout.isTTY) {
@@ -22,6 +25,19 @@ export const browseCommand = new Command()
 
       const environmentId = env.environment.environmentId ?? env.name;
 
+      // Use provided --forward-to, or fall back to the saved URL
+      const forwardTo = options.forwardTo ?? env.environment.forwardUrl;
+
+      // Save the forward URL if a new one was provided
+      if (
+        options.forwardTo &&
+        options.forwardTo !== env.environment.forwardUrl
+      ) {
+        await updateEnvironment(env.name, {
+          forwardUrl: options.forwardTo,
+        });
+      }
+
       const { createCliRenderer } = await import('@opentui/core');
       const { createRoot } = await import('@opentui/react');
       const { EventsBrowserApp } = await import('./EventsBrowserApp.tsx');
@@ -33,7 +49,7 @@ export const browseCommand = new Command()
       root.render(
         React.createElement(EventsBrowserApp, {
           environmentId,
-          forwardTo: options.forwardTo,
+          forwardTo,
         }),
       );
     } catch (error) {
