@@ -108,6 +108,31 @@ export function getAllEvents(environmentId: string): StoredEvent[] {
   return rows.map(rowToEvent);
 }
 
+export function getEventTypes(environmentId: string): string[] {
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT DISTINCT type FROM events WHERE environment_id = ? ORDER BY type ASC',
+    )
+    .all(environmentId) as Array<{ type: string }>;
+  return rows.map((row) => row.type);
+}
+
+export function listEventsByType(
+  environmentId: string,
+  type: string,
+  limit = 25,
+): StoredEvent[] {
+  if (limit <= 0) return [];
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE environment_id = ? AND type = ? ORDER BY timestamp DESC LIMIT ?',
+    )
+    .all(environmentId, type, limit) as EventRow[];
+  return rows.map(rowToEvent);
+}
+
 /**
  * Close the database connection. Primarily for testing cleanup.
  */
