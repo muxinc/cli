@@ -65,7 +65,7 @@ export const listenCommand = new Command()
     }
 
     if (!options.json) {
-      console.log(`Connecting to ${url}...`);
+      console.log(`Connecting...`);
       if (options.forwardTo) {
         console.log(`Forwarding events to ${options.forwardTo}`);
         console.log(
