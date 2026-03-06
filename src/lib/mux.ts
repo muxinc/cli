@@ -54,53 +54,54 @@ export async function createAuthenticatedMuxClient(): Promise<Mux> {
 }
 
 /**
- * Validate Mux credentials by making a simple API call
- * Returns true if credentials are valid, false otherwise
+ * Validate Mux credentials by making a simple API call.
+ * On success, also returns the environment ID from /whoami.
  */
 export async function validateCredentials(
   tokenId: string,
   tokenSecret: string,
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<{ valid: boolean; environmentId?: string; error?: string }> {
   try {
-    // Initialize Mux client with the provided credentials
-    const mux = new Mux({
-      tokenId,
-      tokenSecret,
-      defaultHeaders: { 'User-Agent': getUserAgent() },
+    const baseUrl = getMuxBaseUrl();
+    const credentials = btoa(`${tokenId}:${tokenSecret}`);
+    const response = await fetch(`${baseUrl}/system/v1/whoami`, {
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'User-Agent': getUserAgent(),
+      },
     });
 
-    // Make a simple API call to verify credentials
-    // We'll list assets with a limit of 1 as a lightweight check
-    await mux.video.assets.list({ limit: 1 });
-
-    return { valid: true };
-  } catch (error) {
-    // Check for authentication errors
-    if (error instanceof Error) {
-      // Mux SDK typically throws errors with status codes
-      const errorMessage = error.message.toLowerCase();
-
-      if (
-        errorMessage.includes('unauthorized') ||
-        errorMessage.includes('authentication') ||
-        errorMessage.includes('401')
-      ) {
+    if (!response.ok) {
+      if (response.status === 401) {
         return {
           valid: false,
           error:
             'Invalid credentials. Verify your Token ID and Secret here: https://dashboard.mux.com/settings/access-tokens',
         };
       }
-
-      if (errorMessage.includes('forbidden') || errorMessage.includes('403')) {
+      if (response.status === 403) {
         return {
           valid: false,
           error:
             'Access forbidden. Your credentials may not have the required permissions.',
         };
       }
+      return {
+        valid: false,
+        error: `Failed to validate credentials: ${response.status} ${response.statusText}`,
+      };
+    }
 
-      // Generic error
+    const body = (await response.json()) as {
+      data: { environment_id?: string };
+    };
+
+    return {
+      valid: true,
+      environmentId: body.data.environment_id,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
       return {
         valid: false,
         error: `Failed to validate credentials: ${error.message}`,

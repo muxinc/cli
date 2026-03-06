@@ -129,6 +129,7 @@ export const loginCommand = new Command()
     await setEnvironment(envName, {
       tokenId: tokenId.trim(),
       tokenSecret: tokenSecret.trim(),
+      environmentId: validation.environmentId,
     });
 
     console.log(`✅ Credentials saved for environment: ${envName}`);

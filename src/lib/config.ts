@@ -6,6 +6,7 @@ import { getConfigPath } from './xdg.ts';
 export interface Environment {
   tokenId: string;
   tokenSecret: string;
+  environmentId?: string;
   signingKeyId?: string;
   signingPrivateKey?: string;
 }
