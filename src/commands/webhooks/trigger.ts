@@ -1,6 +1,6 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getDefaultEnvironment } from '../../lib/config.ts';
+import { getCurrentEnvironment } from '../../lib/config.ts';
 import {
   generateExampleWebhook,
   WEBHOOK_EVENT_TYPES,
@@ -38,7 +38,7 @@ export const triggerCommand = new Command()
         process.exit(1);
       }
 
-      const env = await getDefaultEnvironment();
+      const env = await getCurrentEnvironment();
       if (!env) {
         console.error("Not logged in. Please run 'mux login' to authenticate.");
         process.exit(1);

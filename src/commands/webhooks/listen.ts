@@ -1,6 +1,6 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getDefaultEnvironment } from '../../lib/config.ts';
+import { getCurrentEnvironment } from '../../lib/config.ts';
 import { appendEvent, type StoredEvent } from '../../lib/events-store.ts';
 import { getAuthHeaders, getMuxBaseUrl } from '../../lib/mux.ts';
 import { parseSSEStream } from '../../lib/sse.ts';
@@ -49,7 +49,7 @@ export const listenCommand = new Command()
       process.exit(0);
     });
 
-    const env = await getDefaultEnvironment();
+    const env = await getCurrentEnvironment();
     if (!env) {
       console.error("Not logged in. Please run 'mux login' to authenticate.");
       process.exit(1);

@@ -2,7 +2,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { getDefaultEnvironment } from './config.ts';
+import { getCurrentEnvironment } from './config.ts';
 import { getDataDir } from './xdg.ts';
 
 function getSigningSecretPath(envName: string): string {
@@ -33,8 +33,8 @@ export async function getSigningSecret(envName: string): Promise<string> {
  * Get the signing secret for the default (logged-in) environment.
  * Throws if not logged in.
  */
-export async function getSigningSecretForDefaultEnv(): Promise<string> {
-  const env = await getDefaultEnvironment();
+export async function getSigningSecretForCurrentEnv(): Promise<string> {
+  const env = await getCurrentEnvironment();
   if (!env) {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
   }

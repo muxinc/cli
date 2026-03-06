@@ -3,7 +3,7 @@ import { Command } from '@cliffy/command';
 import { getAllEvents, getEventById } from '../../../lib/events-store.ts';
 import {
   buildSignedHeaders,
-  getSigningSecretForDefaultEnv,
+  getSigningSecretForCurrentEnv,
 } from '../../../lib/webhook-signing.ts';
 
 interface ReplayOptions {
@@ -59,7 +59,7 @@ export const replayCommand = new Command()
           return;
         }
 
-        const signingSecret = await getSigningSecretForDefaultEnv();
+        const signingSecret = await getSigningSecretForCurrentEnv();
 
         let forwarded = 0;
         let failed = 0;
@@ -117,7 +117,7 @@ export const replayCommand = new Command()
         return;
       }
 
-      const signingSecret = await getSigningSecretForDefaultEnv();
+      const signingSecret = await getSigningSecretForCurrentEnv();
       const { status } = await forwardEvent(
         options.forwardTo,
         event.payload,

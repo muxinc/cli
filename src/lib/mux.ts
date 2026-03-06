@@ -1,6 +1,6 @@
 import Mux from '@mux/mux-node';
 import pkg from '../../package.json';
-import { getDefaultEnvironment } from './config.ts';
+import { getCurrentEnvironment } from './config.ts';
 import { isAgentMode } from './context.ts';
 
 const DEFAULT_BASE_URL = 'https://api.mux.com';
@@ -22,7 +22,7 @@ export function getMuxBaseUrl(): string {
  * Get auth headers for raw fetch requests to Mux API
  */
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  const env = await getDefaultEnvironment();
+  const env = await getCurrentEnvironment();
   if (!env) {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
   }
@@ -41,7 +41,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
  * Throws an error if not logged in
  */
 export async function createAuthenticatedMuxClient(): Promise<Mux> {
-  const env = await getDefaultEnvironment();
+  const env = await getCurrentEnvironment();
   if (!env) {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
   }

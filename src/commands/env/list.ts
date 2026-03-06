@@ -15,12 +15,12 @@ export const listCommand = new Command()
     console.log('Configured environments:\n');
 
     const envNames = Object.keys(config.environments);
-    const defaultEnv = config.defaultEnvironment;
+    const currentEnv = config.defaultEnvironment;
 
     for (const name of envNames) {
-      const isDefault = name === defaultEnv;
-      const marker = isDefault ? '* ' : '  ';
-      console.log(`${marker}${name}${isDefault ? ' (default)' : ''}`);
+      const isCurrent = name === currentEnv;
+      const marker = isCurrent ? '* ' : '  ';
+      console.log(`${marker}${name}${isCurrent ? ' (current)' : ''}`);
     }
 
     console.log(

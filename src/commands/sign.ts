@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import Mux from '@mux/mux-node';
-import { getDefaultEnvironment } from '../lib/config.ts';
+import { getCurrentEnvironment } from '../lib/config.ts';
 import { getSignedUrl } from '../lib/urls.ts';
 
 interface SignOptions {
@@ -121,7 +121,7 @@ export const signCommand = new Command()
   .action(async (options: SignOptions, playbackId: string) => {
     try {
       // Get current environment to retrieve signing keys
-      const currentEnv = await getDefaultEnvironment();
+      const currentEnv = await getCurrentEnvironment();
       if (!currentEnv) {
         throw new Error(
           'No environment configured.\n\n' +
