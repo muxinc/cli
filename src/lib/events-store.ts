@@ -34,6 +34,9 @@ function getDb(): Database {
     'CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events (timestamp)',
   );
   db.run('CREATE INDEX IF NOT EXISTS idx_events_type ON events (type)');
+  db.run(
+    'CREATE INDEX IF NOT EXISTS idx_events_environment_id ON events (environment_id)',
+  );
 
   return db;
 }
@@ -53,46 +56,15 @@ export function appendEvent(event: StoredEvent): void {
     );
 }
 
-export function listEvents(limit = 25): StoredEvent[] {
-  if (limit <= 0) return [];
-  const database = getDb();
-  const rows = database
-    .query(
-      'SELECT id, type, timestamp, environment_id, payload FROM events ORDER BY timestamp DESC LIMIT ?',
-    )
-    .all(limit) as Array<{
-    id: string;
-    type: string;
-    timestamp: string;
-    environment_id: string;
-    payload: string;
-  }>;
-
-  return rows.map((row) => ({
-    id: row.id,
-    type: row.type,
-    timestamp: row.timestamp,
-    environmentId: row.environment_id,
-    payload: JSON.parse(row.payload),
-  }));
+interface EventRow {
+  id: string;
+  type: string;
+  timestamp: string;
+  environment_id: string;
+  payload: string;
 }
 
-export function getEventById(id: string): StoredEvent | undefined {
-  const database = getDb();
-  const row = database
-    .query(
-      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE id = ?',
-    )
-    .get(id) as {
-    id: string;
-    type: string;
-    timestamp: string;
-    environment_id: string;
-    payload: string;
-  } | null;
-
-  if (!row) return undefined;
-
+function rowToEvent(row: EventRow): StoredEvent {
   return {
     id: row.id,
     type: row.type,
@@ -102,27 +74,38 @@ export function getEventById(id: string): StoredEvent | undefined {
   };
 }
 
-export function getAllEvents(): StoredEvent[] {
+export function listEvents(environmentId: string, limit = 25): StoredEvent[] {
+  if (limit <= 0) return [];
   const database = getDb();
   const rows = database
     .query(
-      'SELECT id, type, timestamp, environment_id, payload FROM events ORDER BY timestamp ASC',
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE environment_id = ? ORDER BY timestamp DESC LIMIT ?',
     )
-    .all() as Array<{
-    id: string;
-    type: string;
-    timestamp: string;
-    environment_id: string;
-    payload: string;
-  }>;
+    .all(environmentId, limit) as EventRow[];
+  return rows.map(rowToEvent);
+}
 
-  return rows.map((row) => ({
-    id: row.id,
-    type: row.type,
-    timestamp: row.timestamp,
-    environmentId: row.environment_id,
-    payload: JSON.parse(row.payload),
-  }));
+export function getEventById(
+  id: string,
+  environmentId: string,
+): StoredEvent | undefined {
+  const database = getDb();
+  const row = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE id = ? AND environment_id = ?',
+    )
+    .get(id, environmentId) as EventRow | null;
+  return row ? rowToEvent(row) : undefined;
+}
+
+export function getAllEvents(environmentId: string): StoredEvent[] {
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE environment_id = ? ORDER BY timestamp ASC',
+    )
+    .all(environmentId) as EventRow[];
+  return rows.map(rowToEvent);
 }
 
 /**

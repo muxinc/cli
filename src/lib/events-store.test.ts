@@ -16,10 +16,12 @@ mock.module('./xdg.ts', () => ({
 const { appendEvent, listEvents, getEventById, getAllEvents, closeDb } =
   await import('./events-store.ts');
 
+const ENV_ID = 'env-123';
+
 function makeEvent(
   id: string,
   type = 'video.asset.ready',
-  envId = 'env-123',
+  envId = ENV_ID,
 ): {
   id: string;
   type: string;
@@ -53,7 +55,7 @@ describe('events-store (sqlite)', () => {
   test('appendEvent creates database if it does not exist', () => {
     appendEvent(makeEvent('evt_1'));
     expect(existsSync(testDbPath)).toBe(true);
-    const events = getAllEvents();
+    const events = getAllEvents(ENV_ID);
     expect(events).toHaveLength(1);
     expect(events[0].id).toBe('evt_1');
   });
@@ -61,14 +63,14 @@ describe('events-store (sqlite)', () => {
   test('appendEvent appends to existing events', () => {
     appendEvent(makeEvent('evt_1'));
     appendEvent(makeEvent('evt_2'));
-    const events = getAllEvents();
+    const events = getAllEvents(ENV_ID);
     expect(events).toHaveLength(2);
   });
 
   test('appendEvent deduplicates by event ID', () => {
     appendEvent(makeEvent('evt_1'));
     appendEvent(makeEvent('evt_1'));
-    const events = getAllEvents();
+    const events = getAllEvents(ENV_ID);
     expect(events).toHaveLength(1);
   });
 
@@ -76,7 +78,7 @@ describe('events-store (sqlite)', () => {
     for (let i = 0; i < 150; i++) {
       appendEvent(makeEvent(`evt_${i}`));
     }
-    const events = getAllEvents();
+    const events = getAllEvents(ENV_ID);
     expect(events).toHaveLength(150);
   });
 
@@ -93,7 +95,7 @@ describe('events-store (sqlite)', () => {
       ...makeEvent('evt_3'),
       timestamp: '2024-01-01T00:00:03Z',
     });
-    const events = listEvents(2);
+    const events = listEvents(ENV_ID, 2);
     expect(events).toHaveLength(2);
     expect(events[0].id).toBe('evt_3');
     expect(events[1].id).toBe('evt_2');
@@ -103,25 +105,25 @@ describe('events-store (sqlite)', () => {
     for (let i = 0; i < 30; i++) {
       appendEvent(makeEvent(`evt_${i}`));
     }
-    const events = listEvents();
+    const events = listEvents(ENV_ID);
     expect(events).toHaveLength(25);
   });
 
   test('listEvents returns empty array when no database exists', () => {
-    const events = listEvents();
+    const events = listEvents(ENV_ID);
     expect(events).toEqual([]);
   });
 
   test('listEvents returns 0 for limit <= 0', () => {
     appendEvent(makeEvent('evt_1'));
-    expect(listEvents(0)).toEqual([]);
-    expect(listEvents(-1)).toEqual([]);
+    expect(listEvents(ENV_ID, 0)).toEqual([]);
+    expect(listEvents(ENV_ID, -1)).toEqual([]);
   });
 
   test('getEventById returns matching event', () => {
     appendEvent(makeEvent('evt_target', 'video.upload.created'));
     appendEvent(makeEvent('evt_other'));
-    const event = getEventById('evt_target');
+    const event = getEventById('evt_target', ENV_ID);
     expect(event).toBeDefined();
     expect(event?.id).toBe('evt_target');
     expect(event?.type).toBe('video.upload.created');
@@ -129,7 +131,7 @@ describe('events-store (sqlite)', () => {
 
   test('getEventById returns undefined for non-existent id', () => {
     appendEvent(makeEvent('evt_1'));
-    const event = getEventById('evt_nope');
+    const event = getEventById('evt_nope', ENV_ID);
     expect(event).toBeUndefined();
   });
 
@@ -142,7 +144,7 @@ describe('events-store (sqlite)', () => {
       ...makeEvent('evt_2'),
       timestamp: '2024-01-01T00:00:02Z',
     });
-    const events = getAllEvents();
+    const events = getAllEvents(ENV_ID);
     expect(events).toHaveLength(2);
     expect(events[0].id).toBe('evt_1');
     expect(events[1].id).toBe('evt_2');
@@ -150,14 +152,27 @@ describe('events-store (sqlite)', () => {
 
   test('stores and retrieves environmentId', () => {
     appendEvent(makeEvent('evt_1', 'video.asset.ready', 'env-abc'));
-    const event = getEventById('evt_1');
+    const event = getEventById('evt_1', 'env-abc');
     expect(event?.environmentId).toBe('env-abc');
   });
 
   test('stores and retrieves payload as JSON', () => {
     const payload = { id: 'evt_1', type: 'test', nested: { key: 'value' } };
     appendEvent({ ...makeEvent('evt_1'), payload });
-    const event = getEventById('evt_1');
+    const event = getEventById('evt_1', ENV_ID);
     expect(event?.payload).toEqual(payload);
+  });
+
+  test('queries are scoped to environment', () => {
+    appendEvent(makeEvent('evt_1', 'video.asset.ready', 'env-aaa'));
+    appendEvent(makeEvent('evt_2', 'video.asset.ready', 'env-bbb'));
+    appendEvent(makeEvent('evt_3', 'video.asset.ready', 'env-aaa'));
+
+    expect(listEvents('env-aaa')).toHaveLength(2);
+    expect(listEvents('env-bbb')).toHaveLength(1);
+    expect(getAllEvents('env-aaa')).toHaveLength(2);
+    expect(getAllEvents('env-bbb')).toHaveLength(1);
+    expect(getEventById('evt_1', 'env-aaa')).toBeDefined();
+    expect(getEventById('evt_1', 'env-bbb')).toBeUndefined();
   });
 });
