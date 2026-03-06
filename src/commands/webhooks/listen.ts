@@ -133,11 +133,11 @@ export const listenCommand = new Command()
             id: eventId,
             type: eventType,
             timestamp,
-            environmentName: env.name,
+            environmentId: env.environment.environmentId ?? env.name,
             payload: parsed,
           };
 
-          await appendEvent(storedEvent);
+          appendEvent(storedEvent);
           eventCount++;
 
           let forwardStatus: string | undefined;
