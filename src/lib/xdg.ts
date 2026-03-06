@@ -47,7 +47,15 @@ export function getDataDir(): string {
 
 /**
  * Get the full path to the stored webhook events file
+ * @deprecated Use getEventsDatabasePath() instead
  */
 export function getEventsPath(): string {
   return join(getDataDir(), 'events.json');
+}
+
+/**
+ * Get the full path to the webhook events SQLite database
+ */
+export function getEventsDatabasePath(): string {
+  return join(getDataDir(), 'events.db');
 }
