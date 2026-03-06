@@ -4,8 +4,8 @@ import {
   formatAssetStatus,
   formatCreatedAt,
   formatDuration,
-} from '../../lib/formatters.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+} from '@/lib/formatters.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface ListOptions {
   limit?: number;

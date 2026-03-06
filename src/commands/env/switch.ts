@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { getEnvironment, setCurrentEnvironment } from '../../lib/config.ts';
+import { getEnvironment, setCurrentEnvironment } from '@/lib/config.ts';
 
 export const switchCommand = new Command()
   .description(

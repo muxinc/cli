@@ -1,7 +1,7 @@
 import { Command } from '@cliffy/command';
-import { formatLiveStream } from '../../lib/formatters.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
-import { confirmPrompt } from '../../lib/prompt.ts';
+import { formatLiveStream } from '@/lib/formatters.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import { confirmPrompt } from '@/lib/prompt.ts';
 
 interface ResetStreamKeyOptions {
   force?: boolean;

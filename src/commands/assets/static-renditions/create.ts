@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/mux-node';
-import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 type Resolution = NonNullable<
   Mux.Video.AssetCreateStaticRenditionParams['resolution']

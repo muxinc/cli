@@ -1,15 +1,12 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment } from '../../lib/config.ts';
+import { getCurrentEnvironment } from '@/lib/config.ts';
 import {
   generateExampleWebhook,
   WEBHOOK_EVENT_TYPES,
   type WebhookEventType,
-} from '../../lib/example-webhooks.ts';
-import {
-  buildSignedHeaders,
-  getSigningSecret,
-} from '../../lib/webhook-signing.ts';
+} from '@/lib/example-webhooks.ts';
+import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
 interface TriggerOptions {
   forwardTo: string;

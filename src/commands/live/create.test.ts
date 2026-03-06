@@ -9,7 +9,7 @@ import {
   test,
 } from 'bun:test';
 import type Mux from '@mux/mux-node';
-import * as muxModule from '../../lib/mux.ts';
+import * as muxModule from '@/lib/mux.ts';
 import { createCommand } from './create.ts';
 
 // Note: These tests focus on CLI flag parsing, command structure, and input validation

@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { readConfig } from '../../lib/config.ts';
+import { readConfig } from '@/lib/config.ts';
 
 export const listCommand = new Command()
   .description('List all configured environments')

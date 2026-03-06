@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface ListOptions {
   assetId?: string;

@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
-import { formatLiveStream } from '../../lib/formatters.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { formatLiveStream } from '@/lib/formatters.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 const VALID_RESOLUTIONS = [
   'highest',

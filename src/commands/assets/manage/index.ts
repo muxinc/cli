@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 export const manageCommand = new Command()
   .description('Interactively manage Mux video assets with a TUI')
@@ -21,7 +21,7 @@ export const manageCommand = new Command()
       const { createCliRenderer } = await import('@opentui/core');
       const { createRoot } = await import('@opentui/react');
       const { AssetManageApp } = await import('./AssetManageApp.tsx');
-      const { inputPrompt } = await import('../../../lib/prompt.ts');
+      const { inputPrompt } = await import('@/lib/prompt.ts');
       const React = await import('react');
 
       let renderer = await createCliRenderer({

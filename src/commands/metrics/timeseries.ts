@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
-import { buildDataFilterParams } from '../../lib/data-filters.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { buildDataFilterParams } from '@/lib/data-filters.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface TimeseriesOptions {
   measurement?: string;

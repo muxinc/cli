@@ -1,10 +1,7 @@
 import { Command } from '@cliffy/command';
-import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
-import {
-  createPlaybackId,
-  type PlaybackIdPolicy,
-} from '../../../lib/playback-ids.ts';
-import { getPlayerUrl, getStreamUrl } from '../../../lib/urls.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import { createPlaybackId, type PlaybackIdPolicy } from '@/lib/playback-ids.ts';
+import { getPlayerUrl, getStreamUrl } from '@/lib/urls.ts';
 
 interface CreateOptions {
   policy?: PlaybackIdPolicy;

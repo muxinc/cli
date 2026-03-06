@@ -1,7 +1,7 @@
 import { Command } from '@cliffy/command';
-import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
-import { deleteLiveStreamPlaybackId } from '../../../lib/playback-ids.ts';
-import { confirmPrompt } from '../../../lib/prompt.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import { deleteLiveStreamPlaybackId } from '@/lib/playback-ids.ts';
+import { confirmPrompt } from '@/lib/prompt.ts';
 
 interface DeleteOptions {
   force?: boolean;

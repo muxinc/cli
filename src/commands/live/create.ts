@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/mux-node';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 // Extract types from Mux SDK
 type LatencyMode = NonNullable<

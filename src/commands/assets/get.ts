@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
-import { formatAsset } from '../../lib/formatters.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { formatAsset } from '@/lib/formatters.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface GetOptions {
   json?: boolean;
