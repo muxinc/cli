@@ -139,7 +139,7 @@ These options are available on most commands and are not repeated in individual 
 Listen for Mux webhook events in real-time and forward them to your local development server. Events are stored locally for replay during development.
 
 > [!CAUTION]
-> These CLI commands are for **local development only**. In production, you must configure a webhook endpoint in the [Mux Dashboard](https://dashboard.mux.com) that points to your deployed server's public URL. The CLI tunnel is not a substitute for a production webhook configuration.
+> These CLI commands are for **local development only** and provide **no delivery guarantees**. In production, you must configure a webhook endpoint in the [Mux Dashboard](https://dashboard.mux.com) that points to your server webhook endpoint URL.
 
 ### `mux webhooks listen`
 
