@@ -262,123 +262,126 @@ function getDataForEventType(
   eventType: string,
   objectId: string,
 ): Record<string, unknown> {
-  // Asset events
-  if (eventType === 'video.asset.created')
-    return exampleAsset('preparing', objectId);
-  if (eventType === 'video.asset.ready') return exampleAsset('ready', objectId);
-  if (eventType === 'video.asset.errored')
-    return exampleAsset('errored', objectId);
-  if (
-    eventType === 'video.asset.updated' ||
-    eventType === 'video.asset.deleted' ||
-    eventType === 'video.asset.live_stream_completed' ||
-    eventType === 'video.asset.warning'
-  )
-    return exampleAsset('ready', objectId);
-  if (eventType === 'video.asset.non_standard_input_detected') {
-    const asset = exampleAsset('preparing', objectId);
-    asset.non_standard_input_reasons = { video_codec: 'av1' };
-    asset.aspect_ratio = '16:9';
-    asset.max_stored_resolution = 'HD';
-    asset.max_stored_frame_rate = 30;
-    asset.resolution_tier = '1080p';
-    asset.tracks = [
-      {
-        type: 'audio',
-        primary: true,
-        max_channels: 2,
-        max_channel_layout: 'stereo',
-        id: generateId(),
-        duration: 120.5,
-      },
-      {
-        type: 'video',
-        max_width: 1920,
-        max_height: 1080,
-        max_frame_rate: 30,
-        id: generateId(),
-        duration: 120.5,
-      },
-    ];
-    return asset;
+  switch (eventType) {
+    // Asset events
+    case 'video.asset.created':
+      return exampleAsset('preparing', objectId);
+    case 'video.asset.ready':
+      return exampleAsset('ready', objectId);
+    case 'video.asset.errored':
+      return exampleAsset('errored', objectId);
+    case 'video.asset.updated':
+    case 'video.asset.deleted':
+    case 'video.asset.live_stream_completed':
+    case 'video.asset.warning':
+      return exampleAsset('ready', objectId);
+    case 'video.asset.non_standard_input_detected': {
+      const asset = exampleAsset('preparing', objectId);
+      asset.non_standard_input_reasons = { video_codec: 'av1' };
+      asset.aspect_ratio = '16:9';
+      asset.max_stored_resolution = 'HD';
+      asset.max_stored_frame_rate = 30;
+      asset.resolution_tier = '1080p';
+      asset.tracks = [
+        {
+          type: 'audio',
+          primary: true,
+          max_channels: 2,
+          max_channel_layout: 'stereo',
+          id: generateId(),
+          duration: 120.5,
+        },
+        {
+          type: 'video',
+          max_width: 1920,
+          max_height: 1080,
+          max_frame_rate: 30,
+          id: generateId(),
+          duration: 120.5,
+        },
+      ];
+      return asset;
+    }
+
+    // Master events
+    case 'video.asset.master.ready':
+    case 'video.asset.master.preparing':
+    case 'video.asset.master.deleted':
+    case 'video.asset.master.errored':
+      return exampleAsset('ready', objectId);
+
+    // Track events
+    case 'video.asset.track.created':
+      return exampleTrack('preparing', objectId);
+    case 'video.asset.track.ready':
+      return exampleTrack('ready', objectId);
+    case 'video.asset.track.errored':
+      return exampleTrack('errored', objectId);
+    case 'video.asset.track.deleted':
+      return exampleTrack('ready', objectId);
+
+    // Static rendition events
+    case 'video.asset.static_rendition.created':
+      return exampleStaticRendition('preparing', objectId);
+    case 'video.asset.static_rendition.ready':
+      return exampleStaticRendition('ready', objectId);
+    case 'video.asset.static_rendition.errored':
+      return exampleStaticRendition('errored', objectId);
+    case 'video.asset.static_rendition.deleted':
+      return exampleStaticRendition('ready', objectId);
+    case 'video.asset.static_rendition.skipped':
+      return exampleStaticRendition('skipped', objectId);
+
+    // Upload events
+    case 'video.upload.created':
+      return exampleUpload('waiting', objectId);
+    case 'video.upload.asset_created':
+      return exampleUpload('asset_created', objectId);
+    case 'video.upload.cancelled':
+      return exampleUpload('cancelled', objectId);
+    case 'video.upload.errored':
+      return exampleUpload('errored', objectId);
+
+    // Live stream events
+    case 'video.live_stream.created':
+      return exampleLiveStream('idle', objectId);
+    case 'video.live_stream.connected':
+      return exampleLiveStream('connected', objectId);
+    case 'video.live_stream.recording':
+      return exampleLiveStream('recording', objectId);
+    case 'video.live_stream.active':
+      return exampleLiveStream('active', objectId);
+    case 'video.live_stream.disconnected':
+      return exampleLiveStream('disconnected', objectId);
+    case 'video.live_stream.idle':
+      return exampleLiveStream('idle', objectId);
+    case 'video.live_stream.updated':
+    case 'video.live_stream.enabled':
+    case 'video.live_stream.disabled':
+    case 'video.live_stream.deleted':
+    case 'video.live_stream.warning':
+      return exampleLiveStream('idle', objectId);
+
+    // Simulcast target events
+    case 'video.live_stream.simulcast_target.created':
+      return exampleSimulcastTarget('idle', objectId);
+    case 'video.live_stream.simulcast_target.idle':
+      return exampleSimulcastTarget('idle', objectId);
+    case 'video.live_stream.simulcast_target.starting':
+      return exampleSimulcastTarget('starting', objectId);
+    case 'video.live_stream.simulcast_target.broadcasting':
+      return exampleSimulcastTarget('broadcasting', objectId);
+    case 'video.live_stream.simulcast_target.errored':
+      return exampleSimulcastTarget('errored', objectId);
+    case 'video.live_stream.simulcast_target.deleted':
+      return exampleSimulcastTarget('deleted', objectId);
+    case 'video.live_stream.simulcast_target.updated':
+      return exampleSimulcastTarget('idle', objectId);
+
+    // Fallback
+    default:
+      return exampleAsset('ready', objectId);
   }
-
-  // Master events
-  if (eventType.startsWith('video.asset.master.'))
-    return exampleAsset('ready', objectId);
-
-  // Track events
-  if (eventType === 'video.asset.track.created')
-    return exampleTrack('preparing', objectId);
-  if (eventType === 'video.asset.track.ready')
-    return exampleTrack('ready', objectId);
-  if (eventType === 'video.asset.track.errored')
-    return exampleTrack('errored', objectId);
-  if (eventType === 'video.asset.track.deleted')
-    return exampleTrack('ready', objectId);
-
-  // Static rendition (singular — individual rendition)
-  if (eventType === 'video.asset.static_rendition.created')
-    return exampleStaticRendition('preparing', objectId);
-  if (eventType === 'video.asset.static_rendition.ready')
-    return exampleStaticRendition('ready', objectId);
-  if (eventType === 'video.asset.static_rendition.errored')
-    return exampleStaticRendition('errored', objectId);
-  if (eventType === 'video.asset.static_rendition.deleted')
-    return exampleStaticRendition('ready', objectId);
-  if (eventType === 'video.asset.static_rendition.skipped')
-    return exampleStaticRendition('skipped', objectId);
-
-  // Upload events
-  if (eventType === 'video.upload.created')
-    return exampleUpload('waiting', objectId);
-  if (eventType === 'video.upload.asset_created')
-    return exampleUpload('asset_created', objectId);
-  if (eventType === 'video.upload.cancelled')
-    return exampleUpload('cancelled', objectId);
-  if (eventType === 'video.upload.errored')
-    return exampleUpload('errored', objectId);
-
-  // Live stream events
-  if (eventType === 'video.live_stream.created')
-    return exampleLiveStream('idle', objectId);
-  if (eventType === 'video.live_stream.connected')
-    return exampleLiveStream('connected', objectId);
-  if (eventType === 'video.live_stream.recording')
-    return exampleLiveStream('recording', objectId);
-  if (eventType === 'video.live_stream.active')
-    return exampleLiveStream('active', objectId);
-  if (eventType === 'video.live_stream.disconnected')
-    return exampleLiveStream('disconnected', objectId);
-  if (eventType === 'video.live_stream.idle')
-    return exampleLiveStream('idle', objectId);
-  if (
-    eventType === 'video.live_stream.updated' ||
-    eventType === 'video.live_stream.enabled' ||
-    eventType === 'video.live_stream.disabled' ||
-    eventType === 'video.live_stream.deleted' ||
-    eventType === 'video.live_stream.warning'
-  )
-    return exampleLiveStream('idle', objectId);
-
-  // Simulcast target events
-  if (eventType === 'video.live_stream.simulcast_target.created')
-    return exampleSimulcastTarget('idle', objectId);
-  if (eventType === 'video.live_stream.simulcast_target.idle')
-    return exampleSimulcastTarget('idle', objectId);
-  if (eventType === 'video.live_stream.simulcast_target.starting')
-    return exampleSimulcastTarget('starting', objectId);
-  if (eventType === 'video.live_stream.simulcast_target.broadcasting')
-    return exampleSimulcastTarget('broadcasting', objectId);
-  if (eventType === 'video.live_stream.simulcast_target.errored')
-    return exampleSimulcastTarget('errored', objectId);
-  if (eventType === 'video.live_stream.simulcast_target.deleted')
-    return exampleSimulcastTarget('deleted', objectId);
-  if (eventType === 'video.live_stream.simulcast_target.updated')
-    return exampleSimulcastTarget('idle', objectId);
-
-  // Fallback
-  return exampleAsset('ready', objectId);
 }
 
 /**
