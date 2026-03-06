@@ -30,7 +30,7 @@ export const replayCommand = new Command()
   .description('Replay stored webhook events')
   .arguments('[event-id:string]')
   .option('--forward-to <url:string>', 'POST event(s) to a local URL')
-  .option('--all', 'Replay all stored events', { conflicts: ['event-id'] })
+  .option('--all', 'Replay all stored events')
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: ReplayOptions, eventId?: string) => {
     try {
@@ -38,6 +38,11 @@ export const replayCommand = new Command()
         console.error(
           'Provide an event ID or use --all to replay all stored events.',
         );
+        process.exit(1);
+      }
+
+      if (eventId && options.all) {
+        console.error('Cannot use both an event ID and --all.');
         process.exit(1);
       }
 
