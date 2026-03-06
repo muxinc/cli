@@ -1,7 +1,7 @@
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment, setEnvironment } from '../../lib/config.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
-import { confirmPrompt } from '../../lib/prompt.ts';
+import { getCurrentEnvironment, setEnvironment } from '@/lib/config.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import { confirmPrompt } from '@/lib/prompt.ts';
 
 interface CreateOptions {
   json?: boolean;

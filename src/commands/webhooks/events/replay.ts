@@ -1,10 +1,10 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getAllEvents, getEventById } from '../../../lib/events-store.ts';
+import { getAllEvents, getEventById } from '@/lib/events-store.ts';
 import {
   buildSignedHeaders,
   getSigningSecretForCurrentEnv,
-} from '../../../lib/webhook-signing.ts';
+} from '@/lib/webhook-signing.ts';
 
 interface ReplayOptions {
   forwardTo?: string;

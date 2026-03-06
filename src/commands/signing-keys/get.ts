@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
-import { readConfig } from '../../lib/config.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { readConfig } from '@/lib/config.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface GetOptions {
   json?: boolean;

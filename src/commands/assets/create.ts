@@ -1,9 +1,9 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/mux-node';
-import { expandGlobPattern, uploadFile } from '../../lib/file-upload.ts';
-import { parseAssetConfig } from '../../lib/json-config.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
-import { confirmPrompt } from '../../lib/prompt.ts';
+import { expandGlobPattern, uploadFile } from '@/lib/file-upload.ts';
+import { parseAssetConfig } from '@/lib/json-config.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import { confirmPrompt } from '@/lib/prompt.ts';
 
 // Extract types from Mux SDK
 type PlaybackPolicy = Mux.PlaybackPolicy;

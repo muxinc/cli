@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
-import { confirmPrompt } from '../../lib/prompt.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import { confirmPrompt } from '@/lib/prompt.ts';
 
 interface CancelOptions {
   force?: boolean;

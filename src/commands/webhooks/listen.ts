@@ -1,13 +1,10 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment } from '../../lib/config.ts';
-import { appendEvent, type StoredEvent } from '../../lib/events-store.ts';
-import { getAuthHeaders, getMuxBaseUrl } from '../../lib/mux.ts';
-import { parseSSEStream } from '../../lib/sse.ts';
-import {
-  buildSignedHeaders,
-  getSigningSecret,
-} from '../../lib/webhook-signing.ts';
+import { getCurrentEnvironment } from '@/lib/config.ts';
+import { appendEvent, type StoredEvent } from '@/lib/events-store.ts';
+import { getAuthHeaders, getMuxBaseUrl } from '@/lib/mux.ts';
+import { parseSSEStream } from '@/lib/sse.ts';
+import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
 interface ListenOptions {
   forwardTo?: string;

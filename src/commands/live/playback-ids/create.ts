@@ -1,10 +1,10 @@
 import { Command } from '@cliffy/command';
-import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import {
   createLiveStreamPlaybackId,
   type PlaybackIdPolicy,
-} from '../../../lib/playback-ids.ts';
-import { getPlayerUrl, getStreamUrl } from '../../../lib/urls.ts';
+} from '@/lib/playback-ids.ts';
+import { getPlayerUrl, getStreamUrl } from '@/lib/urls.ts';
 
 interface CreateOptions {
   policy?: PlaybackIdPolicy;

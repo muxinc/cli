@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
-import { formatAsset, formatLiveStream } from '../../lib/formatters.ts';
-import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
+import { formatAsset, formatLiveStream } from '@/lib/formatters.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface PlaybackIdOptions {
   json?: boolean;

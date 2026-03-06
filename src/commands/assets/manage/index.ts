@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 export const manageCommand = new Command()
   .description('Interactively manage Mux video assets with a TUI')

@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import type { Asset } from '@mux/mux-node/resources/video/assets';
-import { createAuthenticatedMuxClient } from '../../../lib/mux.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 type StaticRenditionFile = NonNullable<
   NonNullable<Asset['static_renditions']>['files']

@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { listEvents } from '../../../lib/events-store.ts';
+import { listEvents } from '@/lib/events-store.ts';
 
 interface ListOptions {
   limit?: number;
