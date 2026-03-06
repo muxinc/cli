@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { getDefaultEnvironment, setEnvironment } from '../../lib/config.ts';
+import { getCurrentEnvironment, setEnvironment } from '../../lib/config.ts';
 import { createAuthenticatedMuxClient } from '../../lib/mux.ts';
 import { confirmPrompt } from '../../lib/prompt.ts';
 
@@ -18,7 +18,7 @@ export const createCommand = new Command()
       const mux = await createAuthenticatedMuxClient();
 
       // Get current environment
-      const currentEnv = await getDefaultEnvironment();
+      const currentEnv = await getCurrentEnvironment();
       if (!currentEnv) {
         throw new Error(
           "No environment configured. Please run 'mux login' first.",

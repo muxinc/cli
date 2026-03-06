@@ -86,9 +86,9 @@ export async function setEnvironment(
 }
 
 /**
- * Get the default environment, or the only environment if there's just one
+ * Get the current (selected) environment, or the only environment if there's just one
  */
-export async function getDefaultEnvironment(): Promise<{
+export async function getCurrentEnvironment(): Promise<{
   name: string;
   environment: Environment;
 } | null> {
@@ -123,9 +123,9 @@ export async function getDefaultEnvironment(): Promise<{
 }
 
 /**
- * Set the default environment
+ * Set the current (selected) environment
  */
-export async function setDefaultEnvironment(name: string): Promise<void> {
+export async function setCurrentEnvironment(name: string): Promise<void> {
   const config = await readConfig();
   if (!config) {
     throw new Error('No config file exists');

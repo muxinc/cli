@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { getEnvironment, setDefaultEnvironment } from '../../lib/config.ts';
+import { getEnvironment, setCurrentEnvironment } from '../../lib/config.ts';
 
 export const switchCommand = new Command()
   .description(
@@ -17,6 +17,6 @@ export const switchCommand = new Command()
     }
 
     // Set as default
-    await setDefaultEnvironment(name);
+    await setCurrentEnvironment(name);
     console.log(`✅ Switched default environment to: ${name}`);
   });

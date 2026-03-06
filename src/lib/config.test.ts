@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import {
   type Config,
   type Environment,
-  getDefaultEnvironment,
+  getCurrentEnvironment,
   getEnvironment,
   listEnvironments,
   readConfig,
   removeEnvironment,
-  setDefaultEnvironment,
+  setCurrentEnvironment,
   setEnvironment,
   writeConfig,
 } from './config.ts';
@@ -216,15 +216,15 @@ describe('Config manager', () => {
     });
   });
 
-  describe('getDefaultEnvironment', () => {
+  describe('getCurrentEnvironment', () => {
     it('should return null when no config exists', async () => {
-      const result = await getDefaultEnvironment();
+      const result = await getCurrentEnvironment();
       expect(result).toBeNull();
     });
 
     it('should return null when config has no environments', async () => {
       await writeConfig({ environments: {} });
-      const result = await getDefaultEnvironment();
+      const result = await getCurrentEnvironment();
       expect(result).toBeNull();
     });
 
@@ -235,7 +235,7 @@ describe('Config manager', () => {
       };
 
       await setEnvironment('test', testEnv);
-      const result = await getDefaultEnvironment();
+      const result = await getCurrentEnvironment();
 
       expect(result).toEqual({
         name: 'test',
@@ -255,9 +255,9 @@ describe('Config manager', () => {
 
       await setEnvironment('first', firstEnv);
       await setEnvironment('second', secondEnv);
-      await setDefaultEnvironment('second');
+      await setCurrentEnvironment('second');
 
-      const result = await getDefaultEnvironment();
+      const result = await getCurrentEnvironment();
 
       expect(result).toEqual({
         name: 'second',
@@ -266,9 +266,9 @@ describe('Config manager', () => {
     });
   });
 
-  describe('setDefaultEnvironment', () => {
+  describe('setCurrentEnvironment', () => {
     it('should throw error when config does not exist', () => {
-      expect(setDefaultEnvironment('test')).rejects.toThrow(
+      expect(setCurrentEnvironment('test')).rejects.toThrow(
         'No config file exists',
       );
     });
@@ -283,7 +283,7 @@ describe('Config manager', () => {
         },
       });
 
-      expect(setDefaultEnvironment('test')).rejects.toThrow(
+      expect(setCurrentEnvironment('test')).rejects.toThrow(
         'Environment "test" does not exist',
       );
     });
@@ -300,7 +300,7 @@ describe('Config manager', () => {
 
       await setEnvironment('first', firstEnv);
       await setEnvironment('second', secondEnv);
-      await setDefaultEnvironment('second');
+      await setCurrentEnvironment('second');
 
       const config = await readConfig();
       expect(config?.defaultEnvironment).toBe('second');

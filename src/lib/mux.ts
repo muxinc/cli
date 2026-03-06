@@ -1,7 +1,9 @@
 import Mux from '@mux/mux-node';
 import pkg from '../../package.json';
-import { getDefaultEnvironment } from './config.ts';
+import { getCurrentEnvironment } from './config.ts';
 import { isAgentMode } from './context.ts';
+
+const DEFAULT_BASE_URL = 'https://api.mux.com';
 
 function getUserAgent(): string {
   return isAgentMode()
@@ -10,11 +12,36 @@ function getUserAgent(): string {
 }
 
 /**
+ * Get the Mux API base URL, respecting MUX_BASE_URL env var
+ */
+export function getMuxBaseUrl(): string {
+  return process.env.MUX_BASE_URL || DEFAULT_BASE_URL;
+}
+
+/**
+ * Get auth headers for raw fetch requests to Mux API
+ */
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const env = await getCurrentEnvironment();
+  if (!env) {
+    throw new Error("Not logged in. Please run 'mux login' to authenticate.");
+  }
+
+  const credentials = btoa(
+    `${env.environment.tokenId}:${env.environment.tokenSecret}`,
+  );
+  return {
+    Authorization: `Basic ${credentials}`,
+    'User-Agent': getUserAgent(),
+  };
+}
+
+/**
  * Create an authenticated Mux client using stored credentials
  * Throws an error if not logged in
  */
 export async function createAuthenticatedMuxClient(): Promise<Mux> {
-  const env = await getDefaultEnvironment();
+  const env = await getCurrentEnvironment();
   if (!env) {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
   }

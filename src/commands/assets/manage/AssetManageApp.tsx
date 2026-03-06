@@ -3,7 +3,7 @@ import type Mux from '@mux/mux-node';
 import type { Asset } from '@mux/mux-node/resources/video/assets';
 import { useKeyboard, useRenderer } from '@opentui/react';
 import { useCallback, useEffect, useState } from 'react';
-import { getDefaultEnvironment } from '../../../lib/config.ts';
+import { getCurrentEnvironment } from '../../../lib/config.ts';
 import {
   createPlaybackId,
   deletePlaybackId,
@@ -98,7 +98,7 @@ export function AssetManageApp({ mux, onPrompt }: AssetManageAppProps) {
   const getSignedToken = useCallback(
     async (playbackId: string): Promise<string | null> => {
       try {
-        const env = await getDefaultEnvironment();
+        const env = await getCurrentEnvironment();
         if (!env) return null;
 
         const credentials = {
