@@ -1,0 +1,193 @@
+---
+title: Running ads with Mux Player
+product: video
+description: Monetize your videos by running ads in Mux Player with the Google IMA SDK.
+seoTitle: Running ads with Mux Player
+seoDescription: Monetize your videos by running ads in Mux Player with the Google IMA SDK
+---
+
+Mux Player doesn’t have a built-in way to integrate ads. We will show you how this can be achieved though using client side ad insertion with the Google IMA SDK. This guide will demonstrate how you can enable [preroll](https://www.mux.com/video-glossary/preroll) ads, but [midroll](https://www.mux.com/video-glossary/midroll) and [postroll](https://www.mux.com/video-glossary/postroll) ads could also be achieved using this approach.
+
+If you're unfamiliar with the Google IMA SDK, we recommend reading the [documentation](https://developers.google.com/interactive-media-ads/docs/sdks/html5/client-side) as well as the examples in [this repository](https://github.com/googleads/googleads-ima-html5).
+
+Within web video, ad insertion typically comes in two flavors:
+
+- **SSAI - Server Side Ad Insertion**: A mechanism to insert advertisements into the linear video stream so that it’s played out _without_ any other needed technology on the viewing side.
+- **CSAI - Client Side Ad Insertion**: A method whereby the video player requests an ad from an ad server via the video player located inside an application or website. When the ad server has received the ad request from the video player, it sends back an ad and displays it inside the video content.
+
+<Callout type="info">
+The following guide is using vanilla JS, however it can applied to any popular framework (React, Angular, etc.)
+</Callout>
+
+## 1. Set up Mux Player
+
+First, make sure you have Mux Player set up on your webpage. Include the following CDN links:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mux/mux-player" defer></script>
+```
+
+Then add Mux Player within a containing div element. This div element will act as a container for both Mux Player and the Ad layer
+
+```html
+<div id="mainContainer">
+    <mux-player
+    playback-id="EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs"
+    metadata-video-title="Test VOD"
+    metadata-viewer-user-id="user-id-007"
+    ></mux-player>
+</div>
+```
+
+<Callout type="info">
+ [See the related player documentation](/docs/guides/mux-player-web)
+</Callout>
+
+
+## 2. Include the Google IMA SDK
+
+```html
+<script src="//imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+```
+
+<Callout type="warning">
+While developing locally, the newer versions of Google Chrome might block the loading of this script because of the lack of HTTPS/SSL support
+</Callout>
+
+
+## 3. Create an ad container
+
+We need to add two container elements. One to contain the ad itself, which will overlay Mux Player, and another to wrap around both of them
+
+```html
+<div id="mainContainer">
+    <mux-player
+    playback-id="EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs"
+    metadata-video-title="Test VOD"
+    metadata-viewer-user-id="user-id-007"
+    ></mux-player>
+    <div id="ad-container"></div>
+</div>
+```
+
+Now we add some CSS to position the ad on top of the player. It's important that the `ad-container` is the exact same size as the player element, so that ads are displayed at the same size as the video.
+
+```css
+mux-player {
+    width: 640px;
+    height: 360px;
+}
+
+#mainContainer {
+    position: relative;
+    width: 640px;
+    height: 360px;
+}
+
+#ad-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+}
+```
+
+## 4. Initialize the IMA SDK and handle playback
+
+Initialize the IMA SDK and configure it to use the ad container element we created earlier. The code below initializes the Google IMA SDK for client-side ad insertion. It creates an AdDisplayContainer object, which is used to overlay ads on top of Mux Player. Then, an AdsLoader object is created, which loads the IMA SDK ads. Create an AdsRequest object and request ads using the IMA SDK. You’ll need to have an ad tag URL from your ad server.
+
+```javascript
+let muxPlayer = document.querySelector('mux-player'); // initialize for later use
+
+const adDisplayContainer = new google.ima.AdDisplayContainer(document.getElementById('ad-container'));
+const adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+let adsManager; // initializes the adsManager that get's utilized in later event handlers
+
+adsLoader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED, onAdsManagerLoaded, false);
+adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError, false);
+
+let adsRequest = new google.ima.AdsRequest();
+adsRequest.adTagUrl = 'https://pubads.g.doubleclick.net/gampad/ads?iu=/21775744923/external/single_ad_samples&sz=640x480&cust_params=sample_ct%3Dlinear&ciu_szs=300x250%2C728x90&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&correlator=';
+
+// The above is a testing preroll ad. Please fill in your tag URL from your ad server.
+
+adsRequest.linearAdSlotWidth = 640;
+adsRequest.linearAdSlotHeight = 360;
+adsRequest.nonLinearAdSlotWidth = 640;
+adsRequest.nonLinearAdSlotHeight = 150;
+
+adsLoader.requestAds(adsRequest);
+```
+
+When ads are loaded, initialize the AdsManager to start playing them. This sets up the Google IMA SDK's AdsManager and attaches event listeners to handle ad events. It also initializes and starts the AdsManager, ensuring that ads are played correctly. If an error occurs during initialization or ad playback, the content will be played instead. 
+
+```javascript
+function onAdsManagerLoaded(adsManagerLoadedEvent) {
+    let adsRenderingSettings = new google.ima.AdsRenderingSettings();
+    adsManager = adsManagerLoadedEvent.getAdsManager(muxPlayer, adsRenderingSettings);
+
+    // Add event listeners to the ads manager here
+    adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError);
+    adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
+    adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
+
+    try {
+        adsManager.init(640, 360, google.ima.ViewMode.NORMAL);
+        adsManager.start();
+    } catch (adError) {
+        muxPlayer.play(); // If ad fails, continue with the content
+    }
+}
+
+function onAdError(adErrorEvent) {
+    console.log(adErrorEvent.getError());
+    if (adsManager) {
+        adsManager.destroy();
+    }
+    muxPlayer.play(); // Continue with the content
+}
+
+function onContentPauseRequested() {
+    muxPlayer.pause();
+}
+
+function onContentResumeRequested() {
+    muxPlayer.play();
+}
+```
+
+<Callout type="info">
+Under `adsManager.init(640, 360, google.ima.ViewMode.NORMAL)`, the values of 640 and 360 should match the values of the ad and main container dimensions. Otherwise you will see some unwanted results with the ad dimensions
+</Callout>
+
+## 5. Link Mux Player events with IMA SDK
+
+These event listeners synchronize ad playback with video playback, ensuring that everything is tied together.
+
+```javascript
+muxPlayer.addEventListener('play', function () {
+    adDisplayContainer.initialize();
+});
+
+muxPlayer.addEventListener('pause', function () {
+    if (adsManager) {
+        adsManager.pause();
+    }
+});
+
+muxPlayer.addEventListener('playing', function () {
+    if (adsManager) {
+        adsManager.resume();
+    }
+});
+```
+
+## 6. Start the ad and content
+
+Ensure the ad is initialized and content plays accordingly.
+
+<Callout type="warning">
+Please be mindful when testing if you're using an adblocker as you will not receive any ads
+</Callout>

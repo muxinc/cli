@@ -1,0 +1,167 @@
+---
+title: Monitor Kaltura Player (Android)
+product: data
+dataIntegration: true
+description: >-
+  This guide walks through integration with the [Kaltura PlayKit and TVPlayer
+  for Android](https://github.com/kaltura/playkit-android) to collect video
+  performance metrics with Mux Data.
+---
+
+This documents integration instructions for [Kaltura PlayKit and TVPlayer for Android](https://github.com/kaltura/playkit-android) version v4.16.0 or higher.
+
+The Mux integration with `Kaltura` is built on top of Mux's core Java SDK, and the full code can be seen here: [muxinc/mux-stats-sdk-kaltura-android](https://github.com/muxinc/mux-stats-sdk-kaltura-android).
+
+## Features
+
+<SDKFeatures featureDef={featureDef} />
+
+## 1. Install the Mux Data SDK
+
+Add the Mux Maven repository to your Gradle file:
+```text
+repositories {
+    maven {
+        url "https://muxinc.jfrog.io/artifactory/default-maven-release-local"
+    }
+}
+```
+
+Next, add a dependency to your Gradle file using the Mux SDK version in the following format:
+```text
+api 'com.mux.stats.sdk.muxstats:MuxKalturaSDK:(Mux SDK version)'
+```
+
+Example using Mux Kaltura SDK 0.1.0:
+```text
+api 'com.mux.stats.sdk.muxstats:MuxKalturaSDK:0.1.0'
+```
+
+## 2. Initialize the monitor with your Kaltura player instance
+
+<MdxImport snippet="envKeyCallout" />
+
+Our SDK supports Kaltura PlayKit and TVPlayer v4.16.0 or higher.
+
+First, create the `CustomerPlayerData` and `CustomerVideoData` objects as appropriate for your current playback, and be sure to set your `ENV_KEY`.
+```java
+import com.mux.stats.core.model.CustomerData;
+import com.mux.stats.core.model.CustomerPlayerData;
+import com.mux.stats.core.model.CustomerVideoData;
+import com.mux.stats.core.model.CustomerViewData;
+// ...
+CustomerPlayerData customerPlayerData = new CustomerPlayerData();
+customerPlayerData.setEnvironmentKey("ENV_KEY");
+CustomerVideoData customerVideoData = new CustomerVideoData();
+customerVideoData.setVideoTitle("The most epic video ever");
+CustomerViewData customerViewData = new CustomerViewData();
+customerViewData.setViewSessionId("A26C4C2F-3C8A-46FB-885A-8D973F99A998");
+CustomerData customerData = new CustomerData(customerPlayerData, customerVideoData, customerViewData);
+```
+
+Next, create the `MuxStatsKaltura` object by passing your Android `Context` (typically your `Activity`), the player instance, a player name, and the customer data object. The following example shows how to instantiate the SDK using the TVPlayer "KalturaPlayer" (represented by the variable `player`). For a PlayKit-only player just pass in your raw `com.kaltura.playkit.Player` reference in place of the KalturaPlayer.
+
+```java
+MuxNetworkRequests network = new MuxNetworkRequests();
+muxStats = new MuxStatsKaltura(this, player, "my-player-name", customerData, new CustomOptions().setSentryEnabled(false), network);
+```
+
+In order to correctly monitor if the player is full-screen, provide the screen size to the `MuxStatsKaltura` instance.
+```java
+Point size = new Point();
+getWindowManager().getDefaultDisplay().getSize(size);
+muxStats.setScreenSize(size.x, size.y);
+muxStats.enableMuxCoreDebug(true, false);
+```
+
+Finally, when you are destroying the player, call the `MuxStatsKaltura.release()` method.
+
+```java
+muxStats.release()
+```
+
+After you've integrated, start playing a video in your player. A few minutes after you stop watching, you'll see the results in your Mux data dashboard. Login to the dashboard and find the environment that corresponds to your `env_key` and look for video views.
+
+## 3. Add Metadata
+
+In the Java SDK, options are provided via the `CustomerPlayerData`, `CustomerVideoData`, and `CustomerViewData` objects.
+
+All metadata details except for `envKey` are optional, however you'll be able to compare and see more interesting results as you include more details. This gives you more metrics and metadata about video streaming, and allows you to search and filter on important fields like the player version, CDN, and video title.
+
+For more information, see the [Metadata Guide](/docs/guides/make-your-data-actionable-with-metadata).
+
+## 4. Advanced
+
+## Changing the video
+
+There are two cases where the underlying tracking of the video view must be reset. First, when you load a new source URL into an existing player, and second when the program within a singular stream changes (such as a program within a live stream).
+
+Note: You do not need to change the video info when changing to a different source of the same video content (e.g. different resolution or video format).
+
+## New source
+
+When you change to a new video (in the same player) you need to update the information that Mux knows about the current video. Examples of when this is needed are:
+
+* The player advances to the next video in a playlist
+* The user selects a different video to play
+
+This is done by calling `MuxStatsKaltura.videoChange(CustomerVideoData)` which will remove all previous video data and reset all metrics for the video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+It's best to change the video info immediately after telling the player which new source to play.
+
+## New program (in single stream)
+
+In some cases, you may have the program change within a stream, and you may want to track each program as a view on its own. An example of this is a live stream that streams multiple programs back to back, with no interruptions.
+
+In this case, call `MuxStatsKaltura.programChange(CustomerVideoData)`. This will remove all previous video data and reset all metrics for the video view, creating a new video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+## Error tracking
+
+By default, Mux's integration with Kaltura automatically tracks fatal errors as thrown by the Kaltura player. If a fatal error happens outside the context of Kaltura player and you want to track it with Mux, you can call `MuxStatsKaltura.error` like this:
+
+```java
+// Error code: integer value for the generic type of error that
+// occurred.
+// Error message: String providing more information on the error
+// that occurred.
+// For an example, the HTML5 video element uses the
+// following: https://developer.mozilla.org/en-US/docs/Web/API/MediaError
+// for codes and messages. Feel free to use your own codes and messages
+int errorCode = 1;
+String errorMessage = "A fatal error was encountered during playback";
+MuxErrorException error = new MuxErrorException(errorCode, errorMessage);
+muxStats.error(error);
+```
+Note that `MuxStatsKaltura.error(MuxErrorException e)` can be used with or without automatic error tracking. If your application has retry logic that attempts to recover from Kaltura player errors then you may want to disable automatic error tracking like this:
+
+```java
+muxStats.setAutomaticErrorTracking(false)
+```
+
+<Callout type="warning">
+It is important that you only trigger an error when the playback has to be abandoned or aborted in an unexpected manner, as Mux tracks fatal playback errors only.
+</Callout>
+
+### Sentry
+
+In order to improve our SDKs, Mux utilizes [Sentry](https://sentry.io) to track exceptions that our SDK may throw. No personal data is captured by Mux's SDK in these error reports, but if you want to disable this functionality, you can. This should be managed through the `CustomOptions` object passed to the constructor.
+
+```java
+muxStats = new MuxStatsKaltura(this, player, "my-player-name", customerData, new CustomOptions().setSentryEnabled(false), network);
+```
+
+<Releases>
+## Release notes
+
+### Current release
+
+#### v0.2.0
+Improvements:
+* Update to MuxCore 7.8, adds `CustomerViewerData` to `CustomerData`
+
+### Previous releases
+
+#### v0.1.0
+Feature:
+ - First beta release of the Kaltura SDK for Android
+</Releases>

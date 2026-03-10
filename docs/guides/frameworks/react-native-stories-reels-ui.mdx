@@ -1,0 +1,983 @@
+---
+title: Build a Stories/Reels UI in React Native
+product: video
+description: Create an Instagram Stories or TikTok-style vertical video feed with full-screen videos, swipe navigation, and gesture controls.
+---
+
+This guide shows you how to build a vertical, full-screen video feed similar to Instagram Stories, TikTok, or Snapchat Spotlight. Users swipe up and down to navigate between videos, with automatic playback and gesture controls.
+
+<Callout type="info">
+  This is one of the most engaging UX patterns for short-form video. It's perfect for AI-generated content, user stories, or any vertical video feed.
+</Callout>
+
+## What we're building
+
+A Stories-style interface with:
+- **Full-screen vertical videos** (one video visible at a time)
+- **Swipe navigation** (swipe up/down to see next/previous video)
+- **Auto-play** (current video plays automatically)
+- **Gesture controls** (tap to pause, double-tap to like)
+- **UI overlay** (username, caption, stats, actions)
+- **Smooth transitions** between videos
+- **Preloading** for seamless playback
+
+---
+
+## Architecture overview
+
+The Stories UI uses these key components:
+
+```
+StoriesScreen
+  ├── FlatList (pagingEnabled, vertical)
+  │   └── StoryItem (full-screen video + overlay)
+  │       ├── MuxVideo (with auto-play logic)
+  │       ├── VideoOverlay (username, stats, actions)
+  │       └── GestureDetector (tap, double-tap)
+  └── PreloadManager (loads next videos)
+```
+
+---
+
+## Step 1: Configure FlatList for full-screen paging
+
+The foundation is a FlatList configured for vertical paging:
+
+```tsx
+import React, { useRef, useState, useCallback } from 'react';
+import {
+  FlatList,
+  Dimensions,
+  StyleSheet,
+  ViewToken,
+  View,
+} from 'react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+interface Video {
+  id: string;
+  playbackId: string;
+  title: string;
+  username: string;
+  userId: string;
+  viewCount: number;
+  likeCount: number;
+}
+
+interface StoriesFeedProps {
+  videos: Video[];
+}
+
+export default function StoriesFeed({ videos }: StoriesFeedProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0) {
+        const index = viewableItems[0].index;
+        if (index !== null) {
+          setCurrentIndex(index);
+        }
+      }
+    },
+    []
+  );
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50, // Item is "visible" when 50% is on screen
+  }).current;
+
+  return (
+    <FlatList
+      ref={flatListRef}
+      data={videos}
+      renderItem={({ item, index }) => (
+        <StoryItem
+          video={item}
+          isActive={index === currentIndex}
+        />
+      )}
+      keyExtractor={(item) => item.id}
+      pagingEnabled
+      showsVerticalScrollIndicator={false}
+      snapToInterval={SCREEN_HEIGHT}
+      snapToAlignment="start"
+      decelerationRate="fast"
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+      getItemLayout={(data, index) => ({
+        length: SCREEN_HEIGHT,
+        offset: SCREEN_HEIGHT * index,
+        index,
+      })}
+      windowSize={3} // Render 1 above, 1 current, 1 below
+      maxToRenderPerBatch={2}
+      removeClippedSubviews
+    />
+  );
+}
+```
+
+### Key FlatList props
+
+| Prop | Purpose |
+|------|---------|
+| `pagingEnabled` | Snaps to full screens |
+| `snapToInterval={SCREEN_HEIGHT}` | Ensures exact screen alignment |
+| `snapToAlignment="start"` | Aligns to top of screen |
+| `decelerationRate="fast"` | Quick snap to next video |
+| `windowSize={3}` | Renders 3 items (prev, current, next) |
+| `getItemLayout` | Optimizes scroll performance |
+| `removeClippedSubviews` | Unmounts off-screen items (memory optimization) |
+
+---
+
+## Step 2: Build the StoryItem component
+
+Each story item is a full-screen video with controls:
+
+```tsx
+import React, { useRef, useState, useEffect } from 'react';
+import { View, StyleSheet, Dimensions, Pressable } from 'react-native';
+import Video, { VideoRef } from 'react-native-video';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+interface StoryItemProps {
+  video: Video;
+  isActive: boolean;
+}
+
+export function StoryItem({ video, isActive }: StoryItemProps) {
+  const videoRef = useRef<VideoRef>(null);
+  const [paused, setPaused] = useState(!isActive);
+  const [liked, setLiked] = useState(false);
+
+  // Auto-play when active, pause when not
+  useEffect(() => {
+    setPaused(!isActive);
+  }, [isActive]);
+
+  // Single tap: pause/play
+  const singleTap = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      setPaused((prev) => !prev);
+    });
+
+  // Double tap: like
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      setLiked(true);
+      // TODO: Call API to like video
+    });
+
+  const taps = Gesture.Exclusive(doubleTap, singleTap);
+
+  return (
+    <View style={styles.container}>
+      <GestureDetector gesture={taps}>
+        <View style={styles.videoContainer}>
+          <Video
+            ref={videoRef}
+            source={{ uri: `https://stream.mux.com/${video.playbackId}.m3u8` }}
+            poster={`https://image.mux.com/${video.playbackId}/thumbnail.png?time=0`}
+            posterResizeMode="cover"
+            style={styles.video}
+            paused={paused}
+            repeat={true} // Loop the video
+            resizeMode="cover"
+            onError={(error) => console.error('Video error:', error)}
+          />
+
+          {/* Overlay UI */}
+          <VideoOverlay
+            username={video.username}
+            title={video.title}
+            viewCount={video.viewCount}
+            likeCount={video.likeCount}
+            liked={liked}
+            onLike={() => setLiked(!liked)}
+          />
+
+          {/* Like animation (shown on double-tap) */}
+          {liked && <LikeAnimation />}
+        </View>
+      </GestureDetector>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#000',
+  },
+  videoContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  video: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+});
+```
+
+<Callout type="info">
+  **Install gesture handler** if you haven't already:
+  ```bash
+  npx expo install react-native-gesture-handler
+  ```
+</Callout>
+
+---
+
+## Step 3: Create the video overlay
+
+The overlay displays video metadata and actions:
+
+```tsx
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
+interface VideoOverlayProps {
+  username: string;
+  title: string;
+  viewCount: number;
+  likeCount: number;
+  liked: boolean;
+  onLike: () => void;
+}
+
+export function VideoOverlay({
+  username,
+  title,
+  viewCount,
+  likeCount,
+  liked,
+  onLike,
+}: VideoOverlayProps) {
+  return (
+    <>
+      {/* Top gradient for better text readability */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.6)', 'transparent']}
+        style={styles.topGradient}
+      />
+
+      {/* Bottom gradient and content */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.8)']}
+        style={styles.bottomGradient}
+      >
+        <View style={styles.bottomContent}>
+          {/* Left side: User info and caption */}
+          <View style={styles.leftContent}>
+            <Text style={styles.username}>@{username}</Text>
+            <Text style={styles.title} numberOfLines={2}>
+              {title}
+            </Text>
+            <Text style={styles.views}>
+              {formatNumber(viewCount)} views
+            </Text>
+          </View>
+
+          {/* Right side: Actions */}
+          <View style={styles.rightContent}>
+            <ActionButton
+              icon={liked ? '❤️' : '🤍'}
+              label={formatNumber(likeCount)}
+              onPress={onLike}
+            />
+            <ActionButton
+              icon="💬"
+              label="Comment"
+              onPress={() => {/* TODO */}}
+            />
+            <ActionButton
+              icon="🔗"
+              label="Share"
+              onPress={() => {/* TODO */}}
+            />
+          </View>
+        </View>
+      </LinearGradient>
+    </>
+  );
+}
+
+function ActionButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.actionButton} onPress={onPress}>
+      <Text style={styles.actionIcon}>{icon}</Text>
+      <Text style={styles.actionLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function formatNumber(num: number): string {
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return num.toString();
+}
+
+const styles = StyleSheet.create({
+  topGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 150,
+    zIndex: 1,
+  },
+  bottomGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 40,
+    zIndex: 1,
+  },
+  bottomContent: {
+    flexDirection: 'row',
+    padding: 20,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  leftContent: {
+    flex: 1,
+    marginRight: 20,
+  },
+  username: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  title: {
+    color: '#fff',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  views: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+  },
+  rightContent: {
+    alignItems: 'center',
+    gap: 20,
+  },
+  actionButton: {
+    alignItems: 'center',
+  },
+  actionIcon: {
+    fontSize: 32,
+    marginBottom: 4,
+  },
+  actionLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+});
+```
+
+---
+
+## Step 4: Add like animation
+
+Show a heart animation when users double-tap:
+
+```tsx
+import React, { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  runOnJS,
+} from 'react-native-reanimated';
+
+export function LikeAnimation({ onComplete }: { onComplete?: () => void }) {
+  const scale = useSharedValue(0);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    scale.value = withSequence(
+      withSpring(1.2, { damping: 10 }),
+      withSpring(1, { damping: 10 }),
+      withSpring(0, { damping: 10 }, () => {
+        if (onComplete) {
+          runOnJS(onComplete)();
+        }
+      })
+    );
+
+    opacity.value = withSequence(
+      withSpring(1),
+      withSpring(1),
+      withSpring(0)
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.container, animatedStyle]}>
+      <Animated.Text style={styles.heart}>❤️</Animated.Text>
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -50,
+    marginTop: -50,
+    zIndex: 10,
+  },
+  heart: {
+    fontSize: 100,
+  },
+});
+```
+
+---
+
+## Step 5: Add progress indicator
+
+Show progress at the top (like Instagram Stories):
+
+```tsx
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+interface ProgressIndicatorProps {
+  duration: number; // Video duration in seconds
+  paused: boolean;
+}
+
+export function ProgressIndicator({ duration, paused }: ProgressIndicatorProps) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    if (!paused) {
+      progress.value = withTiming(1, {
+        duration: duration * 1000,
+        easing: Easing.linear,
+      });
+    }
+  }, [paused, duration]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    width: `${progress.value * 100}%`,
+  }));
+
+  return (
+    <View style={styles.container}>
+      <Animated.View style={[styles.progress, animatedStyle]} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 50, // Below status bar
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    zIndex: 10,
+  },
+  progress: {
+    height: '100%',
+    backgroundColor: '#fff',
+  },
+});
+```
+
+---
+
+## Step 6: Preload adjacent videos
+
+Preload the next video for seamless transitions:
+
+```tsx
+import { useEffect } from 'react';
+import Video from 'react-native-video';
+
+interface PreloadManagerProps {
+  videos: Video[];
+  currentIndex: number;
+}
+
+export function PreloadManager({ videos, currentIndex }: PreloadManagerProps) {
+  useEffect(() => {
+    // Preload next video
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < videos.length) {
+      const nextVideo = videos[nextIndex];
+      // Create hidden video component to trigger preload
+      Video.preload(`https://stream.mux.com/${nextVideo.playbackId}.m3u8`);
+    }
+
+    // Optionally preload previous video
+    const prevIndex = currentIndex - 1;
+    if (prevIndex >= 0) {
+      const prevVideo = videos[prevIndex];
+      Video.preload(`https://stream.mux.com/${prevVideo.playbackId}.m3u8`);
+    }
+  }, [currentIndex, videos]);
+
+  return null;
+}
+```
+
+<Callout type="info">
+  HLS streaming means videos don't need to fully download before playing. Preloading just fetches the manifest and initial segments for instant startup.
+</Callout>
+
+---
+
+## Complete StoriesFeed implementation
+
+Putting it all together:
+
+```tsx
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import {
+  FlatList,
+  Dimensions,
+  StyleSheet,
+  ViewToken,
+  View,
+  StatusBar,
+} from 'react-native';
+import Video, { VideoRef } from 'react-native-video';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+interface Video {
+  id: string;
+  playbackId: string;
+  title: string;
+  username: string;
+  userId: string;
+  viewCount: number;
+  likeCount: number;
+  duration: number;
+}
+
+interface StoriesFeedProps {
+  videos: Video[];
+  initialIndex?: number;
+}
+
+export default function StoriesFeed({ videos, initialIndex = 0 }: StoriesFeedProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Hide status bar for full-screen experience
+  useEffect(() => {
+    StatusBar.setHidden(true);
+    return () => StatusBar.setHidden(false);
+  }, []);
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0) {
+        const index = viewableItems[0].index;
+        if (index !== null && index !== currentIndex) {
+          setCurrentIndex(index);
+        }
+      }
+    },
+    [currentIndex]
+  );
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: Video; index: number }) => {
+      const isActive = index === currentIndex;
+      return <StoryItem video={item} isActive={isActive} />;
+    },
+    [currentIndex]
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <FlatList
+        ref={flatListRef}
+        data={videos}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
+        snapToInterval={SCREEN_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(data, index) => ({
+          length: SCREEN_HEIGHT,
+          offset: SCREEN_HEIGHT * index,
+          index,
+        })}
+        windowSize={3}
+        maxToRenderPerBatch={2}
+        removeClippedSubviews
+        initialScrollIndex={initialIndex}
+      />
+
+      {/* Preload adjacent videos */}
+      <PreloadManager videos={videos} currentIndex={currentIndex} />
+    </SafeAreaView>
+  );
+}
+
+function StoryItem({ video, isActive }: { video: Video; isActive: boolean }) {
+  const videoRef = useRef<VideoRef>(null);
+  const [paused, setPaused] = useState(!isActive);
+  const [liked, setLiked] = useState(false);
+  const [showLikeAnimation, setShowLikeAnimation] = useState(false);
+
+  useEffect(() => {
+    setPaused(!isActive);
+  }, [isActive]);
+
+  const singleTap = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      setPaused((prev) => !prev);
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (!liked) {
+        setLiked(true);
+        setShowLikeAnimation(true);
+        // TODO: Call API to like video
+      }
+    });
+
+  const taps = Gesture.Exclusive(doubleTap, singleTap);
+
+  return (
+    <View style={styles.storyContainer}>
+      <GestureDetector gesture={taps}>
+        <View style={styles.videoWrapper}>
+          <Video
+            ref={videoRef}
+            source={{ uri: `https://stream.mux.com/${video.playbackId}.m3u8` }}
+            poster={`https://image.mux.com/${video.playbackId}/thumbnail.png?time=0`}
+            posterResizeMode="cover"
+            style={styles.video}
+            paused={paused}
+            repeat
+            resizeMode="cover"
+            onError={(error) => console.error('Video error:', error)}
+          />
+
+          {/* Progress indicator */}
+          {isActive && (
+            <ProgressIndicator duration={video.duration} paused={paused} />
+          )}
+
+          {/* Overlay */}
+          <VideoOverlay
+            username={video.username}
+            title={video.title}
+            viewCount={video.viewCount}
+            likeCount={video.likeCount}
+            liked={liked}
+            onLike={() => setLiked(!liked)}
+          />
+
+          {/* Like animation */}
+          {showLikeAnimation && (
+            <Animated.View
+              entering={FadeIn}
+              exiting={FadeOut}
+              style={StyleSheet.absoluteFill}
+            >
+              <LikeAnimation
+                onComplete={() => setShowLikeAnimation(false)}
+              />
+            </Animated.View>
+          )}
+        </View>
+      </GestureDetector>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  storyContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  videoWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  video: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+});
+```
+
+---
+
+## Performance optimization
+
+### 1. Memory management
+
+```tsx
+// Clean up videos when they're far from view
+const [loadedVideos, setLoadedVideos] = useState<Set<number>>(new Set([0]));
+
+const onViewableItemsChanged = useCallback(
+  ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const visibleIndices = viewableItems.map(item => item.index).filter(Boolean);
+
+    // Load current + adjacent
+    const indicesToLoad = new Set([
+      ...visibleIndices,
+      ...visibleIndices.map(i => i - 1),
+      ...visibleIndices.map(i => i + 1),
+    ].filter(i => i >= 0 && i < videos.length));
+
+    setLoadedVideos(indicesToLoad);
+  },
+  [videos.length]
+);
+
+// In renderItem:
+if (!loadedVideos.has(index)) {
+  return <VideoPlaceholder />;
+}
+```
+
+### 2. Use React.memo
+
+```tsx
+const StoryItem = React.memo(
+  ({ video, isActive }: StoryItemProps) => {
+    // ... component code
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.video.id === nextProps.video.id &&
+      prevProps.isActive === nextProps.isActive
+    );
+  }
+);
+```
+
+### 3. Optimize re-renders
+
+```tsx
+// Use useCallback for all event handlers
+const handleLike = useCallback(() => {
+  // API call
+}, []);
+
+const handleShare = useCallback(() => {
+  // Share logic
+}, []);
+```
+
+---
+
+## Advanced features
+
+### Horizontal swipe for user navigation
+
+Add horizontal swipes to jump between users:
+
+```tsx
+const panGesture = Gesture.Pan()
+  .onEnd((event) => {
+    if (Math.abs(event.translationX) > 100) {
+      if (event.translationX > 0) {
+        // Swipe right - previous user
+        goToPreviousUser();
+      } else {
+        // Swipe left - next user
+        goToNextUser();
+      }
+    }
+  });
+```
+
+### Multiple videos per user
+
+Track user stories and show progress bars:
+
+```tsx
+<View style={styles.progressBars}>
+  {userVideos.map((video, index) => (
+    <ProgressBar
+      key={video.id}
+      filled={index < currentVideoIndex}
+      active={index === currentVideoIndex}
+    />
+  ))}
+</View>
+```
+
+### Mute toggle
+
+```tsx
+const [muted, setMuted] = useState(false);
+
+<Video
+  source={videoSource}
+  muted={muted}
+/>
+
+<TouchableOpacity onPress={() => setMuted(!muted)}>
+  <Text>{muted ? '🔇' : '🔊'}</Text>
+</TouchableOpacity>
+```
+
+---
+
+## Best practices
+
+### 1. Handle video errors gracefully
+
+```tsx
+const [error, setError] = useState(false);
+
+<Video
+  source={videoSource}
+  onError={() => setError(true)}
+/>
+
+{error && (
+  <View style={styles.errorOverlay}>
+    <Text>Video unavailable</Text>
+    <Button title="Skip" onPress={skipToNext} />
+  </View>
+)}
+```
+
+### 2. Respect device orientation
+
+```tsx
+import { useOrientation } from './hooks/useOrientation';
+
+const orientation = useOrientation();
+
+// Only show Stories UI in portrait mode
+if (orientation === 'landscape') {
+  return <Text>Please rotate your device</Text>;
+}
+```
+
+### 3. Pause on app background
+
+```tsx
+import { AppState } from 'react-native';
+
+useEffect(() => {
+  const subscription = AppState.addEventListener('change', (nextAppState) => {
+    if (nextAppState !== 'active') {
+      setPaused(true);
+    }
+  });
+
+  return () => subscription.remove();
+}, []);
+```
+
+### 4. Test on real devices
+
+Stories UI requires testing on physical devices:
+- Gesture responsiveness varies between simulator and device
+- Video performance is better on real hardware
+- Test on both iOS and Android
+- Test on different screen sizes
+
+<Callout type="warning">
+  The iOS simulator and Android emulator don't accurately represent real-device video performance. Always test Stories UI on physical devices before shipping.
+</Callout>
+
+---
+
+## Troubleshooting
+
+### Videos don't auto-play
+
+- Check `isActive` prop is updating correctly
+- Verify `paused` state changes when `isActive` changes
+- Ensure `onViewableItemsChanged` fires (add console.log)
+
+### Stuttering between videos
+
+- Increase `windowSize` to preload more videos
+- Verify `getItemLayout` is set correctly
+- Enable `removeClippedSubviews` for memory management
+- Check network conditions (poor network = stuttering)
+
+### High memory usage
+
+- Reduce `windowSize` (default is 3, ideal for Stories)
+- Use `removeClippedSubviews={true}`
+- Implement video unloading for far-away items
+- Monitor with Xcode Instruments / Android Profiler
+
+### Gestures not working
+
+- Wrap root component with `<GestureHandlerRootView>`
+- Check `react-native-gesture-handler` is installed correctly
+- Verify gesture detector wraps the video container

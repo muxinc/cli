@@ -1,0 +1,108 @@
+---
+title: Synchronize video playback
+product: video
+description: Learn how to synchronize video playback with other components on your webpage.
+---
+
+## Introduction to video playback synchronization
+
+You may have encountered many video streaming products and services enabling the following experiences:
+* Plan a watch party where each viewer is watching the video at the exact moment at the same time.
+  And when one viewer pauses the video, the video playback pauses for every viewer at the same time at the exact moment.
+* Synchronize video playback with other components like chats, activity feeds, fitness stats collection, etc.
+
+You can build similar and possibly many more interactive experiences like those mentioned above by aligning your web page
+or application components using a common source of truth, i.e., [epoch time](https://en.wikipedia.org/wiki/Unix_time).
+The underlying assumption to achieve synchronization is that your viewer's device remains synced to an NTP server.
+
+Mux records the epoch time of each frame received for the live stream and includes that timing information in
+the HLS Manifest as [`EXT-X-PROGRAM-DATE-TIME` (aka PDT) tag](https://datatracker.ietf.org/doc/html/rfc8216#section-4.3.2.6).
+The PDT tag value is represented in [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601).
+This tag is added every few seconds with monotonically increasing epoch time representing the next frame's recorded epoch time.
+
+Below is an example of the HLS rendition (2nd level) manifest with repeating PDT tags for every 2s of the
+live stream recorded:
+```text
+#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-TARGETDURATION:2
+#EXT-X-MAP:URI="https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/18446744073709551615.m4s?skid=default&signature=NjBmMjFkODBfYWVhMjIyZTdmMDU0ZmI0YWU2ZWJkZTJiYTY4MzhmYWQzNWQ2YzMyMTVlYjdjNmM0NzZiZjBmZGU0ODU1MTUyNQ=="
+#EXT-X-PLAYLIST-TYPE:VOD
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:25.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/0.m4s?skid=default&signature=NjBmMjFkODBfOWJkMzMyMTc5YzgwY2VmMTdlYzIwODgzZGI2NWFiMThiM2U1NDM0NzM0NDZhMmQwOThhZmI0NDQ5OWY5N2VmMA==
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:27.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/1.m4s?skid=default&signature=NjBmMjFkODBfMjA1ZWNmYzgzYWRhMzNjMTY5YmEyYmM2NzE4MDk5N2I1MWE3NzhjODlhNGIzNWI3NGIwNTA5ZTIxOWQyNjI5OQ==
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:29.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/2.m4s?skid=default&signature=NjBmMjFkODBfZTIyOTA5YWFjZjMzYTY4MzQ4YWEzZDBiNDkyODk1NTg2ODE2M2YwZjI3NmY2MTVhOTM5MTA2MzQ4ODIyNTNkOQ==
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:31.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/3.m4s?skid=default&signature=NjBmMjFkODBfNDRkZTNhYTE5M2RhYTA4MTA4MWFkODc0YzgyMDcyMGMwODFmZWIxOGRiNWM4YzJhMTM0YTNiNGRhYmYyMWE1Nw==
+
+#EXT-X-ENDLIST
+```
+
+## How to get epoch time value
+
+Every modern video player exposes an API to get `EXT-X-PROGRAM-DATE-TIME` tag value.
+Your application can synchronize video playback to other components using this epoch time.
+An example demonstrating how to implement synchronization:
+* Watch this Demuxed 2018 presentation by Seth Maddison on
+  [How to Synchronize your Watches: Cross-platform stream synchronization of HLS and DASH](https://youtu.be/lSe4hcKRlYk)
+
+## Supported Video Players
+The list below shows the various video players providing API to get `EXT-X-PROGRAM-DATE-TIME` tag value.
+If your player isn't listed here, [please reach out](/support).
+* [Mux Player](/docs/guides/player-advanced-usage#synchronize-video-playback)
+* [hls.js](https://hls-js-dev.netlify.app/api-docs/)
+* [JW Player](https://docs.jwplayer.com/players/reference/seek-events#ontime)
+* [THEOplayer](https://docs.theoplayer.com/knowledge-base/03-playback/04-program-date-time.md)
+* [Bitmovin](https://cdn.bitmovin.com/player/web/8/docs/interfaces/core_events.segmentplaybackevent.html#datetime)
+* [React Native](https://github.com/react-native-video/react-native-video#currentplaybacktime)
+* [Apple AVPlayer](https://developer.apple.com/documentation/avfoundation/avplayeritem/1386188-currentdate)
+* [Android ExoPlayer](https://exoplayer.dev/doc/reference/com/google/android/exoplayer2/source/hls/playlist/HlsMediaPlaylist.html#hasProgramDateTime)
+
+If your application wants to synchronize viewers playing videos on different devices, your application can
+subscribe to communication channels for receiving and sending epoch time values. Many cloud-based or other
+commercial products developed using WebSockets are available for implementing such a communication channel.
+
+## Add `exclude_pdt` parameter
+
+By default, HLS playback using `stream.mux.com/{PLAYBACK_ID}.m3u8` URL always adds `EXT-X-PROGRAM-DATE-TIME` tag with
+recorded epoch time value. If you add the `exclude_pdt=true` parameter to the playback URL, then Mux will exclude this tag
+from the HLS rendition manifest.
+
+There are few reasons to exclude the HLS tag:
+* Video Player, like React Native, updates the current play position time value with the `EXT-X-PROGRAM-DATE-TIME` tag value.
+So if your application expects a zero-based play position time, the viewer could experience playback issues when the video
+player starts reporting epoch time instead.
+* Your application is using a legacy video player or a player version without support for this HLS tag.
+
+## Using signed URLs
+Mux videos have two types of playback policy, `public` or `signed`. If your `playback_id` is `signed`,
+then all query parameters, including `exclude_pdt` need to be added to the claims body.
+
+Take a look at the [signed URLs guide](/docs/guides/secure-video-playback) for details.
+
+## FAQs
+
+### Is the epoch time available with on-demand video?
+
+Yes. Mux records epoch time for all live streams. So, the HLS manifest includes the epoch time every few seconds
+with the `EXT-X-PROGRAM-DATE-TIME` tag value when the live stream is active, or for the on-demand playback of the
+live stream recording.
+
+The epoch time is not available in the HLS manifest when the input is a video file.
+
+### Can I retrieve the epoch time through the API?
+
+Yes. The <ApiRefLink href="/docs/api-reference/video/assets">asset resource object</ApiRefLink> includes
+`recording_times` which represents the live stream start epoch time and the duration recorded.
+You can store the live stream timing information using the`recording_times`
+for managing the live stream's status information.

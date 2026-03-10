@@ -1,0 +1,45 @@
+---
+title: Add high-performance video to your PHP application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video
+  in your PHP application
+---
+
+## Installation
+
+We publish Mux PHP to Packagist. You should depend on Mux PHP by adding us to your `composer.json` file.
+
+```php
+composer require mux/mux-php
+```
+
+## Quickstart
+
+To start, you'll need a Mux access token. Once you've got that, you're off to the races!
+
+```php
+// Authentication Setup
+$config = MuxPhp\Configuration::getDefaultConfiguration()
+    ->setUsername(getenv('MUX_TOKEN_ID'))
+    ->setPassword(getenv('MUX_TOKEN_SECRET'));
+
+// API Client Initialization
+$assetsApi = new MuxPhp\Api\AssetsApi(
+    new GuzzleHttp\Client(),
+    $config
+);
+
+// Create Asset Request
+$input = new MuxPhp\Models\InputSettings(["url" => "https://storage.googleapis.com/muxdemofiles/mux-video-intro.mp4"]);
+$createAssetRequest = new MuxPhp\Models\CreateAssetRequest(["input" => $input, "playback_policy" => [MuxPhp\Models\PlaybackPolicy::PUBLIC_PLAYBACK_POLICY] ]);
+
+// Ingest
+$result = $assetsApi->createAsset($createAssetRequest);
+
+// Print URL
+print "Playback URL: https://stream.mux.com/" . $result->getData()->getPlaybackIds()[0]->getId() . ".m3u8\n"
+```
+
+## Full documentation
+Check out the [Mux PHP SDK docs](https://github.com/muxinc/mux-php) for more information.

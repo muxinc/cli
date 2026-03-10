@@ -1,0 +1,163 @@
+---
+title: Content Security Policy for Mux
+product: system
+description: Learn how to configure Content Security Policy (CSP) to work with Mux Video and Data services.
+steps:
+  - title: Understanding CSP with Mux
+    description: Learn what Content Security Policy is and why it matters for Mux integrations.
+    topic: security
+  - title: Basic CSP configuration
+    description: Get started with a simple CSP that covers all Mux services.
+    topic: configure
+  - title: Granular CSP configuration
+    description: Use specific directives for more restrictive security policies.
+    topic: configure
+  - title: Upload and media handling
+    description: Configure CSP to support file uploads and media processing.
+    topic: configure
+  - title: Product-specific requirements
+    description: Understand CSP requirements for specific Mux features.
+    topic: configure
+---
+
+<LinkedHeader step={steps[0]} />
+
+Content Security Policy (CSP) is a security feature that helps protect your web application from cross-site scripting (XSS) attacks and other code injection attacks. CSP works by restricting the resources (such as scripts, stylesheets, images, and network connections) that a web page can load.
+
+When integrating Mux Video and Mux Data into your application, you'll need to configure your CSP to allow connections to Mux services. This guide will help you set up the appropriate CSP directives to ensure your Mux integration works securely.
+
+<Callout type="info" title="CSP Basics">
+  If you're new to Content Security Policy, we recommend reading [Google's CSP guide](https://developers.google.com/web/fundamentals/security/csp) for a comprehensive introduction to CSP concepts and implementation.
+</Callout>
+
+<LinkedHeader step={steps[1]} />
+
+For most applications, the simplest approach is to use a basic CSP that allows all Mux services. This configuration ensures compatibility with all current and future Mux features:
+
+```
+Content-Security-Policy: default-src 'self' *.mux.com *.litix.io storage.googleapis.com
+```
+
+This CSP directive allows your application to:
+- Load resources from your own domain (`'self'`)
+- Connect to all Mux Video services (`*.mux.com`)
+- Connect to all Mux Data services (`*.litix.io`)
+- Connect to Google Cloud Storage (`storage.googleapis.com`) -- this is needed for [Direct Uploads](/docs/guides/upload-files-directly)
+
+The wildcard approach for `mux.com` and `litix.io` is recommended because Mux utilizes multiple CDNs and subdomains to provide optimal performance globally. These hostnames may change without notice as we optimize our infrastructure.
+
+<LinkedHeader step={steps[2]} />
+
+If your security requirements call for a more restrictive CSP, you can use specific directives instead of the broad `default-src` approach. Here's a granular configuration that covers all Mux functionality:
+
+```
+Content-Security-Policy: 
+  connect-src 'self' https://*.mux.com https://*.litix.io https://storage.googleapis.com;
+  media-src 'self' blob: https://*.mux.com;
+  img-src 'self' https://image.mux.com https://*.litix.io;
+  script-src 'self' https://src.litix.io;
+  worker-src 'self' blob:
+```
+
+<Callout type="warning" title="Merge with existing policies">
+  The above configuration must be merged with your existing CSP directives. Each directive should combine values from both your current policy and the Mux requirements.
+</Callout>
+
+<LinkedHeader step={steps[3]} />
+
+If your application uploads media files to Mux via [Direct Uploads](/docs/guides/upload-files-directly), you'll need additional CSP directives to handle binary data and file uploads:
+
+```
+Content-Security-Policy: 
+  connect-src 'self' https://*.mux.com https://*.litix.io https://storage.googleapis.com;
+  media-src 'self' blob: https://*.mux.com;
+  img-src 'self' https://image.mux.com https://*.litix.io;
+  script-src 'self' https://src.litix.io;
+  worker-src 'self' blob:;
+  form-action 'self' https://*.mux.com https://storage.googleapis.com
+```
+
+The key additions for upload functionality are:
+
+| Directive | Purpose |
+| :-------- | :------ |
+| `https://storage.googleapis.com` in `connect-src` | Allows uploads to Google Cloud Storage endpoints used by Mux |
+| `form-action` directive | Permits form submissions and PUT/POST requests to upload endpoints |
+| `blob:` in `media-src` and `worker-src` | Enables handling of binary file data during upload processing |
+
+<LinkedHeader step={steps[4]} />
+
+Different Mux features have specific CSP requirements. Here's what you need for each:
+
+### Mux Video Playback
+
+For video playback functionality, you **must** include:
+
+```
+connect-src https://*.mux.com;
+media-src blob: https://*.mux.com;
+worker-src blob:
+```
+
+This is required because:
+- HLS manifests and video segments are delivered via `https://stream.mux.com` and other `*.mux.com` subdomains
+- Video players use web workers and blob URLs for optimal performance
+- Mux uses multiple CDNs with different hostnames for global performance
+
+### Video Thumbnails and Storyboards
+
+If you're displaying video thumbnails or timeline hover previews, include:
+
+```
+img-src https://image.mux.com;
+connect-src https://image.mux.com
+```
+
+The `connect-src` directive is needed for dynamic thumbnail loading in timeline hover previews, while `img-src` covers standard image embedding.
+
+### Mux Data Integration
+
+For Mux Data analytics, you **must** allow:
+
+```
+connect-src https://*.litix.io;
+img-src https://*.litix.io
+```
+
+This covers:
+- Data collection endpoints across multiple subdomains
+- Fallback beacon loading through image tags
+- Various monitoring and analytics endpoints
+
+<Callout type="success" title="Environment-specific restriction">
+  For tighter security, you can replace `https://*.litix.io` with `https://img.litix.io` and `https://<env_key>.litix.io` where `<env_key>` is your Mux environment key. However, the wildcard approach is recommended for maximum compatibility.
+</Callout>
+
+### Hosted Mux Data Integrations
+
+If you're loading pre-built Mux Data integrations from our hosted domain (rather than installing via NPM), add:
+
+```
+script-src https://src.litix.io
+```
+
+This is not required if you bundle the Mux Data SDK directly into your application code.
+
+### Complete Example
+
+Here's a complete CSP that supports all Mux features including uploads:
+
+```
+Content-Security-Policy: 
+  default-src 'self';
+  connect-src 'self' https://*.mux.com https://*.litix.io https://storage.googleapis.com;
+  media-src 'self' blob: https://*.mux.com;
+  img-src 'self' https://image.mux.com https://*.litix.io;
+  script-src 'self' https://src.litix.io;
+  worker-src 'self' blob:;
+  form-action 'self' https://*.mux.com https://storage.googleapis.com
+```
+
+<Callout type="warning" title="Test thoroughly">
+  After implementing your CSP, test all Mux functionality in your application including video playback, uploads, thumbnails, and analytics to ensure everything works as expected.
+</Callout>

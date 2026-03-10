@@ -1,0 +1,299 @@
+---
+title: Mux fundamentals
+product: system
+description: A reference guide covering the essential concepts, terminology, and components you need to understand when building with Mux.
+---
+
+Whether you're just getting started with Mux or need a quick refresher on how the pieces fit together, this guide covers the fundamental concepts you'll encounter when building video, audio, and live streaming applications.
+
+# Quick reference
+
+| Term | Description |
+| :--- | :---------- |
+| [**Organization**](#organizations) | The top-level account container. You can belong to multiple organizations, each with its own billing, team members, and environments. |
+| [**Environment**](#environments) | A container within an organization for organizing your Mux resources (assets, live streams, API tokens, etc.). Each organization can have multiple environments. |
+| [**Access Token**](#access-tokens) | A credential pair (Token ID + Token Secret) used to authenticate API requests. Scoped to a single environment. |
+| [**Asset**](#assets) | A video or audio file that has been uploaded to Mux and processed for streaming playback. |
+| [**Playback ID**](#playback-ids) | A unique identifier used to stream an asset or live stream to viewers. |
+| [**Live Stream**](#live-streams) | A resource representing a live broadcast that can receive RTMP/SRT input and deliver to viewers. |
+| [**Stream Key**](#live-streams) | A secret credential that allows a broadcaster to push video to a specific live stream. |
+| [**Signing Key**](#signing-keys) | A public/private key pair used to create signed tokens (JWTs) for secure playback. |
+| [**Webhook**](#webhooks) | An HTTP callback that Mux sends to your server when events occur (e.g., asset ready, live stream started). |
+
+# Organizations
+
+An **organization** is your top-level Mux account. It's the highest container in the Mux hierarchy and contains everything else: environments, team members, and billing settings.
+
+Key things to know about organizations:
+
+- **You can belong to multiple organizations.** This is useful if you work with different companies or clients, each with their own Mux account.
+- **Each organization has its own billing.** Usage charges are tracked and billed per organization.
+- **Team members are managed at the organization level.** You can invite collaborators and assign roles (Admin, Member) within each organization.
+- **Organizations contain environments.** All your media resources live inside environments, which live inside organizations.
+
+You can switch between organizations and create new ones from the [Mux Dashboard](https://dashboard.mux.com/organizations).
+
+# Environments
+
+An **environment** is a container within an organization for organizing your Mux resources. Each environment has its own isolated set of assets, live streams, access tokens, signing keys, and webhooks.
+
+Common use cases for multiple environments:
+- Separate **development** and **production** resources
+- Isolate resources for different websites or domains (e.g., `site1.com`, `site2.com`)
+- Organize by project or use case (e.g., CMS media, marketing site, customer uploads)
+- Keep test data separate from production content
+
+<Callout type="warning" title="Environment isolation">
+Resources are scoped to their environment. An access token created in Development cannot be used to manage assets in Production, and webhooks configured for one environment won't fire for events in another.
+</Callout>
+
+You can view and manage environments in the [Mux Dashboard](https://dashboard.mux.com/organizations).
+
+# Access Tokens
+
+**Access tokens** are credentials that authenticate your API requests to Mux. Each token consists of two parts:
+
+| Part | Description |
+| :--- | :---------- |
+| **Token ID** | The "username" portion of your credential. Safe to log (but not expose publicly). |
+| **Token Secret** | The "password" portion. Keep this secure and never expose it in client-side code. |
+
+<Callout type="info" title="Secret recovery">
+Mux only stores a hash of your token secret. If you lose it, you'll need to create a new access token.
+</Callout>
+
+<Callout type="warning" title="Server-side only">
+Mux API requests must be made from a server, not from client-side code. The API does not support CORS, and exposing your credentials in a browser or mobile app is a security risk.
+</Callout>
+
+## Token permissions
+
+When creating an access token, you configure which permissions it has:
+
+| Permission | Use case |
+| :--------- | :------- |
+| **Mux Video Read** | Retrieve information about assets and live streams |
+| **Mux Video Write** | Create, update, and delete assets and live streams |
+| **Mux Data Read** | Access playback performance metrics |
+| **Mux Data Write** | Create Data annotations |
+| **System Read** | View signing keys and other system resources |
+| **System Write** | Create and manage signing keys |
+
+For most use cases when getting started, you'll want **Mux Video Read** and **Write** permissions.
+
+You can create and manage access tokens in the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens).
+
+**Learn more:** [Make API requests](/docs/core/make-api-requests) | [Use an SDK](/docs/core/sdks)
+
+# Assets
+
+An **asset** is a video or audio file that has been ingested into Mux and processed for adaptive bitrate streaming. When you create an asset, Mux:
+
+1. Downloads the file from your provided URL (or receives it via [direct upload](/docs/guides/upload-files-directly))
+2. Transcodes it into multiple quality levels
+3. Packages it for HLS streaming
+4. Generates a unique **asset ID**
+
+```json
+// Example asset response
+{
+  "data": {
+    "id": "01itgOBvgjAbES7Inwvu4kEBtsQ44HFL6",
+    "status": "ready",
+    "playback_ids": [
+      {
+        "id": "TXjw00EgPBPS6acv7gBUEJ14PEr5XNWOe",
+        "policy": "public"
+      }
+    ],
+    "duration": 120.5,
+    "aspect_ratio": "16:9"
+  }
+}
+```
+
+## Asset status lifecycle
+
+Assets progress through several statuses:
+
+| Status | Description |
+| :----- | :---------- |
+| `preparing` | Mux is downloading and processing the file |
+| `ready` | The asset is ready for playback |
+| `errored` | Something went wrong during processing |
+
+Rather than polling the API to check status, use [webhooks](/docs/core/listen-for-webhooks) to be notified when an asset is ready.
+
+**Learn more:** [Stream videos in five minutes](/docs/core/stream-video-files) | <ApiRefLink href="/docs/api-reference/video/assets">Assets API</ApiRefLink>
+
+# Playback IDs
+
+A **playback ID** is what you use to actually stream content to viewers. While asset IDs are used to _manage_ your content (via `api.mux.com`), playback IDs are used to _stream_ your content (via `stream.mux.com`).
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8
+```
+
+## Playback policies
+
+Each playback ID has a policy that controls how it can be accessed:
+
+| Policy | Description |
+| :----- | :---------- |
+| `public` | Anyone with the URL can access the content |
+| `signed` | Viewers need a valid JWT token to watch |
+
+An asset can have multiple playback IDs with different policies. This lets you, for example, have a public playback ID for trailers and a signed playback ID for the full content.
+
+<Callout type="info" title="Multiple playback IDs">
+You can add and remove playback IDs without affecting the underlying asset. This is useful for revoking access without re-encoding your content.
+</Callout>
+
+**Learn more:** [Play your videos](/docs/guides/play-your-videos) | [Secure video playback](/docs/guides/secure-video-playback)
+
+# Live streams
+
+A **live stream** represents a live broadcast channel. Unlike assets (which are created from existing files), live streams receive real-time input and deliver it to viewers with low latency.
+
+## Key live stream components
+
+| Component | Description |
+| :-------- | :---------- |
+| **Stream Key** | A secret credential broadcasters use to connect their encoder to Mux |
+| **RTMP URL** | The ingest endpoint (`rtmp://global-live.mux.com:5222/app`) |
+| **SRT URL** | Alternative ingest endpoint for SRT protocol |
+| **Playback ID** | Used to stream to viewers (same concept as asset playback IDs) |
+
+<Callout type="warning" title="Keep stream keys secret">
+Anyone with your stream key can broadcast to your live stream. Treat it like a password.
+</Callout>
+
+## Live stream lifecycle
+
+| Status | Description |
+| :----- | :---------- |
+| `idle` | No one is broadcasting; waiting for input |
+| `active` | A broadcaster is connected and viewers can watch |
+| `disabled` | The live stream has been disabled and won't accept connections |
+
+When a live stream ends, Mux automatically creates a new asset from the recording (if recording is enabled).
+
+**Learn more:** [Configure broadcast software](/docs/guides/configure-broadcast-software) | [Handle disconnections](/docs/guides/handle-live-stream-disconnects) | <ApiRefLink href="/docs/api-reference/video/live-streams">Live Streams API</ApiRefLink>
+
+# Signing keys
+
+**Signing keys** are cryptographic key pairs used to generate JWTs (JSON Web Tokens) for [secure video playback](/docs/guides/secure-video-playback). When you have assets or live streams with `signed` playback policies, you need signing keys to create valid playback tokens.
+
+| Component | Description |
+| :-------- | :---------- |
+| **Key ID** | A unique identifier for the signing key |
+| **Private Key** | Used by your server to sign JWTs. Keep this secret. |
+
+Your server uses the private key to create short-lived tokens that grant access to specific content. The token can include claims for:
+
+- **Expiration time** - When the token becomes invalid
+- **Playback restrictions** - Additional rules like allowed domains
+
+<Callout type="info" title="Not the same as access tokens">
+Signing keys and access tokens serve different purposes:
+- **Access tokens** authenticate your server-to-Mux API requests
+- **Signing keys** create tokens that authenticate viewer playback requests
+</Callout>
+
+You can create and manage signing keys in the [Mux Dashboard](https://dashboard.mux.com/settings/signing-keys).
+
+**Learn more:** [Secure video playback](/docs/guides/secure-video-playback) | <ApiRefLink href="/docs/api-reference/system/signing-keys">Signing Keys API</ApiRefLink>
+
+# Webhooks
+
+**Webhooks** are HTTP callbacks that Mux sends to your application when events occur. Instead of repeatedly polling the API to check if an asset is ready, you configure a webhook URL and Mux notifies you automatically.
+
+Common webhook events:
+
+| Event | Description |
+| :---- | :---------- |
+| `video.asset.ready` | An asset has finished processing and is ready for playback |
+| `video.asset.errored` | An asset failed to process |
+| `video.live_stream.active` | A live stream has started broadcasting |
+| `video.live_stream.idle` | A live stream has stopped broadcasting |
+| `video.upload.asset_created` | A direct upload has completed and created an asset |
+
+<Callout type="warning" title="Environment-scoped">
+Webhooks are configured per environment. Make sure your webhook is set up in the same environment where your resources are created.
+</Callout>
+
+**Learn more:** [Listen for webhooks](/docs/core/listen-for-webhooks) | [Verify webhook signatures](/docs/core/verify-webhook-signatures)
+
+# IDs at a glance
+
+Mux uses several different types of identifiers. Here's a quick reference:
+
+| ID Type | Format Example | Purpose |
+| :------ | :------------- | :------ |
+| **Organization ID** | `abc123` | Identify your organization |
+| **Environment ID** | `j0863n` | Identify specific environments within an organization |
+| **Asset ID** | `01itgOBvgj...` | Identify and manage assets via the API |
+| **Playback ID** | `TXjw00EgPB...` | Stream content to viewers |
+| **Live Stream ID** | `aA02skpHX...` | Identify and manage live streams via the API |
+| **Upload ID** | `OA02dANZ...` | Track direct upload status |
+| **Token ID** | `44c819de-4add-...` | Identify access tokens (part of API auth) |
+| **Signing Key ID** | `JjPXgkqO...` | Identify signing keys for JWT creation |
+
+# SDKs
+
+Mux provides official SDKs for several languages that handle authentication and make it easier to work with the API:
+
+- [Node.js](/docs/integrations/mux-node-sdk)
+- [Python](/docs/integrations/mux-python-sdk)
+- [Ruby](/docs/integrations/mux-ruby-sdk)
+- [PHP](/docs/integrations/mux-php-sdk)
+- [Java](/docs/integrations/mux-java-sdk)
+- [C# / .NET](/docs/integrations/mux-csharp-sdk)
+- [Elixir](/docs/integrations/mux-elixir-sdk)
+
+For client-side playback, see [Mux Player](/docs/guides/mux-player-web) and the various player SDK guides.
+
+**Learn more:** [Use an SDK](/docs/core/sdks)
+
+# API and webhook specifications
+
+Mux publishes machine-readable specifications for both the API and webhook events:
+
+| Specification | URL | Description |
+| :------------ | :-- | :---------- |
+| **Combined spec** | [`mux.com/full-combined-spec.json`](https://www.mux.com/full-combined-spec.json) | All API endpoints and webhook events in one spec |
+| **API spec** | [`mux.com/api-spec.json`](https://www.mux.com/api-spec.json) | Core API endpoints only |
+| **Webhook spec** | [`mux.com/webhook-spec.json`](https://www.mux.com/webhook-spec.json) | Webhook event schemas only |
+| **Image API spec** | [`mux.com/image-spec.json`](https://www.mux.com/image-spec.json) | Thumbnail, animated GIF, and storyboard endpoints |
+| **Streaming API spec** | [`mux.com/stream-spec.json`](https://www.mux.com/stream-spec.json) | HLS and MP4 streaming playback endpoints |
+| **Engagement Counts spec** | [`mux.com/stats-spec.json`](https://www.mux.com/stats-spec.json) | Real-time view and viewer count endpoints |
+
+These are useful for generating API clients, importing into tools like [Postman](/docs/core/postman), validating webhook payloads, or integrating with any tooling that supports OpenAPI. Use the combined spec if you want everything in one file.
+
+# What's next?
+
+Now that you understand the fundamentals, here are some recommended next steps:
+
+<GuideCards>
+  <GuideCard
+    title="Stream videos in five minutes"
+    description="Upload your first video to Mux and play it back in your application."
+    links={[
+      {title: "Read the guide", href: "/docs/core/stream-video-files"},
+    ]}
+  />
+  <GuideCard
+    title="Listen for webhooks"
+    description="Set up webhooks to receive real-time notifications when events occur."
+    links={[
+      {title: "Read the guide", href: "/docs/core/listen-for-webhooks"},
+    ]}
+  />
+  <GuideCard
+    title="Secure video playback"
+    description="Learn how to protect your content with signed URLs and playback restrictions."
+    links={[
+      {title: "Read the guide", href: "/docs/guides/secure-video-playback"},
+    ]}
+  />
+</GuideCards>

@@ -1,0 +1,684 @@
+---
+title: Custom Java integration
+product: data
+description: This is a guide for building a custom integration with Mux Data in Java. Build a custom integration if Mux does not already have an SDK for your player.
+steps:
+  - title: "Include the Library"
+    topic: add
+  - title: "Initialize the SDK"
+    topic: code
+  - title: "Provide Callbacks"
+    topic: fetch
+  - title: "Emit Events"
+    topic: events
+  - title: Release notes
+    topic: notes
+---
+
+Mux has a pre-built integration with Google's [ExoPlayer v2](/docs/guides/monitor-exoplayer) and [Android Media Player](/docs/guides/monitor-android-media-player) for Android applications.
+
+If the player that you use does not expose the `ExoPlayer` instance directly, swaps between multiple instances during playback, or uses some other playback mechanism completely (for instance, outside of Android), a custom integration may be needed.
+
+## Important Related Docs
+Before proceeding, read the following overview: [Building a Custom Integration](/docs/guides/build-a-custom-data-integration).
+
+In addition, the source code for Mux's integration with Google's ExoPlayer is open source and can be found in the [Mux-Stats-SDK-ExoPlayer GitHub repository](https://github.com/muxinc/mux-stats-sdk-exoplayer). This project is a good example of how to use the Java core library in building a player integration.
+
+<LinkedHeader step={steps[0]} />
+
+The Mux Core Java library is made available as a JAR file which can be installed using the following methods:
+
+## Option 1: Add Gradle dependency (preferred)
+Add the Mux Maven repository to your Gradle file:
+
+```text
+repositories {
+    maven {
+        url "https://muxinc.jfrog.io/artifactory/default-maven-release-local"
+    }
+}
+```
+
+Next, add a dependency on Mux Core (current version is 8.8.0):
+
+```
+api 'com.mux:stats.muxcore:8.8.0'
+```
+
+## Option 2: Add Maven dependency
+Add the Mux repository to your Maven pom.xml:
+
+```xml
+<repository>
+    <id>mux</id>
+    <name>Mux Maven Repository</name>
+    <url>https://muxinc.jfrog.io/artifactory/default-maven-release-local</url>
+    <releases>
+        <enabled>true</enabled>
+    </releases>
+    <snapshots>
+        <enabled>false</enabled>
+    </snapshots>
+</repository>
+```
+
+Next, add a dependency on Mux Core (current version is 7.0.11):
+
+```xml
+<dependency>
+    <groupId>com.mux</groupId>
+    <artifactId>stats.muxcore</artifactId>
+    <version>8.8.0</version>
+</dependency>
+```
+
+<LinkedHeader step={steps[1]} />
+
+The core Java SDK is initialized by implementing certain interfaces and providing these back to the SDK. In general, the structure used within [MuxBaseExoPlayer](https://github.com/muxinc/mux-stats-sdk-exoplayer/blob/14a65c0b365a1245e500543b976b3b9be1101aaa/MuxExoPlayer/src/main/java/com/mux/stats/sdk/muxstats/MuxBaseExoPlayer.java#L89) should be followed, where you create a class that extends `EventBus` and implements `IPlayerListener`, and then follows the following general steps.
+
+```java
+import com.mux.stats.sdk.core.events.EventBus;
+import com.mux.stats.sdk.core.model.CustomerPlayerData;
+import com.mux.stats.sdk.core.model.CustomerVideoData;
+import com.mux.stats.sdk.core.model.CustomerViewData;
+import com.mux.stats.sdk.muxstats.IPlayerListener;
+
+public class PlayerListener extends EventBus implements IPlayerListener {
+      MuxStats muxStats;
+
+    PlayerListener(Context ctx, ExoPlayer player, String playerName, CustomerPlayerData customerPlayerData, CustomerVideoData customerVideoData, CustomerViewData customerViewData) {
+        super();
+        this.player = new WeakReference<>(player);
+        state = PlayerState.INIT;
+        MuxStats.setHostDevice(new MuxDevice(ctx));
+        MuxStats.setHostNetworkApi(new MuxNetworkRequests());
+        muxStats = new MuxStats(this, playerName, customerPlayerData, customerVideoData, customerViewData);
+        addListener(muxStats);
+    }
+}
+```
+
+The above does the following:
+1. Initializes the `EventBus` superclass
+2. Sets the host device to a new instance of a class that implements `IDevice`
+3. Sets the host network API to a new instance of a class that implements `INetworkRequest`
+4. Instantiates a new instance of `MuxStats`, passing itself (a class that implements `IPlayerListener`) along with metadata
+5. Adds muxStats as a listener for `this`'s events (via EventBus)
+
+The `IDevice`, `INetworkRequest`, and `IPlayerListener` interfaces are described in the next section, as they provide the majority of the functionality aside from the actual emitting of events.
+
+<LinkedHeader step={steps[2]} />
+
+The core Java SDK relies heavily on callbacks, via implemented interfaces. These interfaces provide necessary metadata as well as core functionality that may be different depending on your Java environment.
+
+## `IDevice`
+The `IDevice` interface provides device-specific information to the core library, which is used as metadata attached to each view.
+
+```java
+package com.mux.stats.sdk.muxstats;
+
+public interface IDevice {
+    // Return the hardware name (e.g. Build.HARDWARE)
+    String getHardwareArchitecture();
+    // Return the OS (e.g. Android)
+    String getOSFamily();
+    // Return the OS version
+    String getOSVersion();
+    // Return the device manufacturer (e.g. Build.MANUFACTURER)
+    String getManufacturer();
+    // Return the model name (e.g. Build.MODEL)
+    String getModelName();
+    // Return the player version
+    String getPlayerVersion();
+    // Return a unique identifier for this device
+    String getDeviceId();
+    // Return the name of the running application
+    String getAppName();
+    // Return the version of the running application
+    String getAppVersion();
+    // Return the name of the plugin (e.g. exoplayer-mux)
+    String getPluginName();
+    // Return the version of the plugin
+    String getPluginVersion();
+    // Return the player software (e.g. 'ExoPlayer')
+    String getPlayerSoftware();
+    // Return the network connection type (e.g. 'wifi', 'cellular', 'ethernet')
+    String getNetworkConnectionType();
+    // Return milliseconds since epoch, ideally from a
+    // monotonically increasing clock. For instance, in
+    // ExoPlayer and Android, we suggest
+    // android.os.SystemClock.elapsedRealtime
+    long getElapsedRealtime();
+    // Return provide a mechanism to log an output, for instance to logcat
+    void outputLog(String tag, String msg);
+}
+```
+
+There must be an instance of a class that implements the `IDevice` interface, and this should be provided to `MuxStats.setHostDevice` prior to instantiating an instance of `MuxStats`.
+
+You can see the implementation of `IDevice` within Mux's ExoPlayer integration within [MuxBaseExoPlayer.java](https://github.com/muxinc/mux-stats-sdk-exoplayer/blob/14a65c0b365a1245e500543b976b3b9be1101aaa/MuxExoPlayer/src/main/java/com/mux/stats/sdk/muxstats/MuxBaseExoPlayer.java#L605).
+
+## INetworkRequest
+The `INetworkRequest` interface defines the methods that the Mux core SDK requires in order to make the necessary network requests.
+
+```java
+package com.mux.stats.sdk.muxstats;
+
+/**
+ * <b>MuxStats</b> will use this interface implementation to send events and metrics to the backend,
+ * overlaying player SDK need to implement this interface and set it to the <b>MuxStats</b> via
+ * {@link MuxStats#setHostNetworkApi(INetworkRequest)} method.
+ * Always set this interface before instantiating the <b>MuxStats</b> instance.
+ */
+public interface INetworkRequest {
+
+  /**
+   * This interface is used to get from the network implementation that
+   * {@link #postWithCompletion(String, String, String, Hashtable, IMuxNetworkRequestsCompletion)}
+   * have succeed or not.
+   *
+   * @deprecated please prefer {@link IMuxNetworkRequestsCompletion2}
+   */
+  @Deprecated
+  interface IMuxNetworkRequestsCompletion {
+
+    /**
+     * Called by the implementation object when
+     * {@link #postWithCompletion(String, String, String, Hashtable,
+     * IMuxNetworkRequestsCompletion)} is called.
+     *
+     * @param result if post was completed successfully or not.
+     */
+    void onComplete(boolean result);
+  }
+
+  interface IMuxNetworkRequestsCompletion2 {
+    void onComplete(boolean result, Map<String, List<String>> headers);
+  }
+
+  /**
+   * Perform a HTTP GET request.
+   *
+   * @param url url to send get request to.
+   */
+  void get(URL url);
+
+  /**
+   * Perform HTTP POST request.
+   *
+   * @param url url to send post request to.
+   * @param body post request body.
+   * @param headers post request headers.
+   */
+  void post(URL url, JSONObject body, Hashtable<String, String> headers);
+
+  /**
+   * Perform network request with confirmation callback, type of request is left to the
+   * implementation.
+   *
+   * @param domain domain to send beacons to.
+   * @param envKey backend key used to authenticate with backend.
+   * @param body request body.
+   * @param headers request headers.
+   * @param callback callback triggered after the request signalling the request status.
+   */
+  void postWithCompletion(String domain, String envKey, String body,
+      Hashtable<String, String> headers, IMuxNetworkRequestsCompletion callback);
+
+  /**
+   * Perform a network request with the given completion handler. If implemented, the completion
+   * handler will also report the response headers for the call
+   *
+   * This method has a default implementation, which does not report response headers, and delegates
+   * to the other postWithCompletion
+   *
+   * @param domain domain to send beacons to.
+   * @param envKey backend key used to authenticate with backend.
+   * @param body request body.
+   * @param headers request headers.
+   * @param callback callback triggered after the request signalling the request status.
+   */
+  default void postWithCompletion(String domain, String envKey, String body,
+      Hashtable<String, String> headers, IMuxNetworkRequestsCompletion2 callback) {
+    postWithCompletion(domain, envKey, body, headers, result -> callback.onComplete(result, null));
+  }
+}
+```
+
+There must be an instance of a class that implements the `INetworkRequest` interface, and this should be provided to `MuxStats.setHostNetworkApi` prior to instantiating an instance of `MuxStats`.
+
+You can see the implementation of `INetworkRequest` within Mux's ExoPlayer integration within [MuxNetworkRequests.java](https://github.com/muxinc/mux-stats-sdk-exoplayer/blob/14a65c0b365a1245e500543b976b3b9be1101aaa/MuxExoPlayer/src/main/java/com/mux/stats/sdk/muxstats/MuxNetworkRequests.java).
+
+## IPlayerListener
+The `IPlayerListener` interface defines the callbacks that `MuxStats` will utilize to retrieve player state information.
+
+```java
+package com.mux.stats.sdk.muxstats;
+
+public interface IPlayerListener {
+    // Return the current playhead position in milliseconds
+    // The playhead position must be updated at least every 250 milliseconds,
+    // but can be updated more often than this.
+    long getCurrentPosition();
+    // Return the MIME type of the content being played (e.g. "video/mp4"
+    // or "application/x-mpegUrl" etc)
+    String getMimeType();
+    // Return the width of the source, in pixels
+    Integer getSourceWidth();
+    // Return the height of the source, in pixels
+    Integer getSourceHeight();
+    // Return the current advertised bitrate, in bits per second
+    Integer getSourceAdvertisedBitrate();
+    // Return the current advertised framerate
+    Float getSourceAdvertisedFramerate();
+    // Return the current codec string
+    String getSourceCodec();
+    // Return the source duration, in milliseconds
+    Long getSourceDuration();
+    // Return whether the player is currently paused (i.e. not actively
+    // trying to play the content). This should return true if the player
+    // is not actively playing, rebuffering, or starting up.
+    boolean isPaused();
+    // Return whether the player is currently buffering content (e.g. not
+    // playing back because the buffer is not full enough).
+    boolean isBuffering();
+    // Return the width of the player, in logical pixels
+    int getPlayerViewWidth();
+    // Return the height of the player, in logical pixels
+    int getPlayerViewHeight();
+    // Return the current playback position as based off of the PDT tags
+    Long getPlayerProgramTime();
+    // Return the time of the furthest position in the manifest as based
+    // off of the PDT tags in the stream
+    Long getPlayerManifestNewestTime();
+    // Return the configured holdback value for a live stream (ms)
+    Long getVideoHoldback();
+    // Return the configured holdback value for parts in a low latency live
+    // stream (ms)
+    Long getVideoPartHoldback();
+    // Return the configured target duration for parts in a low latency
+    // live stream (ms)
+    Long getVideoPartTargetDuration();
+    // Return the configured target duration for segments in a live
+    // stream (ms)
+    Long getVideoTargetDuration();
+}
+```
+
+The class that implements `IPlayerListener` serves as the interface between `MuxStats` and the actual player API, and is provided when creating an instance of `MuxStats`.
+
+You can see the implementation of `IPlayerListener` within Mux's ExoPlayer integration within [MuxBaseExoPlayer.java](https://github.com/muxinc/mux-stats-sdk-exoplayer/blob/14a65c0b365a1245e500543b976b3b9be1101aaa/MuxExoPlayer/src/main/java/com/mux/stats/sdk/muxstats/MuxBaseExoPlayer.java#L64). This superclass is used to handle the base API interaction, and is subclassed by each individual `MuxStatsExoPlayer.java` to handle the varying APIs that ExoPlayer exposes with each of its minor versions (such as [this one for r2.11.1](https://github.com/muxinc/mux-stats-sdk-exoplayer/blob/14a65c0b365a1245e500543b976b3b9be1101aaa/MuxExoPlayer/src/r2_11_1/java/com/mux/stats/sdk/muxstats/MuxStatsExoPlayer.java)).
+
+<LinkedHeader step={steps[3]} />
+
+## Playback Events
+For the Java core SDK, the [Mux Playback Events](/docs/guides/mux-data-playback-events) are emitted via the `dispatch` method that is inherited from the `EventBus` class. In order to emit a given event, you must first instantiate an instance of the event class that you are trying to emit.
+
+```java
+import com.mux.stats.sdk.core.events.EventBus;
+import com.mux.stats.sdk.core.model.CustomerPlayerData;
+import com.mux.stats.sdk.core.model.CustomerVideoData;
+import com.mux.stats.sdk.muxstats.IPlayerListener;
+import com.mux.stats.sdk.events.playback.PlayEvent;
+
+public class PlayerListener extends EventBus implements IPlayerListener {
+      MuxStats muxStats;
+
+    PlayerListener(Context ctx, ExoPlayer player, String playerName, CustomerPlayerData customerPlayerData, CustomerVideoData customerVideoData) {
+        super();
+        this.player = new WeakReference<>(player);
+        state = PlayerState.INIT;
+        MuxStats.setHostDevice(new MuxDevice(ctx));
+        MuxStats.setHostNetworkApi(new MuxNetworkRequests());
+        muxStats = new MuxStats(this, playerName, customerPlayerData, customerVideoData);
+        addListener(muxStats);
+    }
+
+    // When the player begins trying to play back the video
+    public void onPlay() {
+        dispatch(new PlayEvent(null));
+    }
+}
+```
+
+While not necessary, each playback event can take an optional parameter of `PlayerData`, if certain information of the player has changed. This object has the following properties:
+
+| Property | Description |
+| --- | --- |
+| `playerMuxPluginName` | The name of the integration being built, as a string |
+| `playerMuxPluginVersion` | The version of the integration being built, as a string |
+| `playerSoftwareName` | The name of the player software (e.g. `Exoplayer`, etc) |
+| `playerSoftwareLanguageCode` | The language code (e.g. en-US) of the player UI localization |
+| `playerWidth` | The width of the player, in logical pixels |
+| `playerHeight` | The height of the player, in logical pixels |
+| `playerIsFullscreen` | Boolean of whether the player is currently displayed in full screen or not |
+| `playerIsPaused` | Boolean of whether the player is currently paused (i.e. not playing or trying to play) |
+| `playerPlayheadTime` | The current playhead time of the player, in milliseconds |
+
+Most of these properties are pulled automatically via the `IPlayerListener` interface, so there is no need to provide these values. You will need to emit all required [Playback Events](/docs/guides/mux-data-playback-events) in order to make a working integration.
+
+<Callout type="info">
+    Prior to v5.0.0, the SeekingEvent was not necessary. As of v5.0.0, this is now a required event to be emitted by the player integration.
+
+    Prior to v6.0.0, the RebufferStartEvent and RebufferEndEvent were not necessary. As of v6.0.0 and newer, these events must be emitted by the player integration.
+</Callout>
+
+## Data Events
+There is an additional type of event that is permissible, the `DataEvent`. This event is emitted the same way (via `EventBus.dispatch`), but should be used when some metadata has changed outside of a playback event. Examples of this are when you may have any of the metadata within `CustomerVideoData`, `CustomerPlayerData`, `EnvironmentData`, `VideoData`, or `ViewerData` changes. This event likely will not be needed, but it is provided in the case that it might be useful. Mux does not use this at all within the [ExoPlayer integration](https://github.com/muxinc/mux-stats-sdk-exoplayer).
+
+### Experiment Values
+Values for Experiments can be tracked via the tags of an HLS stream's main playlist. The values in the `SessionTags` will override the values provided via objects like `CustomerPlayerData` or `CustomerVideoData`. When your player has loaded the experiment values (such as through and HLS stream's `X-SESSION-DATA` tags), you may pass them to `MuxStats::setSessionData(List<SessionTag>)`
+
+## Bandwidth Throughput Events
+For the bandwidth throughput and latency related events, the structure is slightly different. Rather than having a specific class for each event, there is one high level network event, the `RequestBandwidthEvent`. This event exposes a method, `setBandwidthMetricData(BandwidthMetricData)`, which is used to provide all information about the event. In particular, the `BandwidthMetricData` class exposes a property (via a getter/setter) named `requestEventType`, which is a string that will match the event names as defined in [Playback Events - Bandwidth Throughput Events](/docs/guides/mux-data-playback-events#bandwidth-throughput-events).
+
+The implementation of these events for the Mux ExoPlayer integration can be found [here in this file](https://github.com/muxinc/mux-stats-sdk-exoplayer/blob/14a65c0b365a1245e500543b976b3b9be1101aaa/MuxExoPlayer/src/main/java/com/mux/stats/sdk/muxstats/MuxBaseExoPlayer.java#L751), from the linked line until the end of the file. This can serve as a good example of how to implement these events, though they are not necessary for a functioning integration.
+
+## Ad Events
+In the case that your player supports advertising, you should instrument the ad events that are defined in [Mux Playback Events - Ad Events](/docs/guides/mux-data-playback-events#ad-events). Ad events are emitted just as normal events would be, but the ad events should have the ad metadata included via a `ViewData` instance that is attached to each event via `setViewData`. For instance, to emit an `AdPlayEvent`, you should do the following:
+
+```
+AdData adData = new AdData();
+adData.setAdCreativeId(creativeId);
+adData.setAdId(adId);
+AdPlayEvent adPlayEvent = new AdPlayEvent(null);
+adPlayEvent.setAdData(adData);
+dispatch(adPlayEvent);
+```
+
+The implementation of ad events within Mux's ExoPlayer integration, on top of Google's IMA SDK, can be found within [AdsImaSDKListener.java](https://github.com/muxinc/mux-stats-sdk-exoplayer/blob/14a65c0b365a1245e500543b976b3b9be1101aaa/MuxExoPlayer/src/main/java/com/mux/stats/sdk/muxstats/AdsImaSDKListener.java), and can serve as a good example.
+
+## Changing the video
+Rather than requiring an event to be emitted for changing the video, `MuxStats` exposes two helper methods: `videoChange` and `programChange`. These methods encapsulate the logic necessary to end a view and start a new one, and both take an instance of `CustomerVideoData` containing the metadata about the new video being played.
+
+You should call one of these methods when a new video is being loaded into an already-tracked player.
+
+There is one critical difference between `videoChange` and `programChange` - `programChange` is intended to be used in the case that the underlying video changes _within the same stream_. An example of this would be within live linear playback, where the underlying program changes without the player having to reload a new stream.
+
+In the case that the player is loading a new HLS/Dash/MP4 video, you should use `videoChange`.
+
+```
+CustomerVideoData customerVideoData = new CustomerVideoData(null);
+customerVideoData.setVideoTitle("New Video Title");
+// Add other video metadata here
+muxStats.videoChange(customerVideoData);
+```
+
+## Reporting Network Changes
+If your player is able to detect changes in network connectivity (for instance, switching from cellular to wifi), you can report these changes to Mux by calling the `networkChange` method on your instance of `MuxStats`. This method takes a single parameter, a string representing the new network connection type. Valid values are `"wifi"`, `"cellular"`, `"wired"`, `"other"`, and `"no_connection"`.
+
+There's an overload of `networkChange` that also takes a boolean called `isLowDataMode`, which indicates whether the current network connection is in low data mode. This can be useful for mobile connections where the user has enabled a low data usage setting. This can be null if you don't know whether low data mode is enabled.
+
+```java
+// change to wifi
+muxStats.networkChange("wifi");
+// change to cellular with low data mode enabled
+muxStats.networkChange("cellular", true);
+```
+
+## Sending Error events
+Your custom integration is able to dispatch error events associated with the current view. These errors can get alerted on and are also visually indicated on the event timeline shown for that view.
+
+When dispatching errors your custom integration can provide additional error metadata with Error Categorization. This section will cover several examples of dispatching errors using the Java SDK. You can find [more general information on Error Categorization here](/docs/guides/error-categorization).
+
+This example illustates how to construct and send different categories of error events.
+
+<Callout type="info">
+Any error categories specified by your custom integration can be configured to be overridden based on the player error code. [See the Error Categorization guide for more details](/docs/guides/error-categorization#2-configuring-error-categorization).
+</Callout>
+
+
+```java
+import com.mux.stats.sdk.core.events.EventBus;
+import com.mux.stats.sdk.core.model.CustomerPlayerData;
+import com.mux.stats.sdk.core.model.CustomerVideoData;
+import com.mux.stats.sdk.muxstats.IPlayerListener;
+import com.mux.stats.sdk.events.playback.PlayEvent;
+import com.mux.stats.sdk.events.playback.ErrorEvent;
+
+public class PlayerListener extends EventBus implements IPlayerListener {
+    MuxStats muxStats;
+
+    PlayerListener(Context ctx, ExoPlayer player, String playerName, CustomerPlayerData customerPlayerData, CustomerVideoData customerVideoData) {
+        super();
+        this.player = new WeakReference<>(player);
+        state = PlayerState.INIT;
+        MuxStats.setHostDevice(new MuxDevice(ctx));
+        MuxStats.setHostNetworkApi(new MuxNetworkRequests());
+        muxStats = new MuxStats(this, playerName, customerPlayerData, customerVideoData);
+        addListener(muxStats);
+    }
+
+    // When the player begins trying to play back the video
+    public void onPlay() {
+        dispatch(new PlayEvent(null));
+    }
+
+    // Call from onPlayerError() with parameters appropriate to your integration. Dispatches an error event that Mux will categorize as a fatal playback error by default
+    public void onPlaybackError(String errorCode, String errorMessage, String errorContext) {
+        PlayerData playerData = new PlayerData();
+        playerData.setErrorCode(errorCode);
+        playerData.setErrorMessage(errorMessage);
+
+        ErrorEvent errorEvent = new ErrorEvent(playerData, errorContext);
+
+        dispatch(errorEvent);
+    }
+
+    // Call from onPlayerError() with parameters appropriate to your integration. Dispatches an error event that Mux will categorize as a warning by default
+    public void onPlaybackWarning(String errorCode, String errorMessage, String errorContext) {
+        PlayerData playerData = new PlayerData();
+        playerData.setErrorCode(errorCode);
+        playerData.setErrorMessage(errorMessage);
+
+        ErrorEvent errorEvent = new ErrorEvent(playerData, errorContext, ErrorSeverity.ErrorSeverityWarning);
+
+        dispatch(errorEvent);
+    }
+
+    // Call from onPlayerError() with parameters appropriate to your integration. Dispatches an error event that Mux will categorize as a business exception by default
+    public void onBusinessException(String errorCode, String errorMessage, String errorContext) {
+        PlayerData playerData = new PlayerData();
+        playerData.setErrorCode(errorCode);
+        playerData.setErrorMessage(errorMessage);
+
+        // This method does not set an explicit error severity, see below for an example method that does.
+        ErrorEvent errorEvent = new ErrorEvent(playerData, errorContext);
+        errorEvent.setIsBusinessException(true);
+
+        dispatch(errorEvent);
+    }
+
+    // Call from onPlayerError() with parameters appropriate to your integration. Dispatches an error event that Mux will categorize as a business exception by default
+    public void onBusinessException(String errorCode, String errorMessage, String errorContext, ErrorSeverity severity) {
+        PlayerData playerData = new PlayerData();
+        playerData.setErrorCode(errorCode);
+        playerData.setErrorMessage(errorMessage);
+
+        ErrorEvent errorEvent = new ErrorEvent(playerData, errorContext, severity, true);
+
+        dispatch(errorEvent);
+    }
+}
+```
+
+## Tearing Down
+There is no `destroy` event for the core Java SDK. Instead, the `release` method is exposed on `MuxStats` that cleans up all tracking and releases all references held within the core library. This method should be called when you release your player instance, and after calling `release`, the instance of `muxStats` will be unusable.
+
+<Releases>
+<LinkedHeader step={steps[4]} />
+
+### Current release
+
+#### v8.9.1
+Fixes:
+* Remove long-unused dependency on commons-math. If you were getting commons-math from us, you'll need to add a dependency for it
+
+### Previous releases
+
+#### v8.9.0
+New:
+* Track ranges of content played during a view via `video_playback_range` metric
+
+Improvements:
+* NetworkChangeEvent no longer accepts null values. If the network disconnects, use `no_connection`
+* `null` values from `IDevice.getNetworkConnectionType` are now coerced to `"no_connection"`
+
+#### v8.8.2
+Fixes:
+* count cumulative playing time after `seeked` events
+
+#### v8.8.1
+Fixes:
+* start cumulative time tracking on rebufferend if player wasn't paused
+
+#### v8.8.0
+New:
+* Add `MuxStats.networkChange()` API for tracking network connectivity changes during a view
+
+#### v8.7.0
+Updates:
+* Allow error codes as String values
+* Add overloads of `MuxStats.error()` which take code, message, error context and flags directly
+* Add `ErrorSeverity.WARNING` and `ErrorSeverity.FATAL`. Deprecate `ErrorSeverity.errorSeverityWarning` and `ErrorSeverity.erorrSeverityFatal`
+
+#### v8.6.0
+Updates:
+* Add `playbackModeChange` API methods to `MuxStats`. You can specify your own arbitrary playback modes, or use one of the presets in `PlaybackMode`
+* Add cumulative ad playing time and total content time metric tracking. The metrics track the "wall-clock" time spent with video playing during a view, and exclude time spent buffering or paused.
+* Add `AdData.adType` for indicating whether an ad is a preroll, midroll, or postroll
+
+#### v8.5.3
+Fixes:
+* do not dedupe error code and message if they were included
+
+#### v8.5.2
+Improvements:
+* Prevent overriding `mux_embed_version`, `mux_api_version`, and `mux_embed`
+* Do not flush beacons for non-fatal `error` events
+
+#### v8.5.1
+Fixes:
+* Un-deprecate `CustomerVideoData.videoCdn`
+
+#### v8.5.0
+New:
+* Add `CdnChangeEvent`, which will be sent automatically if using Request Metrics and sending your `x-cdn` header
+Fixes:
+* fix: Beacons not sent in v8.4.2 of the SDK
+
+#### v8.4.2
+Fixes:
+* fix: duplicate events and incorrect metadata when resuming after a long time
+* fix: error severity not reported correctly
+
+#### v8.4.1
+Fixes:
+* fix: Incorrect minified key for ViewerClientApplicationName and ViewerClientApplicationVersion
+
+#### v8.4.0
+Updates:
+* Add `CustomerVideoData::videoCreatorId`
+
+#### v8.3.0
+Updates:
+* Add new Standard Dimensions
+
+#### v8.2.0
+Updates:
+* support 10 more custom dimensions
+
+#### v8.1.4
+Fixes:
+* fix: Always send metadata on 'renditionchange'
+* fix: resolve conflicting UUIDs in rare cases
+ 
+#### v8.1.3 
+Fixes:
+* fix: flush beacons when ad breaks end
+ 
+#### v8.1.2 
+Fixes:
+* fix: end rebuffering on seek
+
+#### v8.1.1
+Fixes:
+* fix: verbose debug logging logging can break beacon dispatch
+* fix: seeking should end any active rebuffering
+
+#### v8.1.0
+Updates:
+* update: expose `enable` and `disable` methods for pausing and resuming data collection
+ 
+#### v8.0.2
+Improvements:
+* size metrics are now ignored if values are set to -1
+
+#### v8.0.1
+Fixes:
+* fix: reported application hang due to event handling
+
+#### v8.0.0
+Improvements
+* Error events can be categorized with warning or fatal severity levels
+* Error events can be categorized as business exceptions
+* An error translator can be configured to extend or customize the Core SDK error handling logic
+
+Fixes:
+* Player error details such as error code, error context, error message, error severity, and whether the error is a business exception are only sent to Mux when an error event is dispatched.
+* Player error details (same as listed above) are no longer deduplicated and are explicitly included with each error event sent to Mux.
+* The SDK continues to track watch time after an error event is dispatched based on player playhead progression. To explicitly indicate that watch time should no longer be tracked after an error during a playback session please dispatch a `ViewEnd` event.
+
+#### v7.13.2
+Fixes:
+* Update json.org to 20231013
+
+#### v7.13.1
+Fixes:
+* Update json.org to 20230227
+
+#### v7.13.0
+Fixes:
+* fix issue where seeking time would be included in time-to-first-frame if user seeked before playback started
+
+#### v7.12.0
+Updates:
+* add `update()` method for `CustomerData`
+
+#### v7.11.0
+New:
+* Support video source codec in `IPlayerListener`
+
+#### v7.10.0
+New:
+* Add ability to set lower-priority video data, for auto-detected metadata
+
+#### v7.9.1
+Improvements:
+* Additional improvements in reliability during large events
+
+#### v7.9.0
+Improvements:
+* Added `drmType` to `CustomerViewData` so customers can override it
+* Added `x-litix-shard-id` header populated with device ID
+
+#### v7.8.0
+New:
+* Add a field to `CustomOptions` for controlling beacon update interval. Very few cases require `longBeaconDispatch`.
+
+#### v7.7.4
+Fixes:
+* Fix Beacon interval incorrectly being 10 minutes
+
+#### v7.7.3
+Improvements:
+* Update beacon interval changed from 5s to 10s
+
+#### v7.7.2
+Improvements:
+* Fix Ad metadata not being reported properly
+
+#### v7.7.0
+New:
+Add `AdEvent` with `AdData` to represent data about individual, non-preroll ad events during play
+</Releases>

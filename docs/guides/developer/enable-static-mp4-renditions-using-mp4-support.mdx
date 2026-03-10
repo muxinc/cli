@@ -1,0 +1,218 @@
+---
+title: Enable static MP4 renditions using `mp4_support` (Deprecated)
+product: video
+description: Enable static MP4 renditions on your video assets using the deprecated mp4_support method.
+---
+
+<Callout type="info">
+This guide describes using the `mp4_support` method of creating MP4s. This method is now deprecated though it continues to function. For more information on migrating to the new, more flexible `static_renditions` API, please refer to [enabling static mp4 renditions](/docs/guides/enable-static-mp4-renditions)
+</Callout>
+
+## How to enable MP4 support
+
+There is no additional cost for creating and storing MP4 files for plus and premium quality level assets.
+
+For **basic quality level assets**, [we do charge for MP4 storage, but encoding is free](/pricing#do-you-charge-for-mp4-downloads).
+
+Delivery for MP4s has the same [price-per-minute cost as HLS delivery](/pricing#delivery).
+
+### Enabling MP4 renditions when you create an asset
+
+You can add MP4 support to an asset when <ApiRefLink href="/docs/api-reference/video/assets/create-asset">creating an asset</ApiRefLink> by including the `"mp4_support: <option>"` parameter.
+
+The supported options are:
+* `capped-1080p`: Produces a single MP4 file with the video resolution up to 1080p.
+* `audio-only`: Produces a single M4A (audio-only MP4) file for a video asset.
+* `audio-only,capped-1080p`: Produces both M4A and MP4 files for assets with video and audio, only the MP4 file for video-only assets, or only the M4A file for audio-only assets.
+* `standard` (deprecated). Depending on the source video resolution, produces up to three MP4 files with different levels of resolution. We strongly recommend using one of the previous options, depending on your use case.
+
+The files produced by each `mp4_support` option depends on the source asset type:
+| `mp4_support` option | video asset | video-only asset | audio-only asset |
+| -------------------| ----------- | ---------------- | ---------------- |
+| `capped-1080p` | `capped-1080p.mp4` | `capped-1080p.mp4`| `audio.m4a` |
+| `audio-only` | `audio.m4a`  | error | `audio.m4a` |
+| `audio-only,capped-1080p` | `audio.m4a` and `capped-1080p.mp4` | `capped-1080p.mp4` | `audio.m4a` |
+| `standard` | `low.mp4`, `medium.mp4`, `high.mp4` | `low.mp4`, `medium.mp4`, `high.mp4` | `audio.m4a` |
+
+The `standard` option generates one or more renditions depending on your source video's resolution. 
+A video qualifies for a rendition if either its width or height meets the minimum threshold for that tier, regardless of aspect ratio. 
+Output renditions will never exceed the source video's resolution.
+
+| Rendition | Minimum Resolution |
+| --------- | ------------------- |
+| `low.mp4` | (always generated) |
+| `medium.mp4` | 640x360 |
+| `high.mp4` | 960x540 |
+
+
+Here's an example of creating an asset with `mp4_support` enabled using the `capped-1080p` option:
+
+```json
+// POST /video/v1/assets
+{
+  "inputs": [
+    {
+      "url": "https://storage.googleapis.com/muxdemofiles/mux.mp4"
+    }
+  ],
+  "playback_policies": [
+    "public"
+  ],
+  "mp4_support": "capped-1080p"
+}
+```
+
+### Enable MP4 renditions after an asset has already been created
+
+You can also add MP4 support retroactively by calling the <ApiRefLink href="/docs/api-reference/video/assets/update-asset-mp4-support">update asset MP4 support API</ApiRefLink>, as shown below.
+
+```json
+// PUT /video/v1/assets/{ASSET_ID}/mp4-support
+{
+  "mp4_support": "capped-1080p"
+}
+```
+
+If you already have an asset with the `standard` option enabled and want to generate new static renditions with one of the `capped-1080p`, `audio-only` or `audio-only,capped-1080p` options, you need to make the following two <ApiRefLink href="/docs/api-reference/video/assets/update-asset-mp4-support">update asset MP4 support API calls</ApiRefLink>:
+
+1. Update request with the `mp4_support` option set to `none` to first delete the existing static renditions
+2. Update request with the `mp4_support` option set to one of the `capped-1080p`, `audio-only`, or `audio-only,capped-1080p` options
+
+### Enable MP4 renditions for a direct upload
+
+To enable MP4 support for direct upload, you need to specify the same `mp4_support` field within `new_asset_settings`, as shown below:
+
+```json
+// POST /video/v1/uploads
+{
+  "cors_origin": "https://example.com/",
+  "new_asset_settings": {
+    "playback_policies": [
+      "public"
+    ],
+    "mp4_support" : "capped-1080p"
+  }
+}
+```
+
+### Enable MP4 renditions when a live stream finishes
+
+If you want to enable MP4 support from the recorded version of a live stream soon after the live stream is finished, use the `mp4_support` property in the `new_asset_settings` when <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">creating the live stream</ApiRefLink>.
+
+```json
+// POST /video/v1/live-streams
+{
+  "playback_policies": [
+    "public"
+  ],
+  "new_asset_settings": {
+    "playback_policies": [
+      "public"
+    ],
+    "mp4_support": "capped-1080p"
+  }
+}
+```
+
+## Create the MP4 streaming URL
+
+After adding MP4 support you'll see an additional key on the asset object called `static_renditions`. This is the object that will contain the information about which MP4s are available.
+
+The `static_renditions.status` parameter refers to the current status of processing the MP4s. MP4s take longer to create than our default HLS version of the video, so they will not be ready immediately when the asset status is `ready`. Instead they will be ready when the `static_renditions.status` is `ready`, and a webhook of `video.asset.static_renditions.ready` is fired.
+
+```json
+{
+  ...all asset details...
+  "mp4_support": "capped-1080p",
+  "static_renditions": {
+    "status": "preparing"
+  }
+}
+```
+
+When the `static_renditions.status` field is `ready`, you will see the details of the MP4s available in an array under the `files` key.  The example below shows the files for the `audio-only,capped-1080` option:
+```json
+{
+  ...all asset details...
+  "mp4_support": "capped-1080p",
+  "static_renditions": {
+    "status": "ready",
+    "files": [
+      {
+        "name": "audio.m4a",
+        "ext": "m4a",
+        "bitrate":  {M4A_BITRATE},
+        "filesize":  {M4A_FILESIZE}
+      },
+      {
+        "name": "capped-1080p.mp4",
+        "ext": "mp4",
+        "height": {MP4_HEIGHT},
+        "width":  {MP4_WIDTH},
+        "bitrate":  {MP4_BITRATE},
+        "filesize":  {MP4_FILESIZE}
+      }
+    ]
+  }
+}
+```
+
+The MP4 or M4A streaming URL is compiled using the playback ID and one of the static_renditions.
+
+```
+https://stream.mux.com/{PLAYBACK_ID}/{capped-1080p.mp4, audio.m4a}
+--
+ex. https://stream.mux.com/abcd1234/capped-1080p.mp4
+ex. https://stream.mux.com/abcd1234/audio.m4a
+```
+
+If you want a browser to download the MP4 file rather than attempt to stream it, you can provide a file name for the MP4 to save it via the `download` query parameter:
+
+```
+https://stream.mux.com/{PLAYBACK_ID}/{MP4_FILE_NAME}?download={FILE_NAME}
+--
+ex. https://stream.mux.com/abcd1234/capped-1080p.mp4?download=cats
+```
+
+For the deprecated `standard` option, the file names will be `low.mp4`, `medium.mp4`, `high.mp4`.
+
+## Webhooks
+
+Your application can be automatically updated with the status of MP4 downloads for an asset through [webhooks](/docs/core/listen-for-webhooks).
+
+There are four related events you can receive.
+
+| Webhook       | Description   |
+| :------------ |:--------------|
+|`video.asset.static_renditions.preparing` | Received when MP4 support is first requested |
+|`video.asset.static_renditions.ready` |Received when the MP4 URL(s) are available and ready for use |
+|`video.asset.static_renditions.deleted` |Received if MP4 support has been set to `none` via a PUT to the `mp4-support` endpoint |
+|`video.asset.static_renditions.errored` |Received if an unexpected error happens while making the MP4 URLs available |
+
+<Callout type="info" title="Audio M4A support">
+
+* For an audio-only asset: All `mp4_support` options will only produce a single M4A `audio.m4a` file.
+* For a video asset: The  `audio-only` or `audio-only,capped-1080p` `mp4_support` options will produce an `audio.m4a` file.
+* For a video-only asset: The `audio-only,capped-1080p` option will only produce a `capped-1080p.mp4` file. MP4 generation will error for the  `audio-only` option.
+
+</Callout>
+
+## Signed URLs with MP4 video
+
+Mux videos have two types of playback policy, `public` or `signed`. If your `playback_id` is `signed`, you will need to also sign requests made for MP4 URLs.
+
+You can check out how to do that in our [signed URLs guide](/docs/guides/secure-video-playback).
+
+If you run into any trouble signing MP4 requests, please reach out to [Mux Support](/support) and we'll be able to help.
+
+
+## Disable MP4 renditions
+
+To disable MP4 support on an asset, you can use the <ApiRefLink href="/docs/api-reference/video/assets/update-asset-mp4-support">update asset MP4 support APIs</ApiRefLink>, setting `mp4_support` to `none`.
+
+```json
+// PUT /video/v1/assets/{ASSET_ID}/mp4-support
+{
+  "mp4_support": "none"
+}
+```

@@ -1,0 +1,551 @@
+---
+title: Monitor AndroidX Media3
+product: data
+dataIntegration: true
+description: This guide walks through integration with Google's Media3 to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player
+  - title: 1. Install the Mux Data SDK
+    description: Add the Mux Data SDK for Media3 to your project
+  - title: 2. Integrate this SDK with Media 3 in your app
+    description: The Mux monitor attaches to an instance of Player, collecting the most data if you are using ExoPlayer
+  - title: 3. Add Metadata
+    description: Customize your data by adding metadata related to your customer, device, and media
+  - title: 4. Advanced Features
+    description: Your application may require additional SDK options not covered in previous steps, such as IMA Ads integration, custom display and player sizing, and more
+  - title: Migrating from the Mux Data SDK for ExoPlayer
+    description: If you are migrating from ExoPlayer to Media3, you can migrate your Mux Data integration as well using this guide.
+    topic: code
+  - title: Release notes
+    topic: list
+---
+
+The Mux Data SDK for Media3 integrates Mux Data with Google's [AndroidX Media3](https://developer.android.com/guide/topics/media/media3) SDK in order to integrate your video app with Mux Data. Our SDK consists of a set of [open-source libraries](https://github.com/muxinc/mux-stats-sdk-media3) capable of observing Media3 for events and data related to your customers' playback experience.
+
+This guide will walk you through a basic integration with Mux Data and your Media3 app. You will add the Mux Data SDK to your project, integrate the SDK with your Media3 `Player` and if necessary, learn to customize our SDK's functionality based on your specific needs
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<Callout type="warning" title="Players other than `ExoPlayer`">
+
+Most of this guide assumes you are using `ExoPlayer`, specifically, as opposed to a `MediaController` or a custom implementation of `Player`. Our SDK does offer support for players other than `ExoPlayer`, but this support is limited by the interface of `Player` and `Player.Listener`. You may supplement the data we are able to collect using your `Player`'s specific APIs by overriding `BaseMedia3Binding` and supplying that object when you create your `MuxStatsSdkMedia3<>` for your custom player.
+
+</Callout>
+
+<LinkedHeader step={steps[1]} />
+
+## Add our repository to your Gradle project
+
+Add Mux's maven repository to your gradle files. Newer projects require declaring this in `settings.gradle`, and older projects require it to be set in the project-level `build.gradle`.
+
+<CodeExamples product="data" example="media3AddRepo" exampleOrder="gradle_kts,gradle_groovy"/>
+
+## Add a dependency for Mux Data
+
+Add our library to the `dependencies` block for your app. Replace the string `[Current Version]` with the current version of the SDK from the [releases page](https://github.com/muxinc/mux-stats-sdk-media3/releases).
+
+<CodeExamples
+  examples={{
+    gradle_kts: `
+implementation("com.mux.stats.sdk.muxstats:data-media3:[Current Version]")
+    `,
+    gradle_groovy: `
+implementation "com.mux.stats.sdk.muxstats:data-media3:[Current Version]"
+    `,
+  }}
+  exampleOrder="gradle_kts,gradle_groovy"
+/>
+
+## Stay on a version of Media3
+
+By default, we try to support the latest minor release of media3 with our SDK. That is, 1.0, 1.1, etc. When media3 updates, we update our `data-media3` library to support the newest version. If you need an update to the Mux Data SDK, but can't update your media3 integration, you can use one of our `-atX_Y` variants. These variants of our Mux Data SDK receive all the same updates as the default version, but offer support for a specific version of media3.
+
+To stay on a specific version of media3, add the appropriate version to the end of our `artifactId`. For example, to always use Media3 1.0.x, use the library at `com.mux.stats.sdk.muxstats:data-media3-at_1_0:[Current Version]`
+
+<CodeExamples
+  examples={{
+    gradle_kts: `
+// Stay on media3 1.0 while getting the most-recent mux data
+implementation("com.mux.stats.sdk.muxstats:data-media3-at_1_0:[Current Version]")
+    `,
+    gradle_groovy: `
+// Stay on media3 1.0 while getting the most-recent mux data
+implementation "com.mux.stats.sdk.muxstats:data-media3-at_1_0:[Current Version]"
+    `,
+  }}
+  exampleOrder="gradle_kts,gradle_groovy"
+/>
+
+### Officially Supported Media3 Versions
+
+We try to support all production versions of media3. Currently, we support the following versions:
+
+* 1.9.x
+* 1.8.x
+* 1.6.x
+* 1.5.x
+* 1.4.x
+* 1.3.x
+* 1.2.x
+* 1.1.x
+* 1.0.x
+
+<LinkedHeader step={steps[2]} />
+
+<MdxImport snippet="envKeyCallout" />
+
+To monitor a `Player`, monitor it using `monitorWithMuxData()`. You must initialize your Mux Data integration with a valid Environment Key.
+
+If your player is newly-created, it's best to do this at around the same time that you call `prepare()` or `play()`. Ideally, you should do it synchronously, either right before calling *or* right after you start preparing/playing.
+
+<CodeExamples product="data" example="media3MonitorPlayer" exampleOrder="kotlin,java"/>
+
+### Reusing `Player` instances
+
+If your `Player`'s state was `IDLE` before calling `monitorWithMuxData()` or `enable()`, you should follow the same advice as if you were working with a new `Player` instance: start monitoring either immediately before or right after calling `prepare()` and `play()`. When you start monitoring again, a new View will be created in Mux Data. 
+
+The easiest way to get your player into the `IDLE` state is to call `stop()`, though you'll have to call `prepare()` and `play()` again to start playing.
+
+If you want to start monitoring a `Player` instance that was already created and prepared, you should start start monitoring via `monitorWithMuxData()` or `enable()` immediately after you start the player again or set a new `MediaItem`. When you attach a monitor to the `Player` in this case, a new View will be created in Mux Data. In this case, this order is important; you must monitor the player after setting a new `MediaItem` in order to properly count any buffering the player may do.
+
+<LinkedHeader step={steps[3]} />
+
+You can make your data more informative and actionable by supplementing it with data of your own. To supply this data, you can use the `CustomerData` object you created in Step 2.
+
+<CodeExamples product="data" example="media3AddMetadata" exampleOrder="kotlin,java"/>
+
+Those examples contain only a few of the fields available. For more information, see the [Metadata Guide](/docs/guides/make-your-data-actionable-with-metadata).
+
+All metadata details are optional, however you'll be able to compare and see more interesting results as you include more details. This gives you more metrics and metadata about video streaming, and allows you to search and filter on important fields like the player version, CDN, and video title.
+
+Certain metadata can be collected automatically, such as the media title, source URL, and poster art.
+
+<LinkedHeader step={steps[4]} />
+
+## Changing the video
+
+There are two cases where the underlying tracking of the video view needs to be reset: first, when you load a new source URL into an existing player, and second, when the program within a single media stream changes (such as a program within a live stream, described more below).
+
+Note: You do not need to change the video info when changing to a different source of the same video content (e.g. different resolution or video format).
+
+## New source
+
+When you change to a new video (in the same player) you need to update the information that Mux knows about the current video. Examples of when this is needed are:
+
+* The player advances to the next video in a playlist
+* The user selects a different video to play
+
+This is done by calling `muxStatsExoPlayer.videoChange(CustomerVideoData)` which will remove all previous video data and reset all metrics for the video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+It's best to change the video info immediately after telling the player which new source to play.
+
+## New program (in single stream)
+
+In some cases, you may have the program change within a stream, and you may want to track each program as a view on its own. An example of this is a live stream that streams multiple programs back to back, with no interruptions.
+
+In this case, call `muxStatsExoPlayer.programChange(CustomerVideoData)`. This will remove all previous video data and reset all metrics for the video view, creating a new video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+## Manually set when a video is being played full-screen
+
+For most use cases, the SDK is capable of detecting whether or not a video is being played full-screen. Specifically, it can do so in the case where the player view is the same size as the device display (excepting ActionBars and other framework window decoration).
+
+For other uses cases (non-overlaid controls, window decoration via plain `View`s, etc) you may need to tell the SDK when the user switches to full-screen.
+
+If you are using `SimplePlayerView` or a similar ExoPlayer UI component, you can set the full-screen flag from the `OnFullScreenModeChangedListener`.
+
+```kotlin
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    // If you are using SimplePlayerView, StyledPlayerView, etc
+    playerView = findViewById(R.id.my_player_view)
+
+    playerView.setFullscreenButtonClickListener { isFullScreen ->
+      // Set presentation based on which mode is requested
+      if(isFullScreen) {
+        muxStats.presentationChange(MuxSDKViewPresentation.FULLSCREEN)
+      } else {
+        muxStats.presentationChange(MuxSDKViewPresentation.NORMAL)
+      }
+      // Handle moving to fullscreen playback with your code
+    }
+  }
+```
+
+## Error tracking
+
+By default, Mux's integration with ExoPlayer automatically tracks fatal errors as thrown by ExoPlayer. If a fatal error happens outside the context of ExoPlayer and you want to track it with Mux, you can call `muxStats.error(MuxErrorException)` like this:
+
+```kotlin
+// Error code: integer value for the generic type of error that
+// occurred.
+// Error message: String providing more information on the error
+// that occurred.
+// For an example, the HTML5 video element uses the
+// following: https://developer.mozilla.org/en-US/docs/Web/API/MediaError
+// for codes and messages. Feel free to use your own codes and messages
+val errorCode = 1
+val errorMessage = "A fatal error was encountered during playback"
+val errorContext = "Additional information about the error such as a stack trace"
+val error = MuxErrorException(errorCode, errorMessage, errorContext)
+muxStats.error(error)
+```
+Note that `error(MuxErrorException e)` can be used with or without automatic error tracking. If your application has retry logic that attempts to recover from ExoPlayer errors then you may want to disable automatic error tracking like this:
+
+```kotlin
+muxStats.setAutomaticErrorTracking(false)
+```
+
+<Callout type="warning">
+It is important that you only trigger an error when the playback has to be abandoned or aborted in an unexpected manner, as Mux tracks fatal playback errors only.
+</Callout>
+
+## Usage with Google Interactive Media Ads (IMA)
+
+The Mux Data SDK for Media3 can observe events that occur during Ad playback. To enable this functionality, you need to attach an instance of `MuxStatsSdkMedia3<ExoPlayer>` to your `ImaAdsLoader`.
+
+<Callout type="warning">
+The Mux Data SDK must take over the `AdErrorListener` and `AdEventListener` of your loader, but you can supply your own listeners, as shown in the example.
+</Callout>
+
+Fist, add Mux's Media3 IMA Extension to your build:
+
+<CodeExamples
+  examples={{
+    gradle_kts: `
+// in your app's dependencies
+implementation("com.mux.stats.sdk.muxstats:data-media3-ima:0.7.1")
+    `,
+    gradle_groovy: `
+// in your app's dependencies
+implementation "com.mux.stats.sdk.muxstats:data-media3-ima:0.7.1"
+    `,
+  }}
+  exampleOrder="gradle_kts,gradle_groovy"
+/>
+
+Then, use the extension to monitor your IMA integration.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+val newPlayer = ExoPlayer.Builder(this)
+  .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this))
+  .setLocalAdInsertionComponents({ adsLoader }, view.playerView))
+  // ... rest of builder calls
+  .build()
+val customerData = CustomerData()
+// optionally, set properties on CustomerData
+
+muxStats = newPlayer.monitorWithMuxData(context, DATA_ENV_KEY, customerData)
+adsLoader = ImaAdsLoader.Builder(this)
+  // ... rest of builder calls
+  .monitorWith(
+    muxStats = muxStats!!,
+    customerAdErrorListener = { /*Optional parameter, your custom logic*/ },
+    customerAdEventListener = { /*Optional parameter, your custom logic*/ },
+  )
+  .build()
+adsLoader.setPlayer(newPlayer)
+    `,
+    java: `
+ExoPlayer player = new ExoPlayer.Builder(this)
+    // ... Add IMA components
+    .build();
+
+MuxStatsSdkMedia3<ExoPlayer> muxStats =
+    new MuxStatsSdkMedia3<>(
+        /* context = */ this,
+        /* envKey = */ "YOUR MUX DATA ENV KEY HERE",
+        /* customerData = */ myCustomerData, // Populated as in Step 2 of the guide
+        /* player = */ player,
+        /* playerView = */ playerView,
+        /* playerBinding = */ new ExoPlayerBinding()
+    );
+
+MuxImaAdsListener muxAdsListener = MuxImaAdsListener.newListener(
+    muxStats,
+    adEvent -> {}, // If you have handling logic for AdEvents, put it here
+    adError -> {} // If you have handling logic for Ad Errors, put it here
+);
+adsLoader = new ImaAdsLoader.Builder(this)
+    .setAdErrorListener(muxAdsListener)
+    .setAdEventListener(muxAdsListener)
+    // Set up rest of AdsLoader
+    .build();
+adsLoader.setPlayer(player);
+    `,
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Manually set the screen orientation
+
+The Mux SDK supports sending an event when the playback orientation changes. You can trigger this by calling `muxStatsExoPlayer.orientationChange(MuxSDKViewOrientation orientation)`, passing either `MuxSDKViewOrientation.LANDSCAPE` or `MuxSDKViewOrientation.PORTRAIT` depending on the current orientation of the player.
+
+<LinkedHeader step={steps[5]} />
+
+If you are updating from our ExoPlayer SDK, you have to do a short migration. The migration steps below should get you building again:
+
+1. Change your Mux Data SDK dependency to `implementation "com.mux.stats.sdk.muxstats:data-media3:1.0.0"`
+1. Change all mentions of `MuxStatsExoPlayer` to `MuxStatsSdkMedia3<ExoPlayer>`
+1. **If you are using java**, add `new ExoPlayerBinding()` to the end of the parameters you set when creating your `muxStats`.
+1. **If you are using the IMA Ads SDK**: You will need to rewrite your integration as explained in Step 4 of this guide.
+
+<Releases>
+<LinkedHeader step={steps[6]} />
+
+### Current release
+
+#### v1.11.1
+New:
+* Track which sections of content a user has watched
+* Track mid-view changes to network type and send `networkchange` events
+
+Improvements:
+* Send `"no_connection"` as a network connection type if connectivity is momentarily lost during a stream
+
+Internal Lib Updates:
+* Update `muxstats:android` to 1.7.2 
+* Update `stats.muxcore` to 8.9.0
+
+### Previous releases
+
+#### v1.11.0
+New:
+* Detect changes to network connectivity during views and dispatch `networkchange` events
+
+Internal Lib Updates:
+* Update `stats.muxcore` to v8.8.0
+* Update `muxstats:android` to v1.7.0
+
+#### v1.10.1
+Updates:
+* Add support for media3 v1.9.x 
+Fixes:
+* fix: manifestNewestTime reported as the earliest PDT, not the latest 
+
+#### v1.10.0
+Updates:
+* Add (incubating) `playbackModeChange` API methods to `MuxStatsSdkMedia3`.
+* Add cumulative ad playing time and total content time metric tracking. The metrics track the "wall-clock" time spent with video playing during a view, excluding buffering, seeking, and startup time.
+* library-ima: Detect the type of ad being played (preroll, midroll, or postroll)
+
+Internal lib updates:
+* Update `stats.muxcore` to 8.6.0
+* Update `stats.android` to 1.5.0
+
+#### v1.9.0
+Improvements:
+* Update Kotlin version from 1.9 to 2.2.10. This should be a backward-compatible change, but please reach out if you see issues
+
+Internal Lib Updates:
+* Update `stats.muxcore` to v8.5.2
+
+#### v1.8.1
+Updates:
+* Add support for media3 v1.8
+
+Fixes:
+* Un-deprecate `CustomerVideoData.videoCdn`
+
+Internal lib updates:
+* Update `stats.muxcore` to v8.5.1
+
+#### v1.8.0
+
+Updates:
+* Add automatic CDN-change detection, assuming your CDN is sending `x-cdn` response headers
+* Improved Request Metrics tracking
+
+Internal lib updates:
+* Update `stats.muxcore` to v8.5.0
+
+#### v1.7.4
+Improvements:
+* fix: AbstractMethodError in some apps
+  
+#### v1.7.3
+Improvements:
+* fix: viewerClientApplicationName and viewerClientApplicationVersion not reported
+
+Internal lib updates:
+* Update sdk.android to v1.4.10
+* Update muxstats.java to v8.4.1
+* This update also makes `sdk:android` and `muxstats.java` peers of each other. Previously, `sdk.android` depended on `muxstats.java`. This should be an internal-only change, but it's noted here in case you are tracking transitive dependencies in your build workflows
+
+#### v1.7.2
+Improvements:
+* Add support for media3 v1.6.0
+
+Fixes:
+* fix: when showing multiple Players simultaneously, each should be counted as a separate view
+
+Internal Lib Updates:
+* Update `muxstats:android` to v1.4.9
+
+#### v1.7.1
+Updates
+* Add `CustomerVideoData::videoCreatorId`
+
+Internal lib updates:
+* update `muxstats.java` to v8.4.0
+* Update `sdk:android` to v1.4.8
+
+#### v1.7.0
+Updates
+* Add more Standard Dimensions 
+
+Internal lib updates:
+* Update `stats.muxcore` to v8.3.0
+* Update `muxstats.android` to v1.4.7
+
+#### v1.6.3
+Improvements:
+* Adds 10 more custom dimension slots for media customers
+Internal lib updates:
+* Update `stats.android` to v1.4.6 and `stats.muxcore` to v8.2.0
+
+#### v1.6.2
+Improvements:
+* update: add support for media3 1.5.x
+* fix: content `renditionchange`s during ad breaks must be deferred until after the ad break
+
+Internal lib updates:
+* update `android` to v1.4.5
+* update `muxstats.core` to v8.4.1
+
+#### v1.6.1
+Improvements:
+* fix: suppress some ad events when outside of an ad break
+* fix: dropped frames not tracked 
+
+Internal Library Updates:
+* Update `muxstats-android` to v1.4.4
+
+#### v1.6.0
+Updates:
+* Better tracking of ad events. If you are using a `VideoPlayerAdCallback` supply it to `ImaAdsLoader.monitorWith`
+
+Fixes:
+* fix rebuffering not ended when seeking starts
+* fix verbose logging causing bad views in some cases
+
+Internal lib updates:
+* Update `stats.java` to 8.1.2
+* Update `muxstats.android` to 1.4.2
+
+#### v1.5.2
+Fixes:
+* fix: media3 version reported as, eg, `1.2.x` instead of the real version
+
+Improvements:
+* Add support for media3 v1.4
+* Handle nonfatal codec exceptions on API 21+
+
+Internal lib updates:
+* Update `android` lib 1.4.0
+* Update `stats.java` lib to 8.1.0
+* Remove `kt-utils` from the dependencies. It is no longer required
+
+#### v1.5.1
+Improvements:
+* fix: incorrect startup time after enable, disable, and videoChange
+
+#### v1.5.0
+Improvements:
+* Update Android Core to 1.3.0
+* misc. local build updates
+
+
+#### v1.4.0
+New:
+* Expose parameter to control logging level when initializing monitoring
+
+#### v1.3.2
+* fix: incorrect screen resolution reported in some cases
+* Update to Mux Android Core 1.2.2
+* Update to Mux Java Core 8.0.2
+
+#### v1.3.1
+Updates:
+* update: Add support for media3 1.3.0
+
+Fixes:
+* fix: reported app hang due to event handling during beacon dispatch
+* fix: crash when exoplayer HLS module not used
+
+Improvements:
+* Update Android Core to v1.2.1
+* Update Java Core to v8.0.1
+
+#### v1.3.0
+New:
+* `MuxErrorException` now allows you to report non-fatal and business-related errors
+
+Improvements:
+* update: Updated MuxCore to version 8.0.0
+* update: Updated Android Core to version 1.2.0
+
+Fixes:
+* fix: renditionchange sent in situations where rendition was only reset
+* fix: Capture IMA CSAI media failures with LOG events
+* fix: rebuffering percentage inflated if client ads fail to load
+
+#### v1.2.2
+
+Fixes:
+* fix: populate ad data even for non-preroll ads
+* fix: seeking time included in time-to-first frame if user seeks before play starts
+
+Improvements:
+* remove extraneous androidx deps from the exoplayer lib (they are still required if using IMA)
+
+#### v1.2.1
+
+Updates:
+* add support for media3 v1.2.x
+
+#### v1.2.0
+
+Updates:
+* add support for media3 v1.2.x
+
+#### v1.1.0
+
+Updates:
+* Expose `IDevice` and `INetworkRequest` for injection, as with the other player sdks
+
+#### v1.0.3
+
+Updates:
+* update: Update compileSdkVersion and targetSdkVersion to 34.
+
+#### v1.0.2
+
+Fixes:
+* fix: SSAI Ad events not properly reported
+
+#### v1.0.1
+
+Fixes:
+* fix: setting playWhenReady to true while READY sends play but not playing
+
+Improvements:
+* Update to Core 1.0.1 - Fixes handling of leaving ads by seeking out of them
+
+#### v1.0.0
+New:
+* Update this SDK to v1.0.0 (🎉)
+
+Fixes:
+* fix: Custom Domain implementation POSTs to wrong URL
+* fix: viewstart may not be sent if monitor attached while idle && playWhenReady == true
+
+#### v0.8.0
+Improvements:
+* feat: Detect Title, Source URL, and Poster Art
+</Releases>

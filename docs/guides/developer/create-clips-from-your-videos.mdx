@@ -1,0 +1,157 @@
+---
+title: Create clips from your videos
+product: video
+description: >-
+  Learn how to create clips from your video files or live stream event
+  recordings.
+videoWalkthrough:
+  src: Hv8S2SfibcU6C8HR7iJo1001dgfodzJMmdD353PEYEsk
+  thumbnailTime: 135
+  created: '2022-02-02T14:54:00Z'
+---
+
+To drive higher viewer engagement with the videos already on your service, you can create additional videos from your existing library or catalog. These videos could:
+* Provide quick previews
+* Highlight key moments
+* Be polished versions of a live stream with the extra minutes trimmed from the beginning & end (aka preroll and postroll slates) for on-demand replays
+
+Mux can now help you quickly create these kinds of videos using the asset clipping functionality.
+
+<Callout type="info">
+  If you do not need frame accurate clips, or require immediate availability of clips, you may find that the [instant clipping feature may meet your requirements](/docs/guides/create-instant-clips).
+</Callout>
+
+## 1. Create a clip
+
+When you [POST a new video](/docs/core/stream-video-files) or [start live streaming](/docs/guides/start-live-streaming), Mux creates a new asset for the video file or live stream event recording.
+You can create a clip from an existing asset by making a <ApiRefLink href="/docs/api-reference/video/assets/create-asset">POST request to /assets endpoint</ApiRefLink> and defining the `input` object's clipping parameters.
+* `url` is defined with `mux://assets/{asset_id}` template where `asset_id` is the source Asset Identifier to create the clip from.
+* `start_time` is the time offset in seconds from the beginning of the video, indicating the clip's start marker. The default value is 0 when not included.
+* `end_time` is the time offset in seconds from the beginning of the video, indicating the clip's end marker. The default value is the duration of the video when not included.
+
+A request and response might look something like this:
+
+### Example request
+
+```bash
+curl https://api.mux.com/video/v1/assets \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d '{
+        "inputs": [
+          {
+            "url": "mux://assets/01itgOBvgjAbES7Inwvu4kEBtsQ44HFL6",
+            "start_time": 10.0,
+            "end_time": 51.10
+          }
+        ],
+        "playback_policies": [
+          "public"
+        ],
+        "video_quality" : "basic"
+      }' \
+  -u ${MUX_TOKEN_ID}:${MUX_TOKEN_SECRET}
+```
+
+### Example response
+```json
+{
+  "data": {
+    "status": "preparing",
+    "playback_ids": [
+      {
+        "policy": "public",
+        "id": "TXjw00EgPBPS6acv7gBUEJ14PEr5XNWOe"
+      }
+    ],
+    "mp4_support": "none",
+    "master_access": "none",
+    "id": "kcP3wS3pKcEPywS5zjJk7Q1Clu99SS1O",
+    "created_at": "1607876845",
+    "video_quality" : "basic",
+    "source_asset_id": "01itgOBvgjAbES7Inwvu4kEBtsQ44HFL6"
+  }
+}
+```
+
+Mux creates a new asset for the clip. And the response will include an **Asset ID** and a **Playback ID**.
+
+* Asset IDs are used to manage assets using `api.mux.com` (e.g. to read or delete an asset).
+* <ApiRefLink href="/docs/api-reference/video/playback-id">Playback IDs</ApiRefLink> are used to stream an asset to a video player through `stream.mux.com`. You can add multiple playback IDs to an asset to create playback URLs with different viewing permissions, and you can delete playback IDs to remove access without deleting the asset.
+* `source_asset_id` is the video or live stream event recording asset used to create the clip. The `source_asset_id` can be useful for associating clips with the source video object in your CMS.
+
+## 2. Wait for "ready" event
+
+When the clip is ready for playback, the asset "status" changes to "ready".
+
+The best way to do this is via **webhooks**. Mux can send a webhook notification as soon as the asset is ready. See the [webhooks guide](/docs/core/listen-for-webhooks) for details.
+
+If you can't use webhooks for some reason, you can manually **poll** the <ApiRefLink href="/docs/api-reference/video/assets/get-asset">asset API</ApiRefLink> to see asset status. Note that this only works at low volume.
+
+### Build your own request
+
+<ExampleRequestRetrieveAsset />
+
+<CodeExamples
+  product="video"
+  example="retrieveAsset"
+/>
+
+Please don't poll this API more than once per second.
+
+## 3. Play your clip
+
+To play back the video, create a playback URL using the `PLAYBACK_ID` you received when you created the clip.
+
+<ExamplePlaybackUrl />
+
+```curl
+https://stream.mux.com/{PLAYBACK_ID}.m3u8
+```
+
+<CodeExamples
+  product="video"
+  example="hlsPlayback"
+  exampleOrder="html,react,embed,swift,android"
+/>
+
+See the [playback guide](/docs/guides/play-your-videos) for more information about how to integrate with a video player.
+
+
+## FAQs
+A few commonly asked questions:
+
+### How many clips can be created from a single source asset?
+
+Unlimited! Mux creates a new asset for each clip. Hence, there is no limit to how many clips you can create.
+
+### Is there a cost to create clips?
+
+Each clip is a new asset and is considered an on-demand video. On-Demand video pricing applies and that includes Encoding, Storage, and Delivery usage.
+
+### Can I use basic video quality on clips?
+
+Yes! Clips can be created as either `basic` or `plus`.
+
+### Can I create clips when adding new video files?
+
+Mux only allows creating clips from existing videos in your account. That means, clipping specific parameters (`start_time` and `end_time`) added to <ApiRefLink href="/docs/api-reference/video/assets/create-asset">Asset Creation</ApiRefLink> are only applicable for `input.url` with `mux://assets/{asset_id}` format.
+
+### Can I create clips from live streams?
+
+Yes! Mux supports creating clips from the active asset being generated by a live stream while broadcasting. If you clip an asset while the broadcast is active, just remember that the active asset is still growing, so if you don't provide `end_time`, it will default to the end of the asset at the time of creation. As such, when clipping an active asset during the broadcast, for best results you should always provide an `end_time`.
+
+### My source asset has subtitles/captions text tracks. Will the clip have them?
+
+Mux copies all the text tracks from the source asset to the new asset created for the clip. Mux also trims the text tracks to match the clip's start and end markers.
+
+### What other data is copied from the source asset?
+
+Mux copies the captions and watermark image from the source asset to the clips created. If your source asset does not have a watermark image and you want your clipped
+asset to have a watermark, pass it through in `overlay_settings`. See more details in the [watermark guide](/docs/guides/add-watermarks-to-your-videos).
+
+All other fields, such as `passthrough`, are not copied over.
+
+### What is the minimum duration for a clip?
+
+Clips must have a duration of at least 500 milliseconds.

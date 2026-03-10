@@ -1,0 +1,793 @@
+---
+title: Monitor ExoPlayer
+product: data
+dataIntegration: true
+description: This guide walks through integration with Google's ExoPlayer to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Add a dependency on the Mux Data SDK
+    description: Download the version of the SDK that matches your version of ExoPlayer.
+  - title: 2. Initialize the monitor with your ExoPlayer instance
+    description: The Mux monitor attaches to your ExoPlayer instance.
+  - title: 3. Add Metadata
+    description:
+  - title: 4. Advanced
+    description: Depending on the details of your implementation, you may want to leverage some of the advanced options of MuxStatsExoPlayer.
+  - title: Java Build Compatibility
+  - title: Release notes
+    topic: notes
+---
+
+This documents integration instructions for [Google's `ExoPlayer` library](https://github.com/google/ExoPlayer), version 2.x. `ExoPlayer` versions before 2.0 are not supported. As of version 3.0.0 of Mux's integration with `ExoPlayer`, only versions of `ExoPlayer` greater than or equal to 2.10.x are supported.
+
+The Mux integration with `ExoPlayer` is built on top of Mux's core Java SDK, and the full code can be seen here: [muxinc/mux-stats-sdk-exoplayer](https://github.com/muxinc/mux-stats-sdk-exoplayer).
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+## Add Gradle dependency on the Mux ExoPlayer SDK
+Add the Mux Maven repository to your Gradle file:
+```gradle
+repositories {
+    maven {
+        url "https://muxinc.jfrog.io/artifactory/default-maven-release-local"
+    }
+}
+```
+
+Next, add a dependency on the Mux Data ExoPlayer SDK. Supported versions of ExoPlayer are:
+ - r2.10.6
+ - r2.11.1
+ - r2.12.1
+ - r2.13.1
+ - r2.14.1
+ - r2.15.1
+ - r2.16.1
+ - r2.17.1
+ - r2.18.1
+ - r2.19.1
+ - `amznPort` (see below)
+
+There is typically API compatibility within an ExoPlayer major-minor version, so you should be able to pair one of the versions listed above with any player sharing the same major-minor version (e.g., the ExoPlayer r2.12.1 version of the Mux ExoPlayer SDK works with ExoPlayer r2.12.0 and r2.12.2 equally well).
+
+Add a dependency to your Gradle file using the Mux SDK version and an ExoPlayer version listed above in the following format:
+```gradle
+api 'com.mux.stats.sdk.muxstats:MuxExoPlayer_(ExoPlayer SDK version with underscores):(Mux SDK version)'
+```
+
+Example using Mux ExoPlayer SDK 2.7.2 and ExoPlayer version r2.16.1:
+```gradle
+api 'com.mux.stats.sdk.muxstats:MuxExoPlayer_r2_16_1:2.7.2'
+```
+
+## Configure ProGuard/R8
+
+If you're using ProGuard or R8, you'll need to add the following line to your app's proguard rules file (eg, `proguard-rules.pro`). This won't change anything about your app binary, it just suppresses a known warning
+
+```
+-dontwarn com.google.ads.interactivemedia.v3.api.**
+```
+
+#### Amazon ExoPlayer Port
+In addition to the versions above, the Mux Data ExoPlayer SDK also supports [Amazon's official ExoPlayer port for Amazon Devices](https://github.com/amzn/exoplayer-amazon-port). If you are monitoring ExoPlayer on an Amazon device, you can get that version with the following line:
+```gradle
+api 'com.mux.stats.sdk.muxstats:MuxExoPlayer_amznPort:(Mux SDK version)'
+```
+
+For an example integration, you can see the demo application within [muxinc/mux-stats-sdk-exoplayer](https://github.com/muxinc/mux-stats-sdk-exoplayer) which integrates Mux into the ExoPlayer demo application.
+
+<LinkedHeader step={steps[2]} />
+
+<MdxImport snippet="envKeyCallout" />
+
+First, create the `CustomerPlayerData` and `CustomerVideoData` objects as appropriate for your current playback
+
+```kotlin
+val customerData = CustomerData().apply {
+        customerVideoData = CustomerVideoData().apply {
+          // Data about this video
+          // Add or change properties here to customize video metadata such as title,
+          //   language, etc
+          videoTitle = "Mux ExoPlayer Android Example"
+          // ExoPlayer doesn't provide an API to obtain this, so it must be set manually
+          videoSourceUrl = videoUrl
+        }
+        customerViewData = CustomerViewData().apply {
+          // Data about this viewing session
+          viewSessionId = UUID.randomUUID().toString()
+        }
+        customerViewerData = CustomerViewerData().apply {
+          // Data about the Viewer and the device they are using
+          muxViewerDeviceCategory = "kiosk"
+          muxViewerDeviceManufacturer = "Example Display Systems"
+          muxViewerOsVersion = "1.2.3-dev"
+        }
+        customData = CustomData().apply {
+          // Add values for your Custom Dimensions.
+          // Up to 5 strings can be set to track your own data
+          customData1 = "Hello"
+          customData2 = "World"
+          customData3 = "From"
+          customData4 = "Mux"
+          customData5 = "Data"
+        }
+```
+
+Next, create the `MuxStatsExoPlayer` object by passing your `Context` (typically your `Activity`), your `ENV_KEY`, the `ExoPlayer` instance, and the customer data object you just created.
+
+```kotlin
+muxStatsExoPlayer = exoPlayer.monitorWithMuxData(
+      context = requireContext(),
+      envKey = "YOUR_ENV_KEY_HERE",
+      playerView = playerView,
+      customerData = customerData
+    )
+```
+
+If you haven't set your `playerView` already, do so now. We recommend this in order to determine a number of viewer context values as well as track the size of the video player.
+
+```java
+muxStatsExoPlayer.setPlayerView(simpleExoPlayerView.getVideoSurfaceView());
+```
+
+Finally, when you are destroying the player, call the `MuxStatsExoPlayer.release()` function.
+
+```java
+muxStatsExoPlayer.release()
+```
+
+After you've integrated, start playing a video in your player. A few minutes after you stop watching, you'll see the results in your Mux data dashboard. Login to the dashboard and find the environment that corresponds to your `env_key` and look for video views.
+
+#### Note For ExoPlayer v2.15 and below
+
+On older supported versions of ExoPlayer, Mux prefers that you pass an instance of `SimpleExoPlayer` specifically, instead of any `ExoPlayer`. In the latter case, however, some metrics and errors may not be available, such as upscaling metrics. Updating to ExoPlayer r2.16.0 or higher will remove this limitation
+
+```kotlin
+muxStatsExoPlayer = exoPlayer.monitorWithMuxData(
+      context = requireContext(),
+      envKey = "YOUR_ENV_KEY_HERE",
+      playerView = playerView,
+      customerData = customerData
+    )
+
+```
+or in java:
+```java
+// Make sure to monitor the player before calling `prepare` on the ExoPlayer instance
+muxStatsExoPlayer = new MuxStatsExoPlayer(this, "YOUR_ENV_KEY_HERE", player, playerView, customerData);
+```
+
+<LinkedHeader step={steps[3]} />
+
+Options are provided to this SDK via the objects within the `CustomerData` object.
+
+All metadata details are optional, however you'll be able to compare and see more interesting results as you include more details. This gives you more metrics and metadata about video streaming, and allows you to search and filter on important fields like the player version, CDN, and video title.
+
+There is one caveat with ExoPlayer; ExoPlayer does not provide an API to retrieve the current source URL from the player. Due to this, `CustomerVideoData` has a method allowing you to set via `CustomerVideoData.setVideoSourceUrl(String url)`. Setting this value will allow you to see the source URL as well as the dimension Source Hostname within the dashboard.
+
+For more information, see the [Metadata Guide](/docs/guides/make-your-data-actionable-with-metadata).
+
+<LinkedHeader step={steps[4]} />
+
+## Changing the video
+
+There are two cases where the underlying tracking of the video view need to be reset. First, when you load a new source URL into an existing player, and second when the program within a singular stream changes (such as a program within a live stream).
+
+Note: You do not need to change the video info when changing to a different source of the same video content (e.g. different resolution or video format).
+
+## New source
+
+When you change to a new video (in the same player) you need to update the information that Mux knows about the current video. Examples of when this is needed are:
+
+* The player advances to the next video in a playlist
+* The user selects a different video to play
+
+This is done by calling `muxStatsExoPlayer.videoChange(CustomerVideoData)` which will remove all previous video data and reset all metrics for the video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+It's best to change the video info immediately after telling the player which new source to play.
+
+## New program (in single stream)
+
+In some cases, you may have the program change within a stream, and you may want to track each program as a view on its own. An example of this is a live stream that streams multiple programs back to back, with no interruptions.
+
+In this case, call `muxStatsExoPlayer.programChange(CustomerVideoData)`. This will remove all previous video data and reset all metrics for the video view, creating a new video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+## Manually set when a video is being played full-screen
+
+For most use cases, the SDK is capable of detecting whether or not a video is being played full-screen. Specifically, it can do so in the case where the player view is the same size as the device display (excepting ActionBars and other framework window decoration).
+
+For other uses cases (non-overlaid controls, window decoration via plain `View`s, etc) you may need to tell the SDK when the user switches to full-screen.
+
+If you are using `SimplePlayerView` or a similar ExoPlayer UI component, you can set the full-screen flag from the `OnFullScreenModeChangedListener`.
+
+```kotlin
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    // If you are using SimplePlayerView, StyledPlayerView, etc
+    playerView = findViewById(R.id.my_player_view)
+
+    playerView.setFullscreenButtonClickListener { isFullScreen ->
+      // Set presentation based on which mode is requested
+      if(isFullScreen) {
+        muxStats.presentationChange(MuxSDKViewPresentation.FULLSCREEN)
+      } else {
+        muxStats.presentationChange(MuxSDKViewPresentation.NORMAL)
+      }
+      // Handle moving to fullscreen playback with your code
+    }
+  }
+```
+
+## Error tracking
+
+By default, Mux's integration with ExoPlayer automatically tracks fatal errors as thrown by ExoPlayer. If a fatal error happens outside the context of ExoPlayer and you want to track it with Mux, you can call `muxStatsExoPlayer.error` like this:
+
+```kotlin
+// Error code: integer value for the generic type of error that
+// occurred.
+// Error message: String providing more information on the error
+// that occurred.
+// For an example, the HTML5 video element uses the
+// following: https://developer.mozilla.org/en-US/docs/Web/API/MediaError
+// for codes and messages. Feel free to use your own codes and messages
+val errorCode = 1
+val errorMessage = "A fatal error was encountered during playback"
+val errorContext = "Additional information about the error such as a stack trace"
+val error = MuxErrorException(errorCode, errorMessage, errorContext)
+muxStatsExoPlayer.error(error)
+```
+Note that `muxStatsExoPlayer.error(MuxErrorException e)` can be used with or without automatic error tracking. If your application has retry logic that attempts to recover from ExoPlayer errors then you may want to disable automatic error tracking like this:
+
+```kotlin
+muxStatsExoPlayer.setAutomaticErrorTracking(false)
+```
+
+<Callout type="warning">
+It is important that you only trigger an error when the playback has to be abandoned or aborted in an unexpected manner, as Mux tracks fatal playback errors only.
+</Callout>
+
+
+## Usage with Google Interactive Media Ads (IMA)
+
+If you are using Google's IMA SDK to play back ads within your Android application, you can configure Mux to monitor the ad performance by passing your instance of `AdsLoader` to `muxStatsExoPlayer.monitorImaAdsLoader(adsLoader)`.
+
+### ExoPlayer r2.12.x and Up
+
+```kotlin
+// For example, within the r2.12.x demo application
+// PlayerActivity.getAdsLoader
+adsLoader = ImaAdsLoader.Builder(context = this)
+    /*
+     * This replaces `monitorImaAdsLoader` method because in r2.12.x ImaAdsLoader
+     * will create google.v3.AdsLoader on adRequest, which means that monitorImaAdsLoader
+     * Will always receive null pointer and will be unable to recieve add events.
+     */
+    .setAdErrorListener(muxStats.getAdErrorEventListener())
+    .setAdEventListener(muxStats.getAdEventListener())
+    .build()
+```
+
+### ExoPlayer pre-r2.12.x
+
+```kotlin
+// Within setting up the AdsMediaSource
+sdkFactory = ImaSdkFactory.getInstance()
+adsLoader = sdkFactory.createAdsLoader(this)
+muxStatsExoPlayer.monitorImaAdsLoader(adsLoader)
+```
+
+As of version `1.3.0` and later, the Mux SDK for ExoPlayer supports firing an event when the playback orientation changes. You can trigger this by calling `muxStatsExoPlayer.orientationChange(MuxSDKViewOrientation orientation)`, passing either `MuxSDKViewOrientation.LANDSCAPE` or `MuxSDKViewOrientation.PORTRAIT` depending on the current orientation of the player.
+
+<LinkedHeader step={steps[5]} />
+
+## Java and Android Gradle Plugin Build Compatibility
+Starting with version `2.6.0`, the Mux SDK for ExoPlayer requires JDK 11 and version 7.0 or greater of the Android Gradle Plugin. This is only a requirement for build compatibility. The Mux SDK for ExoPlayer will remain bytecode-compatible with Java 1.8.
+
+If you are updating from version `2.5.9` or lower, you may need to:
+  - Update Android Studio to version `2020.x` or greater
+  - Update your dependency on the Android Build Tools plugin to `7.0.0` or greater
+  - Update Gradle in `gradle-wrapper.properties` to `7.0.2` or greater
+  - Ensure your Android Studio is using JDK 11:
+    - Go to Android Studio Settings
+    - Go `Build, Execution and Deployment` -> `BuildTools` -> `Gradle`
+    - If the `Gradle JDK` option is not set to a Java 11 JDK, click the dropdown and select a Java 11 JDK. It should be the default on Studio `2020.x`
+
+<Releases>
+<LinkedHeader step={steps[6]} />
+
+### Current release
+
+#### v3.5.2
+
+Fixes:
+* fix rebuffering not ended when seeking starts
+* fix extra-verbose logging causing crashes in some cases
+
+### Internal library updates
+* Update MuxCore to v8.1.2
+
+### Previous releases
+
+#### v3.5.1
+
+Fixes:
+* allow media3 and exoplayer Data SDKs to coexist in the same app build
+
+#### v3.5.0
+New:
+* `MuxErrorException` now allows you to report non-fatal and business-related errors
+
+Improvements:
+* Updated MuxCore to version 8.0.0
+* Updated Android Core to version 1.2.0
+
+Fixes:
+* fix: Capture IMA CSAI media failures with LOG events
+
+#### v3.4.7
+Fixes:
+* fix: ad metadata not collected for mid and postrolls
+* fix: time-to-first-frame incorrect if user seeks before play starts
+
+#### v3.4.6
+Fixes:
+* fix: seeking not properly tracked on ExoPlayer 2.18 and 2.19
+
+#### v3.4.5
+Improvements:
+* Add support for ExoPlayer 2.19
+
+#### v3.4.4
+Fixes:
+* fix issue where beaconCollectionDomain wouldn't work correctly
+
+#### v3.4.3
+Improvements:
+* chore: Cut support for ExoPlayer v2.10.x - v2.13.x
+* fix: starting an ad break while rebuffering doesn't end rebuffering
+
+#### v3.4.2
+Improvements:
+* collect segment response headers beginning with x-litix
+
+#### v3.4.1
+Improvements:
+* Include ad playback time in total playback time
+
+#### v3.4.0
+Updated:
+* Added `viewDrmType` to `CustomerViewData` so customers can provide their own value
+Improvements:
+* Under-the-hood reliability improvements during large events
+
+#### v3.3.4
+Improvements:
+* Simplify some internal HTTP error handling. This change should not affect the majority of users
+
+#### v3.3.3
+Improvements:
+* Update to MuxCore v7.8.0, adds `longBeaconDispatch` to `CustomOptions`. This feature should only be used in a small number of use cases, and your setting may be overridden by mux's backend servers
+
+#### v3.3.2
+Improvements:
+* Update beacon batch interval from 5s to 10s (#277)
+
+#### v3.3.1
+Improvements:
+* Update to Mux Core 7.7.2, Fixes bug in ad-metadata reporting
+
+#### v3.3.0
+New:
+* Add ad-related metadata to ad events
+Improvements:
+* Update to Gradle 7.3 + Wrapper 7.4.0 + Simplify Demo Variant Names
+
+#### v3.2.0
+Updates:
+* Improve Error Code Variety on ExoPlayer 2.15+
+* Add Error Context and DRM Type for views
+* Add API Total dropped frames
+
+Improvements:
+* Added extra values for Rendition lists.
+
+#### v3.1.1
+Fixes:
+* Fix ArrayIndexOutOfBounds Exception after clearing the media item
+
+#### v3.1.0
+Updates:
+* Override metadata about your users' device with `CustomerViewerData`
+
+Fixes:
+* Allow overriding Device Category metadata
+* Exoplayer 2.11: Fix renditonchange sent on non-video track changes
+* Fix beacon dispatcher crashing when verbose logging is enabled
+
+Improvements:
+* Update to MuxCore 7.4.0 (improvements/fixes have been noted in the release notes)
+
+#### v3.0.2
+Improvements:
+* Collect Request IDs for HLS segments for Error Tracking
+
+#### v3.0.1
+Fixes:
+* Fix the Kotlin extension for MuxStatsExoPlayer to require envKey
+
+#### v3.0.0
+API Improvements:
+* Automatic Screen Size Detection: You no longer have to manually input your device's screen size to see fullscreen/screen size metrics. Just pass in your `Activity` and `PlayerView` when you make your `MuxStatsExoPlayer`
+* Supply your player view via constructor parameter
+* Kotlin extension for monitoring ExoPlayer
+* `ENV_KEY` is now a required parameter to create a `MuxStatsExoPlayer`. It's required, so it's been made mandatory. The existing (non-env-key) constructors are now deprecated
+
+Please refer to [the new usage guide](/docs/guides/monitor-exoplayer#2-initialize-the-monitor-with-your-exoplayer-instance) for more details
+
+APIs Removed:
+* Removed deprecated constructors of `MuxExoPlayer`. Use `CustomerData` instead
+* Removed `MuxExoPlayer.setStreamType()` as it was no longer used
+* Removed several methods, such as `getPlayerData()`, `getCurrentPosition()`, etc that are not meant for public use
+
+The full list of removed methods is long, but the change is unlikely to impact you if you are using the SDK as documented. You can review the complete list of removed APIs [on our Release page on GitHub](https://github.com/muxinc/mux-stats-sdk-exoplayer/releases/tag/v3.0.0)
+
+Commit Changelog:
+Breaking:
+* Remove Support for ExoPlayer 2.9.6
+* Remove deprecated constructors (see above)
+
+Updates:
+* API Update: Add Environment Key via Constructor
+
+Improvements:
+* Convert to Kotlin, Refactor ExoPlayer interaction for maintainability, remove deprecations
+* Remove non-ads demos, as the difference is not significant. This reduces CI time
+* Remove Release Variants for test and demo apps. They are not required, and this reduces build/CI time
+* Add GitHub Actions for Basic CI and Release Automation
+
+#### v2.10.0
+Fixes:
+* Fix `setPlayerSize` to treat input as physical pixels, as documented. If you are using `setPlayerSize()`, you may have to update your code
+
+#### v2.9.1
+Improvements:
+* Support for ExoPlayer `v2.18.1`
+* Fix crashes in rare cases where the player is released asynchronously
+* Update MuxCore to `v7.3.1`
+
+MuxCore Changes:
+* Split views with long periods of inactivity into multiple views
+
+#### v2.9.0
+Improvements:
+* Add ability to override OS data values (incubating)
+* Update to MuxCore `7.3.0`
+
+MuxCore Changes:
+* Support for overriding OS data values
+
+#### v2.8.0
+Improvements:
+* Add support for Custom Data Domains
+* Add support for manually tracking if a view was played automatically
+* Update to MuxCore `v7.2.0`
+
+Fixes:
+* Fix Issue with HLS/DASH CDN tracking
+
+MuxCore Changes:
+* Custom Beacon Collection Domains
+* Add Autoplay flag on CustomerPlayerData
+* Fix serialization strategy for complex objects in beacons
+
+### 2.7.2
+Fixes:
+* Fix Build/Crash Issues When Used With Minimal/Custom ExoPlayers
+
+#### v2.7.1
+Fixes:
+* Fix an issue where our core library wasn't being packaged properly
+
+#### v2.7.0
+Improvements:
+* Add support for Experiment Tracking via manifest tags (HLS only)
+* Add support for Amazon ExoPlayer Port
+* Add support for ExoPlayer `v2.17.x`
+
+Fixes:
+* HLS/DASH: Fix CDN tracking when playlist and chunks are coming from different CDNs
+* Rate-limit `requestcompleted` events to prevent ingestion errors when the `DataSource` enters a retry loop
+
+MuxCore Changes
+* Add support for Experiment Tracking
+
+#### v2.6.1
+MuxCore 7.0.10 Fixes:
+  - Fix event-handling issues that can cause events to be dropped in rare cases
+
+#### v2.6.0
+Improvements:
+  - Add support for ExoPlayer r2.16.1
+  - Update to AGP 7.0
+  - Add additional logging for Event dispatching errors
+  - Add ability to override device name
+
+Fixes
+  - Fix an issue with screen dimensions while in fullscreen
+
+MuxCore 7.0.7 and 7.0.8 Changes:
+  - Fix potential packaging errors when used with androidX
+  - Fix bug related to the manual fullscreen API
+
+#### v2.5.9
+Improvements:
+ - Add support for measuring live stream glass-to-glass latency (#181)
+
+MuxCore 7.0.6 Changes
+ - Added support for Live Latency
+
+MuxCore 7.0.7 Changes
+ - Final API for Live latency
+
+#### v2.5.8
+Improvements:
+ - Add API to indicate whether video is shown fullscreen
+ - MuxCore:
+     - Add support for latency metrics
+     - Add a `Fullscreen` enum and API
+     - Remove Sentry
+
+Fixes:
+ - Fix for usage of legacy support libraries
+ - Added `-donotwarn` for ExoPlayer classes
+ - MuxCore:
+     - Fix upscale percentages by clamping player size
+
+#### v2.5.7
+Improvements:
+ - Add support for ExoPlayer r2.15
+
+Fixes:
+ - Updating to MuxCore 7.0.4 to fix ConcurrentModificationException when calling updateCustomerData.
+
+#### v2.5.6
+Fixes:
+ - Fix reference to packageVersionName in Gradle `deployVariant` task. Includes a change to the Gradle package layout, see example in docs.
+
+#### v2.5.5
+Fixes:
+ - Problem with ExoPlayer default implementation of methods on interfaces.
+
+#### v2.5.4
+Fixes:
+ - Reverts audio test improvements introduced in v2.5.3.
+
+#### v2.5.3
+Improvements:
+ - Upgrade Docker base image used for builds to JDK 8u302
+ - Audio test improvements
+
+Fixes:
+ - Retain code obfuscation and mapping files
+ - Added pause event to be dispatched when player-stop is called
+
+#### v2.5.2
+ - Updating to MuxCore 7.0.2 with fixes to code obfuscation
+
+#### v2.5.1
+ - Fix packaging of ExoPlayer SDK AAR with MuxCore
+
+#### v2.5.0
+Improvements:
+ - Releasing process involving Artifactory
+ - MuxCore pulled from Maven instead of in bundled jar
+ - Support for overriding the beacon domain
+ - Javadoc coverage for public API
+ - For API version 30+ use context.getDisplay instead of WindowManager.
+
+Fixes:
+ - Removed VideoComponent listener and now capturing firstFrameRendered
+ - Added conversion from physical `px` to `dpx` on `setScreen` size
+ -  MuxCore:
+     - Fix customer data null pointer exception
+     - Fixed key name in setMuxEmbed function
+     - Handle case where player size is larger than physical screen, treat as full-screen
+
+#### v2.4.15
+ - Reduced the amount of messages sent each second to main thread.
+ - Additional logging for bandwidth metrics tests.
+
+#### v2.4.14
+ - Support ExoPlayer 2.14
+
+#### v2.4.13
+ - Add CustomerData class to ProGuard
+
+#### v2.4.12
+ - Add `checkstyle` task to Gradle
+ - Replaced FrameRendererListener with VideoListener.
+ - Custom data update: deprecate MuxExoPlayer constructors that take a CustomerData argument separately, add custom-dimensions example to demo app
+
+#### v2.4.11
+ - Run automated tests on real devices
+ - Fix MIME-type detection for HLS & DASH stream by allowing the server to make that determination.
+ - Upgrade MuxCore to 6.6.0, which includes:
+   - Add support for custom dimensions in view metadata
+   - Fix propagation of bandwidth metrics data by sending even when unchanged
+
+#### v2.4.10
+ - Fix an issue where a null pointer exception may be raised when playing back DASH content (only present in v2.4.9)
+
+#### v2.4.9 (deprecated)
+ - Added support for CDN header tracking, including mid-stream CDN switching
+ - Fix a null-pointer crash in the ads listener
+ - Updated the Mux Core library, added support for bandwidth metrics
+
+#### v2.4.8
+ - Reset internal state when calling `videochange`, fixing an issue where rebuffering may be reported incorrectly after calling `videochange`
+
+#### v2.4.7
+ - Fix an issue where metrics weren't tracked correctly sometimes when playback starts with a seek event
+ - Upgrade MuxCore to 6.3.0, which includes:
+   - Reset error-tracking state when loading a new video.
+ - [Internal] Fix automated tests for r2.13.1
+
+#### v2.4.5
+ - Add support for ExoPlayer r2.13.x
+
+#### v2.4.4
+ - Removed all content from res directory under MuxExoPlayer, ensuring smaller build size
+ - [Internal] Added test for playback end events and view end event
+ - [Maintenance] Reformat code with Google Java style
+ - Upgrade MuxCore to 6.2.0, which includes:
+   - Added `viewEnd` event on player release.
+
+#### v2.4.3
+ - Fix an issue where `customerViewData` was not propagated correctly through all constructors
+
+#### v2.4.2
+ - Fix an issue where `customerViewData` was not propagated correctly through constructors
+
+#### v2.4.1
+ - Fix an issue where detection of rebuffering after seeking was not working at times
+ - Use a random UUID stored in shared preferences for `mux_viewer_id`
+ - Fix an issue where `view_session_id` wasn't sent correctly
+
+#### v2.4.0
+ - Fix an issue where additional icons and image files were included
+ - Fix an issue where the application would crash on Android 11
+ - Expose additional fatal playback errors
+
+#### v2.3.1
+ - Fix an issue where AAR file size was too large due to inadvertent inclusion of a video file
+
+#### v2.3.0
+ - Fix an issue where logical resolution was calculated incorrectly
+ - Report `wired` instead of `ethernet` for certain connection types
+ - [internal] Integrate automated integration tests
+
+#### v2.2.0
+ - Upgrade to Android Studio 4.1
+ - Upgrade to Gradle 6.1.1
+ - Update Dockerfile and build script for new tooling
+ - Support back to minAPI 16 via multidexing support
+
+#### v2.1.0
+ - Support ExoPlayer r2.12.x flavors
+ - Expose CustomerViewData through ProGuard
+ - Ensure packages are scoped to com.mux.stats.sdk in ProGuard
+ - Update version reported by the plugin (v2.0.0 reported v1.5.0 unintentionally, now will report v2.1.0)
+ - Fix an issue where accessing ad integration could cause a crash
+ - Bump to MuxCore v6.0.0
+ - Fix invalid rebuffering reported for audio-only and playback
+ - Ensure that events are sent in a more timely manner (some events are held after a PauseEvent until
+the next active event)
+
+#### v2.0.0
+ - Bump to v5.0.0 of MuxCore
+   - Update ad handling logic to ensure that ad metrics and dimensions are tracked correctly
+   - Retry sending failed beacons, rather than letting them drop
+   - Fix issue where we were incorrectly calculating scaling metrics when screen or video resolution was negative
+   - Fix an issue where watch time is incorrectly increasing after certain events
+   - Make sure that time to first frame is not tracked for views that result from `programchange`
+   - Add support for `viewer_connection_type`, which is a breaking change for `IDevice`, as it adds another method that must be implemented
+   - Add support for `view_session_id`, which includes an additional `CustomerViewData` class. This changes the constructor for creating a `MuxStats` instance
+ - Drop support for ExoPlayer r2.7.x and r2.8.x
+ - Implement SeekingEvent directly in `MuxStatsExoPlayer`
+ - Fix issue where source type could be null and cause a crash
+ - Fix an issue where ad events are sent out of order in some cases
+ - Add connection type detection
+ - Report logical sizes for player size, rather than physical size
+ - Fix an issue where time to first frame was incorrectly measured in some cases, such as mid- or post-roll ad playback without a pre-roll
+ - Add support for `CustomerViewData`, including `setViewSessionId`
+
+#### v1.5.0
+ - Fix an issue where if you were using `muxStatsExoPlayer.setPlayerSize(width, height)` those values were not used correctly. Note: If you call this, you must update the player size whenever that changes, as the SDK will no longer pull those values automatically.
+
+#### v1.4.0
+ - Move `MuxSDKViewOrientation` to `com.mux.stats.sdk.core.MuxSDKViewOrientation` and expose it publicly
+
+#### v1.3.0
+ - Add support for `RenditionChangeEvent`, which is tracked automatically
+ - Add support for `OrientationChangeEvent`, which can be triggered by calling `muxStatsExoPlayer.orientationChange(MuxSDKViewOrientation orientation)`. Supported orientations are `MuxSDKViewOrientation.LANDSCAPE` and `MuxSDKViewOrientation.PORTRAIT`.
+ - Fix an issue where full screen tracking was not working correctly
+
+#### v1.2.0
+ - Add support for ExoPlayer 2.11.x
+ - Note: there is a known issue right now with ExoPlayer r2.11.x where ads are not tracked correctly. This is under development.
+
+#### v1.1.0
+ - Add support for additional debug logging. See `muxStatsExoPlayer.enableMuxCoreDebug(Boolean enable, Boolean verbose)`
+ - Add the ability to update customerVideoData and customerPlayerData mid-stream, in cases that certain metadata may not be available at the beginning of playback. See `muxStatsExoPlayer.updateCustomerData(CustomerPlayerData customerPlayerData, CustomerVideoData customerVideoData)`
+ - Fix an issue where if `MuxStatsExoPlayer` is initialized too late, the stream is not tracked correctly
+ - Fix an issue where Mux Plugin Version is reported incorrectly
+ - Fix an issue where the `EndedEvent` is not sent to the backend
+ - Fix an issue where tracking playback is not correct when playWhenReady is set to false (i.e. non-autoplay playback)
+ - Fix an issue where events could be sent after playback completes, forcing the view to be active for longer than it actually was
+ - Utilize more accurate client timestamps for event timing
+
+#### v1.0.0
+ - Add support for ExoPlayer 2.9.x
+ - Add support for ExoPlayer 2.10.x
+ - Fix issue where ExoPlayer versions 2.9.x and greater would log messages about accessing the player on the wrong thread
+ - **breaking change** Removed support for ExoPlayer 2.6.x and older (due to changes in build pipeline and Gradle configurations)
+ - Support Gradle 3.5.2
+
+#### v0.5.1
+ - Clean up demo application
+ - Allow disabling of Sentry reporting for exceptions.
+
+#### v0.5.0
+ - Deprecated method `muxStatsExoPlayer.getImaSDKListener` in favor of `muxStatsExoPlayer.monitorImaAdsLoader(adsLoader)`. The previous method will still work, but you should migrate to the new method as the deprecated method will be removed with the next major version.
+ - Fix an issue where Google IMA SDK was a hard requirement unintentionally.
+
+#### v0.4.5
+ - Introduce support for tracking ads with Google's IMA SDK.
+
+#### v0.4.3
+ - Fix an issue where a `NullPointerException` may occur during playback of a video while tracking bandwidth metrics.
+
+#### v0.4.2
+ - Added API method `programChange(CustomerVideoData customerVideoData)`, for use when inside of a single stream the program changes. For instance, in a long-running live stream, you may have metadata indicating program changes which should be tracked as separate views within Mux. Previously, `videoChange` might have been used for this case, but this would not work correctly, and you would not necessarily have seen the subsequent views show up.
+ - Fixed a bug where under poor network conditions, an exception raised as a result of a network request could result in not tracking the view correctly subsequently (such as missing rebuffer tracking after this point).
+
+#### v0.4.1
+- Remove the listeners on the `ExoPlayer` object when `release` is called.
+  - This fixes and issue where the application may crash after calling release
+    if the ExoPlayer instance is removed while the SDK is still listening to
+    it.
+
+#### v0.4.0
+- [feature] Support bandwidth throughput metrics on video segment download
+  for HLS and Dash streaming.
+- **breaking change** The signature for `getAdaptiveMediaSourceEventListener`
+  and `getExtractorMediaSourceEventListener` has been changed. These methods
+  are used to enable throughput metrics tracking for ExoPlayer versions
+  _before_ r2.8.0, and now require that the streaming protocol type is
+  passed as the first parameter. The type is the same as is returned from
+  [this ExoPlayer API call](https://github.com/muxinc/stats-sdk-exoplayer/blob/release-v2/demo/src/main/java/com/google/android/exoplayer2/demo/PlayerActivity.java#L355).
+
+#### v0.3.0
+- **breaking change** The signature for the `MuxStatsExoPlayer` constructor
+  has changed, and now requires an additional parameter (the first) to be
+  and Android `Context` reference.
+- abstract more core logic into mux-stats-sdk-java
+- [build] rename and copy build artifacts
+
+#### v0.2.2
+- add back in previously missing methods to `MuxStatsExoPlayer`:
+  - `videoChange`
+  - `setPlayerSize`
+  - `error`
+  - `setAutomaticErrorTracking`
+
+#### v0.2.1
+- add support for `ExoPlayer` r2.7.x
+- add support for `ExoPlayer` r2.8.x
+- update to v2.1.0 of mux-stats-sdk-java
+</Releases>

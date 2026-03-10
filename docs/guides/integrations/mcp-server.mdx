@@ -1,0 +1,99 @@
+---
+title: Using the Mux MCP Server
+description: Use the Mux Model Context Protocol (MCP) Server to bring Mux's Video and Data platform capabilities directly to your AI tools.
+---
+
+The Mux MCP ([Model Context Protocol](https://modelcontextprotocol.io/introduction)) Server brings Mux's Video and Data platform capabilities directly to your AI tools. Once set up, you can upload videos, manage live streams, analyze video performance, and access practically all of Mux's video infrastructure through natural language prompts in supported AI clients.
+
+This guide walks you through the functionality in Mux's MCP server, and connecting it to various AI clients.
+
+## Tools & Routes
+
+Here are the following tools and API routes supported in the local Mux MCP Server:
+
+- **Video API**: Create assets, uploads, live streams, playback URLs
+- **Data API**: Query metrics, dimensions, real-time data
+- **Webhook management**: List and verify webhook signatures
+- **Asset management**: Retrieve, update video metadata
+- **Live streaming**: Create streams, manage recordings
+- **Analytics**: Performance metrics, viewer data, error tracking
+
+Here are the tools and routes we don't currently support in the local Mux MCP Server. Generally speaking, these are composed of endpoints which can execute deletions, and are disabled for safety:
+
+- Asset deletion endpoints
+- Live stream deletion endpoints
+- Webhook deletion endpoints
+
+## Prompt examples
+
+**Video Management**
+
+* Using the Mux tool, create a webpage where I can upload a video to Mux
+* Give me the playback URL for the most recently uploaded video to my Mux account, use Mux MCP
+* List all my video assets and their current status (using the Mux MCP tool)
+* With the Mux tool: Show me recent video uploads
+* Using Mux MCP, generate a subtitles track for asset ID: `ASSET_ID`
+
+**Mux Data Analytics and Performance**
+
+* Using the Mux MCP, tell me the best performing country for video streaming over the last month
+* Show me video performance metrics for the last week using the Mux tool
+* With the Mux tool: what are the top performing videos by view count?
+* Using Mux, which countries have the highest video engagement?
+* What are the most common video errors in my account (use the Mux MCP)?
+* Show me breakdown values for video quality metrics using the Mux MCP tool
+* List all available data dimensions I can filter by, use the Mux MCP to answer this prompt
+
+## Prerequisites
+
+Before utilizing the Mux MCP Server, make sure you meet the following prerequisites:
+
+- A Mux account (sign up at [mux.com](https://mux.com/) if you don't have one)
+- Claude Desktop, Cursor, or any other client that supports remote MCP servers, installed and updated to the latest version
+
+## Configuring the Mux MCP Server
+
+Mux's MCP server is hosted at https://mcp.mux.com, and when using this remote MCP server, authentication should be handled automatically, with no need for grabbing Access Token information from the Dashboard. In order to configure the Mux MCP server in your client, you need to add an MCP server, which is sometimes called a "connector" (Claude/Claude Code/ChatGPT), an "extension" (Goose), or simply an MCP Server (VSCode), and enter the URL `https://mcp.mux.com` as the location.
+
+Once configured, the LLM client and our MCP server should negotiate authentication and authorization, prompting you automatically to:
+
+- Log in to https://dashboard.mux.com via whatever means you normally log in (this is skipped if you're already logged in)
+- Choose which environment you want to authorize this connection for
+
+When you're already logged in, your experience will look something like this:
+
+<Image src="https://image.mux.com/gBuQlI7JC3zQwMlrhSTWPOfEGF02KaVni/animated.gif?start=4&end=11&width=640" width={640} height={640} />
+
+And that's it, you're good to go!
+
+### Configuration options
+
+By default, https://mcp.mux.com will be configured in the simplest manner (though this may change in the future), exposing access to the full set of tools available to Mux. That said, depending on your workflow, you may want to limit this set of tools in some way. For that reason, Mux supports query parameters to configure the MCP server. A more complete set of configuration options can be [seen here](https://github.com/muxinc/mux-node-sdk/tree/master/packages/mcp-server#exposing-endpoints-to-your-mcp-client), and most of those work simply as query params. However, a few bear mentioning directly:
+
+- `tools`: options are `all` (default), and `dynamic`. 
+  - Use `dynamic` if you want to expose tools mean to [allow the LLMs to dynamically discover endpoints and tools](https://github.com/muxinc/mux-node-sdk/tree/master/packages/mcp-server#exposing-endpoints-to-your-mcp-client), which can aid in controlling context windows and speeding up processing if a lot of tools are available.
+- `resource`: array of resources (sets of APIs) to expose, such as `video.*`. These act as an inclusion set, rather than excluding, so you can chain multiple to expand the list of tools. Some options include:
+  - `video.*`: all Mux Video APIs
+  - `data.*`: all Mux Data APIs
+  - `system.*`: all System APIs, such as managing Signing Keys
+  - `video.asset.*`: the APIs used to manage Mux Video assets
+  - ...and so on
+- `client`: options are `claude` (default), `claude-code`, `cursor`, `openai-agents`.
+  - Each LLM has varying support for capabilities related to complex JSON schemas, and these are tested defaults for each of the known clients. You can read more about this in [this doc by Stainless](https://www.stainless.com/docs/guides/generate-mcp-server-from-openapi#client-capabilities).
+
+You can also chain these together. For instance, if you want to configure an MCP server that exposes _only_ the Video APIs, but does it in a dynamic way, for Cursor, you'd just use `https://mcp.mux.com?client=cursor&resource=video.*&tools=dynamic` as your remote URL.
+
+## A note on remote MCP support
+
+These days, most LLM clients directly support remote MCP servers (rather than locally installed ones), so you shouldn't have much trouble getting set up. That said, there are still some clients (particularly older versions) that don't have built-in remote MCP support (such as Goose as of the time I wrote this guide). For those situations, you have two options:
+1. You can still [install our MCP server locally](/docs/integrations/installing-mcp-server-locally)
+1. You can utilize [mcp-remote](https://www.npmjs.com/package/mcp-remote), which brings support for remote MCP servers to practically any LLM client (and may perform better than the built-in remote MCP support depending on the client).
+
+## Having trouble?
+
+If you run into issues or have questions:
+
+- Check the [Model Context Protocol documentation](https://modelcontextprotocol.io/quickstart/user) for general MCP setup guidance
+- Review [Claude's MCP documentation](https://docs.anthropic.com/en/docs/agents-and-tools/mcp) for Claude-specific configuration
+- Visit our [API reference](https://docs.mux.com/api-reference) for detailed endpoint documentation
+- Contact support: [mux.com/support](/support)

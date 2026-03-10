@@ -1,0 +1,272 @@
+---
+title: Integrate with Convex
+product: video
+description: >-
+  The Mux Convex component syncs your Mux assets, live streams, and uploads
+  to your Convex database with real-time updates via webhooks.
+seoTitle: Integrate Mux with Convex Database
+seoDescription: >-
+  Sync your Mux video assets and live streams to Convex using the @mux/convex
+  component for real-time video application development.
+---
+
+The `@mux/convex` package is a reusable Convex component that bridges Mux video services with the Convex backend. It provides database tables for Mux resources, webhook handling, and query helpers for building video applications.
+
+## What you'll get
+
+After setup, your Convex database will have tables for:
+
+- **assets** - Mux video assets and their metadata
+- **uploads** - Direct upload records
+- **liveStreams** - Live stream configurations and status
+- **events** - Webhook event history
+- **videoMetadata** - App-level metadata (user ID, title, description, visibility, tags, custom fields)
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- A [Mux account](https://dashboard.mux.com/signup) with API credentials
+- A [Convex project](https://dashboard.convex.dev) with a `convex/` directory already initialized
+- The Convex CLI installed (`npm install -g convex`)
+- A TypeScript web application (e.g., [Next.js](https://docs.convex.dev/quickstart/nextjs), [React](https://docs.convex.dev/quickstart/react), or any [Convex-supported framework](https://docs.convex.dev/quickstarts))
+
+<Callout type="info">
+
+New to Convex? Follow the [Convex quickstart](https://docs.convex.dev/quickstarts) for your framework first, then come back here to add Mux integration.
+
+</Callout>
+
+## 1. Install packages
+
+Install the required packages in your project:
+
+```bash
+npm install convex @mux/convex @mux/mux-node
+```
+
+## 2. Generate project files
+
+Run the initialization script to generate the required Convex files:
+
+```bash
+npx @mux/convex init --component-name mux
+```
+
+This creates four files in your `convex` directory:
+
+- `convex.config.ts` - Mounts the Mux component into your Convex app
+- `migrations.ts` - Backfill function for syncing existing Mux assets
+- `muxWebhook.ts` - Webhook handler for receiving Mux events
+- `http.ts` - HTTP route that exposes the webhook endpoint
+
+If any of these files already exist, the CLI will skip them. Use `--force` to overwrite existing files.
+
+<Callout type="info">
+
+If you already have a `convex/convex.config.ts` or `convex/http.ts`, use `--skip-config` or `--skip-http` to skip those files and manually integrate the Mux component into your existing configuration.
+
+</Callout>
+
+## 3. Set environment variables
+
+Configure your Mux API credentials in Convex:
+
+```bash
+npx convex env set MUX_TOKEN_ID your-mux-token-id
+npx convex env set MUX_TOKEN_SECRET your-mux-token-secret
+```
+
+You can find your API credentials in the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens).
+
+## 4. Start development and backfill
+
+Start the Convex development server:
+
+```bash
+npx convex dev
+```
+
+In another terminal, run the backfill migration to sync your existing Mux assets:
+
+```bash
+npx convex run migrations:backfillMux '{}'
+```
+
+This will import your existing Mux assets into the Convex `assets` and `videoMetadata` tables. You can customize the backfill with options:
+
+```bash
+npx convex run migrations:backfillMux '{"maxAssets": 500, "defaultUserId": "my-user-id", "includeVideoMetadata": true}'
+```
+
+<Callout type="info">
+
+The backfill currently syncs Mux assets only. Live streams and uploads will be synced in real time once you configure the webhook in the next step.
+
+</Callout>
+
+## 5. Configure the Mux webhook
+
+In the [Mux Dashboard](https://dashboard.mux.com/settings/webhooks), create a new webhook with your Convex HTTP endpoint as the URL:
+
+```
+https://your-deployment.convex.site/mux/webhook
+```
+
+Mux will send all events to this endpoint. The component automatically handles routing asset, live stream, and upload events to the appropriate tables and ignores unsupported event types.
+
+After creating the webhook, copy the signing secret and add it to your Convex environment:
+
+```bash
+npx convex env set MUX_WEBHOOK_SECRET your-webhook-signing-secret
+```
+
+## Verify the setup
+
+Check your [Convex dashboard](https://dashboard.convex.dev) to verify the tables are populated:
+
+1. Navigate to your project's Data tab
+2. You should see the Mux tables: `assets`, `uploads`, `liveStreams`, `events`, and `videoMetadata`
+3. Upload a test video in Mux and verify it appears in your Convex database
+
+## Querying your data
+
+The component syncs Mux data into your Convex database via webhooks. To access that data, you wrap the component's built-in queries with your own Convex functions, then call those functions from your frontend.
+
+### Define your queries
+
+Create a new file in your `convex` directory (e.g., `convex/videoQueries.ts`) to wrap the component queries:
+
+```typescript
+import { query } from './_generated/server';
+import { components } from './_generated/api';
+import { v } from 'convex/values';
+
+// Returns an array of asset objects, each containing:
+// muxAssetId, status, playbackIds, durationSeconds, aspectRatio, tracks, etc.
+export const listAssets = query({
+  handler: async (ctx) => {
+    return await ctx.runQuery(components.mux.catalog.listAssets, {});
+  },
+});
+
+// Returns a single asset object or null
+export const getAsset = query({
+  args: { muxAssetId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.runQuery(components.mux.catalog.getAssetByMuxId, {
+      muxAssetId: args.muxAssetId,
+    });
+  },
+});
+
+// Returns an array of { metadata, asset } pairs for a given user
+export const getUserVideos = query({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.runQuery(components.mux.videos.listVideosForUser, {
+      userId: args.userId,
+    });
+  },
+});
+```
+
+### Use queries in your frontend
+
+Call these queries from your React components using Convex's `useQuery` hook:
+
+```typescript
+import { useQuery } from 'convex/react';
+import { api } from '../convex/_generated/api';
+
+function VideoList() {
+  const assets = useQuery(api.videoQueries.listAssets);
+
+  if (!assets) return <div>Loading...</div>;
+
+  return (
+    <ul>
+      {assets.map((asset) => (
+        <li key={asset.muxAssetId}>
+          {asset.muxAssetId} — {asset.status}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+These queries are reactive — your UI will update automatically when the underlying data changes in Convex, such as when a webhook updates an asset's status.
+
+### Available queries
+
+The component exposes the following queries through `components.mux`:
+
+| Query | Description |
+|---|---|
+| `catalog.listAssets` | List all synced assets, sorted by most recently updated |
+| `catalog.getAssetByMuxId` | Get a single asset by its Mux asset ID |
+| `catalog.listLiveStreams` | List all synced live streams |
+| `catalog.getLiveStreamByMuxId` | Get a single live stream by its Mux live stream ID |
+| `catalog.listUploads` | List all synced direct uploads |
+| `catalog.getUploadByMuxId` | Get a single upload by its Mux upload ID |
+| `catalog.listRecentEvents` | List recent webhook events |
+| `videos.listVideosForUser` | List assets with app-level metadata for a specific user |
+| `videos.getVideoByMuxAssetId` | Get an asset with its associated metadata |
+
+All list queries accept an optional `limit` parameter (default: 50).
+
+## Adding video metadata
+
+The catalog queries above return Mux-level data synced via webhooks. The video metadata system lets you layer your own app-level data — like titles, descriptions, user ownership, and visibility — on top of those synced assets.
+
+```typescript
+import { mutation } from './_generated/server';
+import { components } from './_generated/api';
+import { v } from 'convex/values';
+
+export const setVideoMetadata = mutation({
+  args: {
+    muxAssetId: v.string(),
+    userId: v.string(),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    visibility: v.optional(
+      v.union(v.literal('public'), v.literal('private'), v.literal('unlisted'))
+    ),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(components.mux.videos.upsertVideoMetadata, {
+      muxAssetId: args.muxAssetId,
+      userId: args.userId,
+      title: args.title,
+      description: args.description,
+      visibility: args.visibility,
+      tags: args.tags,
+    });
+  },
+});
+```
+
+Once metadata is set, queries like `videos.listVideosForUser` and `videos.getVideoByMuxAssetId` will return both the Mux asset data and your app-level metadata together.
+
+## Important notes
+
+<Callout type="info">
+
+The backfill is a one-time synchronization. After that, webhooks maintain near real-time updates between Mux and Convex.
+
+</Callout>
+
+<Callout type="warning">
+
+Make sure to use consistent component names across all configuration steps. If you change the component name from `mux`, regenerate the wrapper files with the matching name: `npx @mux/convex init --component-name yourName --force`
+
+</Callout>
+
+## Resources
+
+- [GitHub repository](https://github.com/Joshalphonse/mux-convex-component)
+- [Convex documentation](https://docs.convex.dev)
+- [Mux API reference](/docs/api-reference)

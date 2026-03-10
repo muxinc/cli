@@ -1,0 +1,280 @@
+---
+title: Migrate to LiveKit Web SDK
+product: video
+description: Learn how to migrate your Mux Real-Time Video web application to LiveKit
+steps:
+  - title: Introduction to LiveKit
+    description: Learn about LiveKit
+  - title: Construct a LiveKit JWT
+    description: Learn how to construct a LiveKit JWT
+  - title: Using the LiveKit Adapter
+    description: Learn how to use the @mux/spaces-livekit-adapter to quickly move your application to LiveKit
+    topic: code
+  - title: 1. Install the LiveKit Web SDK
+  - title: 2. Update your imports
+  - title: 3. Convert `Space` to `Room`
+  - title: 4. Participant changes
+  - title: 5. Track changes
+  - title: 6. Event changes
+  - title: Translation Guide
+    description: A lookup table of Mux Spaces Web SDK objects to their LiveKit equivalents
+    topic: code
+---
+
+<LinkedHeader step={steps[0]}/>
+
+[LiveKit](https://livekit.io/) provides real-time video services, including both an open-source stack and a cloud-hosted option,
+and will provide a simple integration with Mux to produce a Live Stream broadcast of any real-time video interactions.
+
+When migrating from Mux Spaces to LiveKit you'll find most of the concepts are the same but there are a few terminology
+changes. We recommend using one of LiveKit's [Server SDKs](https://docs.livekit.io/references/server-sdks/) to manage
+any communication with LiveKit's API.
+
+## Spaces
+
+The LiveKit equivalent of a Space is called a [Room](https://docs.livekit.io/client/connect/). Rooms can be created manually
+or will be auto-created when the first participant joins. With LiveKit you must provide a unique
+`name` for the room.
+
+<Callout type="warning">
+One notable difference between Spaces and Rooms is the behavior of the auto subscription functionality.
+Spaces' automatic subscription mode works by subscribing to a maximum of 20 participants which have the highest priority server-side.
+LiveKit's behavior around automatic subscription will subscribe participants to every other participant.
+</Callout>
+
+## Broadcasts
+
+The LiveKit equivalent of a Broadcast is called a [Composite Recording](https://docs.livekit.io/server/egress/room-composite/).
+
+<Callout type="info">
+LiveKit will provide a native integration with Mux to produce a Live Stream broadcast of any real-time video interactions.
+In the mean time you can also use Composite Recording to send an RTMP stream to Mux as a Live Stream.
+</Callout>
+
+### Broadcast Layouts
+
+LiveKit has their own built-in layouts for Composite Recordings but Mux is also open-sourcing
+the layouts we used for Broadcasts so you can use them within LiveKit.
+See the GitHub page [muxinc/spaces-livekit-broadcast-layouts](https://github.com/muxinc/spaces-livekit-broadcast-layouts)
+for more details
+
+<LinkedHeader step={steps[1]}/>
+
+JWTs are fundamental to using both Mux’s Real-Time Video & LiveKit but there are some major differences in their claim structure.
+See the [LiveKit documentation](https://docs.livekit.io/concepts/authentication/) for more details.
+
+## JWT Claims
+
+| Claim | Mux | LiveKit |
+|-------|-----|---------|
+| `exp` | Expiration time of the token | No changes |
+| `iss` | N/A | API key ID used to issue this token |
+| `kid` | API Key ID used to sign this token | N/A |
+| `sub` | Space ID | Unique identity of the participant |
+| `aud` | `"rt"` | N/A |
+| `participant_id` | Unique identity of the participant | N/A |
+| `role` | `publisher` or `subscriber` | N/A |
+| `metadata` | N/A | Participant metadata |
+| `video.room` | N/A | name of room the participant will join |
+| `video.roomJoin` | N/A | `true` if the participant is allowed to join the room |
+| `video.canPublish` | N/A | `true` if the participant is allowed to publish media to the room |
+| `video.canSubscribe` | N/A | `true` if the participant is allowed to subscribe to media in the room |
+| `video.canPublishData` | N/A | `true` if the participant is allowed to publish data (**Equivalent to Mux's custom events**) to the room |
+| `video.canUpdateOwnMetadata` | N/A | `true` if the participant is allowed to update their own metadata (**required for participant to set their own display name**) |
+
+## Example of a Publisher JWT
+
+<CodeExamples
+  examples={{
+    Mux: `{
+	"exp": 1750137631,
+	"kid": "{ KEY ID HERE }",
+	"sub": "{ SPACE ID HERE }",
+	"aud": "rt",
+	"participant_id": "bob",
+	"role": "publisher"
+}
+    `,
+    LiveKit: `{
+	"exp": 1750137631,
+	"iss": "{ KEY ID HERE }",
+	"sub": "bob",
+	"metadata": "details about bob",
+	"video": {
+		"room": "{ ROOM ID HERE }",
+		"roomJoin": true,
+		"canPublish": true,
+		"canSubscribe": true,
+		"canUpdateOwnMetadata": true,
+		"canPublishData": true
+	}
+}
+    `,
+  }}
+  exampleOrder="Mux,LiveKit"
+  args={{ Mux: { lang: 'text' }, LiveKit: { lang: 'text' }}}
+/>
+
+<LinkedHeader step={steps[2]} />
+
+In order to make the transition to LiveKit easier we have created an adapter that will allow you
+continue using the Mux Spaces Web SDK while using LiveKit under the hood.
+
+<Callout type="warning">
+  The adapter is not a long term solution and we recommend that you migrate to the LiveKit Web SDK as soon as possible.
+</Callout>
+
+## Install the adapter
+
+Update your `package.json` file to pull in the adapter using `@mux/spaces-web` as an alias
+so that you can continue to use the same import statements followed by an `npm install`.
+
+```json
+"@mux/spaces-web": "npm:@mux/spaces-livekit-adapter@^0.1.9",
+```
+
+The only client side change you'll need to make is to update the `Space` constructor
+to tell it which LiveKit instance to use.
+
+```js
+new Space(/* Your LiveKit JWT */, /* Your LiveKit URL */);
+```
+
+<Callout type="success">
+At this point your application should be using LiveKit under the hood & you can stop here.
+Continue reading when you want to migrate to the LiveKit Web SDK directly.
+</Callout>
+
+<LinkedHeader step={steps[3]}/>
+
+```bash
+yarn add livekit-client
+```
+
+<LinkedHeader step={steps[4]}/>
+
+Replace instances in your imports of `@mux/spaces-web` with `livekit-client`,
+some of the types will not be found but we'll fix them in the following steps.
+
+<LinkedHeader step={steps[5]}/>
+
+We'll begin the code migration by finding where the Space is first initialized &
+replace it with the equivalent new Room call. Before proceeding you'll need your updated JWT
+& your LiveKit URL. If you're using LiveKit Cloud you'll be provided one upon signing up,
+otherwise it'll be the URL where you're hosting LiveKit.
+
+The call flow is roughly the same but with `new Room()` instead of `new Space()`
+and `.connect()` instead of `.join()`. Some parameters are also shifted from the Space
+constructor to the room `connect` method.
+
+<CodeExamples
+  examples={{
+    Mux: `const space: Space = new Space(/* jwt: string */, /* options?: SpaceOptionsParams */);
+const localParticipant = await space.join();
+    `,
+    LiveKit: `const room: Room = new Room(/* options?: RoomOptions */);
+await room.connect(/* url */, /* token */, /* opts? */);
+const localParticipant = room.localParticipant;
+    `,
+  }}
+  exampleOrder="Mux,LiveKit"
+  args={{ Mux: { lang: 'text' }, LiveKit: { lang: 'text' }}}
+/>
+
+<Callout type="warning">
+When calling `join()` using the Mux Spaces SDK any participants already in the room will
+trigger a `ParticipantJoined` event on the space object, but with LiveKit's SDK the existing
+participants will not trigger `ParticipantConnected` events.
+Instead of listening to an event you will need to trigger any handling of the existing
+participants by retrieving the list from `room.participants`.
+</Callout>
+
+<LinkedHeader step={steps[6]}/>
+
+There are only minor differences between Mux's participant objects and LiveKit's.
+
+| Mux | LiveKit |
+|-----|---------|
+| `connectionId` | `sid` (Server ID) |
+| `id` | `identity` |
+| `displayName` | `name` |
+| `role` | `permisions` |
+| `status` | N/A |
+
+
+<LinkedHeader step={steps[7]}/>
+
+Tracks are one of the areas where there's a conceptual difference between Mux Spaces & LiveKit.
+Mux has a single `RemoteTrack` class which may or may not be currently subscribed.
+LiveKit separates out the concept of the tracks that a participant is publishing from the
+tracks to which a `LocalParticipant` is subscribed. `RemoteTrackPublication` is object received
+when a `RemoteParticipant` publishes a track.
+A LiveKit `RemoteTrack` is the object available when the local participant is subscribed to
+that publication. The parameters for events around tracks can contain both a `RemoteTrack` &
+a `RemoteTrackPublication`, depending on what you're code depends on you may need one or both
+of these objects.
+
+<LinkedHeader step={steps[8]}/>
+
+## `SpaceEvent` to `RoomEvent`
+
+| Mux | LiveKit |
+|-----|---------|
+| `ActiveSpeakersChanged` | `ActiveSpeakersChanged` |
+| `LocalParticipantReconnectFailed` | N/A |
+| `LocalParticipantReconnecting` | N/A |
+| `ParticipantDisplayNameChanged` | `ParticipantNameChanged` |
+| `ParticipantLeft` | `ParticipantDisconnected` |
+| `ParticipantTrackPublished` | `TrackPublished` |
+| `ParticipantTrackUnmuted` | `TrackMuted` |
+| `ParticipantTrackUnsubscribed` | `TrackUnsubscribed` |
+| `BroadcastStateChanged` | `RecordingStatusChanged` |
+| `LocalParticipantReconnected` | `Reconnected` |
+| `ParticipantCustomEventPublished` | `DataReceived` |
+| `ParticipantJoined` | `ParticipantConnected` |
+| `ParticipantTrackMuted` | `TrackMuted` |
+| `ParticipantTrackSubscribed` | `TrackSubscribed` |
+| `ParticipantTrackUnpublished` | `TrackUnpublished` |
+
+## ParticipantEvent
+
+| Mux | LiveKit |
+|-----|---------|
+| `CustomEventPublished` | `DataReceived` |
+| `StartedSpeaking` | `IsSpeakingChanged(speaking: true)` |
+| `TrackMuted` | `TrackMuted` |
+| `TrackSubscribed` | `TrackSubscribed` |
+| `TrackUnpublished` | `TrackUnpublished` |
+| `DisplayNameChanged` | `ParticipantNameChanged` |
+| `StoppedSpeaking` | `IsSpeakingChanged(speaking: false)` |
+| `TrackPublished` | `TrackPublished` |
+| `TrackUnmuted` | `TrackUnmuted` |
+| `TrackUnsubscribed` | `TrackUnsubscribed` |
+
+<LinkedHeader step={steps[9]}/>
+
+| Kind | Mux | LiveKit |
+|------|-----|---------|
+| Function | [getUserMedia](https://devdocs.mux.com/spaces-web/latest/functions/getUserMedia.html) | [createLocalTracks](https://docs.livekit.io/client-sdk-js/functions/createLocalTracks.html) |
+| Function | [getDisplayMedia](https://devdocs.mux.com/spaces-web/latest/functions/getDisplayMedia.html) | [createLocalScreenTracks](https://docs.livekit.io/client-sdk-js/functions/createLocalScreenTracks.html) |
+| Function | [getLocalTracksFromMediaStream](https://devdocs.mux.com/spaces-web/latest/functions/getLocalTracksFromMediaStream.html) | [new LocalVideoTrack](https://docs.livekit.io/client-sdk-js/classes/LocalVideoTrack.html) or [new LocalAudioTrack](https://docs.livekit.io/client-sdk-js/classes/LocalAudioTrack.html) |
+| Enum | [AcrScore](https://devdocs.mux.com/spaces-web/latest/enums/AcrScore.html) | LiveKit does not have the concept of reporting user provided ACR scores. |
+| Enum | [ParticipantRole](https://devdocs.mux.com/spaces-web/latest/enums/ParticipantRole.html) | LiveKit does not have roles, instead it has granular permissions: [ParticipantPermission](https://github.com/livekit/protocol/blob/9d0d6c9e94279679f87056400030c2ce0e05d362/livekit_models.proto#L52-L69) |
+| Enum | [SpaceEvent](https://devdocs.mux.com/spaces-web/latest/enums/SpaceEvent.html) | [RoomEvent](https://docs.livekit.io/client-sdk-js/enums/RoomEvent.html) |
+| Enum | [TrackEvent](https://devdocs.mux.com/spaces-web/latest/enums/TrackEvent.html) | [TrackEvent](https://docs.livekit.io/client-sdk-js/enums/TrackEvent.html) |
+| Enum | [TrackSource](https://devdocs.mux.com/spaces-web/latest/enums/TrackSource.html) | [Track.Source](https://docs.livekit.io/client-sdk-js/enums/Track.Source.html) |
+| Enum | [ParticipantEvent](https://devdocs.mux.com/spaces-web/latest/enums/ParticipantEvent.html) | [ParticipantEvent](https://docs.livekit.io/client-sdk-js/enums/ParticipantEvent.html) |
+| Enum | [ParticipantStatus](https://devdocs.mux.com/spaces-web/latest/enums/ParticipantStatus.html) | N/A. Use the `ParticipantEvent`s to determine status |
+| Enum | [SubscriptionMode](https://devdocs.mux.com/spaces-web/latest/enums/SubscriptionMode.html) | [RoomConnectOptions.autoSubscribe](https://docs.livekit.io/client-sdk-js/interfaces/RoomConnectOptions.html#autoSubscribe) |
+| Enum | [TrackKind](https://devdocs.mux.com/spaces-web/latest/enums/TrackKind.html) | [Track.Kind](https://docs.livekit.io/client-sdk-js/enums/Track.Kind.html) |
+| Interface | [CreateLocalMediaOptions](https://devdocs.mux.com/spaces-web/latest/interfaces/CreateLocalMediaOptions.html) | [CreateLocalTrackOptions](https://docs.livekit.io/client-sdk-js/interfaces/CreateLocalTracksOptions.html) |
+| Interface | [SpaceOptionsParams](https://devdocs.mux.com/spaces-web/latest/interfaces/SpaceOptionsParams.html) | [RoomOptions](https://docs.livekit.io/client-sdk-js/interfaces/RoomOptions.html) |
+| Interface | [LocalTrackOptions](https://devdocs.mux.com/spaces-web/latest/interfaces/LocalTrackOptions.html) | [AudioCaptureOptions](https://docs.livekit.io/client-sdk-js/interfaces/AudioCaptureOptions.html) or [VideoCaptureOptions](https://docs.livekit.io/client-sdk-js/interfaces/VideoCaptureOptions.html) |
+| Class | [LocalParticipant](https://devdocs.mux.com/spaces-web/latest/classes/LocalParticipant.html) | [LocalParticipant](https://docs.livekit.io/client-sdk-js/classes/LocalParticipant.html) |
+| Class | [RemoteTrack](https://devdocs.mux.com/spaces-web/latest/classes/RemoteTrack.html) | [RemoteTrack](https://docs.livekit.io/client-sdk-js/classes/RemoteTrack.html) & [RemoteTrackPublication](https://docs.livekit.io/client-sdk-js/classes/RemoteTrackPublication.html) |
+| Class | [Track](https://devdocs.mux.com/spaces-web/latest/classes/Track.html) | [Track](https://docs.livekit.io/client-sdk-js/classes/Track-1.html) |
+| Class | [LocalTrack](https://devdocs.mux.com/spaces-web/latest/classes/LocalTrack.html) | [LocalTrack](https://docs.livekit.io/client-sdk-js/classes/LocalTrack.html) & [LocalTrackPublication](https://docs.livekit.io/client-sdk-js/classes/LocalTrackPublication.html) |
+| Class | [RemoteParticipant](https://devdocs.mux.com/spaces-web/latest/classes/RemoteParticipant.html) | [RemoteParticipant](https://docs.livekit.io/client-sdk-js/classes/RemoteParticipant.html) |
+| Class | [Space](https://devdocs.mux.com/spaces-web/latest/classes/Space.html) | [Room](https://docs.livekit.io/client-sdk-js/classes/Room.html) |
+| Type Alias | [ActiveSpeaker](https://devdocs.mux.com/spaces-web/latest/types/ActiveSpeaker.html) | N/A. LiveKit only identifies the participant in active speaker events not the track |
+| Type Alias | [CustomEvent](https://devdocs.mux.com/spaces-web/latest/types/CustomEvent.html) | [Data messages](https://docs.livekit.io/client/data-messages/#data-messages) |

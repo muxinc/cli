@@ -24,9 +24,19 @@ class Mux < Formula
     end
   end
 
+  resource "docs" do
+    url "https://github.com/muxinc/cli/releases/download/v#{version}/mux-docs.tar.gz"
+    sha256 "PLACEHOLDER"
+  end
+
   def install
     binary = Dir.glob("mux-*").first || "mux"
     bin.install binary => "mux"
+
+    resource("docs").stage do
+      (share/"mux").install "docs"
+      (share/"mux").install "AGENTS.md"
+    end
   end
 
   test do

@@ -1,0 +1,75 @@
+---
+title: Ensure privacy compliance with Mux Data
+product: data
+description: Collect the information you need to be successful while ensuring privacy for your viewers and complying with GDPR and other privacy regulations.
+---
+
+## Is Mux Data GDPR/CCPA/VPPA compliant and privacy preserving?
+
+Mux takes privacy expectations seriously; we are compliant with the Video Privacy Protection Act (VPPA), California Consumer Privacy Act (CCPA), and General Data Protection Regulation (GDPR). We also make available a [detailed Data Processing Addendum (DPA)](https://mux.com/dpa/) that details the measures we've taken to achieve compliance. Mux has attested to our data privacy protections and has been certified under the [Data Privacy Framework (DPF)](https://www.dataprivacyframework.gov/) program. 
+
+Mux works to ensure the privacy of viewers while providing development teams using Mux Data with the visibility they need to track audience engagement and their viewers' quality of experience. We don't believe that privacy and insights should be a trade-off for developers or video viewers.
+
+We also want to ensure that the metadata that developers send to us is also properly anonymized in order to reduce the possibility of personally identifying a viewer with their activity. We strongly urge developers using Mux Data to provide an anonymized viewer id - using a non-personally identifiable id from a system only the customer has access to - that is meaningful to the developer but not to Mux as part of the view metadata.
+
+## Do you track sensitive personally identifiable information?
+
+No. Mux Data does not store information about the user such as email, name, or built-in device identifier (such as the Id for Analytics on iOS). For more information about the data we store - which doesn't include personal viewer information - please reference our [Data Processing Addendum](https://mux.com/dpa/).
+
+## Does Mux have a Data Protection Addendum (DPA)?
+
+Yes. The Mux Data Protection Addendum (DPA) is available at https://mux.com/dpa/ .
+
+## Does Mux participate in the Data Privacy Framework?
+
+Yes, Mux participates in the EU-U.S. [Data Privacy Framework (DPF)](https://www.dataprivacyframework.gov/), having self-certified our compliance. The DPF enables lawful transfers of personal data from the EU to the U.S. and is designed to ensure strong privacy protections. As a U.S.-based company handling data from international customers, our participation in the DPF underscores our commitment to data privacy and provides reassurance that we meet the standards required under EU law. You can find more detailed information and view Mux’s certification on the official DPF website at https://www.dataprivacyframework.gov/list .
+
+## How do I make a GDPR or CCPA data erasure request?
+
+Mux Data does not knowingly store personally identifiable information, but GDPR and CCPA data erasure requests can be made to the gdpr@mux.com email. This email is monitored and you will receive a response from us that the viewers' data is being removed, if any can be identified.
+
+## Is it possible to keep my viewers' IP address data in Europe?
+
+Yes. Mux Data has an ingest location in the European Union (EU) that can be used for processing video views. The full IP addresses will only be processed at our location in Germany and the post-processed view data, including corresponding truncated IP address with the last octet removed, will be sent to the United States for aggregation and reporting. For more information on using the EU location, please reach out to your sales contact or email sales@mux.com.
+
+## What information does Mux Data collect?
+
+Mux Data collects non-personally identifiable information about the viewer experience that allows you to track engagement and the quality of experience for your audience.
+- IP address: We process a viewer's IP address in order to look up coarse location information and do bot detection. After processing, we pseudonymize the IP address by truncating it (to /24 for IPv4) and then we store only the pseudonymized value.
+- Geographic location and Autonomous Systems Number (ASN): We generate coarse location information at the country and state-level from the IP address, but we do not collect fine grained latitude/longitude information nor do we access geo-location features of mobile devices.
+- Viewer ID: We generate a unique, random identifier for a viewer that is used as a viewer id if none is provided by the developer implementing the Mux Data SDK. We do not associate these IDs with any activity other than the video views and we do not associate the id with any advertising profile data. Because we do not store identifiable information about viewers, we are not able to associate the video view history with a specific individual.
+- Device information: Information about the device that is used to access video playback, including model, device type, operating system, and browser used.
+- Details about video content watched: Metadata such as type of stream: live or VOD, video format, autoplay status, etc. A list of [additional metadata](/docs/guides/make-your-data-actionable-with-metadata) is available for reference and most metadata is optional, to be set by the developer implementing Mux Data.
+
+## How long does Mux Data store viewership data?
+
+Pseudonymized video view data is stored for up to 100 days and is then deleted from our systems.
+
+## Is Mux Data appropriate for applications targeted to children?
+
+Yes. Mux does not store personally identifiable data, use viewer data for advertising, or sell user identifiable data. The Mux Data and Mux Video SDKs can be used in applications and receive approval for children's apps on the app stores.
+
+## What information is stored in Mux Data's HTTP cookies?
+
+By default, Mux plugins for HTML5-based players use a cookie to track playback across subsequent page views in order to understand viewing sessions. This cookie includes information about the tracking of the viewer, such as an anonymized viewer ID that Mux generates for each user. None of this information is personally-identifiable, but you can disable the use of this cookie if desired. For example, if your site or application is targeted towards children under 13, you should disable the use of cookies. Please refer to the documentation for the specific Mux Data SDK you are using for info on how to disable cookies.
+
+The cookie is set as a first party cookie on the domain of the website that is embedding the player and Mux Data SDK. For example, if the video player with Mux Data integrated is located on the page: `http://example.com/demo.html` the cookie will be set on the domain `example.com`. The cookies are only available on each individual customer's domain and cannot be used to track viewers across Mux customers.
+
+The Mux Data cookie contains the following information:
+* `mux_viewer_id`: a randomly generated viewer id that is used as the default anonymous Viewer ID.  
+* `msn`: random value used to decide if the viewer will be sampled (tracked) or not
+* `sid`: randomly generated anonymous session id
+* `sst`: the time the session started
+* `sex`: the time at which the session will expire
+
+## Do I need to ask permission to track on iOS when I use a Mux Data SDK in my app?
+
+Mux does not access the Identifier for Advertisers (IDFA) in any SDK, nor does it use viewer data for advertising or advertising efficiency measurement so the Apple AppTrackingTransparency (ATT) framework does not require a tracking permission request to use the Mux SDK.
+
+As of version 2.4.2 of the [Mux Data for AVPlayer SDK](https://github.com/muxinc/mux-stats-sdk-avplayer), the Identifier for Vendors (IDFV) is no longer used and the Mux Data SDK generates a random unique identifier on the device for default Viewer Id. We do not sell the identifier data or attempt to track users across Mux customers.
+
+As of version 3.6.1 of the [Mux Data for AVPlayer SDK](https://github.com/muxinc/mux-stats-sdk-avplayer) and versions 4.7.1 and 5.0.1 of the [Mux Data Objective-C Core SDK](https://github.com/muxinc/stats-sdk-objc), a privacy manifest file that satisfies [Apple’s requirements for third-party SDKs](https://developer.apple.com/support/third-party-SDK-requirements/) to outline privacy practices associated with their use. Customers who export data from Mux for additional processing may need to include additional privacy manifest entries with their application subject to their specific practices.
+
+## Does my app need to access a hardware id on Android when I use a Mux Data SDK?
+
+As of version 2.4.1 of the [Mux Data for ExoPlayer SDK](https://github.com/muxinc/mux-stats-sdk-exoplayer), the Mux Data SDK generates a random unique identifier on the device for the default Viewer Id. We do not sell the identifier data or attempt to track users across Mux customers.

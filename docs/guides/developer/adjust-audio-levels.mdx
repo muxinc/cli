@@ -1,0 +1,80 @@
+---
+title: Adjust audio levels
+product: video
+description: >-
+  This guide will show how to adjust the audio level to your videos. Audio
+  normalization can be added to on-demand assets.
+---
+## What is audio normalization?
+
+Here at Mux, When we refer to audio normalization, we are referring to loudness normalization. Loudness normalization adjusts the recording based on perceived loudness.
+
+Below, is an audio stream _before_ normalization
+<Image src="/docs/images/audio-norm-before.png" width={640} height={200} alt="Audio norm before" />
+
+An audio stream _after_ normalization
+
+<Image src="/docs/images/audio-norm-after.png" width={640} height={200} alt="Audio norm after" />
+
+LUFS, which stands for Loudness Units relative to Full Scale, are a measurement of loudness over the entire length of an audio stream. This is the measurement used in the normalization process.
+The whole goal of normalizing is attaining the gain to bring the average amplitude to a target level; the "norm".
+
+## When to use audio normalization
+
+The main use of audio normalization is to standardize the perceived loudness of your assets. Whether to use normalization at all depends on the content.
+When audio gain is normal and audio quality is high, normalization can be beneficial. Please note however, similar to other video and audio processing, this processing on your audio is going to change it some way.
+So make an informed decision on whether to use this feature or not.
+
+## How to turn on audio normalization
+
+At this moment, the only way to enable audio normalization on a Mux asset is through the <ApiRefLink href="/docs/api-reference/video/assets/create-asset">create asset endpoint.</ApiRefLink> You cannot update this after the asset has been created. This option also only applies to on-demand assets (audio-only included) but not live streams.
+
+To enable audio normalization on your asset ingest, set the `normalize_audio` key to `true` in the body of your asset creation. By default, this boolean is set to false. 
+
+A typical request and response might look something like this:
+
+### Example request
+
+```bash
+curl https://api.mux.com/video/v1/assets \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d '{
+        "inputs": [
+          {
+            "url": "https://example.com/myVideo.mp4"
+          }
+        ],
+        "playback_policies": ["public"],
+        "video_quality": "basic"
+        "normalize_audio": true 
+    }' \
+  -u ${MUX_TOKEN_ID}:${MUX_TOKEN_SECRET}
+```
+
+### Example response
+
+```json
+{
+    "data": {
+        "status": "preparing",
+        "playback_ids": [
+            {
+                "policy": "public",
+                "id": "006Hx6bozgZv2sL9700Y8TT02MKdw4nq01ipMVawIGV9j000"
+            }
+        ],
+        "normalize_audio": true,
+        "mp4_support": "none",
+        "master_access": "none",
+        "id": "jlJydoVkYh01Z3JrLr02RGcp4mJdLvPRbk9n00000",
+        "video_quality": "basic",
+        "created_at": "1612979762"
+    }
+}
+```
+
+
+## Target loudness
+
+Our target loudness value for audio normalization in our video stack is currently –24 LUFS. So, if possible, master your audio with this value in mind.

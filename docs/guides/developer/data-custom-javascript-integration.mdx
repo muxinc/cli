@@ -1,0 +1,145 @@
+---
+title: Custom JavaScript integration
+product: data
+description: >-
+  This is a guide for building a custom JavaScript integration with Mux Data.
+  Build a custom integration if Mux does not already have an SDK for your
+  player.
+---
+
+Mux has a pre-built integration with many HTML5-based video players that are available in the market. Check the SDKs in the [Track your video performance](/docs/guides/track-your-video-performance) guide to see if there is not a pre-built integration for your player.
+
+If there is no integration for a given player, you can install the Mux core JavaScript library (`mux-embed`) and build a custom Mux Data integration.
+
+## Important related docs
+
+Before proceeding, read the following overview: [Building a Custom Integration](/docs/guides/build-a-custom-data-integration).
+
+In addition, Mux has made available a [template repository](https://github.com/muxinc/web-player-framework). This repo is intended to provide the basics for creating a working integration, after implementing the necessary callbacks and methods.
+
+## Include the `mux-embed` library
+
+### Install via yarn or npm (preferred)
+
+Mux utilizes NPM to distribute the core Mux library, `mux-embed`. This library includes the internal state machine for tracking playback, as well as helper methods that may be useful while building the integration. Include `mux-embed` via `yarn` or `npm`, whichever you prefer.
+
+```sh
+yarn add mux-embed
+```
+
+This will add `mux-embed` as a dependency to your package, and will allow you to upgrade it at any time as new versions are released. Mux follows the semver standard, so updates within a major version will not have any breaking changes.
+
+### Load from the CDN (not preferred)
+
+If you do not use a package manager, you can include the source file from https://src.litix.io/core/4/mux.js directly in a vendor folder. The script has been built to support `npm`/`yarn`, but will also work in a standalone environment.
+
+In either case, once the script is included in your library, you can import it as follows:
+
+```js
+import mux from 'mux-embed';
+
+// mux.log - logs message
+// mux.utils - includes multiple helper methods for massaging data
+```
+
+## Initialize the SDK
+
+Loading and importing `mux` will initialize the SDK. However, for each new player that is being tracked, you need to initialize the SDK for that player. This is done by calling
+
+```js
+mux.init(playerID, options);
+```
+
+The core `mux` library can track multiple players at once, so it is important to pass in a unique player ID for each player that you want to track. This ID is going to be used in all future calls to the `mux` library for each player.
+
+The `init` method also takes an optional `options` JSON object. This JSON object supports the following keys:
+
+| Property | Required | Type | Description |
+| --- | --- | --- | --- |
+| `debug` | No | boolean | Controls whether debug log statements are logged to the console |
+| `getPlayheadTime` | Yes | function | Callback for playhead position (see below) |
+| `getStateData` | Yes | function | Callback for player state (see below) |
+| `data` | No | object | Data about the viewer, video, and integration |
+
+Within the `data` object, you should pass any information that is listed in [Metadata](/docs/guides/make-your-data-actionable-with-metadata), which is typically about the viewer or the video itself. In addition, the following should be provided:
+
+| Property | Description | Example |
+| --- | --- | --- |
+| `player_software_name` | The name of the underlying player software | `'Video.js'` |
+| `player_software_version` | The version of the underlying player software | `'1.0.1'` |
+| `player_mux_plugin_name` | The name of the plugin being built | Some descriptive string |
+| `player_mux_plugin_version` | The version of the plugin being built | A version string |
+
+The only required property underneath `data` is the `env_key`, which is your env_key found for each environment on https://dashboard.mux.com/environments.
+
+For most integrations, there should be some `data` that is passed down to the integration at runtime in the page/application, such as viewer information and video information, and often times the `env_key`. This information should be merged with the above four properties as a whole before being passed to `mux.init`.
+
+See the [JavaScript Integration Framework](https://github.com/muxinc/web-player-framework) for an example of how this is done.
+
+## Provide callbacks
+
+The JavaScript Core SDK expects two callback functions to be passed in the `options` object to `mux.init`: `getPlayheadTime` and `getStateData`. These callbacks make it so that additional data does not need to be provided when emitting most events.
+
+The `getPlayheadTime` callback is a simple function that should return the accurate playhead position, in milliseconds.
+
+The `getStateData` callback is a function that should return the following properties:
+
+```js
+options.getStateData = () => {
+  return {
+    // Required properties - these must be provided every time this is called
+    // You _should_ only provide these values if they are defined (i.e. not 'undefined')
+    player_is_paused: player.isPaused(), // Return whether the player is paused, stopped, or complete (i.e. in any state that is not actively trying to play back the video)
+    player_width: player.getWidth(), // Return the width, in pixels, of the player on screen
+    player_height: player.getHeight(), // Return the height, in pixels, of the player on screen
+    video_source_height: player.currentSource().height, // Return the height, in pixels, of the current rendition playing in the player
+    video_source_width: player.currentSource().width, // Return the height, in pixels, of the current rendition playing in the player
+
+    // Preferred properties - these should be provided in this callback if possible
+    // If any are missing, that is okay, but this will be a lack of data for the customer at a later time
+    player_is_fullscreen: player.isFullscreen(), // Return true if the player is fullscreen
+    player_autoplay_on: player.autoplay(), // Return true if the player is autoplay
+    player_preload_on: player.preload(), // Return true if the player is preloading data (metadata, on, auto are all "true")
+    video_source_url: player.src().url, // Return the playback URL (i.e. URL to master manifest or MP4 file)
+    video_source_mime_type: player.src().mimeType, // Return the mime type (if possible), otherwise the source type (hls, dash, mp4, flv, etc)
+    video_source_duration: secondsToMs(player.getDuration()), // Return the duration of the source as reported by the player (could be different than is reported by the customer)
+
+    // Optional properties - if you have them, send them, but if not, no big deal
+    video_poster_url: player.poster().url(), // Return the URL of the poster image used
+    player_language_code: player.language() // Return the language code (e.g. `en`, `en-us`)
+  };
+};
+```
+
+## Emit events
+
+The [Playback Events](/docs/guides/mux-data-playback-events) should be emitted as the events are defined. For the JavaScript core SDK, all events are emitted via `mux.emit`. This method takes three arguments:
+- the player name (the same used in the call to `mux.init`
+- the event name (e.g. `play`)
+- (optional) additional data to send along with the event.
+
+All playback events should be emitted as defined except for one: `viewinit` does not need to be emitted for custom JavaScript integrations. This is handled directly by the call to `mux.init`, and also within the helper `mux.emit('videochange', data)`.
+
+For the basic [Playback Events](/docs/guides/mux-data-playback-events), no additional metadata is necessary, as it will be pulled via the callbacks defined above. However, for the ad event and network events, there are additional data fields that should be sent, as documented.
+
+Lastly, when changing the video, the new video metadata should be included within the third parameter.
+
+For instance:
+
+```js
+// Emit the `play` event
+mux.emit('playerId', 'play');
+
+// Emit an ad event, with additional ad metadata
+mux.emit('playerId', 'adrequest', {
+  ad_tag_url: "https://pubads.g.doubleclick.net/ads/..."
+});
+
+// Changing a video
+mux.emit('playerId', 'videochange', {
+  video_title: 'New Video Title',
+    // ... all other metadata about the video
+});
+```
+## Tearing Down
+When you are tearing down the player and want to stop monitoring it, make sure to remove any listeners that you have on the player for sending events to `mux`. After this, make sure to call `mux.emit('playerId', 'destroy');` for your player, so that the core library can clean up any monitoring and end the view.

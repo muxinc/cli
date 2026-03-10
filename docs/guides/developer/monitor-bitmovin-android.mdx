@@ -1,0 +1,192 @@
+---
+title: Monitor Bitmovin Player Android
+product: data
+dataIntegration: true
+description: This guide walks through integration with the Bitmovin Player Android SDK to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Install the Mux Data SDK
+    description: Download the version of the SDK that matches your version of Bitmovin Player.
+  - title: 2. Initialize the monitor with your Bitmovin Player instance
+    description: The Mux monitor attaches to your Bitmovin Player instance.
+  - title: 3. Add Metadata
+    description:
+  - title: 4. Advanced
+    description: Depending on the details of your implementation, you may want to leverage some of the advanced options of MuxStatsSDKBitmovinPlayer.
+  - title: Release notes
+    topic: notes
+---
+
+This documents integration instructions for [Bitmovin's `Bitmovin Player` library](https://bitmovin.com/docs/player/api-reference/android/android-sdk-api-reference-v3#/player/android/3/docs/index.html), version 3.x and 2.x.
+
+The Mux integration with `Bitmovin Player` is built on top of Mux's core Java SDK, and the full code can be seen here: [muxinc/mux-stats-sdk-bitmovin-android](https://github.com/muxinc/mux-stats-sdk-bitmovin-android).
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+Add the Mux SDK to your project using one of the following approaches:
+
+## Add Gradle dependency on the Mux Bitmovin Player SDK
+Add the Mux Maven repository to your Gradle file:
+```text
+repositories {
+    maven {
+        url "https://muxinc.jfrog.io/artifactory/default-maven-release-local"
+    }
+}
+```
+
+Next, add a dependency on the Mux Data Bitmovin Player SDK. We support both `minapi16` and `minapi21` as separate artifacts.
+
+The current version is `v0.5.1`. Additional releases can be found on our [releases page](https://github.com/muxinc/mux-stats-sdk-bitmovin-android/releases).
+
+### Bitmovin Player support
+We support version `3.11.1` of Bitmovin Player. Support for additional versions is planned
+
+```groovy
+implementation 'com.mux.stats.sdk.muxstats:muxstatssdkbitmovinplayer_r3_11_1:[CurrentVersion]'
+```
+
+<LinkedHeader step={steps[2]} />
+
+<MdxImport snippet="envKeyCallout" />
+
+First, create the `CustomerPlayerData` and `CustomerVideoData` objects as appropriate for your current playback, and be sure to set your `ENV_KEY`.
+
+```java
+import com.mux.stats.sdk.core.model.CustomerPlayerData;
+import com.mux.stats.sdk.core.model.CustomerVideoData;
+import com.mux.stats.sdk.core.model.CustomerViewData
+import com.mux.stats.sdk.core.model.CustomData;
+import com.mux.stats.sdk.core.model.CustomerData;
+
+CustomerPlayerData customerPlayerData = new CustomerPlayerData();
+customerPlayerData.setEnvironmentKey("YOUR_ENVIRONMENT_KEY_HERE");
+
+CustomerVideoData customerVideoData = new CustomerVideoData();
+customerVideoData.setVideoTitle(intent.getStringExtra("YOUR_VIDEO_TITLE"));
+
+CustomerViewData customerViewData = new CustomerViewData();
+customerViewData.setViewSessionId("A26C4C2F-3C8A-46FB-885A-8D973F99A998");
+
+CustomData customData = new CustomData();
+customData.setCustomData1("YOUR_CUSTOM_STRING_HERE");
+
+CustomerData customerData = new CustomerData(customerPlayerData, customerVideoData, customerViewData);
+customerData.setCustomData(customData);
+```
+
+Next, create the `MuxStatsSDKBitmovinPlayer` object by passing your Android `Context` (typically your `Activity`), a `Bitmovin PlayerView` instance, a player name, and the customer data objects.
+
+```java
+import com.mux.stats.sdk.muxstats.MuxStatsSDKBitmovinPlayer;
+...
+// Make sure to monitor the player before calling `prepare` on the Bitmovin Player instance
+muxStatsBitmovinPlayer = new MuxStatsSDKBitmovinPlayer(
+  this, player, "demo-player", customerData);
+```
+
+In order to correctly monitor if the player is full-screen, provide the screen size to the `MuxStatsSDKBitmovinPlayer` instance.
+
+```java
+Point size = new Point();
+getWindowManager().getDefaultDisplay().getSize(size);
+muxStatsBitmovinPlayer.setScreenSize(size.x, size.y);
+```
+
+In order to determine a number of viewer context values as well as track the size of the video player, set the player view.
+
+```java
+muxStatsBitmovinPlayer.setPlayerView(playerView);
+```
+
+Finally, when you are destroying the player, call the `MuxStatsSDKBitmovinPlayer.release()` function.
+
+```java
+muxStatsBitmovinPlayer.release()
+```
+
+After you've integrated, start playing a video in your player. A few minutes after you stop watching, you'll see the results in your Mux data dashboard. Login to the dashboard and find the environment that corresponds to your `env_key` and look for video views.
+
+<LinkedHeader step={steps[3]} />
+
+In the Java SDK, options are provided via the objects within the `CustomerData` object.
+
+All metadata details except for `envKey` are optional, however you'll be able to compare and see more interesting results as you include more details. This gives you more metrics and metadata about video streaming, and allows you to search and filter on important fields like the player version, CDN, and video title.
+
+For more information, see the [Metadata Guide](/docs/guides/make-your-data-actionable-with-metadata).
+
+<LinkedHeader step={steps[4]} />
+
+## Changing the video
+
+There are two cases where the underlying tracking of the video view need to be reset. First, when you load a new source URL into an existing player, and second when the program within a singular stream changes (such as a program within a live stream).
+
+Note: You do not need to change the video info when changing to a different source of the same video content (e.g. different resolution or video format).
+
+## New source
+
+When you change to a new video (in the same player) you need to update the information that Mux knows about the current video. Examples of when this is needed are:
+
+* The player advances to the next video in a playlist
+* The user selects a different video to play
+
+This is done by calling `muxStatsBitmovinPlayer.videoChange(CustomerVideoData)` which will remove all previous video data and reset all metrics for the video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+It's best to change the video info immediately after telling the player which new source to play.
+
+## New program (in single stream)
+
+In some cases, you may have the program change within a stream, and you may want to track each program as a view on its own. An example of this is a live stream that streams multiple programs back to back, with no interruptions.
+
+In this case, call `muxStatsBitmovinPlayer.programChange(CustomerVideoData)`. This will remove all previous video data and reset all metrics for the video view, creating a new video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+## Error tracking
+
+By default, Mux's integration with Bitmovin Player automatically tracks fatal errors as thrown by Bitmovin Player. If a fatal error happens outside the context of Bitmovin Player and you want to track it with Mux, you can call `muxStatsBitmovinPlayer.error` like this:
+
+```java
+// Error code: integer value for the generic type of error that
+// occurred.
+// Error message: String providing more information on the error
+// that occurred.
+// For an example, the HTML5 video element uses the
+// following: https://developer.mozilla.org/en-US/docs/Web/API/MediaError
+// for codes and messages. Feel free to use your own codes and messages
+int errorCode = 1;
+String errorMessage = "A fatal error was encountered during playback";
+MuxErrorException error = new MuxErrorException(errorCode, errorMessage);
+muxStatsBitmovinPlayer.error(error);
+```
+Note that `muxStatsBitmovinPlayer.error(MuxErrorException e)` can be used with or without automatic error tracking. If your application has retry logic that attempts to recover from Bitmovin Player errors then you may want to disable automatic error tracking like this:
+
+```java
+muxStatsBitmovinPlayer.setAutomaticErrorTracking(false)
+```
+
+<Callout type="warning">
+It is important that you only trigger an error when the playback has to be abandoned or aborted in an unexpected manner, as Mux tracks fatal playback errors only.
+</Callout>
+
+<Releases>
+<LinkedHeader step={steps[5]} />
+
+### Current release
+
+#### v0.5.2
+Fixes:
+* Fix `ANRs` during Position Checks (#9)
+
+
+### Previous releases
+#### v0.5.1
+Improvements:
+* Detect Fullscreen Bitmovin's size listeners instead of guessing from view & screen sizes (#5)
+
+#### v0.5.0
+* Initial release
+</Releases>

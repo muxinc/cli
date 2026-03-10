@@ -1,0 +1,61 @@
+---
+title: Mux Data FAQs
+product: data
+description: Answers to common questions about Mux Data.
+---
+## Why use Mux Data?
+Mux Data uncovers four key dimensions of video quality of service: playback failures, startup time, rebuffering, and video quality. If your aim is broadcast-quality video streaming, Mux Data enables you to monitor these critical video metrics.
+
+With each Mux Data metric, you can monitor and track what matters to your viewers. For example, [Overall Viewer Experience Score](/docs/guides/data-overall-viewer-experience-metric#overall-viewer-experience-score) is a metric that quickly summarizes your video platform's performance.
+
+To get familiar with more of the features of Mux Data, see this [introduction to Mux Data](https://mux.com/data).
+
+## What is the Mux Data Dashboard and what can you do with it?
+The Mux Data Dashboard is an interface that lets you set filters and view graphs that monitor each specific key metric you are interested in. With each metric, you can monitor and track what matters to your viewers.
+
+You can also immediately see what is happening before users do with [Anomaly Alerts](/docs/guides/setup-alerts#anomaly-alerts) and [Threshold Alerts](/docs/guides/setup-alerts#threshold-alerts). It is easy to set these alerts for prompt notifications. Check your dashboard to track the source or sources.
+
+You may want to apply [Filters](/docs/guides/setup-alerts#filters) to the alert definition to track only specific data. Finally can also use the <ApiRefLink href="/docs/api-reference/data/metrics/list-insights">List Insights</ApiRefLink> feature as a way of _impact sorting_ which browsers, devices, regions, CDNs, players, ads and videos are creating the most problems for your viewers.
+
+## What is the Monitoring Dashboard and what can you do with it?
+The [Mux Data Monitoring Dashboard](https://data.mux.com/real-time-monitoring/), previously called the Real-time Dashboard, allows you to monitor your critical metrics in one operational dashboard that updates in real-time. This lets you respond to major streaming issues quickly.
+
+<Callout type="success">
+Read this blog post as a great example and resource:
+
+[Respond to and Resolve Incidents with the Monitoring (formerly Real-time) Dashboard](https://mux.com/blog/respond-to-and-resolve-incidents-with-the-real-time-dashboard/).
+
+It dives into how to use tools on the Monitoring Dashboard to investigate the incident, communicate with stakeholders, resolve the issue, and improve your resiliency.
+</Callout>
+
+## Can I access Mux Data via an API?
+
+Yes, all Mux Data views and metrics are all available through the Data API. Raw video view data can be [exported via the API](/docs/guides/export-raw-video-view-data). Additionally, here is a detailed blog post describing how to [create graphs using the Mux API](https://mux.com/blog/use-the-mux-data-api-to-create-graphs-in-react/).
+
+## Where do I find Mux Data Pricing? What features are included in the Pay-as-you-go, Media, and Custom Media Plans?
+Choose a Mux Data pricing plan on the [Data Pricing page](https://mux.com/data/#DataPricing). Here you can view a breakdown of all features that Mux includes with each plan including Pay-as-you-go, Media, and Custom Media.
+
+Or, [contact our Sales team](https://mux.com/sales-contact) to acquire more detailed information.
+
+## Where do I find all supported metrics, dimensions, and devices?
+You can find more [Technical Specs here](https://mux.com/data/#TechSpecs) covering all tracked video metrics, available filters, and supported players.
+
+## Can I use Mux Data to monitor audio-only content? 
+Yes, Mux Data can be used to monitor audio content that uses the `<audio>` element. Mux Data will track Engagement metrics, such as the number of plays and length of playback time, as well as basic Quality of Experience metrics including Startup Time, Rebuffering Percentage, and others. Video Quality metrics are not calculated for audio content.  
+
+## Is Mux Video delivery usage API similar to watch time in Mux Data?
+No, these two measurements are quite different. Mux Video's <ApiRefLink href="/docs/api-reference/video/delivery-usage">Delivery Usage API</ApiRefLink> is based on the number of minutes delivered to clients. This is a server-side (CDN) metric. Whereas Mux Data collects metrics from the client-side and calculates watch time based on the user's interaction with the player.
+
+If a user watches a video, rewinds, and watches the video again that content was only delivered one time to the device but it was watched multiple times. In this scenario Mux Video's delivery usage would be lower than the watched time in Mux Data.
+
+More commonly, the client will build up a buffer of downloaded video content. The user will watch some of it and then leave before watching the full length of the video. In this scenario Mux Video's minutes delivered would be higher than the watched time in Mux Data because the client downloaded more minutes of video than it watched.
+
+Another factor to keep in mind is that because Mux Data runs as a client-side SDK, it is susceptible to being blocked by ad-blockers.
+
+## How should I use Mux environments?
+Environments allow you to separate data collected from players to more accurately analyze your video engagement and performance. A Development and Production environment are created automatically when you sign up, and this is the most common way of organizing environments. You can rename your environments or add additional environments as needed, but we recommend keeping development and production data separate.
+
+Multiple sites or apps can use the same environment and Mux Data environment key. For example, if you have both web and mobile players, and want to view and compare metrics across them, you should use the same environment. Additionally, if you are using Mux Video, use the same environment for Mux Data. Views tracked by Mux Data for videos or live streams streamed from Mux Video are automatically populated with Mux Video identifiers when they’re within the same environment. This allows you to easily view metrics for your assets and live streams in your Mux dashboard. Learn more in our [blog post](https://www.mux.com/blog/giving-developers-more-with-mux-data-mux-video) on Data features for Mux Video.
+
+## How are Mux Data environment keys used?
+Each environment has a client-side key associated with it, which you can find on your Environments page. You’ll also see it in Get Started with Data (accessed from the Overview page) for any environment you haven’t integrated yet. When integrating a Mux Data SDK, your environment key allows us to associate the views collected with that SDK to the correct environment. Environment keys are not secret. In rare cases where you would like to change your environment key, [contact us](/support) and we can change it for you.

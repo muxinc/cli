@@ -1,0 +1,94 @@
+---
+title: Export Monitoring data for integration
+product: data
+description: Understand how to export your monitoring data into your own system for processing and taking action.
+steps:
+  - title: Monitoring Sample Messages
+    description: Monitoring Sample messages contain data samples.
+    topic: API
+  - title: Metrics Included
+    description: Quality metrics are records in the samples.
+    topic: API
+  - title: Continuously stream data
+    description: Export Monitoring data every 30 second interval.
+    topic: API
+  - title: Monitoring Samples message format
+    description: Available for AWS Kinesis.
+    topic: code
+  - title: Versioning
+    description: Understand how to manage the schema versioning for Monitoring Samples
+---
+
+<Callout type="info">
+
+The Monitoring Samples Stream is only available on **Mux Custom Media** plans. Learn more about [Mux Data Plans](https://data.mux.com/pricing) or [contact support](https://mux.com/support).
+</Callout>
+
+Mux provides a mechanism for customers to subscribe to a near-realtime, video view-level data stream of events and measurements related to the quality of service for customers with a Mux Data integration.
+
+This can be used to identify service-level problems, such as widespread rebuffering or playback failures. It can also be used to integrate Mux data with platforms for multi-CDN switching platform, alerting, or constructing your own version of the Mux Data Monitoring dashboard.
+
+<LinkedHeader step={steps[0]} />
+
+A single Monitoring Samples payload may contain multiple samples. Each sample corresponds to a single active video view, with a different view id per sample. The sample can contain multiple records, where each record contains metrics for a point in time for the video view. A record specifies a time period and metrics measured over that time period. All metrics inside a single record will apply to the time range implied by the `start` timestamp field plus the `duration_ms` field. If the duration field is zero, the record includes instantaneous metrics. A record MUST contain at least one metric.
+
+<Image sm src="/docs/images/monitoring-stream-format.png" width={640} height={480} />
+
+<LinkedHeader step={steps[1]} />
+
+### START_LATENCY_MS 
+Also known as Time To First Frame (TTFF). This is Mux’s Video Startup Time which measures the time that the viewer waits for the video to play after the page is loaded and the player is ready.
+
+### EXIT_BEFORE_VIDEO_START
+Instantaneous event metric that is sent when a playback drop is detected. This is sent when Mux has detected an intent to play but playback never begins. Inherently has a delay (up to 1 minute) while waiting to detect play start. The value field contains the playhead time of the player at the time of exit, in milliseconds, typically this value is 0 for videos starting from the beginning. This is NOT sent when the playback is halted due to a PLAYBACK_ERROR.
+
+### WATCH_DURATION_MS
+Watch Duration is the amount of time in millisecond that viewers spend attempting to watch a video. This includes all time spent waiting for video to load, including rebuffering and seeking. It does not include time spent paused. 
+
+### SEEK_LATENCY_MS
+The Seek Latency metric measures the average amount of time that viewers wait for the video to start playing again after seeking to a new time. Seeking is any time the player is asked to jump backward or forward to a new time in the video, outside of normal playback.
+
+### REBUFFER_DURATION_MS
+Rebuffer Duration is the amount of time in milliseconds that viewers spend rebuffering during the record window.
+
+### REBUFFER_COUNT
+Rebuffer Count is the number of independent rebuffer events encountered over the record time window.
+
+### PLAYBACK_ERROR
+Instantaneous event metric that is sent when playback has failed due to a fatal technical error. The value is the player playhead timestamp in milliseconds when the error occurred. Non-fatal technical errors and business errors are not included in the Monitoring stream.
+
+<LinkedHeader step={steps[2]} />
+
+Mux Data supports streaming the Monitoring Samples to an Amazon Kinesis Data Stream in your cloud account. Monitoring data is sent to the configured destination each 30 second interval.
+
+The samples stream data can be stored in your long-term storage for processing and aggregation. This method of access is most useful for customers who want real-time updates of the current performance that can be used for aggregations that inform real-time CDN switching, custom alerting, or internal NOC tools.
+
+## Setting up a Monitoring Samples stream
+Monitoring Samples streams are enabled by working with the Mux team; they are *not* currently configured in the **Streaming Exports** settings in your Mux dashboard. Generally, the steps for configuring realtime sample exports are as follows:
+- Mux will work with the customer to generate the AWS account details.
+- The customer will create the destination and security artifacts in AWS.
+- Send the AWS ARNs to Mux.
+- Mux enables real-time sample exports to the customer Kinesis stream in production & staging.
+
+For more information on setting up AWS Kinesis, refer to the [Amazon Kinesis Data Streams](/docs/guides/export-amazon-kinesis-data-streams) setup guide for more information on setting up an export.
+
+## Message format
+Messages are in either JSON format or Protobuf (proto2) encoding. You can choose between the two formats when setting up the data stream with Mux support.
+
+For Protobuf encoding, every message uses the `com.mux.realtime.Samples` message type defined in the export Protobuf spec, which is available in the [mux-protobuf repository](https://github.com/muxinc/mux-protobuf/tree/main/video_view). Use the latest Protobuf spec when creating schemas or generating code.
+
+<LinkedHeader step={steps[3]} />
+
+The protobuf definition for the Monitoring Samples stream is available in the [mux-protobuf repository](https://github.com/muxinc/mux-protobuf/tree/main/monitoring_samples). Please subscribe to this repository for updates to the protobuf definition.
+
+The JSON format payload contains identical fields as the protobuf-encoded format.
+
+<LinkedHeader step={steps[4]} />
+
+## Backward compatibility
+
+The schema provided by Mux Data is backward compatible, meaning that each schema version guarantees that it will still work upon future upgrades. Customers do not need to worry about breaking changes. 
+
+## When to upgrade the schema?
+
+When Mux adds new fields or metrics to the Monitoring Samples stream, we will upgrade the schema version. Without taking any actions, new fields will be automatically included in the data stream. For JSON formatted data, the new fields will be included in the data objects as they are added to the stream. For proto encoded streams, the new fields will be available once you upgrade to the latest [proto definition](https://github.com/muxinc/mux-protobuf/tree/main/monitoring_samples). 

@@ -1,0 +1,35 @@
+---
+title: Stream export data to a Google Cloud Pub/Sub topic
+product: system
+description: Learn how to send streaming exports data from Mux to Google Cloud Pub/Sub.
+---
+
+<Callout type="info">
+
+Streaming Exports are available on **Mux Data Media** plans. Learn more about [Mux Data Plans](https://data.mux.com/pricing) or [contact support](https://mux.com/support).
+</Callout>
+
+In order to stream exports from Mux to a Pub/Sub topic, you'll need to set up a topic in your Google Cloud account. Mux will write data to the topic as it becomes available. This guide covers the high-level steps required for setup.
+
+## 1. Add a new streaming export
+
+To add a new streaming export, go to **Settings > Streaming Exports** in your Mux dashboard. From that tab, click **New streaming export** to open the configuration modal. 
+
+Select the type of data you want to export, the environment you want to send data from, the export format, and select **Google Cloud Pub/Sub** as the service.
+
+## 2. Set up a topic in Google Cloud Pub/Sub
+
+You'll need to complete the following setup in your Google Cloud account before you can create a new streaming export in Mux:
+1. *(Optional)* If you want to use a schema with your Pub/Sub topic, you can create one using the Protobuf spec for the data you are exporting, which is available in the [mux-protobuf repository](https://github.com/muxinc/mux-protobuf).
+2. Create a Pub/Sub topic. If you're creating a topic with a schema, set the message encoding to **Binary**.
+3. Add the Mux service account to the topic as a Principal with the **Pub/Sub Publisher** role. The Mux service account is shown in the configuration modal.
+
+## 3. Finish setup in Mux
+
+In the configuration modal, provide the Pub/Sub topic name. This should be the full topic name, including the project ID, and match the format `projects/{project-id}/topics/{topic-id}`.
+
+Click **Enable export**, and your streaming export will be activated immediately. We will start streaming data as soon as it becomes available.
+
+## Process messages
+
+With your export set up, you can begin consuming incoming messages. For more information on the message format and processing data, see the main [Export raw Mux data](/docs/guides/export-raw-video-view-data) guide.

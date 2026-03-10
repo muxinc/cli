@@ -1,0 +1,359 @@
+---
+title: Upload video directly from iOS or iPadOS
+product: video
+description:
+  Allow your users to upload video to Mux from an iOS or iPadOS application with
+  Direct Uploads and the Upload SDK.
+---
+[Direct Uploads](/docs/guides/upload-files-directly) allow you to upload content from your client applications directly to Mux without needing any intermediary steps using an authenticated URL.
+
+This guide will help you install the Upload SDK from Mux. The Upload SDK is designed to handle common tasks required to upload large video files, like file chunking and networking. By using the Upload SDK, your application will also become able to pause and resume uploads across restarts, report upload progress, and make adjustments that minimize processing time when your upload is ingested by Mux.
+
+The Upload SDK is supported on iOS 14 and iPadOS 14, or higher. macOS is not supported at this time.
+
+Your application can also handle uploads [on its own](/docs/guides/upload-files-directly#if-you-dont-want-to-use-upchunk) using built-in [`URLSession`](https://developer.apple.com/documentation/foundation/urlsession) and [file system](https://developer.apple.com/documentation/foundation/file_system) APIs. We encourage you to check out the Upload SDK [implementation](https://github.com/muxinc/swift-upload-sdk) as an example to follow along.
+
+## Install the SDK
+
+Let's start by installing the SDK. We'll use the Swift Package Manager. [Step-by-step guide on using Swift Package Manager in Xcode](https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app).
+
+Open your applications project in Xcode. In the Xcode menu bar select File > Add Packages. In the top-right corner of the modal window that opens enter the SDK repository URL which is `https://github.com/muxinc/swift-upload-sdk`.
+
+By default Xcode will fetch the latest version of the SDK available on the `main` branch. If you need a specific package version or to restrict the range of package versions used in your application, select a different Dependency Rule. [Here's an overview of the different SPM Dependency Rules and their semantics](https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app#Decide-on-package-requirements).
+
+Click on Add Package to begin resolving and downloading the SDK package. When completed, select your application target as the destination for the `MuxUploadSDK` package product. To use the SDK in your application, import it's module: `import MuxUploadSDK`.
+
+## Upload content from your application
+
+## Getting an authenticated URL from Mux Video
+
+<Callout type="info">
+
+You must create a new [Direct Upload](/docs/guides/upload-files-directly#1-create-an-authenticated-mux-url) to upload a new video to Mux.
+
+The Direct Upload will contain an authenticated `PUT` url that's unique to your upload. Your application will upload video to this url.
+
+</Callout>
+
+Direct Uploads are resumable and if your application application started an upload and needed to pause it, use the same url to resume the upload.
+
+We recommend that you avoid creating Direct Uploads outside of a trusted environment such as a backend server. Your application can request a new authenticated URL from your server when it needs one. You can also hardcode a pre-made URL in an internal build of your application for a one-time test.
+
+## Create and start your direct upload
+
+Once your application has an authenticated direct upload URL, you're ready to start uploading!
+
+Your application will use the authenticated url to construct a `PUT` request. The body of the request will contain your video data. The `DirectUpload` API in the Upload SDK handles these operations for you.
+
+Initialize a `DirectUpload` with your authenticated URL and a local video file URL. We'll also set the progress handler callback to log the upload progress to the console. In a later example you'll learn how to customize how an upload behaves.
+
+<CodeExamples
+  examples={{
+    swift: `
+    import MuxUploadSDK
+
+    // The url found in the response after creating a direct upload
+    let authenticatedURL: URL = /* fetch from trusted environment */
+
+    // In this example we're uploading a video input file saved locally inside the application sandbox
+    let videoInputURL: URL = /* URL to a video available locally */
+
+    let directUpload = DirectUpload(
+      uploadURL: authenticatedURL,
+      inputFileURL: videoInputURL
+    )
+
+    // Let's log the progress to the console
+    directUpload.progressHandler = { state in
+      print("Uploaded \(state.progress.completedUnitCount) / \(state.progress.totalUnitCount)")
+    }
+
+    // Then start the direct upload
+    directUpload.start()
+    `,
+  }}
+  exampleOrder="swift"
+/>
+
+## Tactics for handling large files
+
+### Chunking uploads
+
+Smaller videos can be uploaded with a single request. We recommend breaking up larger videos into chunks and treating them as separate uploads.
+
+The Upload SDK handles the required networking and file chunking operations for you regardless of file size. By default the SDK splits your video into *8MB* chunks when necessary. To change the chunk size your application will initialize its own `DirectUploadOptions` and pass the custom size as `chunkSizeInBytes`. Be sure to convert any quantities expressed in kilobytes or megabytes to bytes first.
+
+Initialize a `DirectUpload` and pass the custom options you've created as the `options` parameter. A default set of options will be used if `options` isn't set when initializing a `DirectUpload`.
+
+<CodeExamples
+  examples={{
+    swift: `
+    import MuxUploadSDK
+
+    let authenticatedURL: URL = /* fetch from trusted environment */
+    let videoInputURL: URL = /* URL to a video available locally */
+
+    // Construct custom upload options to upload a file in 6MB chunks
+    let chunkSizeInBytes = 6 * 1024 * 1024
+    let options = DirectUploadOptions(
+      chunkSizeInBytes: chunkSizeInBytes
+    )
+
+    // Initialize a DirectUpload with custom options
+    let directUpload = DirectUpload(
+      uploadURL: authenticatedURL,
+      inputFileURL: videoInputURL,
+      options: options
+    )
+
+    // Let's log the upload progress to the console
+    directUpload.progressHandler = { state in
+      print("Uploaded \(state.progress.completedUnitCount) / \(state.progress.totalUnitCount)")
+    }
+
+    // Then start the direct upload
+    directUpload.start()
+    `,
+  }}
+  exampleOrder="swift"
+/>
+
+Smaller chunk sizes result in more requests while larger chunk sizes lead to fewer requests that take longer to complete. We recommend using a smaller chunk size on unstable or lossy networks.
+
+### What happens if an upload request fails?
+
+When the SDK becomes aware of a failed upload `PUT` request, it will automatically retry it. By default the SDK will retry uploading each chunk up to 3 times before the upload is deemed to have failed. This limit can be altered by your application by initializing its own `DirectUploadOptions` with a custom value for `retryLimitPerChunk`. Then initialize a `DirectUpload` with the custom options as the `option` argument.
+
+<CodeExamples
+  examples={{
+    swift: `
+    import MuxUploadSDK
+
+    let authenticatedURL: URL = /* fetch from trusted environment */
+    let videoInputURL: URL = /* URL to a video available locally */
+
+    // Construct custom upload options with a higher per-chunk retry limit
+    let options = DirectUploadOptions(
+      retryLimitPerChunk: 5
+    )
+
+    // Initialize a DirectUpload that will retry each chunk
+    // request up to 5 times
+    let directUpload = DirectUpload(
+      uploadURL: authenticatedURL,
+      inputFileURL: videoInputURL,
+      options: options
+    )
+
+    // Then start the direct upload
+    directUpload.start()
+    `,
+  }}
+  exampleOrder="swift"
+/>
+
+### Pause and resume uploads
+
+Your application might become suspended or terminated in the middle of a long-running upload. You can avoid losing the progress completed so far by pausing the upload and resuming it when the app becomes active again.
+
+<CodeExamples
+  examples={{
+    swift: `
+    import MuxUploadSDK
+
+    class UploadCoordinator {
+      func handleApplicationWillTerminate() {
+        UploadManager.shared.allManagedUploads().forEach { upload in
+          upload.pause()
+        }
+      }
+
+      func handleApplicationDidBecomeActive() {
+        UploadManager.shared.resumeAllUploads()
+      }
+    }
+    `,
+  }}
+  exampleOrder="swift"
+/>
+
+A direct upload can be resumed as long as it remains in a `waiting` status and hasn't yet transitioned to a `timed_out` status. You can customize this length of time by setting the `timeout` value in the <ApiRefLink href="/docs/api-reference/video/direct-uploads/create-direct-upload">create direct upload request</ApiRefLink> to a value between 1 minute and 7 days. If no value is set the upload times out 1 hour after being *created*.
+
+## Need a playable asset as fast as possible?
+
+<Callout type="info" title="Beta Functionality">
+
+The APIs around this feature are not final.
+
+</Callout>
+
+After your direct upload is completed, Mux Video will convert the uploaded input into a playable asset.
+
+Some types of inputs require additional processing time during ingestion before becoming ready for playback. By default the Upload SDK reduces the processing time by adjusting upload inputs locally to a faster-to-process format when needed. More details on how audio and video input formats relate to new asset processing time [available here](/docs/guides/minimize-processing-time).
+
+### Setting a maximum resolution
+
+The SDK can adjust the resolution of your video input locally before it is uploaded to Mux. By default the SDK will adjust the input resolution to 1920 x 1080 for any inputs that are larger.
+
+You can also reduce the maximum resolution further to 1280 x 720. Initialize a new `DirectUploadOptions` and set `.preset1280x720` as `InputStandardization.maximumResolution`.
+
+<CodeExamples
+  examples={{
+    swift: `
+    import MuxUploadSDK
+
+    let authenticatedURL: URL = /* fetch from trusted environment */
+    let videoInputURL: URL = /* URL to a video available locally */
+
+    // Reduce the maximum resolution to 1280 x 720
+    let options = DirectUploadOptions(
+      inputStandardization: .init(maximumResolution: .preset1280x720)
+    )
+
+    // Initialize a DirectUpload with custom options
+    let directUpload = DirectUpload(
+      uploadURL: authenticatedURL,
+      inputFileURL: videoInputURL,
+      options: options
+    )
+
+    // Then start the direct upload
+    directUpload.start()
+    `,
+  }}
+  exampleOrder="swift"
+/>
+
+### Skipping input adjustments
+
+<Callout type="warning">
+
+  The setting described here will only affect *local* changes to your input. Mux Video will still convert any non-standard inputs to a standard format during ingestion.
+
+</Callout>
+
+In most cases your application won't need to bypass these adjustments. When necessary they can be skipped by initializing `DirectUploadOptions` and passing `.skipped` for `inputStandardization`, then passing those to the `options` argument when initializing a new `DirectUpload` like you've customized other options before.
+
+<CodeExamples
+  examples={{
+    swift: `
+    import MuxUploadSDK
+
+    let authenticatedURL: URL = /* fetch from trusted environment */
+    let videoInputURL: URL = /* URL to a video available locally */
+
+    // Skip adjustments to your input locally
+    let options = DirectUploadOptions(
+      inputStandardization: .skipped
+    )
+
+    // Initialize a DirectUpload with that skips input standardization
+    // and uploads your video as-is
+    let directUpload = DirectUpload(
+      uploadURL: authenticatedURL,
+      inputFileURL: videoInputURL,
+      options: options
+    )
+
+    // Then start the direct upload
+    directUpload.start()
+    `,
+  }}
+  exampleOrder="swift"
+/>
+
+<Releases>
+## Release notes
+
+### Current release
+
+### 1.0.0
+
+Improvements
+* Direct uploads are cancelable while inputs are standardized on the client
+* Video inputs can be standardized to 2160p (4K) resolution
+* Upload source `AVAsset` has the correct URL
+
+Known Issues
+* When checking if a video input file is standard or not, the SDK compares an averaged bitrate to a resolution-dependent limit. If different parts of the video input have varying input, the video may require further processing by Mux upon ingestion.
+
+### 0.7.0
+
+New
+* Add macOS deployment target
+
+Improvements
+* Fix memory leak occurring when uploading large files
+
+### 0.6.0
+
+New
+* Add Foundation Measurement API for chunk size
+
+Breaking
+* Rename Version to SemanticVersion for explicitness in API
+
+Improvements
+* Remove UIKit dependency from SDK
+* Backfill missing inline API docs
+
+### 0.5.0
+
+New
+* Add an overload initializer for `DirectUploadOptions`
+
+Breaking
+* Remove prefix use in public APIs and respell Upload as DirectUpload
+
+### Previous releases
+
+### 0.4.0
+
+API Changes
+* Deprecation: `MuxUpload.init(uploadURL:videoFileURL:chunkSize:retriesPerChunk:)` has been deprecated and will be removed in a future SDK version. Use `init(uploadURL:inputFileURL:options:)` instead
+* Breaking Change: `MuxUpload.startTime` now returns an optional value
+* Breaking Change: `MuxUpload.Status` has been renamed to `MuxUpload.TransportStatus`
+* Add: `UploadOptions` struct to contain all available `MuxUpload` options
+* Add: Options to request or to skip input standardization
+* Add: `MuxUpload` initializer APIs that accept `AVAsset` or `PHAsset`
+* Add: `MuxUpload.InputStatus` enum to represent the current state of the upload and change handler
+
+New
+* Support for on-device input standardization, create a playable asset from your direct upload faster. When input standardization is requested from the SDK, input video is converted to a standard range of values on a best-effort basis
+
+Fixes
+* Prevent integer overflow when calculating chunk request content ranges
+* Prevent crash from chunk worker force unwrap
+* Remove public methods from internal SDK classes
+* Prevent removal of result handler properties when passing MuxUpload via UploadManager
+
+### 0.3.0
+
+API Changes
+* `MuxUpload`'s initializer no longer requires a MIME type or Retry Time. These are calculated internally
+* Added methods for querying the `UploadManager` for the list of currenty-active uploads, and listening for changes to the list
+* Add opt-out for upload statistics
+
+Improvements
+* Add a much-improved example app
+
+### 0.2.1
+
+Improvements
+* Track upload statistics
+
+Fixes
+* Resumed Uploads start at the beginning of the file
+
+### 0.2.0
+
+Improvements
+* Remove Alamofire Dependency
+
+### 0.1.0
+
+Our first release of Mux's Swift Upload SDK!! 🎉 💯
+
+This public beta release includes chunked, pause-able, resume-able video uploads for Mux Video. You can upload from anywhere in your app as well as query the upload state from anywhere in your app regardless of your app architecture. Uploads can be resumed even after your app restarted after a shutdown.
+
+</Releases>

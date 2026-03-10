@@ -1,0 +1,287 @@
+---
+title: Filter your Data
+description: Learn how to use the `filters[]` parameter to filter your data with flexible syntax for different dimension types.
+---
+
+The `filters[]` parameter allows you to filter your data using flexible syntax that supports different types of operations depending on the dimension type.
+
+## Filter Syntax Overview
+
+The basic format for all filters is:
+
+<code>
+  filters[]=<span className="bg-yellow text-white">&lt;operation&gt;</span><span className="bg-orange text-white">&lt;dimension&gt;</span>:<span className="bg-pink text-white">&lt;value&gt;</span>
+</code>
+
+- <span className="bg-yellow text-white font-mono">&lt;operation&gt;</span> is the optional prefix that defines the type of filter.
+  Examples:
+  - (none) → equals → `country:US`
+  - `!` → not equals → `!country:US`
+  - `+` → set contains → `+video_cdn_trace:fastly`
+  - `-` → set omits → `-video_cdn_trace:cloudflare`
+
+- <span className="bg-orange text-white font-mono">&lt;dimension&gt;</span> is the field or metric you want to filter on.
+  Examples: `country`, `operating_system`, `video_cdn_trace`
+
+- **`:`** acts as the separator between the dimension and the value.
+
+- <span className="bg-pink text-white font-mono">&lt;value&gt;</span> is the value you're comparing against.
+  Examples:
+  - Scalar → `US`, `windows`
+  - Trace → `[fastly,akamai]`
+  - Empty trace → `[]`
+
+## Supported Operations
+
+### Scalar Operations
+
+Scalar operations can be used with single-value dimensions or simple key-value pairs. Use these operations when you want to filter by an exact match or exclusion.
+
+| Syntax | Operation | Example | Description |
+| --- | --- | --- | --- |
+| `dimension:value` | Equals | `filters[]=country:US` | Field equals value |
+| `!dimension:value` | Not equals | `filters[]=!operating_system:windows` | Field does not equal value |
+
+### Set Operations
+
+Use for trace dimensions that can have multiple values in an ordered list. Use these operations when you want to check if a single value appears in the trace dimension.
+
+| Syntax | Operation | Example | Description |
+| --- | --- | --- | --- |
+| `+dimension:value` | Has | `filters[]=+video_cdn_trace:fastly` | Set contains value |
+| `-dimension:value` | Omits | `filters[]=-video_cdn_trace:cloudflare` | Set does NOT contain value |
+
+Please note that set operations cannot be used as a wildcard for substring searches. For example, `filters[]=+video_cdn_trace:fas` *cannot* be used to return views with CDN traces that contain `fastly`.
+
+### Trace Operations
+
+Use for trace dimensions that can have multiple values in an ordered list. Use this operation when you want to filter for an exact, ordered match.
+
+| Syntax | Operation | Example | Description |
+| --- | --- | --- | --- |
+| `dimension:[value1,value2]` | Equals | `filters[]=video_cdn_trace:[fastly,akamai]` | Trace equals exactly `[fastly, akamai]` |
+
+## Practical Examples
+
+### Scalar (Basic) Operations
+
+Filter for views from the US:
+
+```
+filters[]=country:US
+```
+
+Exclude mobile operating systems:
+
+```
+filters[]=!operating_system:mobile
+```
+
+### Set Operations
+
+Find views with 'fastly' as a CDN value in the video_cdn_trace dimension.
+
+```
+filters[]=+video_cdn_trace:fastly
+```
+
+Exclude views that went through `cloudflare`:
+
+```
+filters[]=-video_cdn_trace:cloudflare
+```
+
+### Trace Operations
+
+Find views that went through exactly `fastly` first, then `akamai`:
+
+```
+filters[]=video_cdn_trace:[fastly,akamai]
+```
+
+Find views where no CDN value was set:
+
+```
+filters[]=video_cdn_trace:[]
+```
+
+### Multiple Filters
+
+You can combine multiple filters.
+
+**Filters with different dimensions**
+
+When you are combining filters with different dimensions they are combined with AND.
+
+```
+# Views from US AND went through fastly
+filters[]=country:US
+filters[]=+video_cdn_trace:fastly
+```
+
+You can also combine dimensions with the same dimension. These are combined with OR.
+
+```
+# Views from US OR Canada
+filters[]=country:US
+filters[]=country:CA
+```
+
+However, if you are combining filters with the same dimension value with a negated value, those are combined using AND.
+
+```
+# Views NOT from US AND NOT from Canada
+filters[]=!country:US
+filters[]=!country:CA
+```
+
+### Value Formatting
+
+- **Scalar (basic) values**: Plain strings (`country:US`)
+- **Trace values**: Comma-separated values in brackets (`video_cdn_trace:[a,b,c]`)
+- **Empty traces**: Use empty brackets (`video_cdn_trace:[]`)
+
+## Common Errors
+
+❌ **Don't use brackets with set operators:**
+
+```
+filters[]=+video_cdn_trace:[fastly]  # Invalid
+```
+
+✅ **Correct:**
+
+```
+filters[]=+video_cdn_trace:fastly    # Valid
+```
+
+❌ **Don't use scalar operator syntax with trace dimensions:**
+
+```
+filters[]=video_cdn_trace:fastly  # Invalid
+```
+
+✅ **Use trace or set operator syntax with trace dimensions:**
+
+```
+filters[]=video_cdn_trace:[fastly]  # Exact match
+filters[]=+video_cdn_trace:fastly   # Contains check
+```
+
+## URL Encoding
+
+When using filters in URLs, remember to properly encode the parameters:
+
+```bash
+# Single filter
+/metrics?filters[]=country:US
+
+# Multiple filters
+/metrics?filters[]=country:US&filters[]=+tags:beta&filters[]=video_cdn_trace:[fastly,akamai]
+
+# URL encoded
+/metrics?filters%5B%5D=country%3AUS&filters%5B%5D=%2Btags%3Abeta&filters%5B%5D=video_cdn_trace%3A%5Bfastly%2Cakamai%5D
+```
+Here's an example of how you can URL encode the filter params using JavaScript:
+
+```javascript
+// Example filters
+const filters = [
+  "country:US",
+  "+tags:beta",
+  "video_cdn_trace:[fastly,akamai]"
+];
+
+// Use URLSearchParams to build query string
+const params = new URLSearchParams();
+filters.forEach(f => params.append("filters[]", f));
+
+// Full URL
+const url = `/metrics?${params.toString()}`;
+
+console.log(url);
+// /metrics?filters%5B%5D=country%3AUS&filters%5B%5D=%2Btags%3Abeta&filters%5B%5D=video_cdn_trace%3A%5Bfastly%2Cakamai%5D
+```
+
+## Common Use Cases
+
+### Analytics and Debugging
+
+#### Find problematic CDN paths:
+
+```
+# Views that went through cloudflare but not fastly
+filters[]=-video_cdn_trace:fastly
+filters[]=+video_cdn_trace:cloudflare
+```
+
+#### Debug specific video delivery paths:
+
+```
+# Exact CDN sequence analysis
+filters[]=video_cdn_trace:[fastly,akamai,cloudfront]
+```
+
+### Performance Analysis
+
+#### High-performance regions:
+
+```
+# Exclude slow CDN providers
+filters[]=-video_cdn_trace:slow-cdn
+filters[]=!operating_system:legacy
+```
+
+#### Mobile vs Desktop comparison:
+
+```
+# Mobile traffic analysis
+filters[]=operating_system:ios
+filters[]=operating_system:android
+```
+
+### Content Filtering
+
+#### Live vs VOD content:
+
+```
+# Exclude recorded content
+filters[]=!content_type:recorded
+filters[]=content_type:live
+```
+
+#### Platform-specific analysis:
+
+```
+# Web platform only, excluding mobile apps
+filters[]=platform:web
+filters[]=!platform:ios
+filters[]=!platform:android
+```
+
+## Error Handling
+
+The API will return validation errors for:
+
+- Invalid dimension names
+- Incorrect operator usage for dimension type
+- Malformed values (e.g., mismatched brackets, quotes)
+- Invalid operator combinations (e.g., `!+dimension:value`)
+
+Example error response:
+
+```json
+{
+  "error": "Sequence dimensions require bracket notation. Use video_cdn_trace:[value] instead of video_cdn_trace:value"
+}
+```
+
+## Advanced Tips
+
+### Testing Your Filters
+
+To ensure your filters are working as expected, it can be helpful to limit the dataset you're working with. For that reason, you may wish to test your filters with a small date range first:
+
+```bash
+/metrics?timeframe[]=24:hours&filters[]=country:US&filters[]=+video_cdn_trace:akamai
+```

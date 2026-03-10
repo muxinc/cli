@@ -1,0 +1,66 @@
+---
+title: Stream recordings of live streams
+product: video
+description: Every live stream on Mux is automatically recorded as an `asset`.
+---
+
+When playing back a live stream, Mux offers you two options for historical playback. Both options are available at any time; you can switch between the two at will.
+
+1. **Non-DVR mode** - keep all users "live". Only a small portion of your live stream (approximately 30 seconds) will be exposed to your viewers through your player.
+2. **DVR mode** - allow your users to scrub back to the beginning of the live stream whenever they want in your player.
+
+The 3 Mux concepts we need to understand here are:
+
+* <ApiRefLink href="/docs/api-reference/video/live-streams">Live streams</ApiRefLink>: This is the top level live streaming resource. Your stream key maps back to a single live stream. Live streams are reusable. Each Live stream has one or more playback IDs associated with it.
+* <ApiRefLink href="/docs/api-reference/video/assets">Assets</ApiRefLink>: Assets are videos on demand. In Mux, assets get created by either: direct uploads, creating an asset with an input URL, or from recordings of live streams. Each Asset has one or more playback IDs associated with it.
+{/* we have to add that darn <i></i> to disable gfm autolink literals */}
+* <ApiRefLink href="/docs/api-reference/video/playback-id">Playback IDs</ApiRefLink>: Playback IDs are the resource that controls playback. A playback ID may point to either a live stream OR an asset and it can be either public or signed. More information on [signed playback IDs is here](/docs/guides/secure-video-playback). A playback ID is the identifier that you use in a `stream.mux.com` URL of the form: <pre>https://<i></i>stream.mux.com/{"{"}PLAYBACK_ID{"}"}.m3u8</pre>.
+
+
+## DVR mode vs. non-DVR mode
+
+In non-DVR Mode, all users viewing the live stream will be viewing the most recent content. The player will have access to approximately the most recent 30 seconds of content.
+
+In order to use non-DVR mode, construct your playback URL with the playback ID _associated with the live stream_.
+
+<Callout type="success" title="Non-DVR Mode is most common">
+
+Most uses of live streaming opt for non-DVR mode and, if you are unsure about which to use, we recommend that you stick with non-DVR mode.
+</Callout>
+
+When using DVR mode, the player will have access to your stream's content going all the way back to the beginning of the live stream.
+
+<Callout type="warning" title="Be careful with DVR Mode and long lived streams">
+
+Mux does not recommend DVR mode for live streams longer than four hours. If you expect long live streams, you should use non-DVR mode.
+
+</Callout>
+
+If you choose to use DVR mode, then you should construct your playback URL using the playback ID _associated with the live stream's `active_asset_id`_.
+
+## Assets created from live streams
+
+Mux will automatically start creating an asset in the background when you begin broadcasting to your live stream. This asset has two purposes:
+
+* You can use the asset directly in order to enable DVR mode playback.
+* When the live stream is over, you can use the asset to play back the recording of the live stream.
+
+Since assets are automatically created from every live stream and live streams can be re-used as many times as you want, Mux creates a new asset every time a live stream begins broadcasting. A single live stream can end up producing an indefinite number of assets.
+
+The lifecycle of events produced by a Mux live stream is as below.
+
+| Step | Event | Description |
+|------|-------|-------------|
+| 1 | Initial State | Live stream begins in status `idle` |
+| 2 | `video.live_stream.connected` | The encoder has connected. At this point in time the live stream will have a new `active_asset_id`. The `active_asset_id` is the ID that points to a new asset that Mux is creating for this live stream. |
+| 3 | `video.asset.created` | The asset corresponding to the `active_asset_id` from step 2 gets created. This asset has a `live_stream_id` that points back to the live stream it was created from. This asset does not have any content yet, it is a placeholder that will be getting content from the ingested live stream. |
+| 4 | `video.live_stream.recording` | Mux has started recording the incoming content. The live stream's status will still be `idle` at this point. |
+| 5 | `video.live_stream.active` | The live stream's state has transitioned `active`. **When in non-DVR mode**, the live stream's playback ID can now be used to build a playback URL on `stream.mux.com`. |
+| 6 | `video.asset.ready` | The asset (`active_asset_id`) from step 2 and 3 will be "ready" at around the same time that the live stream is "active". This asset only has about 10 seconds worth of content at this point. The `duration` on this asset reflects the current playable duration. If you are using DVR mode, it is at this point that you can use the `active_asset_id` to build a playback URL on `stream.mux.com`. |
+| 7 | `video.live_stream.disconnected` | The encoder has disconnected, and the live stream status is still `active`. Please note that live streams that do not use the `"latency_mode": "reduced"` option will enter a reconnect window (defaulting to a duration of 60 seconds) after disconnecting. The encoder can re-connect within this reconnect window and, in doing so, pick back up where it left off with the same `active_asset_id`. For more information, please consult [handling live stream disconnects](/docs/guides/handle-live-stream-disconnects). |
+| 8 | `video.live_stream.idle` | After the encoder has stayed disconnected for the duration of the reconnect window, the live stream will transition back to status `idle`. This live stream will no longer have an active asset associated with it, but for ease of use this event will include the `active_asset_id` of the asset that is just ending. The next time an encoder connects this lifecycle with start back at step 1 with a new `active_asset_id`. |
+| 9 | `video.asset.live_stream_completed` | This event fires at the same time as the live stream transitions back to `idle`. This event tells you that the asset is finalized. The `duration` of the asset will now be the full, finalized duration; you can use the playback ID in your player to play the recording of the live stream. |
+
+Please note that some of these webhook events correspond to the `live_stream` resource and others correspond to the `asset`.
+
+More information about configuring and using webhooks can be found in the [webhooks guide](/docs/core/listen-for-webhooks).

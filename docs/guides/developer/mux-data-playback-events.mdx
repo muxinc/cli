@@ -1,0 +1,391 @@
+---
+title: Mux playback events
+product: data
+description: >-
+  This guide is a canonical list of playback events. This is useful if building
+  a custom integration.
+---
+
+## Playback events overview
+
+The main component of a player integration revolves around events. Most players trigger or fire events for the common playback events such as `play`, `pause`, `error`, and others, but these events are typically named differently on different platforms. The primary purpose of each player integration is to translate these events into the events that the core libraries expect.
+
+Each language library has a slightly different naming scheme to the events, but they should be in-line with each other aside from some slight syntax.
+
+Optional events provide additional detail in tracking views, but are not necessarily required for base Quality of Experience tracking within a player.
+
+Each event occurrence contains a common set of time values that are submitted to the server and contained in the view exports:
+
+<IndexedTable>
+| Field | Description |
+|-------|-------------|
+| `viewer_time` | The wall clock time from the device when the event occurred, in milliseconds since unix epoch |
+| `playback_time` | The playhead position at the time of the event, in milliseconds |
+| `event_time` | The wall clock time on the server when the event is received, in milliseconds since unix epoch (populated in the view exports, not submitted with the event) |
+</IndexedTable>
+
+## General playback events
+
+The main playback events that Mux SDKs expect are defined as follows:
+
+### `playerready`
+Signals that the player initialization process has completed, and the player is ready for interaction. A video may or may not have been loaded in the player; this event is specific to the player completed any tasks in initial startup of the player.
+
+### `viewinit`
+Signals that a new view is beginning and should be recorded. This must be called first before any additional playback events. Note that this should only be emitted for the first view within a player; for a change of videos within the same player, `videochange` should be used.
+
+This event is only required for building integrations using the Objective-C Core SDK. This is handled automatically as a side effect of initialization of the JavaScript and Java Core SDKs.
+
+### `videochange`
+Signals that the video being played in the player has changed. This must be called if a new video is loaded within the same player. The event should be fired immediately after the new video has been given to the player.
+
+This event is only available within the JavaScript Core SDK. For Objective-C, see the section on changing the video in [Custom Objective-C Integration](/docs/guides/data-custom-objectivec-integration). For Java, there are helper methods for this exposed within `MuxStats`.
+
+### `play`
+Signals that the player is beginning its attempt to play back the video. The video is not yet showing on the screen (or moving forward in the case of a resume). The buffer may be empty or full depending on the pre-loading strategy.
+
+For the HTML5 video element, this correlates to the [play](https://developer.mozilla.org/en-US/docs/Web/Events/play) event on the video element.
+
+For ad playback, once resuming from the ad break, the `play` event should be fired immediately after the `adbreakend` event, assuming the player will continue playing content after the ad break without interaction from the viewer.
+
+### `playing`
+Signals that the video is now actually playing. The buffer is full enough that the player has decided it can start showing frames. In other words, this is when the first moving frame is displayed to the end user.
+
+For the HTML5 video element, this correlates to the [playing](https://developer.mozilla.org/en-US/docs/Web/Events/playing) event on the video element.
+
+### `pause`
+Signals that playback has been intentionally delayed, either by the viewer or by the player (e.g. starting an ad).
+
+For the HTML5 video element, this correlates to the [pause](https://developer.mozilla.org/en-US/docs/Web/Events/pause) event on the video element.
+
+In the case of playback breaking to play an ad, the `pause` event should be fired just before the `adbreakstart` event is fired.
+
+### `timeupdate`
+Signals that the playback has advanced some non-zero amount forward. This event should be emitted at _least_ every 250 milliseconds, but can be sent more often than this.
+
+For the HTML5 video element, this correlates to the [`timeupdate`](https://developer.mozilla.org/en-US/docs/Web/Events/timeupdate) event on the video element.
+
+If the `timeupdate` event is not sent, the integration must provide the ability to retrieve the playhead time in the player callback for the SDK. See each language SDK for details on this callback. In all SDKs, emitting the `timeupdate` event is preferred, even if the playhead time callback is provided. In addition, on Java platforms, while emitting `timeupdate` is preferred, you must also provide the callback for `getCurrentPosition` within the `IPlayerListener` interface.
+
+If the `timeupdate` event is sent, you must include the playhead position, in milliseconds, via the following mechanisms:
+ - JavaScript: provided as `player_playhead_time` key within the data object passed along with `timeupdate` to the call to `emit`.
+ - Java: provided via `PlayerData.setPlayerPlayheadTime` on the `PlayerData` emitted with the event.
+ - Objective-C: provided via `[MUXSDKPlayerData setPlayerPlayheadTime: time]` in the `MUXSDKPlayerData` object emitted with the event.
+
+For integrations using the Objective-C Core SDK, this event is required to be sent.
+
+### `seeking`
+Signals that the user has attempted to seek forward or backward within the timeline of the video.
+
+For the HTML5 video element, this correlates to the [seeking](https://developer.mozilla.org/en-US/docs/Web/Events/seeking) event on the video element.
+
+### `seeked`
+Signals that the player has the video data for the new playback position, and is ready to immediately start playing at this new position.
+
+For the HTML5 video element, this correlates to the [`seeked`](https://developer.mozilla.org/en-US/docs/Web/Events/seeked) event on the video element.
+
+### `rebufferstart`
+Signals that the player has stopped playing back content when it is expected that playback should be progressing.
+
+<Callout type="info">
+  For JavaScript and Objective-C/Swift integrations, this event is internal to the core library and must not be emitted by the player integration.
+
+  For Java integrations, after v6.0.0 of the core library, this event must be emitted by the player integration.
+</Callout>
+
+### `rebufferend`
+Signals that the player has resumed playing back content after playback previous stalled while attempting to play back.
+
+<Callout type="info">
+  For JavaScript and Objective-C/Swift integrations, this event is internal to the core library and must not be emitted by the player integration.
+
+  For Java integrations, after v6.0.0 of the core library, this event must be emitted by the player integration.
+</Callout>
+
+### `error`
+Signals an error that will be associated with the view. Error severity can be set to fatal (i.e. not recoverable) or warning. Errors will be assumed to be playback failures within Mux by default but can be categorized as business exceptions either on the client and on the server. [See the Error Categorization guide for more details](/docs/guides/error-categorization).
+
+For the HTML5 video element, this correlates to the [error](https://developer.mozilla.org/en-US/docs/Web/Events/error) event on the video element.
+
+This specific event should be accompanied by the following metadata:
+
+<IndexedTable>
+| Field | Description |
+|-------|-------------|
+| `player_error_code` | An integer that provides a category of the error. You should not send a distinct code for each possible error message, but rather group similar errors under the same code. For instance, if your library has two different conditions for network errors, both should have the same `player_error_code` but different messages. |
+| `player_error_message` | Details about the error encountered, though should remain relatively generic. It shouldn't include a full stack trace, for instance, as this field is used to group like errors together. |
+| `player_error_context` | Used to provide instance-specific details for the error, such as stack trace, segment number, or URL. |
+</IndexedTable>
+
+### `ended`
+Signals that the current video has played to completion.
+
+For the HTML5 video element, this correlates to the [ended](https://developer.mozilla.org/en-US/docs/Web/Events/ended) event on the video element.
+
+### `renditionchange` (optional)
+Signals that the current rendition that is actively being played has changed. Note that this event should be triggered when the playing rendition changes, not necessarily when the player logic has started requesting a different rendition.
+
+This specific event should be accompanied by the following metadata:
+
+<IndexedTable>
+| Field | Required | Description |
+|-------|----------|-------------|
+| `video_source_bitrate` | Required | The current rendition's bitrate (combined video and audio), in bits per second (bps) |
+| `video_source_width` | Optional for web/Java, Required for iOS | Optional for web and Java integrations, assuming `video_source_width` is returned by the appropriate callback (e.g. `getStateData` for web) |
+| `video_source_height` | Optional for web/Java, Required for iOS | Optional for web and Java integrations, assuming `video_source_width` is returned by the appropriate callback (e.g. `getStateData` for web) |
+| `video_source_codec` | Optional for web/Java, Required for iOS | |
+| `video_source_fps` | Optional for web/Java, Required for iOS | |
+| `video_source_name` | Optional for web/Java, Required for iOS | |
+</IndexedTable>
+
+### `orientationchange` (optional)
+Signals that a device orientation has been changed during the view. On most platforms this information is not available directly to the player SDK so the customer implementation will notify the Mux SDK when the orientation is changed and Mux will fire an event based on the notification.
+
+This specific event should be accompanied by the following metadata:
+ - `viewer_device_orientation`. The device's orientation after the change. The orientation is expressed as a  `(x, y, z)` coordinate system, with the most common orientations being `(0,0,90)` for portrait and `(0,0,0)` for landscape.
+
+### `playbackmodechange` (optional)
+Signals that the mode of playback has changed. You can use a defined preset or a custom value based on your playback offering.
+
+<IndexedTable>
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `playbackmode`| string | Required | The name of the playback mode. Presets include `standard`, `inline`, `fullscreen`, `pip`, `miniplayer`, `background`. You can also pass a custom string. 
+| `playbackmodedata` | string (json) | Optional | Optional string that is valid json that contains metadata which can be used for more detailed analysis. Non json strings will be ignored.
+</IndexedTable>
+
+### `heartbeat`
+Internal event that is used to provide periodic updates on the playback state, while the player is not paused. Each core library emits heartbeat events (`hb`) automatically, and custom integrations should not need to emit this.
+
+### `viewend`
+Internal event that is used to signal the end of a view tracked by Mux. Each core library emits the `viewend` event automatically as a result of either tearing down the SDK or changing the video (`videochange`). Custom integrations do not need to emit this manually.
+
+## Ad Events
+
+For players that support ad playback, the following events are expected. If you do not provide these events, playback will still be monitored, but there will not be ad-specific metrics or knowledge of ads vs content.
+
+These events require additional data to be provided. See [Building a Custom Integration](/docs/guides/build-a-custom-data-integration).
+
+### `adrequest` (optional)
+Signals that an ad request is about to be made, or was just made but the response has not been received.
+
+In the process of the player retrieving an ad payload, multiple `adrequest` and `adresponse` events may be fired (either due to waterfall, or for an ad break that has multiple ads). In the case that these requests are made in parallel, the player integration must send an `ad_request_id` in the data along with each `adrequest` and `adresponse` event, so that Mux can match them up correctly.
+
+### `adresponse` (optional)
+Signals that a response was received from the ad server.
+
+In the process of the player retrieving an ad payload, multiple `adrequest` and `adresponse` events may be fired (either due to waterfall, or for an ad break that has multiple ads). In the case that these requests are made in parallel, the player integration must send a `ad_request_id` in the data object along with each `adrequest` and `adresponse` event, so that Mux can match them up correctly.
+
+The `adresponse` event can only be fired by the player integration if the `adrequest` events are fired as well.
+
+### `adbreakstart`
+Signals that an ad break has begun. This coincides with the playback of the video being paused in order to display the ads at the current position. This event should come immediately after the `pause` event is fired due to attempting to play back an ad break, and before any `adplay`, `adplaying`, `adpause`, or `adended`.
+
+The `adbreakstart` event may come before, during, or after the `adrequest`/`adresponse` events, depending on the player’s configuration for making ad requests.
+
+### `adplay`
+Signals that the player is beginning its attempt to play back an individual advertisement video. The ad is not yet showing on the screen (or moving forward in the case of a resume). The buffer may be empty or full depending on the pre-loading strategy.
+
+This event is the ad-specific equivalent of `play`.
+
+### `adplaying`
+Signals that an advertisement is now actually playing. The buffer is full enough that the player has decided it can start showing frames for the ad.
+
+This event is the ad-specific equivalent of `playing`.
+
+### `adpause`
+Signals that playback of an advertisement has been intentionally delayed, either by the viewer or by the player (e.g. user pressing pause on the ad player controls).
+
+This event is the ad-specific equivalent of `pause`.
+
+### `adfirstquartile` (optional)
+Signals that the current advertisement has progressed past the first quartile in playback. This event should coincide with the point in time that the ad integration would fire the `firstQuartile` ad tracking beacon (in VAST terminology).
+
+### `admidpoint` (optional)
+Signals that the current advertisement has progressed past the midpoint in playback. This event should coincide with the point in time that the ad integration would fire the midpoint ad tracking beacon (in VAST terminology).
+
+### `adthirdquartile` (optional)
+Signals that the current advertisement has progressed past the third quartile in playback. This event should coincide with the point in time that the ad integration would fire the `thirdQuartile` ad tracking beacon (in VAST terminology).
+
+### `adended`
+Signals that the advertisement has played to completion.
+
+This event is the ad-specific equivalent of `ended`.
+
+### `adbreakend`
+Signals that all ads in the ad break have completed, and playback is about to resume on the main content. This event should be come immediately after the last `adended` event in the ad break, and before the resuming `play` event signifying that playback of the main content is resuming.
+
+There may be multiple `adplay`/`adended` combinations within a single ad break.
+
+### `aderror`
+Signals that an error has occurred that relates to the ad break currently in play or the ad request/response.
+
+## Bandwidth throughput events
+
+Like the Ad-specific events, these events are not required. However, if you include any of these, you must include all of them. Each of these events refers to a network request made for some component of the media playback. This includes but, depending on your exact configuration, may not be limited to:
+* manifests and content segment requests for HLS playback
+* manifests, init fragment, and content fragment requests for DASH playback
+
+These events should _not_ be fired for ad requests and require additional data to be sent along with them. See [Network Request Data](#network-request-data).
+
+### `requestcompleted`
+Signals that a network request for a piece of content returned successfully.
+
+### `requestfailed`
+Signals that a network request for a piece of content returned unsuccessfully.
+
+### `requestcanceled`
+Signals that a network request for a piece of content was aborted before it could return (either successfully or unsuccessfully).
+
+## Accompanying Data
+
+Each core SDK has its own mechanism for providing data along with each event. This data is used to provide information such as player state (e.g. paused or playhead time), and potentially to override the data that is pulled automatically from the player.
+
+For the most part, most data is retrieved automatically, and you will not need to provide any accompanying data. The notable exceptions for this are in regards to ad information, as well as network request information.
+
+See the following guides for each library on how to provide additional data with each event.
+
+## Ad-Specific Data
+
+The following data should be sent while emitting the ad-specific events, where possible.
+
+### `ad_type`
+The type of ad used during playback: `preroll`, `midroll`, `postroll`
+
+### `ad_asset_url`
+The URL for the current ad being played. For example, in a VAST response, this would correspond with the MediaFile URL that is being played.
+
+Note: this data should only be included alongside `adplay`, `adplaying`, `adpause`, `adended`, `adfirstquartile`, `admidpoint`, `adthirdquartile` events, as they are the only events that correlate with the ad asset that is being played.
+
+### `ad_tag_url`
+The URL for the current ad tag/ad request being made. For example, this could be the URL that is expected to return a VMAP or VAST document detailing what ad(s) to play.
+
+Note: this data should only be included alongside `adrequest` and `adresponse` events, as those are the only events that correlate with the ad tag URL being used currently.
+
+### `ad_creative_id`
+The Creative Id of the ad. This usually is the Ad-Id of the selected creative in the VAST response.
+
+### `ad_id`
+The Id of the ad. This usually is unique in the Ad Provider's system and specified in the VAST response.
+
+### `ad_universal_id`
+The Universal Id of the ad. This usually is globally unique for the ad across all Ad Providers.
+
+Note: the above 3 metadata can be included in all ad events except for `adrequest` and `adresponse` events.
+
+## Network Request Data
+
+The following data should be sent along with any of the network events (`request*`).
+
+### `request_start`
+Timestamp that the request was initiated, in milliseconds since the Unix epoch.
+
+Include alongside: `requestcompleted`, `requestfailed`, `requestcanceled`
+
+### `request_bytes_loaded`
+The total number of bytes loaded as part of this request.
+
+Include alongside: `requestcompleted`
+
+### `request_response_start`
+Timestamp that the response to the request began (i.e. the first byte was received), in milliseconds since the Unix epoch.
+
+Include alongside: `requestcompleted`
+
+### `request_response_end`
+Timestamp that the response was fully received (i.e. the last byte was received), in milliseconds since the Unix epoch.
+
+Include alongside: `requestcompleted`
+
+### `request_type` (optional but recommended)
+The type of content being requested. Specifying the `video` as the `request_type` for video segements is recommended to ensure CDN tracking accuracy. One of the following:
+
+| Type | Description |
+|------|-------------|
+| `manifest` | Used when the request is for a master or rendition manifest in HLS, or a DASH manifest. |
+| `video` | Used when the request is for a video-only segment/fragment |
+| `audio` | Used when the request is for an audio-only segment/fragment |
+| `video_init` | Used when the request is for the video init fragment (DASH only) |
+| `audio_init` | Used when the request is for the audio init fragment (DASH only) |
+| `media` | Used when the type of content being request cannot be determined, is audio+video, or is some other type. |
+| `subtitle` | Used when the request is for subtitle or caption content |
+| `encryption` | Used when the request is for a DRM encryption key |
+
+Include alongside: `requestcompleted`, `requestfailed`, `requestcanceled`
+
+### `request_hostname`
+The hostname portion of the URL that was requested.
+
+Include alongside: `requestcompleted`, `requestfailed`, `requestcanceled`
+
+### `request_id` (optional)
+The id for identifying the individual request. CDNs often include a request id in their responses which can be used for correlating requests across the player and CDN.
+
+Include alongside: `requestcompleted`, `requestfailed`, `requestcanceled`
+
+### `request_url` (optional)
+The URL that was requested.
+
+Include alongside: `requestcompleted`
+
+### `request_labeled_bitrate` (optional)
+Labeled bitrate (in bps) of the video, audio, or media segment that was downloaded.
+
+Include alongside: `requestcompleted`
+
+### `request_response_headers` (optional)
+A map of response headers and their values. You should include whatever headers are available to the client, as this information may be used to determine routing of each request. The most important header, though, is the X-CDN header as described in [CDN Configuration for Request-Level Metadata](/docs/guides/enable-automatic-cdn-detection).
+
+Include alongside: `requestcompleted`
+
+### `request_media_duration` (optional)
+The duration of the media loaded, in seconds. Should not be included for `requestcompleted` events for manifests.
+
+Include alongside: `requestcompleted`
+
+### `request_video_width` (optional)
+For events with `media` or `video` `request_type`, the width of the video included in the segment/fragment that was downloaded.
+
+Include alongside: `requestcompleted`
+
+### `request_video_height` (optional)
+For events with `media` or `video` `request_type`, the height of the video included in the segment/fragment that was downloaded.
+
+Include alongside: `requestcompleted`
+
+### `request_error`
+The name of the error event that occurred. Note this is not the status code of the request itself, but rather something along the lines of `FragLoadError`.
+
+Include alongside: `requestfailed`
+
+### `request_error_code`
+The response code of the request that spawned the error (i.e. 401, 400, 500, etc).
+
+Include alongside: `requestfailed`
+
+### `request_error_text`
+The message returned with the failed status code.
+
+Include alongside: `requestfailed`
+
+## Sample Sequence of Events
+
+A sample sequence of events for an integration would look like the following:
+
+<IndexedTable>
+| Event | Description |
+|-------|-------------|
+| `playerready` | |
+| `viewinit` | When the video is about to be loaded in a player |
+| `play` | When the user presses play to attempt playing back the video |
+| `playing` | When the first frame of video is displayed |
+| `timeupdate` | At least every 250 ms with progress of the playhead time |
+| `pause` | When the viewer presses pause |
+| `play` | When the viewer resumes playback |
+| `playing` | When the first frame is displayed after resuming |
+| `timeupdate` | |
+| `ended` | When the video playback is complete |
+| `viewend` | When the view is complete - e.g. the user is no longer attempting to watch the video |
+</IndexedTable>
+
+At the end, if the viewer loads a new video into the player, a `videochange` event should be emitted instead of the `viewend` event, with the new video data.

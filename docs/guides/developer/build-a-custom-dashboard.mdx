@@ -1,0 +1,310 @@
+---
+title: Build a custom dashboard
+product: data
+description: Create custom dashboards in Mux Data to visualize and track the metrics that matter most to your video performance. Custom dashboards allow you to combine multiple metrics, apply filters, and organize data in a way that best serves your monitoring and analysis needs.
+
+---
+
+## What are Custom Dashboards?
+
+Custom dashboards provide a centralized view of your video performance data through configurable components. You can create dashboards with multiple visualization types, apply filters, and customize time periods to focus on specific aspects of your video performance.
+
+### Key features:
+
+* Four component types: Timeseries, Bar charts, Lists, and Metric numbers
+* 10 components per Dashboard
+* Dashboard and component-level filtering
+* Flexible time period selection
+* Comparison intervals
+* Dashboard sharing and duplication
+
+<Callout type="info">
+Custom Dashboards are available on **Mux Data Media** plans. Learn more about [Mux Data Plans](https://data.mux.com/pricing) or [contact support](https://mux.com/support).
+</Callout>
+
+## Creating a Dashboard
+
+To create a new custom dashboard:
+
+1. Navigate to the **Dashboards** section in Mux Data
+2. Select **Create Dashboard** from the left menu or main window
+3. Enter a descriptive name for your dashboard
+4. Select **Create Dashboard**
+
+Your new dashboard will be created and ready for customization with components and filters.
+
+<MultiImage
+  images={[
+    { src: "/docs/images/build-a-custom-dashboard-A.png", width: 3935, height: 2018, alt: "Dashboard screen in the Mux Video application showing an empty custom dashboards view with a “Create Dashboard” button." },
+    { src: "/docs/images/build-a-custom-dashboard-B.png", width: 1464, height: 794, alt: "Dialog titled “Create Dashboard” in Mux, with a text input field filled in as “My first Dashboard” and two buttons at the bottom: “Cancel” and “Create Dashboard.”" },
+  ]}
+/>
+
+## Dashboard Configuration
+
+### Time Periods
+
+Configure the time period for your entire dashboard to focus on specific date ranges:
+
+* **Default**: Last 24 hours
+* **Relative periods**: Choose from predefined options like last 7 days or last 30 days
+* **Specific periods**: Set exact start and end dates for consistent historical analysis
+
+Time period changes apply to all dashboard components. Save your dashboard to preserve time period settings.
+
+<Callout type="info">
+Custom Dashboards are currently only available for the standard 100 days of data. Long-term Metrics are not yet available with Custom Dashboards. 
+</Callout>
+
+### Dashboard Filters
+
+Dashboard filters apply to all components within the dashboard providing consistent data filtering across visualizations.
+
+#### Dimension Filters
+
+Filter by dimension values such as country, operating system, or player version:
+
+1. Select the **Filter Dimensions** button
+2. Search for and select the dimension type
+3. Choose specific values to include or exclude
+4. Multiple values use OR logic (e.g., selecting iOS and Android shows views from either platform)
+
+<Image
+  alt="New Dashboard creation screen in Mux, showing a dimension filter panel with “Device Model” selected. Viewer Device Model is filtered to “iPhone,” and view counts for different iPhone models are listed."
+  src="/docs/images/build-a-custom-dashboard-C.png"
+  width={2420}
+  height={1164}
+/>
+
+#### Metric Filters
+
+Filter by metric values to focus on specific performance thresholds:
+
+1. Select the **Filter Metrics** button
+2. Choose a metric (e.g., rebuffering percentage)
+3. Select an operator (≤, ≥, \=, etc.)
+4. Set the value threshold
+
+<Image
+  alt="Metrics filter interface in Mux dashboard builder, showing a filter applied to only include results where Rebuffer Percentage is greater than 5%."
+  src="/docs/images/build-a-custom-dashboard-D.png"
+  width={1264}
+  height={500}
+  caption="Example: Filter for views with rebuffering percentage ≤ 5% to focus on high-quality playback experiences."
+/>
+
+Filter changes can be previewed without saving. Click **Save** at the bottom of the dashboard to apply filters permanently.
+
+### Component Filters
+
+Components can have their own filters in addition to Dashboard filters. Dashboard filters act as parent filters affecting all components. Component level filters are additive to Dashboard filters but only apply to the component. 
+
+<Callout type="info">
+If dashboard and component filters conflict, the component may show no data. Ensure filter combinations are logical and compatible.
+</Callout>
+
+## Dashboard Components
+
+Components visualize individual metrics within your dashboard. Each component type serves different analytical purposes and can be customized with specific filters and options.
+
+1. To add a Dashboard component to a new Dashboard, select the Create Component button. 
+2. To add a Dashboard component to an existing Dashboard, select the Edit Icon next to the date selector. 
+
+### Metric Numbers
+
+Display key performance indicators in a prominent metrics bar at the top of your dashboard. Up to 5 Metric numbers can be added per dashboard. Metric numbers (up to 5\) collectively count as 1 component. 
+
+<Image
+  alt="A dashboard titled “Platform Player Key Metrics” displaying metrics for the last 24 hours, including Views, Unique Viewers, Video Startup Failure Percentage, Playback Failure Percentage, and Rebuffer Percentage."
+  src="/docs/images/build-a-custom-dashboard-E.png"
+  width={1999}
+  height={554}
+/>
+
+#### Configuration:
+
+1. Select **Metric Number** as the component type
+2. Choose the metric to display
+3. Provide a descriptive name (50 character limit)
+4. **Optional**: Add a comparison time period to show rate of change
+5. **Optional**: Apply component-specific dimension or metric filters
+
+<Callout type="info">
+Metric number components appear in creation order and cannot be reordered.
+</Callout>
+
+### Timeseries
+
+<Image
+  alt="Line graph showing “Video Startup Time” over a 24-hour period in Mux, comparing performance for “Last 24 hours” (orange line) versus “One day ago” (purple dashed line)."
+  src="/docs/images/build-a-custom-dashboard-F.png"
+  width={1134}
+  height={832}
+/>
+
+Track metrics over time to identify trends, patterns, and anomalies in your video performance.
+
+#### Configuration:
+
+1. Select **Timeseries** as the component type
+2. Choose the metric to chart over time
+3. Set a descriptive component name
+4. Select component size (half or full width)
+5. **Optional**: Choose either:
+    * **Comparison interval**: Compare current period with a previous timeframe
+    * **Breakdown values**: Chart multiple values for a single dimension type (e.g., different device types)
+6. **Optional**: Apply component-specific filters
+
+<Callout type="info">
+Comparison intervals and breakdown values are mutually exclusive options. Also note that breakdown dimensions will take priority over dashboard and component filters of the same dimension.
+</Callout>
+
+### Bars
+
+<Image
+  alt="Bar chart titled “Video Startup Failure Percentage” broken down by browser. Chrome has the highest failure rate, followed by Firefox, Safari, and Edge. A tooltip highlights Firefox with a failure percentage of 1.39%."
+  src="/docs/images/build-a-custom-dashboard-G.png"
+  width={1134}
+  height={834}
+/>
+
+Compare performance across different dimension values using horizontal bars.
+
+#### Configuration:
+
+1. Select **Bars** as the component type
+2. Choose the metric to measure in the bars visualization
+3. Select component size (half or full width)
+4. Choose breakdown dimension type and values that you wish to display
+5. **Optional**: Add a comparison interval to compare current period with a previous timeframe
+6. **Optional**: Apply component-specific filters
+
+<Callout type="info">
+Breakdown values must come from a single dimension category.
+</Callout>
+
+### Lists
+
+Rank and organize data to quickly identify top performers or problem areas.
+
+<Image
+  alt="Table showing Rebuffer Percentage broken down by operating system. Windows has the highest rebuffer rate at 0.70%, followed by iOS and Android, with directional trend indicators in green or red."
+  src="/docs/images/build-a-custom-dashboard-H.png"
+  width={1190}
+  height={770}
+/>
+
+#### Configuration:
+
+1. Select **List** as the component type
+2. Choose the metric to measure for each list item
+3. Select the dimension to list (e.g., player names, video titles)
+4. Set sort order (ascending or descending)
+5. Specify the number of items to display in the list component
+6. Provide a descriptive component name
+7. **Optional**: Add a comparison interval
+8. **Optional**: Apply component-specific filters
+
+<Callout type="info">
+Lists are only available in half-width size.
+</Callout>
+
+## Dashboard Management
+
+### Sharing Dashboards
+
+When creating a new dashboard, you can choose to share it with everyone in your environment. Public dashboards appear in the Shared folder for all users in your environment. You can change the sharing level at any time from the More Options dropdown.
+
+All users can view public dashboards. To save an editable version of a public dashboard, create a duplicate (see below).
+
+### Sharing via Dashboard Link
+
+Any dashboard can be shared with users who have access to your Mux environment via the dashboard link, even if it's not marked as public. Users who receive a link can:
+
+- View the dashboard
+- Favorite it to save it to their personal list
+- Create a duplicate to make their own editable copy (see below)
+
+### Editing Dashboard Permissions
+
+Users have the ability to edit dashboards they are the owner of but do not have the ability to edit public dashboards they do not own. Admins have full editing abilities for all dashboards.
+
+Advanced role-based permissions are coming soon.
+
+### Favoriting Dashboards
+
+Favorite personal or shared dashboards to allow quick access to your most frequently used dashboards. You can have up to 20 favorited dashboards across your environments.
+
+Favorite a dashboard by pressing the favoriting star in the dashboard menu. When a dashboard is favorited, the star will be highlighted and the dashboard will be added to the top of the custom dashboard navigation sidebar in the favorites section. 
+
+<Image
+  sm
+  alt="Star a custom dashboard by pressing the star icon"
+  src="/docs/images/build-a-custom-dashboard-K.png"
+  width={750}
+  height={224}
+/>
+
+### Saving Dashboard Copies
+
+Save a modified version without affecting the original:
+
+1. Make your desired changes to the dashboard
+2. Use the **Save As** option in the save menu
+3. Provide a new name for the copy
+
+<Image
+  alt="Bottom section of a Mux dashboard displaying two metric widgets: one for “Exits Before Video Start” (line chart) and another for “Rebuffer Percentage” by Windows. Save, Save As, and Cancel buttons appear below."
+  src="/docs/images/build-a-custom-dashboard-J.png"
+  width={1999}
+  height={436}
+/>
+
+### Exporting Dashboards
+
+Export a dashboard to a PDF to save a snapshot of your dashboard:
+
+1. Select the **More Options** menu (⋯) next to the favorite button
+2. Choose **Export PDF**
+
+<Image
+  sm
+  alt="Dropdown menu under the time range selector “Last 24 hours” with options to “Export PDF“, “Duplicate“ or “Delete” the dashboard."
+  src="/docs/images/build-a-custom-dashboard-I.png"
+  width={774}
+  height={364}
+/>
+
+### Duplicating Dashboards
+
+Create an exact copy of an existing dashboard:
+
+1. Select the **More Options** menu (⋯) next to the favorite button
+2. Choose **Duplicate**
+
+<Callout type="info">
+Duplication is not available while a dashboard is being edited.
+</Callout>
+
+### Deleting Dashboards
+
+Permanently remove dashboards you no longer need:
+
+1. Select the **More Options** menu (⋯) next to the favorite button
+2. Choose **Delete**
+3. Confirm the deletion
+
+<Callout type="warning">
+Deleting a dashboard removes it for all users. Duplicate dashboards are not affected.
+</Callout>
+
+### Dashboard Navigation
+
+#### Exploring Metric Details
+
+Access detailed metric analysis directly from dashboard components:
+
+1. Select the **Go To Metrics** icon on any component
+2. The metrics page opens with:
+    * Selected filters from your dashboard applied
+    * The component's metric pre-selected

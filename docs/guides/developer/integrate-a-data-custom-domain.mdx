@@ -1,0 +1,47 @@
+---
+title: Integrate a Data custom domain
+product: data
+description: Learn how to integrate a Data custom domain for beacon collection.
+steps:
+  - title: 1. Point your custom domain to the Mux domain
+  - title: 2. Configure your SDK integration to use a custom beacon domain
+---
+In this guide you will learn how to configure a custom domain used for submitting Mux Data beacons from SDK clients. Video view data will be sent to the specified custom domain rather than the default Mux domain.
+
+You might choose to do this for a couple of reasons, such as allowing analytics traffic to bypass school or other network firewall restrictions (via a known domain), [zero-rating](https://en.wikipedia.org/wiki/Zero-rating) this traffic, or to aid tracking performance when ad blockers are in place.
+
+<Callout type="info">
+
+Custom Domains for Mux Data are available on select plans, such as **Mux Data Media**. [Reach out](mailto:help@mux.com) if you have any questions.
+
+</Callout>
+
+<LinkedHeader step={steps[0]} />
+
+After selecting your desired custom domain, you will need to create CNAME records with your DNS provider to alias the custom domain to a Mux-controlled one and allow Mux to issue TLS certificates for your selected domain. After providing your Customer Success Manager with the desired subdomain, Mux will provide you with the specific required DNS records to enable custom domains (including the value for `{KEY}` below). The records will have the following basic format:
+
+```
+subdomain.yourdomain.com 300 IN CNAME ${KEY}.customdomains.litix.io
+_acme-challenge.subdomain.yourdomain.com 300 IN CNAME ${KEY}.validations.customdomains.litix.io
+```
+
+Notify Mux after these records have been created so we can issue TLS certificates to terminate beacon traffic sent to your selected custom domain. You will be notified by Mux when the domain has been successfully provisioned.
+
+<LinkedHeader step={steps[1]} />
+
+You can verify whether the custom domain is operational by using `curl` to query your domain:
+
+```
+$ curl https://subdomain.yourdomain.com -s -w "%{http_code}"
+200%
+```
+
+<Callout type="info">
+Make sure that you have upgraded to the latest versions of each SDK to ensure Custom Domains function correctly.
+</Callout>
+
+It may take some time for DNS records to propagate before this request will work. After that is complete, configure your SDK integrations to specify your custom domain. Set the `beaconCollectionDomain` property to your custom domain. 
+
+Depending on your SDK, you can set the value for `beaconCollectionDomain` in various ways.
+
+<CodeExamples product="data" example="customDomainExamples" />

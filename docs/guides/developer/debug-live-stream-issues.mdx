@@ -1,0 +1,223 @@
+---
+title: Debug live stream issues
+product: video
+description: Learn how to debug live streams and identify the most commonly seen live stream issues with the Live Stream Input Health dashboard.
+steps:
+  - title: Navigate to the Live Stream Input Health dashboard
+    description: This dashboard has both real-time and historical data about the live stream input.
+    topic: overview
+  - title: Healthy live stream
+    description: See what a healthy live stream input looks like.
+    topic: health
+  - title: Unhealthy live stream
+    description: Identify common issues and possible solutions.
+    topic: general
+  - title: Integrate Live Stream Input Health data
+    description: Export live stream input health data
+---
+
+<LinkedHeader step={steps[0]} />
+
+The Live Stream Input Health dashboard is a real-time dashboard that provides visibility on how Mux receives your live stream from the encoder. When a sizable percentage of your viewers complain about their viewing experience or your configured Mux Data Alert fires, a good starting point for identifying the problem is understanding the live stream's health. The video below shows how to navigate to your Live Stream Input Health dashboard.
+
+<Image
+  src="/docs/images/navigate-to-live-stream-input-health.gif"
+  width={1666}
+  height={1088}
+  alt="Navigate to live stream input health"
+/>
+
+<LinkedHeader step={steps[1]} />
+
+Let's first look at a healthy live stream in the dashboard.
+
+<Image
+  src="/docs/images/health-live-stream.png"
+  width={2322}
+  height={724}
+  alt="Health live stream"
+/>
+
+A few key points to notice from this graph that indicate this is a healthy live stream:
+
+* Mux is receiving consistent frames per second. Receiving inconsistent frames per second can introduce video stuttering and sometimes cause playback interruptions for all your viewers.
+* Consistent non-zero audio bitrate is important for uninterrupted listening. A good encoder always creates a constant non-zero bitrate even when no person is speaking, or no music is being played. A varying audio bitrate can result in a bad listening experience and sometimes a good indicator for Audio-Video sync problems.
+* Like Audio, a consistent average video bitrate is equally important for a good viewing experience. A varying video bitrate does not necessarily cause a playback problem but could result in a bad viewing experience.
+  * A low variance in the video bitrate typically means optimal network bandwidth availability and encoder hardware resource utilization.
+  * A high variance in the video bitrate indicates that the encoder hardware cannot keep up with the encoding load. Try reducing the video bitrate and using a constant bitrate (CBR) for a more reliable live stream input. Alternatively, you can also switch to another encoder like [OBS, Wirecast, etc](/docs/guides/configure-broadcast-software#software-encoders).
+  * An unstable/unreliable network bandwidth availability results in transient video bitrate drops, which can cause playback interruptions.
+
+<Callout type="success">
+
+No actions required.
+</Callout>
+
+<LinkedHeader step={steps[2]} />
+
+Now let's look at a few examples of live stream issues and potential next steps for resolution.
+
+## Example 1: High video bitrate variance
+
+<Image
+  src="/docs/images/unhealthy-live-stream-1.png"
+  width={2322}
+  height={722}
+  alt="Unhealthy live stream high video bitrate variance"
+/>
+
+Because of the constant frames per second and audio bitrate this live stream looks good, but the high variance of video bitrate and drop in the average video bitrate mid-stream can impact the viewer experience.
+
+<Callout type="warning">
+
+# Use lower and constant video bitrate
+
+Configure your encoder to use a lower video bitrate and a constant video bitrate. Recommended encoder settings are [available here](/docs/guides/configure-broadcast-software#recommended-encoder-settings).
+</Callout>
+
+## Example 2: Intermittent loss
+
+<Image
+  src="/docs/images/unhealthy-live-stream-2.png"
+  width={2322}
+  height={722}
+  alt="Unhealthy live stream intermittent loss"
+/>
+
+Mux is receiving mostly constant frames per second and audio/video bitrate. This indicates that when the encoder is connected the stream is healthy. However the small spikes as well as intermittent loss in receiving the live stream, indicates transient network bandwidth availability issues.
+
+<Callout type="error">
+
+Try switching to a more reliable network and/or stop other network bandwidth consuming services for the duration of the live stream.
+</Callout>
+
+## Example 3: Spiky audio and video bitrate
+
+<Image
+  src="/docs/images/unhealthy-live-stream-3.png"
+  width={2340}
+  height={718}
+  alt="Unhealthy live stream spiky audio and video bitrate"
+/>
+
+There is a high variance in receiving audio and video bitrate in this example. Because connection never fully drops the network connection is probably not the problem in this one. More likely is that the encoder is unable to keep up at a fast enough pace to send consistent video and audio data. One cause of this is that the device running the computer might be running out of available CPU.
+
+<Callout type="error">
+
+Consider using any of these [recommended encoders](/docs/guides/configure-broadcast-software#software-encoders) for your live stream.
+</Callout>
+
+<Callout type="warning" title="Use lower and constant video bitrate">
+
+Configure your encoder to use a lower video bitrate and a constant video bitrate. Recommended encoder settings are [available here](/docs/guides/configure-broadcast-software#recommended-encoder-settings).
+</Callout>
+
+## Example 4: Spiky frame rate
+
+<Image
+  src="/docs/images/unhealthy-live-stream-4.png"
+  width={2296}
+  height={728}
+  alt="Unhealthy live stream spiky frame rate"
+/>
+
+This is a good example of a very unhealthy live stream. There is high variance in the video bitrate and several instances of the frame rate dipping to nearly zero. The spiky video bitrate mid-stream indicates that the encoder is optimizing the video encoding based on the feed contents. This is not ideal for live streaming.
+
+<Callout type="error">
+
+Try switching to a more reliable network and/or stop other network bandwidth consuming services for the duration of the live stream.
+</Callout>
+
+<Callout type="error" title="Use constant video bitrate">
+
+Configure your encoder to use a constant video bitrate. Recommended encoder settings are [available here](/docs/guides/configure-broadcast-software#recommended-encoder-settings).
+</Callout>
+
+<LinkedHeader step={steps[3]} />
+
+<Callout type="info">
+
+Please note, this feature is only available to customers who have subscribed to this feature. [Contact our Sales team](https://www.mux.com/sales-contact) if you would like more information.
+</Callout>
+
+Live Stream Input Health data can be integrated with an Amazon Kinesis or Google Pub/Sub endpoint in your cloud account. Health and encoding metadata are sent to Kinesis or Pub/Sub as the events occur and are made available to retrieve from the stream with the same five second interval as the Dashboard.
+
+Each message is either a Live Stream input health update or an metadata update from the encoder. The data can be stored in your long-term storage for immediate display and historical reporting.
+
+This method of access is most useful for customers who want to embed live stream health in a user-facing application feature or need to build an internal operational tool for stream reporting.
+
+## Setting up a streaming export
+Streaming exports can be configured in the **Streaming Exports** settings in your Mux dashboard. See the setup guide for your platform for more information on setting up an export:
+-  [Amazon Kinesis Data Streams](/docs/guides/export-amazon-kinesis-data-streams)
+-  [Google Cloud Pub/Sub](/docs/guides/export-google-cloud-pubsub)
+
+## Message Format
+Messages are formatted using Protobuf (proto2) encoding. Every message uses the `live_stream_input_health.v1.LiveStreamInputHealth` message type defined in the export Protobuf spec.
+
+The protobuf definition for the Live Stream Input Health is available in the [mux-protobuf repository](https://github.com/muxinc/mux-protobuf/tree/main/live_stream_input_health/v1). Please subscribe to this repository for updates to the protobuf definition.
+
+There are two types of updates that can be specified, though new types may be added in the future. Each message contains one type of update:
+* Encoder metadata sent by the RTMP encoder
+* Stream Input Health data
+
+The following are descriptions of the data provided by each type of update:
+```javascript
+RTMPMetadataEvent = {
+  // Unless otherwise specified, all the data contained in `video_track` and `audio_track` is as
+  // specified by the encoder (not as observed).
+  "video_track": {                           // Video track, present for AV streams
+      "width": 1280,                         // Width of the input video
+      "data_rate": 4000,                     // Kbps data rate of the video
+      "codec_id": "avc1",                    // Video codec
+      "height": 720,                         // Height of the input video
+      "frame_rate": 30                       // Number of frames per second
+  },
+  "audio_track": {                           // Audio track, present for AV and audio-only streams
+      "sample_size": 16,                     // Bits per audio sample
+      "sample_rate": 44100,                  // Sample rate
+      "data_rate": 128,                      // Kbps data rate of the audio
+      "codec_id": "mp4a",                    // Audio codec
+      "channel_count": 1                     // Number of audio channels
+  },
+	"encoder": "ffmpeg",                       // The encoder used to transcode for the broadcast
+
+  "live_stream_id": "uiwe7gZtIcuyYSCfjfpGjad02RPqN", // The Mux Live Stream Id for live stream
+  "asset_id": "hfye6sBqRmR8MRJZaWYq602X1rB0"         // The Mux Asset Id for the asset where the input stream is stored
+}
+```
+
+```javascript
+HealthUpdateEvent = {
+  "video_tracks": [                        // Video tracks, present for AV streams
+    {
+      "bytes_received": 3155737,           // Number of video bytes received data during this interval
+      "stream_start_ms": 4979091,          // Timestamp of the first video frame in this interval, as measured in milliseconds since start of the stream
+      "stream_end_ms": 4985097,            // Timestamp of the last video frame in this interval, as measured in milliseconds since start of the stream
+      "keyframes_received": 3,             // Number of keyframes that occurred during this interval
+      "total_frames_received": 180         // Total number of video frames received during this interval
+    }
+  ],
+  "audio_tracks": [                        // Audio tracks, present for AV and audio-only streams
+    {
+      "bytes_received": 94864              // Number of audio bytes received from the encoder during this interval
+    }
+  ],
+  "caption_tracks": [                      // Caption tracks
+    {
+      "bytes_received": 12354,             // Number of captions bytes received from the encoder during this interval
+      "channel_count": 1                   // Number of captions channels that received data during this interval
+    }
+  ],
+
+  "measurement_start_ms": 1644313838000,       // Timestamp of the start of the interval in milliseconds since Unix epoc
+  "measurement_end_ms": 1644313838000,         // Timestamp of the end of the internval in milliseconds since Unix epoc
+
+  "live_stream_id": "uiwe7gZtIcuyYSCfjfpGjad02RPqN",   // The Mux Live Stream Id for live stream
+  "asset_id": "hfye6sBqRmR8MRJZaWYq602X1rB0",           // The Mux Asset Id for the asset where the input stream is stored
+  "asn": 25135,                            // The ASN number for the ingest IP address
+  "asn_name": "VODAFONE_UK_ASN (AS2135)"   // The friendly name associated with the ASN number
+}
+```
+
+### Update Frequency
+* Encoder metadata is sent when the RTMP stream connects to Mux. Some encoders also send metadata updates during the live stream.
+* Live Stream Input Health updates occur every 5 seconds for each stream that is currently connected.

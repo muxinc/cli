@@ -116,7 +116,8 @@ node -e "
   fs.writeFileSync('$STAGING/package.json', JSON.stringify(pkg, null, 2) + '\n');
 "
 cp -r bin "$STAGING/bin"
-cp README.md LICENSE "$STAGING/"
+cp -r docs "$STAGING/docs"
+cp AGENTS.md README.md LICENSE "$STAGING/"
 
 echo "Publishing @mux/cli@${VERSION}..."
 (cd "$STAGING" && npm publish --access public --tag "$NPM_TAG" $PROVENANCE)

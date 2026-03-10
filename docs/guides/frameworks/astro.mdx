@@ -1,0 +1,279 @@
+---
+title: Add high-performance video to your Astro application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video
+  in your Astro application
+---
+
+## When should you use Mux with Astro?
+When adding video to your Astro app, you'll encounter some common hurdles. First, videos are large. Storing them in your public directory can lead to excessive bandwidth consumption and poor Git repository performance. Next, it's important to compress and optimize your videos for the web. Then, as network conditions change, you might want to adapt the quality of your video to ensure a smooth playback experience for your users. Finally, you may want to integrate additional features like captions, thumbnails, and analytics.
+
+You might consider using Mux's APIs and components to handle these challenges, [and more](https://www.mux.com/features).
+
+## Use the API to build your video workflow
+
+If you're looking to build your own video workflow that enables uploading, playback, and more in your application, you can use the Mux API and components like [Mux Player](/docs/guides/mux-player-web) and [Mux Uploader](/docs/guides/mux-uploader).
+
+### Example: allowing users to upload video to your app
+One reason you might want to build your own video workflow is when you want to allow users to upload video to your app.
+
+<Callout type="info">
+  Much of the work described here is done on the server and is unique for every user. Make sure your Astro app is [in SSR mode](https://docs.astro.build/en/docs/guides/server-side-rendering/) before you begin.
+</Callout>
+
+Let's start by adding a new page where users can upload videos. This will involve using the [Mux Uploader](/docs/guides/mux-uploader) component, which will upload videos to a Mux <ApiRefLink href="/docs/api-reference/video/direct-uploads/create-direct-upload">Direct Uploads URL</ApiRefLink>.
+
+First, install the Astro version of Mux Uploader:
+
+```bash
+npm install @mux/mux-uploader-astro
+```
+
+In the code sample below, we'll create an upload URL using the [Mux Node SDK](https://github.com/muxinc/mux-node-sdk) and the Direct Uploads URL API. We'll pass that URL to the native Astro `<MuxUploader />` component, which will handle uploading for us.
+
+```astro filename=src/pages/index.astro
+---
+import Layout from '../layouts/Layout.astro';
+import Mux from "@mux/mux-node";
+import MuxUploader from "@mux/mux-uploader-astro";
+
+const mux = new Mux({
+  tokenId: import.meta.env.MUX_TOKEN_ID,
+  tokenSecret: import.meta.env.MUX_TOKEN_SECRET
+});
+
+const upload = await mux.video.uploads.create({
+  new_asset_settings: {
+    playback_policy: ['public'],
+    video_quality: 'basic',
+  },
+  cors_origin: '*',
+});
+---
+
+<Layout title="Upload a video to Mux">
+  <MuxUploader endpoint={upload.url} />
+</Layout>
+```
+
+<Callout type="warning">
+In production, you'll want to apply additional security measures to your upload URL. Consider protecting the route with authentication to prevent unauthorized users from uploading videos. Also, use `cors_origin` and consider [`playback_policy`](/docs/guides/secure-video-playback) to further restrict where uploads can be performed and who can view uploaded videos.
+</Callout>
+
+Next, we'll create an API endpoint that will [listen for Mux webhooks](/docs/core/listen-for-webhooks). When we receive the notification that the video has finished uploading and is ready for playback, we'll add the video's metadata to our database.
+
+```ts filename=src/pages/mux-webhook.json.ts
+import type { APIRoute } from 'astro';
+import mux from '../lib/mux';
+
+export const POST: APIRoute = async ({ request }) => {
+  const body = await request.text();
+  // mux.webhooks.unwrap will validate that the given payload was sent by Mux and parse the payload.
+  // It will also provide type-safe access to the payload.
+  // Generate MUX_WEBHOOK_SIGNING_SECRET in the Mux dashboard
+  // https://dashboard.mux.com/settings/webhooks
+  const event = mux.webhooks.unwrap(
+    body,
+    request.headers,
+    process.env.MUX_WEBHOOK_SIGNING_SECRET
+  );
+
+  // you can also unwrap the payload yourself:
+  // const event = await request.json();
+  switch (event.type) {
+    case 'video.upload.asset_created':
+      // we might use this to know that an upload has been completed
+      // and we can save its assetId to our database
+      break;
+    case 'video.asset.ready':
+      // we might use this to know that a video has been encoded
+      // and we can save its playbackId to our database
+      break;
+    // there are many more Mux webhook events
+    // check them out at https://www.mux.com/docs/webhook-reference
+    default:
+      break;
+  }
+
+  return new Response(JSON.stringify({ message: 'ok' }), {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+};
+```
+
+Finally, let's make a playback page. We retrieve the video metadata from our database, and play it by passing its `playbackId` to [Mux Player](/docs/guides/mux-player-web).
+
+First, install the Astro version of Mux Player:
+
+```bash
+npm install @mux/mux-player-astro
+```
+
+Now create your playback page using the native Astro `<MuxPlayer />` component:
+
+```astro filename=src/pages/playback/[playbackId].astro
+---
+import Layout from '../../layouts/Layout.astro';
+import MuxPlayer from "@mux/mux-player-astro";
+
+const { playbackId } = Astro.params;
+---
+
+<Layout>
+  <MuxPlayer
+    playbackId={playbackId}
+    metadata={{video_title: 'My Video'}}
+  />
+</Layout>
+```
+
+And we've got upload and playback. Nice!
+
+## Retrieving asset data with the Mux Node SDK
+
+You can use the [Mux Node SDK](https://github.com/muxinc/mux-node-sdk) to retrieve information about your videos and pass that data to your Astro components. This is useful for displaying video metadata like title, duration, and upload date.
+
+```bash
+npm install @mux/mux-node
+```
+
+Here's an example of fetching video asset data and using it in your component:
+
+```astro filename=src/pages/video/[assetId].astro
+---
+import Layout from '../../layouts/Layout.astro';
+import Mux from "@mux/mux-node";
+import MuxPlayer from "@mux/mux-player-astro";
+
+const mux = new Mux({
+  tokenId: import.meta.env.MUX_TOKEN_ID,
+  tokenSecret: import.meta.env.MUX_TOKEN_SECRET,
+});
+
+const { assetId } = Astro.params;
+const asset = await mux.video.assets.retrieve(assetId);
+
+const playbackId = asset.playback_ids?.find((id) => id.policy === "public")?.id;
+const videoTitle = asset?.meta?.title;
+const createdAt = Number(asset?.created_at);
+const duration = Number(asset?.duration);
+
+const date = new Date(createdAt * 1000).toDateString();
+const time = new Date(Math.round(duration) * 1000).toISOString().substring(14, 19);
+---
+
+<Layout>
+  <h1>My Video Page</h1>
+  <p>Title: {videoTitle}</p>
+  <p>Upload Date: {date}</p>
+  <p>Length: {time}</p>
+
+  <MuxPlayer
+    playbackId={playbackId}
+    metadata={{video_title: videoTitle}}
+  />
+</Layout>
+```
+
+## Using Mux video element
+
+If you prefer a simpler alternative to Mux Player that provides browser support for HLS playback with automatic Mux Data analytics, you can use the `<mux-video>` web component:
+
+```bash
+npm install @mux/mux-video
+```
+
+```astro filename=src/components/SimpleVideoPlayer.astro
+<script>import '@mux/mux-video'</script>
+
+<mux-video
+  playback-id="FOTbeIxKeMPzyhrob722wytaTGI02Y3zbV00NeFQbTbK00"
+  metadata-video-title="My Astro Video"
+  controls
+  disable-tracking
+></mux-video>
+```
+
+## Event handling for uploads
+
+You can listen for upload events and handle them with client-side scripts. Here's an example of handling upload events:
+
+```astro filename=src/pages/upload-with-events.astro
+---
+import Layout from '../layouts/Layout.astro';
+import Mux from "@mux/mux-node";
+import MuxUploader from "@mux/mux-uploader-astro";
+
+const mux = new Mux({
+  tokenId: import.meta.env.MUX_TOKEN_ID,
+  tokenSecret: import.meta.env.MUX_TOKEN_SECRET
+});
+
+const upload = await mux.video.uploads.create({
+  new_asset_settings: {
+    playback_policy: ['public'],
+    video_quality: 'basic',
+  },
+  cors_origin: '*',
+});
+---
+
+<Layout title="Upload with Event Handling">
+  <MuxUploader
+    id="my-uploader"
+    endpoint={upload.url}
+    pausable
+    maxFileSize={50000}
+  />
+
+  <script>
+    import type { MuxUploaderElement } from '@mux/mux-uploader-astro';
+
+    const uploader = document.getElementById('my-uploader') as MuxUploaderElement;
+
+    uploader.addEventListener('uploadstart', (event) => {
+      console.log('Upload started!', event.detail);
+    });
+
+    uploader.addEventListener('success', (event) => {
+      console.log('Upload successful!', event.detail);
+    });
+
+    uploader.addEventListener('uploaderror', (event) => {
+      console.error('Upload error!', event.detail);
+    });
+
+    uploader.addEventListener('progress', (event) => {
+      console.log('Upload progress: ', event.detail);
+    });
+  </script>
+</Layout>
+```
+
+What's next? You can [integrate with your CMS](/docs/integrations/cms). You can [optimize your loading experience](/docs/guides/player-lazy-loading). Or get started with the example project below:
+
+## Example projects
+
+<GuideCards>
+  <GuideCard
+    title="muxinc/examples/astro-uploader-and-player"
+    description={<>
+      <p>This is a bare-bones starter application with Astro that uses:</p>
+      <ul>
+        <li>Mux <ApiRefLink href="/docs/api-reference/video/direct-uploads">Direct Uploads</ApiRefLink> and <a href="/docs/guides/mux-uploader">Mux Uploader</a></li>
+        <li>Mux <a href="/docs/guides/video" title="Mux Video">Video</a> + Mux <a href="/docs/guides/data" title="Mux Data">Data</a></li>
+        <li>Mux <a href="/docs/guides/mux-player-web" title="Mux Player">Player</a></li>
+      </ul>
+    </>}
+    links={[
+      {
+        title: "View project →",
+        href: "https://github.com/muxinc/examples/tree/main/astro-uploader-and-player",
+      },
+    ]}
+  />
+</GuideCards>
+

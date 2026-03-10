@@ -1,0 +1,169 @@
+---
+title: Create timeline hover previews
+product: video
+description: Learn how to add hover image previews to your player.
+---
+
+## What are timeline hover previews?
+
+Timeline hover previews, also known as trick play or scrub bar previews, make player operations like fast-forward, rewind, and seeking more visual to the user. Here it is in action:
+
+<Image src="/docs/images/animated-storyboard.gif" width={640} height={360} />
+
+Each image (also called a thumbnail or tile) you see when hovering over the scrub bar (or player timeline) on the video player is part of a larger image called a storyboard.
+A storyboard is a collection of thumbnails or tiles, created from video frames selected at regular time intervals and are arranged in a grid layout.
+
+Below image an example storyboard for the video, [Tears of Steel](https://mango.blender.org/), the same video used to demo timeline hover previews above:
+
+<Image src="/docs/images/storyboard.png" width={1920} height={1600} />
+
+## Add timeline hover previews to your player
+
+There are a few different ways to add this functionality to your players, depending on which methods your chosen player exposes to support timeline hover previews.
+
+The storyboard image can be requested from the following URL in either `webp`, `jpg`, or `png` format from Mux:
+
+<CodeExample
+  lang="curl"
+  code="https://image.mux.com/{PLAYBACK_ID}/storyboard.{png|jpg|webp}"
+/>
+
+Each storyboard has an associated metadata file and can be used as a `metadata` text track. The storyboard image is referenced from the metadata in this case.
+
+The storyboard metadata provides the x-axis and y-axis coordinates of each image in the storyboard image and the corresponding time range. The metadata is available in both WebVTT and JSON format.
+
+Storyboard images will contain 50 tiles within the image if the asset is less than 15 minutes in duration. If the asset is more than 15 minutes, then there will be 100 tiles populated in the storyboard image.
+### WebVTT
+Most popular video players use WebVTT file for describing individual tiles of the storyboard image. You can request the WebVTT file by making a request to generate a storyboard of the image.
+
+<CodeExample
+  lang="curl"
+  code="GET https://image.mux.com/{PLAYBACK_ID}/storyboard.vtt"
+/>
+
+```
+WEBVTT
+
+00:00:00.000 --> 00:01:06.067
+https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.jpg#xywh=0,0,256,160
+
+00:01:06.067 --> 00:02:14.067
+https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.jpg#xywh=256,0,256,160
+
+00:02:14.067 --> 00:03:22.067
+https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.jpg#xywh=512,0,256,160
+
+00:03:22.067 --> 00:04:28.067
+https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.jpg#xywh=768,0,256,160
+
+00:04:28.067 --> 00:05:36.067
+https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.jpg#xywh=1024,0,256,160
+
+00:05:36.067 --> 00:06:44.067
+https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.jpg#xywh=0,160,256,160
+```
+
+By default, this request will generate a `jpg` for the storyboard image. If you'd like to change the format to `webp`, you can do so by adding `?format=webp` to the end of the request URL:
+
+<CodeExample
+  lang="curl"
+  code="GET https://image.mux.com/{PLAYBACK_ID}/storyboard.vtt?format=webp"
+/>
+
+#### WebVTT Compatible Video Players
+The list below shows the various video players supporting the WebVTT files for trick play. If your player isn't listed here, [please reach out](/support), and we'll help where we can!
+
+- [VideoJS](https://videojs.com/) + [VTT Thumbnails plugin](https://www.npmjs.com/package/videojs-vtt-thumbnails)
+- [JW Player](https://docs.jwplayer.com/players/docs/ios-add-preview-thumbnails)
+- [THEOplayer](https://www.theoplayer.com/docs/theoplayer/how-to-guides/texttrack/how-to-implement-preview-thumbnails/)
+- [Bitmovin](https://bitmovin.com/demos/thumbnail-seeking)
+- [Flow Player](https://flowplayer.com/demos/video-thumbnails)
+- [Plyr](https://plyr.io)
+
+<Callout type="info">
+Using a WebVTT file may be limited to HTML5 browser-based video players and may not be supported in Device specific SDKs including iOS and Android. iOS, Android, and other device platforms use a HLS iFrame Playlist. Generating HLS iFrame Playlists is on Mux's roadmap.
+</Callout>
+
+### JSON
+There are many other scenarios for using storyboards. For instance:
+- A quick way of previewing the entire video can save the video editor/reviewer's time without requiring a full video playback
+- Ease of developing trick play like functionality in Chromeless Video players like [hls.js](https://github.com/video-dev/hls.js/)
+
+Using a WebVTT file for metadata can be burdensome to implement. Storyboard metadata expressed in an easy to understand & widely supported format like JSON helps in taking advantage of storyboards in new ways. Mux provides the same storyboard metadata in JSON format.
+
+<CodeExample
+  lang="curl"
+  code="https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.json"
+/>
+
+```json
+{
+  "url": "https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.jpg",
+  "tile_width": 256,
+  "tile_height": 160,
+  "duration": 6744.1,
+  "tiles": [
+    {
+      "start": 0,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "start": 66.066667,
+      "x": 256,
+      "y": 0
+    },
+    {
+      "start": 134.066667,
+      "x": 512,
+      "y": 0
+    },
+    {
+      "start": 202.066667,
+      "x": 768,
+      "y": 0
+    },
+    {
+      "start": 268.066667,
+      "x": 1024,
+      "y": 0
+    },
+    {
+      "start": 336.066667,
+      "x": 0,
+      "y": 160
+    }
+  ]
+}
+```
+
+By default, this request will generate a `jpg` for the storyboard image. If you'd like to change the format to `webp`, you can do so by adding `?format=webp` to the end of the request URL:
+
+<CodeExample
+  lang="curl"
+  code="https://image.mux.com/Dk8pvMnvTeqDk9dy5nqmXz02MM4YtdElW/storyboard.json?format=webp"
+/>
+
+## Cross-Origin Resource Sharing (CORS) requirements
+The storyboards URLs use `image.mux.com` hostname and `stream.mux.com` hostname is used for video playback URL. Because the URLs use different hostnames, it is recommended to add `crossorigin` attribute to the [`<video>` HTML tag](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video) for access.
+
+## Roku trick play
+
+Roku announced changes to their [channel certification criteria](https://blog.roku.com/developer/channel-certification-criteria-updates-october-2020) mandating trick play for on-demand video longer than 15mins starting October 1st, 2020.
+To support this requirement, you can add this playback modifier for playback on Roku devices when making a playback request:
+
+```none
+https://stream.mux.com/{PLAYBACK_ID}.m3u8?roku_trick_play=true
+```
+
+Mux will include an Image Media Playlist in the HLS manifest to support this requirement on Roku.
+
+<Callout type="warning" title="Using `roku_trick_play` with signed URLs">
+
+If you are using [signed playback URLs](/docs/guides/secure-video-playback) make sure you include the extra `roku_trick_play` in your signed token.
+</Callout>
+
+## Using signed URLs
+
+Mux videos have two types of playback policy, `public` or `signed`. If your `playback_id` is `signed`, you will need to also sign requests made for storyboards.
+You can check out how to do that in our [signed URLs guide](/docs/guides/secure-video-playback).

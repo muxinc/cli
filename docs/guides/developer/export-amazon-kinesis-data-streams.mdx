@@ -1,0 +1,66 @@
+---
+title: Stream export data to an Amazon Kinesis data stream
+product: system
+description: >-
+  Learn how to send streaming exports data from Mux to Amazon Kinesis Data
+  Streams.
+seoTitle: Export video views to an Amazon Kinesis data stream
+seoDescription: "Mux integrates with Amazon\_Kinesis Data Streams to help you build custom applications that process, store, and analyze\_your streaming video data."
+---
+
+<Callout type="info">
+Streaming Exports are available on **Mux Data Media** plans. Learn more about [Mux Data Plans](https://data.mux.com/pricing) or [contact support](https://mux.com/support).
+</Callout>
+
+<Callout type="info">
+For a detailed walkthrough of the Amazon Kinesis Data Streams setup process, see this [blog post](https://www.mux.com/blog/mux-amazon-kinesis-integration).
+</Callout>
+
+In order to stream exports from Mux to Amazon Kinesis Data Streams, you’ll need to set up a data stream in your AWS account. This guide covers the high-level steps required for setup.
+
+## 1. Add a new streaming export
+
+To add a new streaming export, go to **Settings > Streaming Exports** in your Mux dashboard. From that tab, click **New streaming export** to open the configuration modal. 
+
+Select the type of data you want to export, the environment you want to send data from, the export format, and select **Amazon Kinesis Data Streams** as the service.
+
+## 2. Set up a data stream in Amazon Kinesis
+
+You'll need to complete the following setup in your AWS account before you can create a new streaming export in Mux:
+1. Create an Amazon Kinesis data stream.
+2. Create an IAM role for Mux’s AWS account. To create the IAM role, you'll need Mux's AWS account ID and an external ID, which are shown in the configuration modal. See [this AWS user guide](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html) for more information about how the external ID is used. When creating the role, choose "AWS account" for the Trusted entity type. Select "Another AWS account" and enter Mux’s AWS account ID. Check "Require external ID" and paste in the "External ID" that Mux provided to you in the configuration modal.
+3. Provide the IAM role you created with write access to your data stream. Here’s an example of an IAM policy that grants the necessary permissions (replace the resource with your data stream ARN):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+          "kinesis:ListShards",
+          "kinesis:PutRecord",
+          "kinesis:PutRecords"
+      ],
+      "Resource": [
+        "arn:aws:kinesis:{region}:{account-id}:stream/{stream-name}"
+      ]
+    }
+  ]
+}
+```
+
+## 3. Finish setup in Mux
+
+In the configuration modal, provide the data stream ARN and IAM role ARN. Make sure the values you provide match these formats:
+
+- Data stream ARN  
+`arn:aws:kinesis:{region}:{account-id}:stream/{data-stream-name}`
+- IAM role ARN  
+`arn:aws:iam::{account-id}:role/{role-name}`
+
+Click **Enable export**, and your streaming export will be activated immediately. We will start streaming views as soon as they're completed.
+
+## Process messages
+
+With your export set up, you can begin consuming incoming messages. For more information on the message format and processing data, see the main [Export raw Mux data](/docs/guides/export-raw-video-view-data) guide.

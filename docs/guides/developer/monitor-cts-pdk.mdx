@@ -1,0 +1,463 @@
+---
+title: Monitor CTS PDK
+product: data
+dataIntegration: true
+description: This guide walks through integration with Comcast Technology Solutions Player Development Kit (CTS PDK).
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Install `cts-mux`
+    description: Install ctx-mux either directly in the MPX Console or in the player embed
+  - title: 2. Make your data actionable
+    description: Use metadata fields to make the data collected by Mux actionable and useful.
+  - title: 3. Advanced options
+    description: Depending on the details of your implementation, you may want to leverage some of the advanced options of `cts-mux`.
+  - title: Release notes
+    topic: notes
+---
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+If installing from the MPX Console, load `ctx-mux` from the CDN:
+
+```curl
+https://src.litix.io/cts/3/cts-mux.js
+```
+
+<MdxImport snippet="envKeyCallout" />
+
+If installing in the player embed, follow the example below
+
+```html
+<div class="tpPlayer"
+     id="player"
+     // ... other configuration options
+     tp:muxPlugin = "priority=1|URL=https://src.litix.io/cts/3/cts-mux.js|env_key=ENV_KEY|debug=false">
+</div>
+<script>
+  // Creates the Player object that builds the component.
+  const player = new Player("player");
+  player.bind("player");
+</script>
+```
+
+<LinkedHeader step={steps[2]} />
+
+The only required field in the SDK options is `env_key`. Mux will automatically pull some metadata fields like `video_id`, `video_title`, and `video_duration` from the player itself. You can optionally override these values in the plugin parameters. Providing useful metadata allows you to search and filter on important fields in order to diagnose issues and optimize the playback experience for your end users.
+
+Pass in metadata fields separated by `|` with the plugin parameters.
+
+```html
+<div class="tpPlayer"
+     id="player"
+     // ... other configuration options
+     tp:muxPlugin = "priority=1|URL=https://src.litix.io/cts/3/cts-mux.js|env_key=ENV_KEY|debug=false|player_name='EXAMPLE_PLAYER_NAME'|player_version=1.0.0">
+</div>
+<script>
+  // Creates the Player object that builds the component.
+  const player = new Player("player");
+  player.bind("player");
+</script>
+```
+
+The only required field in the `options` that you pass into the `data` options in the `player.mux` function is `env_key`. But without some metadata the metrics in your dashboard will lack the necessary information to take meaningful actions. Metadata allows you to search and filter on important fields in order to diagnose issues and optimize the playback experience for your end users.
+
+For more information, view [Make your data actionable](/docs/guides/make-your-data-actionable-with-metadata).
+
+<LinkedHeader step={steps[3]} />
+
+### Changing the video
+
+If the underlying source changes of the video within the same player, `cts-mux` will track this change automatically. No extra configuration is needed.
+
+### Disable cookies
+
+By default, `cts-mux` uses a cookie to track playback across subsequent page views. This cookie includes information about the tracking of the viewer, such as an anonymized viewer ID that Mux generates for each user. None of this information is personally-identifiable, but you can disable the use of this cookie if desired. For instance, if your site or application is targeted towards children under 13, you should disable the use of cookies.
+
+This is done by setting `disableCookies=true` in the options passed to the Mux plugin.
+
+```html
+<div class="tpPlayer"
+     id="player"
+     // ... other configuration options
+     tp:muxPlugin = "priority=1|URL=https://src.litix.io/cts/3/cts-mux.js|env_key=ENV_KEY|debug=false|player_name='EXAMPLE_PLAYER_NAME'|disableCookies=true>
+</div>
+<script>
+  // Creates the Player object that builds the component.
+  const player = new Player("player");
+  player.bind("player");
+</script>
+```
+
+### Over-ride 'do not track' behavior
+
+By default, `cts-mux` does not respect [Do Not Track](https://www.eff.org/issues/do-not-track) when set within browsers. This can be enabled in the options passed to Mux, via a setting named `respectDoNotTrack`. The default for this is `false`. If you would like to change this behavior, pass `respectDoNotTrack=true`.
+
+```html
+<div class="tpPlayer"
+     id="player"
+     // ... other configuration options
+     tp:muxPlugin = "priority=1|URL=https://src.litix.io/cts/3/cts-mux.js|env_key=ENV_KEY|debug=false|player_name='EXAMPLE_PLAYER_NAME'|respectDoNotTrack=true>
+</div>
+<script>
+  // Creates the Player object that builds the component.
+  const player = new Player("player");
+  player.bind("player");
+</script>
+```
+
+### Customize error tracking behavior
+
+<Callout type="error" title="Errors are fatal">
+
+Errors tracked by mux are considered fatal meaning that they are the result of playback failures. If errors are non-fatal they should not be captured.
+</Callout>
+
+There is currently no way to change the default error tracking behavior. If this is something you need in your CTS PDK integration, please reach out.
+
+### Ads tracking with `cts-mux`
+
+Mux has been tested with CTS's VAST plugin for ad support. Configure the VAST plugin as you would with your PDK player normally, and Mux will track ads automatically. No additional configuration is needed.
+
+<Releases>
+<LinkedHeader step={steps[4]} />
+
+### Current release
+
+#### v3.13.18
+
+- fix issue where playing time might accumulate for paused players
+  - Updated dependency: `mux-embed` to v5.17.1
+
+### Previous releases
+
+#### v3.13.17
+
+- add compatibility for dash.js 5
+  - Updated dependency: `mux-embed` to v5.17.0
+
+#### v3.13.16
+
+- Update parsing of initial value for player_playback_mode
+  - Updated dependency: `mux-embed` to v5.16.1
+
+#### v3.13.15
+
+- Add Playback Range Tracker for new engagement metrics
+  - Updated dependency: `mux-embed` to v5.16.0
+
+#### v3.13.14
+
+- Automatically detect playback mode changes for HTML 5 Video
+  - Updated dependency: `mux-embed` to v5.15.0
+
+#### v3.13.13
+
+- Emit a renditionchange event at the start of views to eanble updated rendition tracking.
+  - Updated dependency: `mux-embed` to v5.14.0
+
+#### v3.13.12
+
+- Add ad type metadata to Ad Events
+- Add support for the upcoming Playback Mode changes:
+  - Updated dependency: `mux-embed` to v5.13.0
+
+#### v3.13.11
+
+- SDKs will no longer immediately send error events that are flagged as warnings. Fatal errors will still immediately be sent.
+  - Updated dependency: `mux-embed` to v5.12.0
+
+#### v3.13.10
+
+- Allow dev to specify page starting load and page finished loading times to calculate Page Load Time
+  - Updated dependency: `mux-embed` to v5.11.0
+
+#### v3.13.9
+
+- Adds support for cdnchange events
+  - Updated dependency: `mux-embed` to v5.10.0
+
+#### v3.13.8
+
+- Submit Aggregate Startup Time when autoplay is set
+  - Updated dependency: `mux-embed` to v5.9.1
+
+#### v3.13.7
+
+- Update `mux-embed` to v5.9.0
+
+#### v3.13.6
+
+- Update `mux-embed` to v5.8.3
+
+#### v3.13.5
+
+- Update `mux-embed` to v5.8.2
+
+#### v3.13.4
+
+- Update `mux-embed` to v5.8.1
+
+#### v3.13.3
+
+- Update `mux-embed` to v5.8.0
+
+#### v3.13.2
+
+- Update `mux-embed` to v5.7.0
+
+#### v3.13.1
+
+- Update `mux-embed` to v5.6.0
+
+#### v3.13.0
+
+- Update mechanism for generating unique IDs, used for `view_id` and others
+
+- Update `mux-embed` to v5.5.0
+
+#### v3.12.3
+
+- [chore] internal build process fix (no functional changes)
+- Update `mux-embed` to v5.4.3
+
+#### v3.12.2
+
+- Update `mux-embed` to v5.4.2
+
+#### v3.12.1
+
+- Update `mux-embed` to v5.4.1
+
+#### v3.12.0
+
+- Add updateData function that allows Mux Data metadata to be updated mid-view.
+
+- Update `mux-embed` to v5.4.0
+
+#### v3.11.6
+
+- Update `mux-embed` to v5.3.3
+
+#### v3.11.5
+
+- Update `mux-embed` to v5.3.2
+
+#### v3.11.4
+
+- Update `mux-embed` to v5.3.1
+
+#### v3.11.3
+
+- Update `mux-embed` to v5.3.0
+
+#### v3.11.2
+
+- Update `mux-embed` to v5.2.1
+
+#### v3.11.1
+
+- Update `mux-embed` to v5.2.0
+
+#### v3.11.0
+
+- Target ES5 for bundles and validate bundles are ES5
+
+- Update `mux-embed` to v5.1.0
+
+#### v3.10.0
+
+- Refactors to properly enforce new TypeScript types and account for non-standard constructor usage by CTS.
+
+- Update `mux-embed` to v5.0.0
+
+#### v3.9.4
+
+- Update `mux-embed` to v4.30.0
+
+#### v3.9.3
+
+- Update `mux-embed` to v4.29.0
+
+#### v3.9.2
+
+- Update `mux-embed` to v4.28.1
+
+#### v3.9.1
+
+- Update `mux-embed` to v4.28.0
+
+#### v3.9.0
+
+- fix an issue where seek latency could be unexpectedly large
+- fix an issue where seek latency does not include time at end of a view
+
+- Update `mux-embed` to v4.27.0
+
+#### v3.8.3
+
+- Update `mux-embed` to v4.26.0
+
+#### v3.8.2
+
+- Update `mux-embed` to v4.25.1
+
+#### v3.8.1
+
+- Update `mux-embed` to v4.25.0
+
+#### v3.8.0
+
+- Fix an issue where beacons over a certain size could get hung and not be sent
+
+- Update `mux-embed` to v4.24.0
+
+#### v3.7.0
+
+- Fix an issue where tracking rebuffering can get into an infinite loop
+
+- Update `mux-embed` to v4.23.0
+
+#### v3.6.5
+
+- Update `mux-embed` to v4.22.0
+
+#### v3.6.4
+
+- Update `mux-embed` to v4.21.0
+
+#### v3.6.3
+
+- Update `mux-embed` to v4.20.0
+
+#### v3.6.2
+
+- Update `mux-embed` to v4.19.0
+
+#### v3.6.1
+
+- Update `mux-embed` to v4.18.0
+
+#### v3.6.0
+
+- Support `player_error_context` in `errorTranslator`
+
+- Update `mux-embed` to v4.17.0
+
+#### v3.5.0
+
+- Adds support for new and updated fields: `renditionchange`, error, DRM type, dropped frames, and new custom fields
+
+- Update `mux-embed` to v4.16.0
+
+#### v3.4.6
+
+- Update `mux-embed` to v4.15.0
+
+#### v3.4.5
+
+- Update `mux-embed` to v4.14.0
+
+#### v3.4.4
+
+- Update `mux-embed` to v4.13.4
+
+#### v3.4.3
+
+- Update `mux-embed` to v4.13.3
+
+#### v3.4.2
+
+- Update `mux-embed` to v4.13.2
+
+#### v3.4.1
+
+- Update `mux-embed` to v4.13.1
+
+#### v3.4.0
+
+- Upgraded internal webpack version
+
+- Update `mux-embed` to v4.13.0
+
+#### v3.3.14
+
+- Publish package to NPM
+
+#### v3.3.13
+
+- Update `mux-embed` to v4.12.1
+
+#### v3.3.12
+
+- Update `mux-embed` to v4.12.0
+
+#### v3.3.11
+
+- Update `mux-embed` to v4.11.0
+
+#### v3.3.10
+
+- Update `mux-embed` to v4.10.0
+
+#### v3.3.9
+
+- Update `mux-embed` to v4.9.4
+
+#### v3.3.8
+
+- Use common function for generating short IDs
+- Update `mux-embed` to v4.9.3
+
+#### v3.3.7
+
+- Update `mux-embed` to v4.9.2
+
+#### v3.3.6
+
+- Update `mux-embed` to v4.9.1
+
+#### v3.3.5
+
+- Update `mux-embed` to v4.9.0
+
+#### v3.3.4
+
+- Update `mux-embed` to v4.8.0
+
+#### v3.3.3
+
+- Update `mux-embed` to v4.7.0
+
+#### v3.3.2
+
+- Update `mux-embed` to v4.6.2
+
+#### v3.3.1
+
+- Update `mux-embed` to v4.6.1
+
+#### v3.3.0
+
+- Bump mux-embed to 4.6.0
+
+#### v3.2.0
+
+- Update `mux-embed` to v4.2.0
+- Fix an issue where views that resulted from `programchange` may not have been tracked correctly
+- Fix an issue where if `destroy` was called multiple times, it would raise an exception
+
+#### v3.1.0
+
+- Update `mux-embed` to v4.1.1
+- Fix an issue where `player_remote_played` would not be reported correctly
+
+#### v3.0.0
+
+- Update mux-embed to v4.0.0
+- Support server-side device detection
+</Releases>

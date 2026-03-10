@@ -1,0 +1,230 @@
+---
+title: Add your own live closed captions
+product: video
+description: >-
+  Learn how to add your own closed captions to your live stream for
+  accessibility.
+---
+
+## Why are closed captions important?
+
+Closed captions refers to the visual display of the audio in a program. Closed captions make video more accessible to people who are deaf or hard of hearing, but the benefits go beyond accessibility. Closed captions empower your viewers to consume video content in whichever way is best for them, whether it be audio, text, or a combination.
+
+## Supported live caption formats
+
+There are many types of closed caption sources, and each streaming standard may use a different format for embedding captions on the output. Mux supports receiving closed captions embedded in the H.264 video stream using the CEA-608 standard for a single language.
+
+CEA-608 stems from the analog era where closed captions data was carried directly in the transmission in a line of the video content that wasn’t displayed unless the decoder was told to look for it. These were often referred to as “Line 21” captions. CEA-608 is still the primary standard for transmitting closed captions within the same stream as audio/video content.
+
+Most major live caption providers (e.g. AI-Media, EEG Falcon, 3Play, Verbit) will support the CEA-608 standard. Mux will translate the CEA-608 captions into WebVTT that will be delivered as part of the HLS stream/manifest, in a standard HLS-supported manner. We will continue to evaluate demand for supporting captions for multiple languages and other caption formats.
+
+## Integrate your own closed captions
+
+Add the `embedded_subtitles` array at time of stream creation or to an existing live stream. Closed captions are a type of subtitle. The resulting Asset's subtitle text track will have `closed_captions: true` set.
+
+| Input Parameters | Type   | Description                                                                                                                                                                                    |
+| ---------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name             | string | The name of the track containing a human-readable description. This value must be unique across all the text type and subtitles text type tracks. Defaults to `language_code` if not provided. |
+| passthrough      | string | Arbitrary metadata set for the live closed caption track. Max 255 characters.                                                                                                                  |
+| language_code    | string | The language of the closed caption stream. Value must be BCP 47 compliant. Defaults to `en` if not provided                                                                                    |
+| language_channel | string | CEA-608 caption channel to read caption data from. Possible values: "cc1"                                                                                                                      |
+
+### Step 1A: Create a live stream in Mux
+
+Create a live stream using the <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">Live Stream Creation API</ApiRefLink>. Let Mux know that closed captions will be embedded in the RTMP stream at time of live stream creation.
+
+#### API Request
+
+```json
+POST /video/v1/live-streams
+
+Request Body
+{
+  "playback_policy" : [
+    "public"
+  ],
+  "embedded_subtitles" : [
+    {
+      "name": "English CC",
+      "passthrough": "English closed captions",
+      "language_code": "en-US",
+      "language_channel" : "cc1"
+    }
+  ],
+  "new_asset_settings" : {
+    "playback_policy" : [
+      "public"
+    ]
+  }
+}
+```
+
+#### API Response
+
+```json
+{
+  "data": {
+    "stream_key": "5bd28537-7491-7ffa-050b-bbb506401234",
+    "playback_ids": [
+      {
+        "policy": "public",
+        "id": "U00gVu02hfLPdaGnlG1dFZ00ZkBUm2m0"
+      }
+    ],
+    "new_asset_settings": {
+      "playback_policies": ["public"]
+    },
+    "embedded_subtitles": [
+      {
+        "name": "English CC",
+        "passthrough": "English closed captions",
+        "language_code": "en-US",
+        "language_channel": "cc1"
+      }
+    ],
+    "id": "e00Ed01C9ws015d5SLU00ZsaUZzh5nYt02u",
+    "created_at": "1624489336"
+  }
+}
+```
+
+### Step 1B: Configure live closed captions for an existing live stream
+
+Use the Live Stream Closed Captions API to configure closed captions to an existing live stream. Live closed captions can not be configured to an active live stream.
+
+#### API Request
+
+```json
+PUT / video/v1/live-streams/{live_stream_id}/embedded-subtitles
+
+Request Body
+{
+  "embedded_subtitles": [
+    {
+      "name": "en-US",
+      "language_code": "en-US",
+      "language_channel": "cc1"
+    }
+  ]
+}
+```
+
+#### API Response
+
+```json
+Response
+{
+  "data": {
+    "stream_key": "5bd28537-7491-7ffa-050b-bbb506401234",
+    "playback_ids": [
+      {
+        "policy": "public",
+        "id": "U00gVu02hfLPdaGnlG1dFZ00ZkBUm2m0"
+      }
+    ],
+    "new_asset_settings": {
+      "playback_policies": [
+        "public"
+      ]
+    },
+    "embedded_subtitles" : [
+      {
+        "name": "English",
+        "language_code": "en-US",
+        "language_channel": "cc1"
+      }
+    ],
+    "id": "e00Ed01C9ws015d5SLU00ZsaUZzh5nYt02u",
+    "created_at": "1624489336"
+  }
+}
+```
+
+### Step 2: Create an event with your preferred closed caption vendor
+
+Log into your preferred closed caption provider account (e.g. AI-Media, 3Play, Verbit) and create an event that needs to be captioned. To create an event, you will need to provide the following inputs
+
+- Start date and time
+- Language of audio to be captioned
+- Destination Stream URL and Stream Key (Mux). The caption vendor will send video with captions encoded via the 608 standard to this destination.
+
+| RTMP Server URL                     | Description                                                                                                          | Common Applications                                                                                                         |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| rtmp://global-live.mux.com:5222/app | Mux's standard RTMP ingest URL. Compatible with the majority of streaming applications and services.                | Open Source RTMP SDKs, most [app-store streaming applications](https://mux.com/blog/guide-to-rtmp-broadcast-apps-for-ios/). |
+| rtmps://global-live.mux.com:443/app | Mux's secure RTMPS ingest URL. Compatible with fewer streaming applications, but offers a higher level of security. | OBS, Wirecast, Streamaxia RTMP SDKs                                                                                         |
+
+Mux's global RTMP or RTMPS ingest urls will connect you to the closest ingest region. While these ingest URLs typically provide optimal performance, you can also select a specific region using our [regional ingest URLs.](/docs/guides/configure-broadcast-software#available-ingest-urls).
+
+Upon successful event creation, the closed caption provider will provide the following
+
+- Stream URL
+- Stream Key
+
+Learn more about:
+
+- [How to setup live captions with AI-Media EEG Falcon](https://www.ai-media.tv/wp-content/uploads/Manual_Falcon-User-Guide-.pdf)
+- [How to setup live captions with 3Play Media](https://support.3playmedia.com/hc/en-us/articles/360048839533-Live-Captions-Schedule-Live-Captions-for-an-RTMP-Stream)
+- [How to setup live captions with Verbit](https://verbit-ai.zendesk.com/hc/en-us/articles/4403013880594-Verbit-s-RTMP-Solution-for-Livestreaming-Events)
+
+### Step 3: Point your RTMP stream to your caption provider
+
+Configure your video encoder with the Stream URL and Stream Key provided by the closed caption provider in Step 2.
+
+### Step 4: Start your live stream
+
+When the stream goes live, a new live asset is created and tracks will be created for the corresponding captions.
+
+### Step 5: Monitor closed caption stream health
+
+When your stream is live, visit the Live Health Dashboard to monitor closed caption stream health. The dashboard will show whether Mux is receiving closed captions. More details can be found at [Debug live stream issues](/docs/guides/debug-live-stream-issues)
+
+## Update stream to not expect live captioning for future connections
+
+Let Mux know to not expect closed captions when the live stream starts again. This can be done by configuring your live stream to not have any captions. This request can only be made while the live stream is idle.
+
+### API Request
+
+```json
+PUT /video/v1/live-streams/{live_stream_id}/embedded-subtitles
+
+Request Body
+{
+  "embedded_subtitles" : []
+}
+```
+
+## FAQ
+
+### Are there any language restrictions?
+
+Yes. The 608 standard only supports the following languages: English, Spanish, French, German, Dutch, and Portuguese, or Italian. We currently only support live closed captions for a single language. We will evaluate supporting multiple languages based off of customer feedback.
+
+### Is the 608 standard supported by my closed caption vendor?
+
+Caption vendors known to support the 608 captions: 3Play, AI-Media EEG Falcon, Verbit
+
+Caption vendors known to not support 608 captions: Rev.ai
+
+### When can I edit my live closed caption configuration?
+
+You can only edit your live caption configuration while the live stream is idle; you cannot make any changes while the live stream is active.
+
+### Will formatting be preserved?
+
+Mux will translate the CEA-608 captions into WebVTT. Though Mux attempts to preserve the caption formatting, some formatting may be lost.
+
+### Does live captions work with audio-only?
+
+No. If you have a use case for this, please let us know.
+
+### How do I download my closed caption track?
+
+```json
+https://stream.mux.com/{PLAYBACK_ID}/text/{TRACK_ID}.vtt
+```
+
+More details can be found at [Advanced Playback features](/docs/guides/play-your-videos#advanced-playback-features)
+
+### Does live closed captions work with low latency?
+
+Not at this time. If you have a use case for this, please let us know.

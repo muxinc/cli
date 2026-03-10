@@ -1,0 +1,34 @@
+---
+title: Live streaming from your app
+product: video
+description: Use this guide to set up your application for live streaming to Mux.
+seoTitle: 'Your Guide to Live Streaming Apps: Stream from your App'
+seoDescription: >-
+  Learn how to stream live video to a Mux Live Stream endpoint in minutes. This
+  guide will help you configure your application to deliver the stream using the
+  RTMP protocol.
+---
+
+## Live building blocks
+
+A recap from our [Start live streaming](/docs/guides/start-live-streaming) guide:
+<Image sm src="/docs/images/live-streaming-overview-2.png" width={1798} height={1040} />
+
+Live streaming from a native application requires software to capture the camera feed and stream it to the Mux live endpoint using the RTMP protocol. Fortunately for both iOS and Android you can find open source software to stream RTMP. The following open source applications can be used as a guide for building live streaming into your own app.
+
+## iOS & Android examples
+
+<Callout type="warning" title="Use current examples">
+  Use the examples linked in this guide. They will contain the most current code and issue list. We may not provide support for outdated apps and dependencies.
+</Callout>
+
+* [iOS Live Streaming Example](https://github.com/muxinc/examples/tree/master/ios-live-streaming)
+* [Android Live Streaming Example](https://github.com/muxinc/examples/tree/master/android-live-streaming)
+
+Over time we'll build out more examples and SDKs for iOS and Android. If you have any feedback or requests please let us know.
+
+If you're looking for a commercial solution, [Streamaxia's OpenSDK](https://www.streamaxia.com/) and [Larix Broadcaster](https://softvelum.com/larix/) are know to work well with Mux's RTMP ingest.
+
+## Web app live streaming
+
+There are not any reliable open source solutions for building web-based encoders for streaming out over RTMP. Check [the blog post](https://mux.com/blog/the-state-of-going-live-from-a-browser) for more information on going live from the browser.

@@ -1,0 +1,238 @@
+---
+title: Listen for webhooks
+product: system
+description: Learn how to listen for webhooks from Mux.
+---
+
+Mux uses [webhooks](https://webhooks.fyi) to let your application know when things happen asynchronously, outside of an API request cycle. For example, you may want to update something on your end when an <ApiRefLink href="/docs/api-reference/video/assets/get-asset">asset</ApiRefLink> transitions its status from `processing` to `ready`, or when a live stream starts or ends. When these asynchronous events happen, we'll make a POST request to the address you give us and you can do whatever you need with it on your end.
+
+After a webhook is configured for an environment, notifications will be sent for all events for that environment.
+
+<Callout type="warning">
+  Note that webhooks are scoped per *environment*. If you have configured webhooks and you are not seeing them show up, double check that the webhook is correctly configured for the environment you are working in.
+</Callout>
+
+If Mux doesn't receive a `2xx` response from your system, we will continue to try the message for the next 24 hours (with an increasing delay between attempts).
+
+<Callout type="info">
+  Mux makes an effort to deliver each message successfully once, but in certain
+  situations duplicate webhook messages may be sent even if your service
+  responds with a 2xx response code. Please ensure that your webhook handling
+  mechanism treats duplicated event delivery appropriately.
+</Callout>
+
+# Webhooks vs. polling
+
+Please use webhooks to track asset status rather than polling the <ApiRefLink href="/docs/api-reference/video/assets/get-asset">Asset API</ApiRefLink>. Webhooks are much more efficient for both you and Mux, and we rate limit GET requests to the `/assets` endpoint, which means polling the `/assets` API doesn't scale.
+
+# Handling webhooks locally
+
+A common gotcha for anyone new to working with webhooks is figuring out how to receive them when working in a local environment. Since your application runs on a local URL like `http://localhost:3000`, Mux can't reach it directly to deliver webhook events.
+
+The recommended approach is to use the [Mux CLI](/docs/integrations/mux-cli) to listen for events and forward them to your local server.
+
+## Using the Mux CLI
+
+The Mux CLI can connect to Mux's event stream and forward webhook events to your local development server in real-time.
+
+<Callout type="warning">
+  CLI webhook forwarding is for **local development only** and provides **no delivery guarantees**. In production, you must configure a webhook endpoint in the [Mux Dashboard](https://dashboard.mux.com) that points to your server's webhook URL.
+</Callout>
+
+### Listen and forward events
+
+```bash
+mux webhooks listen --forward-to http://localhost:3000/api/webhooks/mux
+```
+
+When using `--forward-to`, the CLI displays a webhook signing secret and signs each forwarded request with a `mux-signature` header. Set `MUX_WEBHOOK_SECRET` in your app's environment to [verify these signatures](/docs/core/verify-webhook-signatures):
+
+```typescript
+const event = mux.webhooks.unwrap(body, headers, process.env.MUX_WEBHOOK_SECRET);
+```
+
+The signing secret is unique per environment and persisted between sessions, so you only need to configure it once.
+
+### Replay past events
+
+The CLI stores the last 100 events received during `listen` sessions. You can replay them to re-test your webhook handler without creating new resources:
+
+```bash
+# List stored events
+mux webhooks events list
+
+# Replay a specific event
+mux webhooks events replay <event-id> --forward-to http://localhost:3000/api/webhooks/mux
+
+# Replay all stored events
+mux webhooks events replay --all --forward-to http://localhost:3000/api/webhooks/mux
+```
+
+### Trigger synthetic events
+
+You can also send synthetic webhook events to your local server for testing, without making any API calls or creating real resources:
+
+```bash
+mux webhooks trigger video.asset.ready --forward-to http://localhost:3000/api/webhooks/mux
+```
+
+Run `mux webhooks trigger <invalid-type>` to see all supported event types.
+
+For the full list of webhook CLI commands, see the [Mux CLI docs](/docs/integrations/mux-cli#webhook-forwarding).
+
+## Alternative: using ngrok
+
+If you prefer, you can also use a tunneling tool like [ngrok](https://ngrok.com/docs/integrations/webhooks/mux-webhooks) to expose your local server to the internet and receive webhooks directly from Mux.
+
+```bash
+ngrok http 3000
+```
+
+This gives you a public URL (e.g. `https://abc123.ngrok.io`) that you can configure as a webhook endpoint in the [Mux Dashboard](https://dashboard.mux.com). Your full webhook URL would be something like `https://abc123.ngrok.io/api/webhooks/mux`.
+
+<Callout type="info">
+  You'll need to create an ngrok account (a free account works for most testing purposes). See [ngrok's Mux integration docs](https://ngrok.com/docs/integrations/webhooks/mux-webhooks) for more details.
+</Callout>
+
+# Configuring endpoints
+
+Webhook endpoints are configured in the Mux dashboard under "Settings."
+
+<Image src="/docs/images/webhooks.png" width={500} height={500} />
+
+Enter a URL from your application that Mux will call for event notifications.
+
+<Image src="/docs/images/new-webhook.png" width={1192} height={898} />
+
+# Receiving events
+
+Mux will submit a POST request to the configured URL, which your application can treat the same as any other route. Your event handler can do things like update the state of the specified asset in your database, or trigger other work.
+
+Note that a single request attempt will timeout after 5 seconds, after which the attempt is considered failed and will be reattempted. If you expect this will be a problem in your workflow, consider doing the work in an asynchronous task so you can respond to the event immediately.
+
+For more details on the Webhook event object definition, see [the example response](#example-response).
+
+# Example response
+
+```json
+{
+  "type": "video.asset.ready",
+  "object": {
+    "type": "asset",
+    "id": "0201p02fGKPE7MrbC269XRD7LpcHhrmbu0002"
+  },
+  "id": "3a56ac3d-33da-4366-855b-f592d898409d",
+  "environment": {
+    "name": "Demo pages",
+    "id": "j0863n"
+  },
+  "data": {
+    "tracks": [
+      {
+        "type": "video",
+        "max_width": 1280,
+        "max_height": 544,
+        "max_frame_rate": 23.976,
+        "id": "0201p02fGKPE7MrbC269XRD7LpcHhrmbu0002",
+        "duration": 153.361542
+      },
+      {
+        "type": "audio",
+        "max_channels": 2,
+        "max_channel_layout": "stereo",
+        "id": "FzB95vBizv02bYNqO5QVzNWRrVo5SnQju",
+        "duration": 153.361497
+      }
+    ],
+    "status": "ready",
+    "max_stored_resolution": "SD",
+    "max_stored_frame_rate": 23.976,
+    "id": "0201p02fGKPE7MrbC269XRD7LpcHhrmbu0002",
+    "duration": 153.361542,
+    "created_at": "2018-02-15T01:04:45.000Z",
+    "aspect_ratio": "40:17"
+  },
+  "created_at": "2018-02-15T01:04:45.000Z",
+  "accessor_source": null,
+  "accessor": null,
+  "request_id": null
+}
+```
+
+# Types of Events
+
+## Asset Events
+
+<IndexedTable>
+| Event | Description |
+|-------|-------------|
+| `video.asset.created` | Asset has been created |
+| `video.asset.ready` | Asset is ready for playback. You can now use the asset's `playback_id` to successfully start streaming this asset. |
+| `video.asset.errored` | Asset has encountered an error. Use this to notify your server about assets with errors. Asset errors can happen for a number of reasons, most commonly an input URL that Mux is unable to download or a file that is not a valid video file. |
+| `video.asset.updated` | Asset has been updated. Use this to make sure your server is notified about changes to assets. |
+| `video.asset.deleted` | Asset has been deleted. Use this so that your server knows when an asset has been deleted, at which point it will no longer be playable. |
+| `video.asset.live_stream_completed` | The live stream for this asset has completed. Every time a live stream starts and ends a new asset gets created and this event fires. |
+| `video.asset.static_rendition.created` | A new static rendition for this asset has been created. Static renditions are streamable mp4 files that are most commonly used for allowing users to download files for offline viewing. |
+| `video.asset.static_rendition.ready` | A static rendition for this asset is ready. Static renditions are streamable mp4 files that are most commonly used for allowing users to download files for offline viewing. |
+| `video.asset.static_rendition.skipped` | A static rendition for this asset was skipped, due to the source not being suitable for the requested static rendition. Static renditions are streamable mp4 files that are most commonly used for allowing users to download files for offline viewing. |
+| `video.asset.static_rendition.deleted` | A static rendition for this asset was deleted. The static renditions (mp4 files) for this asset will no longer be available. |
+| `video.asset.static_rendition.errored` | A static rendition for this asset errored. This indicates that there was some error when creating a static rendition (mp4s) of your asset. This should be rare and if you see it unexpectedly please open a support ticket. |
+| `video.asset.master.ready` | Master access for this asset is ready. Master access is used when downloading an asset for purposes of editing or post-production work. The master access file is not intended to be streamed or downloaded by end-users. |
+| `video.asset.master.preparing` | Master access for this asset is being prepared. After requesting master access you will get this webhook while it is being prepared. |
+| `video.asset.master.deleted` | Master access for this asset has been deleted. Master access for this asset has been removed. You will no longer be able to download the master file. If you want it again you should re-request it. |
+| `video.asset.master.errored` | Master access for this asset has encountered an error. This indicates that there was some error when creating master access for this asset. This should be rare and if you see it unexpectedly please open a support ticket. |
+| `video.asset.track.created` | A new track for this asset has been created, for example a subtitle text track. |
+| `video.asset.track.ready` | A track for this asset is ready. In the example of a subtitle text track the text track will now be delivered with your HLS stream. |
+| `video.asset.track.errored` | A track for this asset has encountered an error. There was some error preparing this track. Most commonly this could be a text track file that Mux was unable to download for processing. |
+| `video.asset.track.deleted` | A track for this asset has been deleted. |
+| `video.asset.warning` | This event fires when Mux has encountered a non-fatal issue with the recorded asset of the live stream. At this time, the event is only fired when Mux is unable to download a slate image from the URL set as `reconnect_slate_url` parameter value. More details on this event is available [here](/docs/guides/handle-live-stream-disconnects#reconnect-window-and-slates). |
+</IndexedTable>
+
+## Upload Events
+
+<IndexedTable>
+| Event | Description |
+|-------|-------------|
+| `video.upload.asset_created` | An asset has been created from this upload. This is useful to know what a user of your application has finished uploading a file using the URL created by a [Direct Upload](/docs/guides/upload-files-directly). |
+| `video.upload.cancelled` | Upload has been canceled. This event fires after hitting the <ApiRefLink href="/docs/api-reference/video/direct-uploads/cancel-direct-upload">cancel direct upload</ApiRefLink> API. |
+| `video.upload.created` | Upload has been created. This event fires after <ApiRefLink href="/docs/api-reference/video/direct-uploads/create-direct-upload">creating a direct upload</ApiRefLink>. |
+| `video.upload.errored` | Upload has encountered an error. This event fires when the asset created by the direct upload fails. Most commonly this happens when an end-user uploads a non-video file. |
+</IndexedTable>
+
+## Live Stream Events
+
+<IndexedTable>
+| Event | Description |
+|-------|-------------|
+| `video.live_stream.created` | A new live stream has been created. Broadcasters with a `stream_key` can start sending encoder feed to this live stream. |
+| `video.live_stream.connected` | An encoder has successfully connected to this live stream. |
+| `video.live_stream.recording` | Recording on this live stream has started. Mux has successfully processed the first frames from the encoder. If you show a _red dot_ icon in your UI, this would be a good time to show it. |
+| `video.live_stream.active` | This live stream is now "active". The live streams `playback_id` OR the `playback_id` associated with this live stream's asset can be used right now to created HLS URLs (`https://stream.mux.com/{PLAYBACK_ID}.m3u8` and start streaming in your player. Note that before the live stream is `"active"`, trying to stream the HLS URL will result in HTTP `412` errors. |
+| `video.live_stream.disconnected` | An encoder has disconnected from this live stream. Note that while disconnected the live stream is still `status: "active"`. |
+| `video.live_stream.idle` | The `reconnect_window` for this live stream has elapsed. The live stream `status` will now transition to `"idle"`. |
+| `video.live_stream.updated` | This live stream has been updated. For example, after <ApiRefLink href="/docs/api-reference/video/live-streams/reset-stream-key">resetting the live stream's stream key</ApiRefLink>. |
+| `video.live_stream.enabled` | This live stream has been enabled. This event fires after <ApiRefLink href="/docs/api-reference/video/live-streams/enable-live-stream">enable live stream</ApiRefLink> API. |
+| `video.live_stream.disabled` | This live stream has been disabled. This event fires after <ApiRefLink href="/docs/api-reference/video/live-streams/disable-live-stream">disable live stream</ApiRefLink> API. Disabled live streams will no longer accept new RTMP connections. |
+| `video.live_stream.deleted` | This live stream has been deleted. This event fires after <ApiRefLink href="/docs/api-reference/video/live-streams/delete-live-stream">delete live stream API</ApiRefLink> API. |
+| `video.live_stream.warning` | This live stream event fires when Mux has encountered a non-fatal issue. There is no disruption to the live stream ingest and playback. At this time, the event is only fired when Mux is unable to download an image from the URL set as `reconnect_slate_url` parameter value. More details on this event is available [here](/docs/guides/handle-live-stream-disconnects#reconnect-window-and-slates). |
+</IndexedTable>
+
+## Simulcast Target Events
+
+These simulcast target events are useful when creating a UI that shows your users the status of their configured 3rd party endpoints. These events are handy when you want to build a UI that shows the state of each simulcast target and keep track of the state changes as they happen.
+
+<IndexedTable>
+| Event | Description |
+|-------|-------------|
+| `video.live_stream.simulcast_target.created` | A new simulcast target has been created for this live stream. |
+| `video.live_stream.simulcast_target.idle` | When the parent live stream is `"disconnected"`, all simulcast targets will have be `"idle"`. |
+| `video.live_stream.simulcast_target.starting` | When the parent live stream fires `"connected"` then the simulcast targets transition to `"starting"`. |
+| `video.live_stream.simulcast_target.broadcasting` | This fires when Mux has successfully connected to the simulcast target and has begun pushing content to that third party. |
+| `video.live_stream.simulcast_target.errored` | This fires when Mux has encountered an error either while attempting to connect to the third party streaming service or while broadcasting. Mux will try to re-establish the connection and if it does successfully the simulcast target will transition back to `"broadcasting"`. |
+| `video.live_stream.simulcast_target.updated` | This simulcast target has been updated. |
+| `video.live_stream.simulcast_target.deleted` | This simulcast target has been deleted. |
+</IndexedTable>
+
+# Webhook specification
+
+A machine-readable specification of all Mux webhook events is available at [`https://www.mux.com/webhook-spec.json`](https://www.mux.com/webhook-spec.json). You can use this to generate types, validate payloads, or integrate with any tooling that supports OpenAPI-style schemas.

@@ -1,0 +1,1011 @@
+---
+title: Handle async video processing
+product: video
+description: Learn how to notify your React Native app when Mux videos are ready using webhooks, realtime databases, and push notifications.
+---
+
+Video processing is asynchronous - whether you're uploading from a device or ingesting from a URL, there's always a delay while Mux processes the video. This guide shows you how to handle this gracefully in React Native.
+
+## Why video processing is async
+
+After you upload a video or create an asset from a URL, Mux needs time to:
+
+1. Download the video (if from URL)
+2. Transcode it into multiple formats and qualities
+3. Generate thumbnails and storyboards
+4. Prepare it for adaptive bitrate streaming
+
+This can take anywhere from **a few seconds** (short videos) to **several minutes** (long, high-resolution videos).
+
+## Asset states
+
+Mux assets go through several states:
+
+| State | Meaning | Action |
+|-------|---------|--------|
+| `preparing` | Video is being processed | Show loading UI |
+| `ready` | Video is ready to play | Display video player |
+| `errored` | Processing failed | Show error message |
+
+There are other intermediate states, but these are the main ones you'll need to handle in your app.
+
+## Getting notified when videos are ready
+
+Your backend receives webhook notifications from Mux when asset states change. Your React Native app then needs to know about these changes. There are three main patterns:
+
+### Pattern comparison
+
+| Pattern | Best For | Pros | Cons |
+|---------|----------|------|------|
+| **Realtime Database** | Production apps | Instant updates, efficient | Requires realtime infrastructure |
+| **Polling** | Simple apps, prototypes | Easy to implement | Server load, delayed updates |
+| **Push Notifications** | Long processes (>60s) | Works when app backgrounded | Requires notification permissions |
+
+---
+
+## Pattern 1: Realtime database (recommended)
+
+The best approach for production apps is to use a realtime database like Supabase or Firebase. Your backend updates the database via webhooks, and React Native subscribes to changes.
+
+### Architecture
+
+```
+Mux → Webhook → Your Backend → Database
+                                   ↓
+                              Realtime Update
+                                   ↓
+                           React Native App
+```
+
+### Backend: Handle Mux webhook
+
+See the [uploading videos guide](/docs/frameworks/react-native-uploading-videos) for the complete webhook handler. Here's the key part:
+
+```javascript
+// Backend: Webhook handler
+export async function handleMuxWebhook(req, res) {
+  // Verify signature (see main docs)
+  const event = req.body;
+
+  if (event.type === 'video.asset.ready') {
+    const { id, playback_ids, duration } = event.data;
+
+    // Update your database
+    await db.videos.update({
+      where: { muxAssetId: id },
+      data: {
+        status: 'ready',
+        playbackId: playback_ids[0].id,
+        duration,
+        updatedAt: new Date(),
+      },
+    });
+    // Database realtime will notify subscribed clients automatically
+  }
+
+  res.json({ received: true });
+}
+```
+
+### React Native: Subscribe to changes (Supabase)
+
+```tsx
+import React, { useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, Image } from 'react-native';
+import { supabase } from './lib/supabase';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+interface Video {
+  id: string;
+  status: 'processing' | 'ready' | 'failed';
+  playbackId: string | null;
+  duration: number | null;
+}
+
+interface VideoStatusProps {
+  videoId: string;
+}
+
+export default function VideoStatus({ videoId }: VideoStatusProps) {
+  const [video, setVideo] = useState<Video | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch initial video state
+    const fetchVideo = async () => {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('id', videoId)
+        .single();
+
+      if (data) {
+        setVideo(data);
+        setLoading(false);
+      }
+    };
+
+    fetchVideo();
+
+    // Subscribe to realtime updates
+    const subscription = supabase
+      .channel(`video-${videoId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'videos',
+          filter: `id=eq.${videoId}`,
+        },
+        (payload) => {
+          console.log('Video updated:', payload.new);
+          setVideo(payload.new as Video);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [videoId]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (video?.status === 'failed') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>
+          Video processing failed. Please try again.
+        </Text>
+      </View>
+    );
+  }
+
+  if (video?.status === 'processing' || !video?.playbackId) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.statusText}>Processing your video...</Text>
+        <Text style={styles.subText}>This usually takes 30-60 seconds</Text>
+      </View>
+    );
+  }
+
+  return <VideoPlayer playbackId={video.playbackId} />;
+}
+
+function VideoPlayer({ playbackId }: { playbackId: string }) {
+  const [showPoster, setShowPoster] = useState(true);
+  const posterUrl = `https://image.mux.com/${playbackId}/thumbnail.png?time=0`;
+
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  return (
+    <View style={styles.videoContainer}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls
+        contentFit="contain"
+        onFirstFrameRender={() => setShowPoster(false)}
+      />
+      {showPoster && (
+        <Image
+          source={{ uri: posterUrl }}
+          style={[styles.video, styles.poster]}
+          resizeMode="cover"
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  videoContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  poster: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  statusText: {
+    fontSize: 16,
+    marginTop: 15,
+    color: '#333',
+  },
+  subText: {
+    fontSize: 14,
+    marginTop: 5,
+    color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ff0000',
+    textAlign: 'center',
+  },
+});
+```
+
+### React Native: Subscribe to changes (Firebase)
+
+```tsx
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import firestore from '@react-native-firebase/firestore';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function VideoStatus({ videoId }: { videoId: string }) {
+  const [status, setStatus] = useState<'processing' | 'ready' | 'failed'>('processing');
+  const [playbackId, setPlaybackId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Subscribe to Firestore document changes
+    const unsubscribe = firestore()
+      .collection('videos')
+      .doc(videoId)
+      .onSnapshot((documentSnapshot) => {
+        const data = documentSnapshot.data();
+        if (data) {
+          setStatus(data.status);
+          if (data.status === 'ready') {
+            setPlaybackId(data.playbackId);
+          }
+        }
+      });
+
+    return () => unsubscribe();
+  }, [videoId]);
+
+  if (status === 'processing' || !playbackId) {
+    return <ActivityIndicator size="large" />;
+  }
+
+  return <VideoPlayer playbackId={playbackId} />;
+}
+
+function VideoPlayer({ playbackId }: { playbackId: string }) {
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.video}
+      nativeControls
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+});
+```
+
+<Callout type="info">
+  **Setup required:** Both Supabase and Firebase require configuration. See [Supabase Realtime docs](https://supabase.com/docs/guides/realtime) or [Firebase Firestore docs](https://firebase.google.com/docs/firestore) for setup instructions.
+</Callout>
+
+---
+
+## Pattern 2: Polling from React Native
+
+If you don't have realtime infrastructure, you can poll your backend for status updates. This is simpler but less efficient.
+
+<Callout type="warning">
+  Polling creates unnecessary server load and provides slower updates compared to realtime databases. Use this only for prototypes or simple apps.
+</Callout>
+
+```tsx
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+interface VideoPollerProps {
+  videoId: string;
+  pollInterval?: number; // milliseconds
+}
+
+export default function VideoPoller({
+  videoId,
+  pollInterval = 3000, // Poll every 3 seconds
+}: VideoPollerProps) {
+  const [status, setStatus] = useState<'processing' | 'ready' | 'failed'>('processing');
+  const [playbackId, setPlaybackId] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const maxAttempts = 60; // Stop after 3 minutes (60 * 3s)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const checkVideoStatus = async () => {
+      try {
+        const response = await fetch(
+          `https://your-api.com/videos/${videoId}/status`
+        );
+        const data = await response.json();
+
+        if (data.status === 'ready') {
+          setStatus('ready');
+          setPlaybackId(data.playbackId);
+          // Stop polling
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+        } else if (data.status === 'failed') {
+          setStatus('failed');
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+        } else {
+          setAttempts((prev) => prev + 1);
+        }
+      } catch (error) {
+        console.error('Failed to check video status:', error);
+      }
+    };
+
+    // Initial check
+    checkVideoStatus();
+
+    // Start polling
+    intervalRef.current = setInterval(() => {
+      if (attempts >= maxAttempts) {
+        // Timeout - stop polling
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        setStatus('failed');
+      } else {
+        checkVideoStatus();
+      }
+    }, pollInterval);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [videoId, attempts, pollInterval, maxAttempts]);
+
+  if (status === 'failed') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>
+          Video processing failed or timed out.
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'processing' || !playbackId) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.statusText}>
+          Processing... ({Math.floor((attempts * pollInterval) / 1000)}s)
+        </Text>
+      </View>
+    );
+  }
+
+  return <VideoPlayer playbackId={playbackId} />;
+}
+
+function VideoPlayer({ playbackId }: { playbackId: string }) {
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.video}
+      nativeControls
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  statusText: {
+    fontSize: 16,
+    marginTop: 10,
+    color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ff0000',
+    textAlign: 'center',
+  },
+});
+```
+
+### Polling best practices
+
+1. **Set a maximum number of attempts** - Don't poll forever
+2. **Use reasonable intervals** - 3-5 seconds is typical
+3. **Stop polling when done** - Clean up intervals on unmount
+4. **Handle errors gracefully** - Network issues happen
+5. **Show elapsed time** - Help users understand progress
+
+---
+
+## Pattern 3: Push notifications
+
+For longer processing times (AI video generation can take 30-120 seconds), push notifications ensure users are notified even if they navigate away or background the app.
+
+### Setup Expo Notifications
+
+```bash
+npx expo install expo-notifications expo-device expo-constants
+```
+
+### Request notification permissions
+
+```tsx
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+
+async function registerForPushNotificationsAsync() {
+  let token;
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      alert('Failed to get push token for push notification!');
+      return;
+    }
+
+    token = (await Notifications.getExpoPushTokenAsync()).data;
+  }
+
+  return token;
+}
+```
+
+### Send notification when video is ready (backend)
+
+```javascript
+// Backend: After video is ready
+async function notifyUserVideoReady(userId, videoId, playbackId) {
+  // Get user's push token from your database
+  const user = await db.users.findUnique({ where: { id: userId } });
+
+  if (user.pushToken) {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: user.pushToken,
+        title: 'Your video is ready! 🎉',
+        body: 'Tap to watch your AI-generated video',
+        data: { videoId, playbackId },
+      }),
+    });
+  }
+}
+```
+
+### Handle notification tap (React Native)
+
+```tsx
+import { useEffect, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
+
+export function useNotificationHandler() {
+  const navigation = useNavigation();
+  const notificationListener = useRef<any>();
+  const responseListener = useRef<any>();
+
+  useEffect(() => {
+    // Handle notification when app is foregrounded
+    notificationListener.current = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log('Notification received:', notification);
+      }
+    );
+
+    // Handle notification tap
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const { videoId } = response.notification.request.content.data;
+
+        // Navigate to video screen
+        navigation.navigate('Video', { videoId });
+      }
+    );
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener.current);
+      Notifications.removeNotificationSubscription(responseListener.current);
+    };
+  }, [navigation]);
+}
+```
+
+<Callout type="info">
+  Push notifications require additional setup including APNs (iOS) and FCM (Android) configuration. See [Expo Notifications docs](https://docs.expo.dev/push-notifications/overview/) for details.
+</Callout>
+
+---
+
+## UI patterns for processing states
+
+### Loading with progress indicator
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
+export function ProcessingIndicator({ estimatedTime = 60 }: { estimatedTime?: number }) {
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedTime((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const progress = Math.min((elapsedTime / estimatedTime) * 100, 95);
+
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#007AFF" />
+      <Text style={styles.title}>Generating your video</Text>
+      <Text style={styles.subtitle}>This usually takes {estimatedTime}s</Text>
+
+      <View style={styles.progressBar}>
+        <View style={[styles.progressFill, { width: `${progress}%` }]} />
+      </View>
+
+      <Text style={styles.time}>{elapsedTime}s elapsed</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 20,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
+  },
+  progressBar: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 2,
+    marginTop: 20,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+  },
+  time: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 10,
+  },
+});
+```
+
+### Success animation
+
+```tsx
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+} from 'react-native-reanimated';
+
+export function SuccessAnimation() {
+  const scale = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withSequence(
+      withSpring(1.2, { damping: 2 }),
+      withSpring(1)
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <View style={styles.container}>
+      <Animated.View style={[styles.checkmark, animatedStyle]}>
+        <Text style={styles.checkmarkText}>✓</Text>
+      </Animated.View>
+      <Text style={styles.text}>Video ready!</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  checkmark: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmarkText: {
+    fontSize: 48,
+    color: '#fff',
+  },
+  text: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 15,
+  },
+});
+```
+
+### Error with retry
+
+```tsx
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+
+interface ErrorStateProps {
+  message: string;
+  onRetry: () => void;
+}
+
+export function ErrorState({ message, onRetry }: ErrorStateProps) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.icon}>⚠️</Text>
+      <Text style={styles.title}>Processing Failed</Text>
+      <Text style={styles.message}>{message}</Text>
+
+      <TouchableOpacity style={styles.button} onPress={onRetry}>
+        <Text style={styles.buttonText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  icon: {
+    fontSize: 48,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+  message: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
+```
+
+## Complete workflow example
+
+Putting it all together - AI video generation with async handling:
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, Image } from 'react-native';
+import { supabase } from './lib/supabase';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { ProcessingIndicator } from './ProcessingIndicator';
+import { SuccessAnimation } from './SuccessAnimation';
+import { ErrorState } from './ErrorState';
+
+export default function AIVideoGenerator() {
+  const [prompt, setPrompt] = useState('');
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'generating' | 'processing' | 'ready' | 'failed'>('idle');
+  const [playbackId, setPlaybackId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!videoId) return;
+
+    // Subscribe to video status updates
+    const subscription = supabase
+      .channel(`video-${videoId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'videos',
+          filter: `id=eq.${videoId}`,
+        },
+        (payload) => {
+          const video = payload.new;
+          setStatus(video.status);
+
+          if (video.status === 'ready') {
+            setPlaybackId(video.playback_id);
+          } else if (video.status === 'failed') {
+            setError(video.error || 'Video generation failed');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [videoId]);
+
+  const generateVideo = async () => {
+    if (!prompt.trim()) return;
+
+    setStatus('generating');
+    setError(null);
+
+    try {
+      const response = await fetch('https://your-api.com/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await response.json();
+      setVideoId(data.videoId);
+      setStatus('processing');
+    } catch (err) {
+      setStatus('failed');
+      setError('Failed to start video generation');
+    }
+  };
+
+  const reset = () => {
+    setPrompt('');
+    setVideoId(null);
+    setStatus('idle');
+    setPlaybackId(null);
+    setError(null);
+  };
+
+  if (status === 'ready' && playbackId) {
+    return (
+      <View style={styles.container}>
+        <SuccessAnimation />
+        <VideoPlayer playbackId={playbackId} />
+        <TouchableOpacity style={styles.button} onPress={reset}>
+          <Text style={styles.buttonText}>Generate Another</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (status === 'failed') {
+    return (
+      <ErrorState
+        message={error || 'Something went wrong'}
+        onRetry={reset}
+      />
+    );
+  }
+
+  if (status === 'generating' || status === 'processing') {
+    return (
+      <View style={styles.container}>
+        <ProcessingIndicator estimatedTime={60} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Generate AI Video</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Describe your video..."
+        value={prompt}
+        onChangeText={setPrompt}
+        multiline
+        numberOfLines={4}
+      />
+      <TouchableOpacity
+        style={[styles.button, !prompt.trim() && styles.buttonDisabled]}
+        onPress={generateVideo}
+        disabled={!prompt.trim()}
+      >
+        <Text style={styles.buttonText}>Generate</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function VideoPlayer({ playbackId }: { playbackId: string }) {
+  const [showPoster, setShowPoster] = useState(true);
+  const posterUrl = `https://image.mux.com/${playbackId}/thumbnail.png?time=0`;
+
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  return (
+    <View style={styles.videoContainer}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls
+        contentFit="contain"
+        onFirstFrameRender={() => setShowPoster(false)}
+      />
+      {showPoster && (
+        <Image
+          source={{ uri: posterUrl }}
+          style={[styles.video, styles.poster]}
+          resizeMode="cover"
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  videoContainer: {
+    position: 'relative',
+    width: '100%',
+    marginVertical: 20,
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  poster: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+});
+```
+
+## Best practices
+
+1. **Always clean up subscriptions** - Prevent memory leaks
+2. **Show meaningful progress** - Elapsed time, estimated time remaining
+3. **Handle edge cases** - What if the user navigates away?
+4. **Set timeouts** - Don't wait forever (max 3-5 minutes)
+5. **Provide feedback** - Loading states, success animations, error messages
+6. **Allow cancellation** - Let users cancel long operations
+7. **Test on slow networks** - Video processing + slow network = long waits
+
+<Callout type="info">
+  For more details on webhook setup and verification, see the [listen for webhooks guide](/docs/core/listen-for-webhooks) in the main Mux documentation.
+</Callout>

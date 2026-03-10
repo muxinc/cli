@@ -1,0 +1,69 @@
+---
+title: Introduction to video clipping
+product: video
+description: >-
+  Overview of Mux's video clipping features, comparing instant clipping and asset-based clipping, with guidance on when to use each.
+---
+
+## Clipping video with Mux
+
+Mux provides two approaches for creating clips from your video content: **Instant Clipping** and **Asset-Based Clipping**. Each method is designed for different use cases, offering flexibility depending on your needs for speed, accuracy, and workflow.
+
+### Instant Clipping
+
+[Instant Clipping](/docs/guides/create-instant-clips) allows you to create clips instantly by specifying start and end times directly in the playback URL (using query parameters or JWT claims). This approach does not require re-encoding or creating a new asset, so clips are available immediately and at no extra encoding cost. Instant clipping operates at the segment level, so clips may start or end a few seconds outside your requested range, depending on the stream's segment duration.
+
+#### Key features:
+- No additional encoding or asset creation required
+- Clips are available instantly
+- No extra cost for encoding or storage
+- Segment-level accuracy (not frame-accurate)
+- Ideal for live streams and quick highlight creation
+
+**Learn more:** [Create instant clips](/docs/guides/create-instant-clips)
+
+### Asset-Based Clipping
+
+[Asset-Based Clipping](/docs/guides/create-clips-from-your-videos) creates a new, standalone asset from a portion of an existing video or live stream recording. This method involves a re-encoding process, resulting in a new asset with its own playback ID, and supports frame-accurate clipping. Asset-based clips incur encoding and storage costs and may take some time to process before they are ready for playback.
+
+#### Key features:
+- Creates a new asset with its own playback ID
+- Frame-accurate clipping
+- Supports additional features like watermarks and text tracks
+- Incurs encoding and storage costs
+- Suitable for polished, distributable clips or downloadable MP4s
+
+**Learn more:** [Create asset-based clips](/docs/guides/create-clips-from-your-videos)
+
+## Which clipping approach should you use?
+
+Choose **Instant Clipping** if:
+
+- You need clips to be available immediately
+- You want to avoid extra encoding costs
+- Segment-level accuracy is sufficient for your use case (e.g., live highlights, quick previews)
+- You want to limit playback to a specific range without creating a new asset
+
+Choose **Asset-Based Clipping** if:
+
+- You require frame-accurate clips
+- You need a new asset for distribution, download, or further processing
+- You want to add watermarks or preserve text tracks in the clip
+- You are willing to wait for processing and incur encoding/storage costs
+
+| Feature | Instant Clipping | Asset-Based Clipping |
+|---------|-----------------|---------------------|
+| Availability | ✅ Immediate | ⏳ Requires processing |
+| Frame Accuracy | ❌ Segment-level only | ✅ Frame-accurate |
+| Additional Encoding Cost | ❌ No | ✅ Yes |
+| Additional Storage Cost | ❌ No | ✅ Yes |
+| Watermark Support | ❌ No | ✅ Yes |
+| Text Track Support | ❌ No | ✅ Yes |
+| Downloadable MP4s | ❌ No | ✅ Yes |
+| Live Stream Support | ✅ Yes | ✅ Yes (recordings) |
+| Unique Playback ID | ❌ No | ✅ Yes |
+
+
+For a deeper dive into each approach, see the individual guides:
+- [Create instant clips](/docs/guides/create-instant-clips)
+- [Create asset-based clips](/docs/guides/create-clips-from-your-videos)

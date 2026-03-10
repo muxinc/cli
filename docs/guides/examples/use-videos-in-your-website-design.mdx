@@ -1,0 +1,426 @@
+---
+title: Use videos in your website design
+product: video
+description: Learn the easiest way to add background and hero videos to your website.
+steps:
+  - title: Two types of video
+    description: A brief overview of background videos and hero videos
+    topic: Overview
+  - title: Background video
+    description: Display background videos with Mux Background Video
+    topic: Background Videos
+  - title: Hero Videos
+    description: Show hero videos using Mux Player
+    topic: Hero Videos
+---
+
+# Use videos in your website design
+
+Video has a wide range of uses, but when you're building a marketing page there are two very common choices: Background videos and Hero videos.
+
+This guide covers the best way to add both types of video to your website.
+
+<LinkedHeader step={steps[0]} />
+
+### Background Videos
+
+<script type="module" src="https://cdn.jsdelivr.net/npm/@mux/mux-background-video/html/+esm"></script>
+
+<div style={{ position: 'relative', width: '100%' }}>
+  <mux-background-video
+    src="https://stream.mux.com/kF01v9aKFlY63i2GkQKQGDv5Y9PbMGdtQD92j5qJCYWU.m3u8"
+    style={{ width: '100%', height: 'auto', display: 'block' }}
+  >
+    <img
+      src="https://image.mux.com/kF01v9aKFlY63i2GkQKQGDv5Y9PbMGdtQD92j5qJCYWU/thumbnail.webp?time=0"
+      alt="Background video example"
+      style={{ width: '100%', height: 'auto', display: 'block' }}
+    />
+  </mux-background-video>
+
+  <div style={{
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px'
+  }}>
+    <div style={{
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      padding: '16px',
+      borderRadius: '8px',
+      backdropFilter: 'blur(4px)',
+      color: 'white',
+      maxWidth: "400px",
+    }}>
+
+      <p style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Short, looping clips that autoplay silently, such as hero banners, product previews, or ambient visuals.</p>
+      <ul style={{ margin: 0, paddingLeft: '20px', listStyleType: 'disc', fontSize: '14px' }}>
+        <li>Short (often 5-60 seconds long)</li>
+        <li>Muted</li>
+        <li>Loop continuously</li>
+        <li>Autoplay on page load</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+### Hero Videos
+
+Informational videos such as product demos, explainers, customer testimonials, and promotional content. These have sound, playback controls, and can be any length.
+  - Any length
+  - User-controlled (play, pause, seek)
+  - Sound enabled
+
+#### Hero Video example
+<iframe
+  src="https://player.mux.com/lSHERjOdEb4T01F5JzfX01qGPrITp6i01hvqYGdhpvHcyM?metadata-video-title=Hero+Video+Example&video-title=Hero+Video+Example"
+  style={{ "width": "100%", "border": "none", "aspect-ratio": "16/9" }}
+  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+  allowFullScreen
+></iframe>
+
+
+---
+
+<LinkedHeader step={steps[1]} />
+
+The recommended way to add background videos to your website is with **Mux Background Video**, a lightweight component that uses HLS streaming to deliver the right quality for each viewer's screen size and network conditions.
+
+- **Adaptive streaming** — Automatically adjusts quality based on network conditions
+- **Resolution control** — Set a maximum resolution to optimize for your layout
+- **Analytics ready** — Optional Mux Data integration for tracking engagement
+- **Lightweight** — Minimal bundle size with no dependencies
+
+### 1. Add the Background Component to Your Page
+
+#### HTML Custom Element
+
+Add the following to your HTML page. This example uses a sample video—you'll replace the playback ID with your own in the next step.
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- Remove this script if you don't want Mux Data analytics -->
+  <script defer src="https://cdn.jsdelivr.net/npm/mux-embed"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@mux/mux-background-video/html/+esm"></script>
+  <style>
+    mux-background-video,
+    mux-background-video img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  <mux-background-video src="https://stream.mux.com/kF01v9aKFlY63i2GkQKQGDv5Y9PbMGdtQD92j5qJCYWU.m3u8">
+    <img src="https://image.mux.com/kF01v9aKFlY63i2GkQKQGDv5Y9PbMGdtQD92j5qJCYWU/thumbnail.webp?time=0" alt="Background video" />
+  </mux-background-video>
+</body>
+</html>
+```
+
+The `<img>` element inside acts as a poster image while the video loads.
+
+#### React Component
+
+For React applications, install the package:
+
+```bash
+npm install @mux/mux-background-video
+```
+
+```tsx
+import { MuxBackgroundVideo } from '@mux/mux-background-video/react';
+
+function BackgroundVideoSection() {
+  return (
+    <MuxBackgroundVideo src="https://stream.mux.com/kF01v9aKFlY63i2GkQKQGDv5Y9PbMGdtQD92j5qJCYWU.m3u8">
+      <img src="https://image.mux.com/kF01v9aKFlY63i2GkQKQGDv5Y9PbMGdtQD92j5qJCYWU/thumbnail.webp?time=0" alt="Background video" />
+    </MuxBackgroundVideo>
+  );
+}
+```
+
+### 2. Upload Your Video and Replace the Playback ID
+
+To use your own video:
+
+1. Go to **Assets** in the Mux Dashboard and click **Upload**
+2. Select your video file
+3. For video quality, select **Basic** (recommended for background videos)
+4. Click **Upload**
+
+Once the upload is complete, copy your **Playback ID** from the asset details page and replace the sample playback ID in your code.
+
+<Callout type="info">
+Mux Background Video requires [Basic](https://www.mux.com/docs/guides/use-video-quality-levels#basic) or [Premium](https://www.mux.com/docs/guides/use-video-quality-levels#premium) video quality.
+</Callout>
+
+### 3. Set Maximum Resolution
+
+Limit the resolution to match your layout and save bandwidth:
+
+```html
+<mux-background-video
+  src="https://stream.mux.com/{PLAYBACK_ID}.m3u8"
+  max-resolution="720p"
+>
+  <img src="https://image.mux.com/{PLAYBACK_ID}/thumbnail.webp?time=0" alt="Background video" />
+</mux-background-video>
+```
+
+For React:
+
+```tsx
+<MuxBackgroundVideo
+  src="https://stream.mux.com/{PLAYBACK_ID}.m3u8"
+  maxResolution="720p"
+>
+  <img src="https://image.mux.com/{PLAYBACK_ID}/thumbnail.webp?time=0" alt="Background video" />
+</MuxBackgroundVideo>
+```
+
+### 4. Pause When Not Visible (Optional)
+
+Background videos continue playing even when users switch to another browser tab. To save CPU and battery, you can pause the video when the page is hidden:
+
+```js
+document.addEventListener('visibilitychange', () => {
+  const video = document.querySelector('mux-background-video video');
+  if (document.hidden) {
+    video.pause();
+  } else {
+    video.play();
+  }
+});
+```
+
+For complete API documentation and advanced options, see the [Mux Background Video guide](/docs/guides/mux-background-video).
+
+---
+
+## Alternative: Static MP4 Files
+
+You can also serve background videos as static MP4 files instead of using HLS streaming. Each approach has its own strengths.
+
+**Why choose MP4:**
+- No JavaScript required—just a `<video>` tag
+- Works on legacy devices and browsers
+- Better for very short clips (under 10 seconds)
+- Downloaded once and cached by the browser
+
+**Why choose HLS (Mux Background Video):**
+- Adaptive streaming adjusts quality to network conditions
+- Lower bandwidth usage on slow connections
+- Videos are ready to play sooner after upload
+
+MP4 files have a small additional cost for storage. See [video pricing](/docs/pricing/video#static-rendition-mp4s-storage) for details.
+
+### Enable Static Renditions
+
+To use MP4 files, enable static renditions when creating your asset. You can do this in both the Mux Dashboard and via the API by including the `static_renditions` property:
+
+```json
+{
+  "playback_policies": ["public"],
+  "video_quality": "basic",
+  "static_renditions": [{ "resolution": "highest" }]
+}
+```
+
+**In the Mux Dashboard:** Click **Advanced** when uploading to reveal the JSON editor, then add the `static_renditions` property shown above.
+
+**Via the API:** Include the `static_renditions` property in your [asset creation request](/api/reference/video#operation/create-asset).
+
+### Embed the Video
+
+```html
+<video
+  src="https://stream.mux.com/{PLAYBACK_ID}/highest.mp4"
+  poster="https://image.mux.com/{PLAYBACK_ID}/thumbnail.jpg"
+  autoplay
+  loop
+  muted
+  playsinline
+></video>
+```
+
+The key attributes:
+- `autoplay` — Start immediately
+- `muted` — Required for autoplay to work in browsers
+- `loop` — Replay continuously
+- `playsinline` — Prevent fullscreen on mobile
+
+For more details on static renditions, see [Use static MP4 and M4A renditions](/docs/guides/enable-static-mp4-renditions).
+
+---
+
+<LinkedHeader step={steps[2]} />
+
+For product demos, explainers, testimonials, and promotional content, you need a different approach than background videos. These videos are typically longer, users actively watch them, and they need playback controls (play, pause, seek, volume).
+
+The **Mux Player** is built for this use case. It provides adaptive quality that adjusts to network conditions, full playback controls, and custom branding.
+
+## Mux Player
+
+Mux Player is a customizable video player with built-in adaptive streaming, playback controls, and branding options for delivering high-quality video experiences on your website.
+
+- **Adaptive streaming** — Quality adjusts automatically to network conditions
+- **Full controls** — Play, pause, seek, volume, fullscreen
+- **Custom branding** — Match your website's colors
+- **Captions** — Built-in support for accessibility
+- **Works everywhere** — Responsive and mobile-friendly
+
+## Implementation
+
+### 1. Upload Your Video
+
+In the Mux Dashboard:
+
+1. Go to **Assets** and click **Upload**
+2. Select your video file
+3. For video quality, select **Basic** (recommended for website videos)
+4. Optionally enable **Auto-generated captions** to automatically generate captions from your video's audio for improved accessibility
+5. Click **Upload**
+
+Once the upload is complete, copy your **Playback ID** from the asset details page.
+
+### 2. Embed the Player
+
+Add an iframe to your page. You can also copy this code directly from the **Playback and Thumbnails** tab on the asset details page in the Dashboard.
+
+```html
+<iframe
+  src="https://player.mux.com/{PLAYBACK_ID}"
+  style="aspect-ratio: 16/9; width: 100%;"
+  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+  allowfullscreen="true"
+></iframe>
+```
+
+You now have a fully functional video player that looks like this.
+
+<iframe
+  src="https://player.mux.com/lSHERjOdEb4T01F5JzfX01qGPrITp6i01hvqYGdhpvHcyM?metadata-video-title=Docs+Hero+Video+Example+%5BDon%27t+Delete%5D&video-title=Docs+Hero+Video+Example+%5BDon%27t+Delete%5D"
+  style={{"width": "100%", "border": "none", "aspect-ratio": "16/9"}}
+  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+  allowfullscreen
+></iframe>
+
+## Controlling Playback Resolution
+
+When you upload a video, Mux creates multiple versions of it at different resolutions (like 480p, 720p, 1080p). These versions are called renditions. Lower resolution renditions download faster on slow connections, while higher resolution renditions look sharper on larger screens.
+
+By default, Mux automatically picks the best rendition for each viewer. You can also set minimum and maximum resolutions to control which renditions are available.
+
+### Setting a Minimum Resolution
+
+You can use `min-resolution` to exclude lower resolution renditions:
+
+```html
+src="https://player.mux.com/{PLAYBACK_ID}?min-resolution=720p"
+```
+
+**Why set a minimum resolution?**
+
+- **Visual quality matters**: If your video contains text, product details, or screen recordings, low resolutions can make content hard to read
+- **Brand perception**: You may not want viewers to ever see a pixelated version of your marketing content
+- **Known audience**: If your viewers are primarily on desktop with reliable connections, there's no need to serve 360p or 480p
+
+### Setting a Maximum Resolution
+
+You can use `max-resolution` to cap the highest quality served:
+
+```html
+src="https://player.mux.com/{PLAYBACK_ID}?max-resolution=1080p"
+```
+
+**Why set a maximum resolution?**
+
+- **Embedded player size**: If your video displays at 720p on the page, serving 4K is unnecessary
+- **Bandwidth control**: Limit data usage for viewers on metered connections
+- **Consistency**: Ensure all viewers get a similar experience regardless of their device capabilities
+- **Cost**: Higher resolutions cost more to deliver, so capping resolution can reduce your bill.
+
+### Combining Both
+
+You can use both parameters together to define a specific range:
+
+```html
+<!-- Only serve 720p and 1080p -->
+src="https://player.mux.com/{PLAYBACK_ID}?min-resolution=720p&max-resolution=1080p"
+```
+
+This excludes both the lower renditions (480p, 360p, 270p) and higher ones (1440p, 2160p), giving you precise control over the viewing experience.
+
+Available values: 270p, 360p, 480p, 540p, 720p, 1080p, 1440p, 2160p
+
+## Customization
+
+You can customize the player by adding parameters to the URL.
+
+### Brand Colors
+
+You can set `accent-color` to match your brand. This colors the play button, progress bar, and controls:
+
+```html
+<iframe
+  src="https://player.mux.com/{PLAYBACK_ID}?min-resolution=720p&accent-color=%235D3FD3"
+  style="aspect-ratio: 16/9; width: 100%;"
+  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+  allowFullScreen="true"
+></iframe>
+```
+
+### Thumbnail
+
+Mux automatically generates a thumbnail from your video. You can also specify a time, use a custom URL, or use a GIF.
+
+```html
+<!-- Default thumbnail -->
+src="https://player.mux.com/{PLAYBACK_ID}"
+
+<!-- Thumbnail at 10 seconds -->
+src="https://player.mux.com/{PLAYBACK_ID}?thumbnail-time=10"
+```
+
+See [Get images from a video](/docs/guides/get-images-from-a-video) for more thumbnail options.
+
+### Sizing
+
+Control the player size with CSS:
+
+```html
+<iframe
+  src="https://player.mux.com/{PLAYBACK_ID}?min-resolution=720p"
+  style="aspect-ratio: 16/9; width: 100%; max-width: 800px;"
+  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+  allowfullscreen="true"
+></iframe>
+```
+
+## Captions
+
+If you enabled auto-generated captions during upload, the player automatically shows the captions button once they're ready. No additional configuration needed.
+
+Mux supports auto-generated captions in English, French, German, Italian, Portuguese, Spanish, and many other languages.
+
+See [Add subtitles to your videos](/docs/guides/add-subtitles-to-your-videos) for more details.
+
+
+## FAQ
+
+### How do I make sure my videos are cached properly
+
+For looping videos, the browser will cache the video and not re-request it on each loop. With short videos, caching typically happens quickly—once the video is fully downloaded, subsequent loops play from cache.
+
+**How to verify:**
+Open DevTools, watch the Network tab, and let a video loop a few times. Cached requests may not show up at all, or they may indicate that they were "(from cache)" or "(from disk cache)".

@@ -1,0 +1,359 @@
+---
+title: Play DRM protected videos on Google Cast Devices
+product: video
+description: Learn how to use Google Cast with DRM-protected Mux Video content.
+---
+
+Google Cast is a popular method for sending video from one device to be played on another, often from a phone to a TV. Most players support Google Cast out of the box, but if your video is protected by DRM, you will need to do a little more work.
+
+## Overview
+
+Google Cast integrations are made up of two parts, a "sender" and a "receiver". In the example of a phone casting to a TV, the player in a mobile browser is the sender and the receiver is a webpage sent to the TV.
+
+There are quite a few steps in this process, so here's a quick overview:
+
+1. Create a sender, either with the Mux Player or by writing your own
+2. Create your playback ID, playback token and DRM token, and add them to the sender
+3. Register your test device in the Google Cast dashboard
+4. Create a custom receiver and register it on the Google Cast dashboard
+5. Add the registered receiver ID to the custom sender
+
+## Sender Setup
+
+A Google Cast sender is an app with a "cast" button. Clicking the cast button performs two actions.
+
+1. If you're not yet connected to another device, the cast button helps set up that connection.
+2. Once you're connected to a device, the sender sends everything needed to play a video to the receiver.
+
+In this section we'll walk through how to write your own web-based Google Cast sender.
+
+### Mux Player Sender
+
+The easiest way to set up your own sender is with [Mux Player for Web](/docs/guides/mux-player-web). In addition to the usual `playback-id` property, you'll need to include additional security and Google Cast fields:
+
+- `playback-token`: A signed playback token, as documented in our [Guide to Secured Video Playback](/docs/guides/secure-video-playback)
+- `drm-token`: A signed DRM token, as documented in the [Sign a DRM license token](/docs/guides/protect-videos-with-drm#sign-a-drm-license-token) section of our DRM guide
+- `cast-receiver`: The application ID of your custom receiver, as documented in the [Custom Receiver](#receiver-setup) section below
+
+<Callout type="info">
+This is only supported in Mux Player version 3.4.1 or greater
+</Callout>
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mux/mux-player" defer></script>
+<mux-player
+  id="player"
+  playback-id="your-playback-id"
+  playback-token="your-playback-token"
+  drm-token="your-drm-token"
+  cast-receiver="your-cast-receiver-app-id"
+></mux-player>
+```
+
+### Custom Web Sender
+
+If you're not using Mux Player, Google offers SDKs for [Web](https://developers.google.com/cast/docs/web_sender), [Android](https://developers.google.com/cast/docs/android_sender) and [iOS](https://developers.google.com/cast/docs/ios_sender). In this section we'll walk through installing the Web SDK and sending a video with DRM to a custom receiver.
+
+#### Requirements
+
+Before you build your own custom web sender, you'll need to create a [playback token](https://www.mux.com/docs/guides/secure-video-playback) and a [DRM license token](https://www.mux.com/docs/guides/protect-videos-with-drm#sign-a-drm-license-token).
+
+**Note:** Google Cast and DRM only works in secure contexts, such as HTTPS or localhost.
+
+#### Import Cast SDK
+
+Include the following script wherever you want to show a cast button.
+
+```html
+<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+```
+
+#### Configure Cast SDK
+
+Before we can cast any videos we need to configure the cast context. The cast framework gives us a great place to do that, in the global `__onGCastApiAvailable` function.
+
+```javascript
+window['__onGCastApiAvailable'] = function(isAvailable) {
+  if (isAvailable) {
+    cast.framework.CastContext.getInstance().setOptions({
+      receiverApplicationId: 'your-receiver-app-id',
+      autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+    });
+  }
+};
+```
+
+For DRM, you'll need to build your own receiver and add the ID to `receiverApplicationId`. We can help you with that in our [custom receiver guide](#receiver-setup).
+
+#### Send Video to Receiver
+
+Let's write a function to encapsulate sending our video over to the receiver.
+
+First we're going to collect all the data we need to play the video in variables at the top.
+
+```javascript
+function playVideo(context) {
+  const playbackId = 'your-playback-id';
+  const playbackToken = 'your-playback-token';
+  const drmToken = 'your-drm-token';
+  const mediaUrl = `https://stream.mux.com/${playbackId}.m3u8?token=${playbackToken}`;
+```
+
+Each of these variables help identify a single asset.
+
+- `playbackId`: An asset can have one or many playback IDs. This is different from the asset ID. You can find it in the API, or in the Mux Dashboard.
+- `playbackToken`: A signed playback token, as documented in our [Guide to Secured Video Playback](https://www.mux.com/docs/guides/secure-video-playback).
+- `drmToken`: A signed DRM token, as documented in the [Sign a DRM license token](https://www.mux.com/docs/guides/protect-videos-with-drm#sign-a-drm-license-token) section of our DRM guide.
+
+Then we'll build a `MediaInfo` object to include all the information Google Cast needs to play the video.
+
+```javascript
+let mediaInfo = new chrome.cast.media.MediaInfo(mediaUrl, 'application/x-mpegurl');
+
+// Mux HLS URLs with DRM will always use `fmp4` segments.
+mediaInfo.hlsSegmentFormat = chrome.cast.media.HlsSegmentFormat.FMP4;
+mediaInfo.hlsVideoSegmentFormat = chrome.cast.media.HlsVideoSegmentFormat.FMP4;
+
+// Send the information needed to create a new license url.
+mediaInfo.customData = {
+  mux: {
+    playbackId,
+    tokens: {
+      drm: drmToken
+    }
+  }
+}
+```
+
+And finally we'll ask the receiver to load the video.
+
+```javascript
+const request = new chrome.cast.media.LoadRequest(mediaInfo);
+
+// Cast the video.
+context.getCurrentSession().loadMedia(request).then(() => {
+  console.log('Successfully loaded the media');
+}).catch((err) => {
+  console.log(`Media playback error code: ${err}`);
+});
+```
+
+Here's the function in its entirety:
+
+<CollapsibleRoot>
+  <CollapsibleTrigger>
+    View example code
+  </CollapsibleTrigger>
+  <CollapsibleContent>
+    ```javascript
+    function playVideo(context) {
+      const playbackId = 'your-playback-id';
+      const playbackToken = 'your-playback-token';
+      const drmToken = 'your-drm-token';
+      const mediaUrl = `https://stream.mux.com/${playbackId}.m3u8?token=${playbackToken}`;
+      let mediaInfo = new chrome.cast.media.MediaInfo(mediaUrl, 'application/x-mpegurl');
+
+      // Mux HLS URLs with DRM will always use `fmp4` segments.
+      mediaInfo.hlsSegmentFormat = chrome.cast.media.HlsSegmentFormat.FMP4;
+      mediaInfo.hlsVideoSegmentFormat = chrome.cast.media.HlsVideoSegmentFormat.FMP4;
+
+      // Send the information needed to create a new license url.
+      mediaInfo.customData = {
+        mux: {
+          playbackId,
+          tokens: {
+            drm: drmToken
+          }
+        }
+      }
+
+      const request = new chrome.cast.media.LoadRequest(mediaInfo);
+
+      // Cast the video.
+      context.getCurrentSession().loadMedia(request).then(() => {
+        console.log('Load Succeeded');
+      }).catch((err) => {
+        console.log(`Error code: ${errorCode}`);
+      });
+    }
+    ```
+  </CollapsibleContent>
+</CollapsibleRoot>
+
+Now we need to hook it up to the cast action. In this example we'll send it as soon as possible by listening for the cast session to start.
+
+```javascript
+let context = cast.framework.CastContext.getInstance();
+context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function(event) {
+  switch (event.sessionState) {
+    case cast.framework.SessionState.SESSION_STARTED:
+    case cast.framework.SessionState.SESSION_RESUMED:
+      playVideo(context);
+      break;
+  }
+});
+```
+
+#### Add Cast Button
+
+Once all your code is hooked up, adding the button is the easiest part. Put this in the HTML of your page and you're good to go.
+
+```html
+<google-cast-launcher>Launch</google-cast-launcher>
+```
+
+**More Docs**
+
+- [JavaScript SDK](https://developers.google.com/cast/docs/web_sender)
+- [iOS SDK](https://developers.google.com/cast/docs/ios_sender)
+- [Android SDK](https://developers.google.com/cast/docs/android_sender)
+
+## Receiver Setup
+
+A Google Cast receiver is a web page that receives data from a sender and plays your video. This is always a webpage, written in HTML and JavaScript, even if you're using a mobile SDK for casting.
+
+### Receiver Prerequisites
+
+Before we can write the code, we need to take care of a couple prerequisites.
+
+1. You need a way for devices to access this web page with a public URL. We recommend either you host the files yourself, or use [ngrok](https://ngrok.com/docs/getting-started/) during development to expose local files on a public URL.
+2. You need to register the receiver's public URL with Google in the [Google Cast SDK Developer Console](https://cast.google.com/u/1/publish/). If you have not joined the Google Cast Developer program, do so now.
+3. Once you have registered your receiver, you will see your app listed in the [dashboard](https://cast.google.com/u/0/publish/) with a unique Application ID. This is the same receiver ID you will configure in the [Mux Player](https://www.mux.com/docs/guides/mux-player-web) or [Custom Sender](#sender-setup).
+4. Until your app is published, you can only cast to registered development devices. This registration requires the destination device's serial number. If you can't find the serial number on the outside of the device, you can use the Chrome browser to cast the [dashboard](https://developers.google.com/cast/codelabs/cast-receiver) directly to the device. This will show a new screen, prominently displaying the device's serial number.
+
+### Receiver Implementation
+
+Google's custom receiver SDK has a lot of functionality built in, so we don't have to do a lot of work. The only thing we need to do is manage the DRM license URL. Before we start working with License URLs, we'll want a small HTML file to describe the playback UI. Here's a minimal example.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title></title>
+        <!-- Web Receiver SDK -->
+        <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+        <!-- Cast Debug Logger -->
+        <script src="//www.gstatic.com/cast/sdk/libs/devtools/debug_layer/caf_receiver_logger.js"></script>
+    </head>
+
+    <body>
+        <cast-media-player></cast-media-player>
+        <footer>
+            <script src="js/receiver.js"></script>
+        </footer>
+    </body>
+</html>
+```
+
+In the above example, the two script tags in the header load the SDK and the Google Cast logger. Further on you'll see a `<cast-media-player>`, which the Google Cast SDK automatically turns into a video player, and a script for managing the DRM.
+
+Now let's create that script. To start, we're going to grab a reference to the cast context and configure the logger.
+
+```javascript
+const context = cast.framework.CastReceiverContext.getInstance();
+
+/**
+ * DEBUGGING
+ */
+const castDebugLogger = cast.debug.CastDebugLogger.getInstance();
+const LOG_TAG = 'MUX';
+castDebugLogger.setEnabled(true);
+
+// Debug overlay on tv screen.
+// You don't need this if you're debugging using the cast tool (https://casttool.appspot.com/cactool) as it will show the logs in your browser.
+castDebugLogger.showDebugLogs(true);
+
+castDebugLogger.loggerLevelByTags = {
+  [LOG_TAG]: cast.framework.LoggerLevel.DEBUG,
+};
+```
+
+Next we're going to intercept all playback requests and see if the request includes DRM license information.
+
+```javascript
+context.getPlayerManager().setMediaPlaybackInfoHandler((loadRequest, playbackConfig) => {
+  const customData = loadRequest.media.customData || {};
+
+  if(customData.mux && customData.mux.tokens.drm){
+```
+
+In that conditional, let's build our license URL and add it to the `playbackConfig`.
+
+```javascript
+    playbackConfig.licenseUrl = `https://license.mux.com/license/widevine/${customData.mux.playbackId}?token=${customData.mux.tokens.drm}`;
+  }
+
+  playbackConfig.protectionSystem = cast.framework.ContentProtection.WIDEVINE;
+  castDebugLogger.debug(LOG_TAG, 'license url', playbackConfig.licenseUrl);
+
+  return playbackConfig;
+});
+```
+
+Finally, we start listening for incoming requests with the line
+
+```javascript
+context.start();
+```
+
+Click the button below to view the full JavaScript file.
+
+<CollapsibleRoot>
+  <CollapsibleTrigger>
+    View example code
+  </CollapsibleTrigger>
+  <CollapsibleContent>
+    ```javascript
+    /**
+     * DEBUGGING
+     */
+    // https://developers.google.com/cast/docs/debugging/cast_debug_logger
+    const castDebugLogger = cast.debug.CastDebugLogger.getInstance();
+    const LOG_TAG = 'MUX';
+    castDebugLogger.setEnabled(true);
+
+    // Debug overlay on tv screen. You don't need this if you're debugging using the cast tool (https://casttool.appspot.com/cactool) as it will show the logs in your browser.
+    castDebugLogger.showDebugLogs(true);
+
+    castDebugLogger.loggerLevelByTags = {
+        [LOG_TAG]: cast.framework.LoggerLevel.DEBUG,
+    };
+
+    /**
+     * DRM SUPPORT
+     */
+    context.getPlayerManager().setMediaPlaybackInfoHandler((loadRequest, playbackConfig) => {
+      const customData = loadRequest.media.customData || {};
+
+      if(customData.mux && customData.mux.tokens.drm){
+        castDebugLogger.debug(LOG_TAG, 'Setting license URL.');
+        playbackConfig.licenseUrl = `https://license.mux.com/license/widevine/${customData.mux.playbackId}?token=${customData.mux.tokens.drm}`;
+      }
+
+      playbackConfig.protectionSystem = cast.framework.ContentProtection.WIDEVINE;
+
+      castDebugLogger.debug(LOG_TAG, 'license url', playbackConfig.licenseUrl);
+
+      return playbackConfig;
+    });
+
+    /**
+     * START LISTENING FOR CASTS
+     */
+    context.start();
+    ```
+  </CollapsibleContent>
+</CollapsibleRoot>
+
+## More docs
+
+- [Google's custom receiver docs](https://developers.google.com/cast/codelabs/cast-receiver#0)
+- [Debug logger docs](https://developers.google.com/cast/docs/debugging/cast_debug_logger)
+- [Adding the Mux Data SDK to Chromecast](https://www.mux.com/docs/guides/monitor-chromecast)
+
+## Testing
+
+Once you've completed every step (Triple check the [overview](#overview) steps!) load up your sender, click the cast button and choose to cast to your test device. After a quick loading screen your DRM-protected video will start playing.
+
+If you're testing our example, the video will automatically start playing behind the cast log. You can remove the cast log by commenting out the line `castDebugLogger.setEnabled(true);` in your custom receiver.

@@ -1,0 +1,644 @@
+---
+title: API reference for React Native
+product: video
+description: Quick reference for common Mux API operations from a React Native context
+---
+
+# API reference for React Native
+
+This guide covers the most common Mux API operations you'll use when building a React Native app. For complete API documentation, see the <ApiRefLink product="video" slug="">Video API reference</ApiRefLink>.
+
+<Callout type="warning">
+**Never call Mux APIs directly from React Native.** All API calls must go through your backend server. Never expose Mux API credentials in client-side code.
+</Callout>
+
+## Common Architecture Pattern
+
+```
+React Native App ←→ Your Backend ←→ Mux API
+```
+
+Your backend acts as a proxy, handling authentication and making secure Mux API calls. React Native sends requests to your backend, which then communicates with Mux.
+
+## Asset Management
+
+### Create Asset from URL
+
+**When to use**: Ingesting AI-generated videos or content from external URLs (like Slop Social's AI workflow).
+
+**React Native perspective**: Your app triggers the backend to ingest a video URL, then listens for webhook/realtime updates when ready.
+
+```javascript
+// Backend code (Node.js with Mux SDK)
+import Mux from '@mux/mux-node';
+
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID,
+  tokenSecret: process.env.MUX_TOKEN_SECRET,
+});
+
+// Backend endpoint
+app.post('/api/ingest-video', async (req, res) => {
+  const { videoUrl, userId } = req.body;
+
+  const asset = await mux.video.assets.create({
+    input: [{ url: videoUrl }],
+    playback_policy: ['public'], // or ['signed'] for private
+    mp4_support: 'standard', // optional: enable MP4 downloads
+  });
+
+  // Save to database
+  await db.videos.create({
+    userId,
+    muxAssetId: asset.id,
+    status: 'preparing',
+  });
+
+  res.json({ assetId: asset.id });
+});
+```
+
+```tsx
+// React Native code
+const ingestAIVideo = async (videoUrl: string) => {
+  const response = await fetch('https://your-api.com/api/ingest-video', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ videoUrl }),
+  });
+
+  const { assetId } = await response.json();
+  return assetId;
+};
+```
+
+**API reference**: <ApiRefLink product="video" slug="operation/create-asset">Create Asset</ApiRefLink>
+
+---
+
+### Create Direct Upload URL
+
+**When to use**: User is uploading a video from their device (camera or library).
+
+**React Native perspective**: Request upload URL from backend, then upload file directly to Mux from device.
+
+```javascript
+// Backend code
+app.post('/api/generate-upload-url', async (req, res) => {
+  const { userId } = req.body;
+
+  const upload = await mux.video.uploads.create({
+    cors_origin: '*', // Set to your app's origin in production
+    new_asset_settings: {
+      playback_policy: ['public'],
+    },
+  });
+
+  // Save upload ID to associate with user
+  await db.uploads.create({
+    userId,
+    muxUploadId: upload.id,
+    uploadUrl: upload.url,
+  });
+
+  res.json({
+    uploadUrl: upload.url,
+    uploadId: upload.id,
+  });
+});
+```
+
+```tsx
+// React Native code
+import * as FileSystem from 'expo-file-system';
+
+const uploadVideo = async (videoUri: string) => {
+  // Step 1: Get upload URL
+  const response = await fetch('https://your-api.com/api/generate-upload-url', {
+    method: 'POST',
+  });
+  const { uploadUrl, uploadId } = await response.json();
+
+  // Step 2: Upload video
+  await FileSystem.uploadAsync(uploadUrl, videoUri, {
+    httpMethod: 'PUT',
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+  });
+
+  return uploadId;
+};
+```
+
+**API reference**: <ApiRefLink product="video" slug="operation/create-direct-upload">Create Direct Upload</ApiRefLink>
+
+---
+
+### Get Asset Details
+
+**When to use**: Checking asset status, getting playback IDs, or retrieving video metadata.
+
+**React Native perspective**: Backend polls asset status or responds to webhook, then updates database. React Native reads from database or backend endpoint.
+
+```javascript
+// Backend code
+app.get('/api/asset/:assetId', async (req, res) => {
+  const { assetId } = req.params;
+
+  const asset = await mux.video.assets.retrieve(assetId);
+
+  res.json({
+    id: asset.id,
+    status: asset.status, // 'preparing', 'ready', 'errored'
+    playbackIds: asset.playback_ids,
+    duration: asset.duration,
+    aspectRatio: asset.aspect_ratio,
+  });
+});
+```
+
+```tsx
+// React Native code
+const getAssetStatus = async (assetId: string) => {
+  const response = await fetch(`https://your-api.com/api/asset/${assetId}`);
+  const asset = await response.json();
+
+  if (asset.status === 'ready') {
+    const playbackId = asset.playbackIds[0].id;
+    return playbackId;
+  }
+
+  return null;
+};
+```
+
+**API reference**: <ApiRefLink product="video" slug="operation/get-asset">Get Asset</ApiRefLink>
+
+---
+
+### Delete Asset
+
+**When to use**: User deletes their video or content moderation removes a video.
+
+**React Native perspective**: App requests deletion from backend, backend calls Mux API.
+
+```javascript
+// Backend code
+app.delete('/api/asset/:assetId', async (req, res) => {
+  const { assetId } = req.params;
+  const { userId } = req.user; // From auth middleware
+
+  // Verify user owns this asset
+  const video = await db.videos.findOne({ muxAssetId: assetId, userId });
+  if (!video) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  // Delete from Mux
+  await mux.video.assets.delete(assetId);
+
+  // Delete from database
+  await db.videos.delete({ muxAssetId: assetId });
+
+  res.json({ success: true });
+});
+```
+
+```tsx
+// React Native code
+const deleteVideo = async (assetId: string) => {
+  await fetch(`https://your-api.com/api/asset/${assetId}`, {
+    method: 'DELETE',
+  });
+};
+```
+
+**API reference**: <ApiRefLink product="video" slug="operation/delete-asset">Delete Asset</ApiRefLink>
+
+---
+
+## Playback
+
+### Get Playback URL
+
+**When to use**: Every time you need to play a video in React Native.
+
+**React Native perspective**: Simple - just construct the URL from the playback ID.
+
+```tsx
+// React Native code - Public playback
+const playbackId = 'EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs';
+const playbackUrl = `https://stream.mux.com/${playbackId}.m3u8`;
+
+<Video source={{ uri: playbackUrl }} />
+```
+
+For **private videos**, use signed playback IDs:
+
+```javascript
+// Backend code - Generate signed URL
+import Mux from '@mux/mux-node';
+
+app.get('/api/video/:videoId/playback-url', async (req, res) => {
+  const { videoId } = req.params;
+  const { userId } = req.user;
+
+  const video = await db.videos.findOne({ id: videoId });
+
+  // Check if user has access
+  if (video.isPrivate && !userHasAccess(userId, videoId)) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  const token = Mux.JWT.signPlaybackId(video.playbackId, {
+    keyId: process.env.MUX_SIGNING_KEY_ID,
+    keySecret: process.env.MUX_SIGNING_KEY_SECRET,
+    expiration: '7d',
+  });
+
+  const signedUrl = `https://stream.mux.com/${video.playbackId}.m3u8?token=${token}`;
+
+  res.json({ playbackUrl: signedUrl });
+});
+```
+
+```tsx
+// React Native code
+const getPlaybackUrl = async (videoId: string) => {
+  const response = await fetch(`https://your-api.com/api/video/${videoId}/playback-url`);
+  const { playbackUrl } = await response.json();
+  return playbackUrl;
+};
+```
+
+**API reference**: <ApiRefLink product="video" slug="">Playback IDs</ApiRefLink> | [Secure Playback Guide](/docs/guides/secure-video-playback)
+
+---
+
+### Get Thumbnail URL
+
+**When to use**: Showing video thumbnails in feeds or before playback.
+
+**React Native perspective**: Construct thumbnail URL directly - no API call needed.
+
+```tsx
+// React Native code
+const playbackId = 'EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs';
+
+// Basic thumbnail
+const thumbnailUrl = `https://image.mux.com/${playbackId}/thumbnail.jpg`;
+
+// With options
+const thumbnailWithOptions = `https://image.mux.com/${playbackId}/thumbnail.jpg?width=640&height=360&time=5`;
+
+<Image source={{ uri: thumbnailUrl }} />
+```
+
+**Parameters**:
+- `width` - Thumbnail width (default: 640)
+- `height` - Thumbnail height (default: 360)
+- `time` - Time offset in seconds (default: 0)
+- `fit_mode` - How to fit image: `smartcrop`, `preserve`, `crop`
+
+**API reference**: [Thumbnail API Guide](/docs/guides/get-images-from-a-video)
+
+---
+
+## Analytics (Mux Data)
+
+### Get View Count
+
+**When to use**: Displaying view counts in video feeds.
+
+**React Native perspective**: Backend fetches from Mux Data API, React Native displays the count.
+
+```javascript
+// Backend code
+import Mux from '@mux/mux-node';
+
+app.get('/api/video/:videoId/views', async (req, res) => {
+  const { videoId } = req.params;
+
+  const response = await mux.data.metrics.breakdown('views', {
+    filters: [`video_id:${videoId}`],
+    timeframe: ['30:days'], // Last 30 days
+  });
+
+  const viewCount = response.total_row_count || 0;
+
+  res.json({ views: viewCount });
+});
+```
+
+```tsx
+// React Native code
+const useViewCount = (videoId: string) => {
+  const [views, setViews] = useState(0);
+
+  useEffect(() => {
+    fetch(`https://your-api.com/api/video/${videoId}/views`)
+      .then(r => r.json())
+      .then(data => setViews(data.views));
+  }, [videoId]);
+
+  return views;
+};
+
+// Usage
+function VideoCard({ video }: Props) {
+  const views = useViewCount(video.id);
+
+  return (
+    <View>
+      <Video source={{ uri: video.playbackUrl }} />
+      <Text>{views.toLocaleString()} views</Text>
+    </View>
+  );
+}
+```
+
+**API reference**: <ApiRefLink product="data" slug="">Data API reference</ApiRefLink>
+
+---
+
+### Get Real-time Viewers
+
+**When to use**: Showing "X people watching now" for live or popular videos.
+
+**React Native perspective**: Backend generates signed viewer count token, React Native polls for updates.
+
+```javascript
+// Backend code
+app.get('/api/video/:playbackId/live-viewers', async (req, res) => {
+  const { playbackId } = req.params;
+
+  const token = Mux.JWT.signViewerCounts(playbackId, {
+    keyId: process.env.MUX_SIGNING_KEY_ID,
+    keySecret: process.env.MUX_SIGNING_KEY_SECRET,
+    type: 'video',
+  });
+
+  const statsResponse = await fetch(`https://stats.mux.com/counts?token=${token}`);
+  const data = await statsResponse.json();
+
+  res.json({ liveViewers: data.current_viewers || 0 });
+});
+```
+
+```tsx
+// React Native code
+const useLiveViewers = (playbackId: string) => {
+  const [viewers, setViewers] = useState(0);
+
+  useEffect(() => {
+    const fetchViewers = async () => {
+      const response = await fetch(`https://your-api.com/api/video/${playbackId}/live-viewers`);
+      const { liveViewers } = await response.json();
+      setViewers(liveViewers);
+    };
+
+    fetchViewers();
+    const interval = setInterval(fetchViewers, 10000); // Every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [playbackId]);
+
+  return viewers;
+};
+```
+
+**API reference**: [Real-time Viewer Counts](/docs/guides/get-real-time-viewer-count)
+
+---
+
+## Webhooks
+
+### Handling Webhooks
+
+**When to use**: Get notified when assets are ready, errored, or other events occur.
+
+**React Native perspective**: Backend receives webhooks, updates database. React Native listens to database changes (Supabase Realtime, Firebase, etc.).
+
+```javascript
+// Backend webhook handler
+import Mux from '@mux/mux-node';
+
+app.post('/webhooks/mux', async (req, res) => {
+  const signature = req.headers['mux-signature'];
+
+  // Verify webhook signature
+  try {
+    Mux.Webhooks.verifyHeader(
+      JSON.stringify(req.body),
+      signature,
+      process.env.MUX_WEBHOOK_SECRET
+    );
+  } catch (error) {
+    return res.status(400).send('Invalid signature');
+  }
+
+  const event = req.body;
+
+  // Handle different event types
+  if (event.type === 'video.asset.ready') {
+    const asset = event.data;
+
+    await db.videos.update({
+      where: { muxAssetId: asset.id },
+      data: {
+        status: 'ready',
+        playbackId: asset.playback_ids[0].id,
+        duration: asset.duration,
+      },
+    });
+  }
+
+  if (event.type === 'video.asset.errored') {
+    const asset = event.data;
+
+    await db.videos.update({
+      where: { muxAssetId: asset.id },
+      data: {
+        status: 'errored',
+        error: asset.errors?.messages?.[0] || 'Unknown error',
+      },
+    });
+  }
+
+  res.sendStatus(200);
+});
+```
+
+```tsx
+// React Native code - Listen to database changes
+import { supabase } from './supabase';
+
+useEffect(() => {
+  const subscription = supabase
+    .channel(`video-${videoId}`)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'videos',
+      filter: `id=eq.${videoId}`,
+    }, (payload) => {
+      if (payload.new.status === 'ready') {
+        setVideo(payload.new);
+        setIsReady(true);
+      }
+    })
+    .subscribe();
+
+  return () => subscription.unsubscribe();
+}, [videoId]);
+```
+
+**API reference**: [Webhooks Guide](/docs/guides/listen-for-webhooks)
+
+**Common webhook events**:
+- `video.asset.ready` - Asset is ready for playback
+- `video.asset.errored` - Asset processing failed
+- `video.asset.created` - New asset created
+- `video.asset.deleted` - Asset deleted
+- `video.upload.asset_created` - Direct upload completed
+- `video.upload.cancelled` - Direct upload cancelled
+- `video.upload.errored` - Direct upload failed
+
+---
+
+## SDKs and Packages
+
+### Backend SDKs
+
+**Mux Node SDK** (Recommended for most backends)
+```bash
+npm install @mux/mux-node
+```
+
+```javascript
+import Mux from '@mux/mux-node';
+
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID,
+  tokenSecret: process.env.MUX_TOKEN_SECRET,
+});
+```
+
+**Other backend SDKs**:
+- [Python SDK](https://github.com/muxinc/mux-python)
+- [Ruby SDK](https://github.com/muxinc/mux-ruby)
+- [Go SDK](https://github.com/muxinc/mux-go)
+- [PHP SDK](https://github.com/muxinc/mux-php)
+
+### React Native Packages
+
+**react-native-video** (Video playback)
+```bash
+npm install react-native-video
+```
+
+**@mux/mux-data-react-native-video** (Analytics)
+```bash
+npm install @mux/mux-data-react-native-video
+```
+
+**@react-native-community/netinfo** (Network detection)
+```bash
+npm install @react-native-community/netinfo
+```
+
+**expo-file-system** (File uploads for Expo)
+```bash
+npx expo install expo-file-system
+```
+
+---
+
+## Authentication & Security
+
+### API Token Management
+
+<Callout type="warning">
+**Never put Mux credentials in React Native code.** API tokens must remain on your backend server.
+</Callout>
+
+```javascript
+// ✅ CORRECT - Backend only
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID, // Server environment variable
+  tokenSecret: process.env.MUX_TOKEN_SECRET,
+});
+
+// ❌ WRONG - Never in React Native
+const MUX_TOKEN_ID = 'abc123'; // DON'T DO THIS
+```
+
+### Signing Keys for Playback
+
+For private videos, use JWT signing:
+
+```javascript
+// Backend - Generate signed URL
+const token = Mux.JWT.signPlaybackId(playbackId, {
+  keyId: process.env.MUX_SIGNING_KEY_ID,
+  keySecret: process.env.MUX_SIGNING_KEY_SECRET,
+  expiration: '7d',
+});
+```
+
+Learn more: [Secure Video Playback](/docs/guides/secure-video-playback)
+
+---
+
+## Rate Limits
+
+Mux API has rate limits:
+- **General API**: 100 requests per second per account
+- **Data API**: Different limits based on endpoint
+
+If you hit rate limits, implement backoff logic:
+
+```javascript
+// Backend - Retry with exponential backoff
+async function muxApiCallWithRetry(apiCall, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      if (error.status === 429 && i < maxRetries - 1) {
+        const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+```
+
+---
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Video API reference"
+    description="Complete API documentation for all Mux Video endpoints"
+    links={[
+      {title: "View API docs", href: "/docs/api-reference/video"},
+    ]}
+  />
+  <GuideCard
+    title="Data API reference"
+    description="Complete API documentation for Mux Data analytics"
+    links={[
+      {title: "View API docs", href: "/docs/api-reference/data"},
+    ]}
+  />
+  <GuideCard
+    title="Troubleshooting"
+    description="Common issues and solutions for React Native + Mux"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/troubleshooting"},
+    ]}
+  />
+</GuideCards>

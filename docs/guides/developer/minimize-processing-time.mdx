@@ -1,0 +1,125 @@
+---
+title: Minimize processing time
+product: video
+description: Learn how to optimize your video files for the fastest processing time.
+---
+
+Mux Video accepts most modern video formats and codecs. However, certain types of inputs need to be *standardized* in order for Mux to do further operations on them, and this can add time before the video is ready to be streamed. If you want to standardize your content before sending it to Mux, and potentially improve performance, this guide will show what you need to do.
+
+## Standard input specs
+
+To be considered standard input, the input video file must meet the following requirements:
+
+* **H.264 or HEVC video codecs**. H.264 is the dominant video codec in use today and almost every device supports H.264. HEVC is a more modern codec that's increasingly popular, though not as universally supported. While Mux accepts other codecs as input, other codecs are considered non-standard and will be standardized automatically to H.264.
+* **Closed GOP** (group-of-pictures). (Warning: video jargon ahead. You can likely ignore this) In video files encoded with a closed-GOP, all B frames reference other frames in the same GOP. Closed GOPs always begins with an IDR (Instantaneous Decoder Refresh) frame. This means that every GOP can be played independently, without reference to another GOP. Standard inputs must be encoded with a closed-GOP.
+* **8-bit 4:2:0, or 10-bit 4:2:0 if HEVC**. This refers to the color depth and chroma subsampling. If you don't know what this is, you can probably ignore this, since most streaming video is 8-bit 4:2:0. HDR usually uses 10-bit 4:2:0, which is only supported as standard when using the HEVC video codec. However, SDR is preferred as Mux does not provide full HDR support.
+* **Simple Edit Decision Lists**. Edit Decision Lists (EDLs) are typically added during post-production and define how certain segments are used to build a track timeline for playback. A good example of a Simple Edit Decision List is to fix out of order frames in the video. Input files with more complex uses of EDLs are considered non-standard.
+* **AAC audio codec**. AAC is the dominant audio codec in use today and almost every device supports this audio codec. While Mux accepts files that use other audio codecs, Mux only delivers AAC audio and non-AAC audio inputs are considered non-standard.
+
+### Additional requirements for assets with a `max_resolution_tier` of 1080p
+
+Assets ingested up to 1080p are subject to the following standard input requirements.
+
+* **1080p/2K or smaller**. Files with a resolution of up to 2048x2048 are considered standard. Files with a larger than this are considered non-standard, unless ingested with a higher `max_resolution_tier`.
+* **Max 20-second keyframe interval (10 seconds for HEVC)**. To stream well using HTTP-based streaming methods like HLS, Mux requires all keyframes intervals to be less than 20 seconds, or less than 10 seconds if encoded with HEVC.
+* **8Mbps or below**. While Mux accepts higher bitrate inputs, average bitrates higher than 8Mbps are generally challenging for most viewers' connections and are considered non-standard. The bitrate should not exceed 16Mbps for any single GOP.
+* **Frame rate between 5 and 120**. Inputs with average frames per second (fps) less than 5 or greater than 120 is considered non-standard. Frame rates within this range will be preserved (e.g. 60 fps will remain 60 fps). Inputs with less than 5 fps or greater than 120 fps will be automatically standardized to 30 fps.
+
+### Additional requirements for assets with a `max_resolution_tier` of 2160p (4K)
+
+[Assets ingested at 2K and 4K resolutions](/docs/guides/stream-videos-in-4k) are subject to the following standard input requirements.
+
+* **2160p or smaller**. The input file must not have any dimension (width, height, or both) that exceeds 4096 pixels.
+* **Max 10-second keyframe interval (6 seconds for HEVC)**. To stream 4k video well, a 10 second keyframe interval is required. If using the HEVC video CODEC, this is further limited to 6 seconds.
+* **20Mbps or below**. While Mux accepts higher bitrate inputs, bitrates higher than 20Mbps are generally challenging for most viewers' connections.
+* **Frame rate between 5 and 60**. For 4k videos, a frame rate above 60fps is considered non-standard.
+
+## How to create standard input (ffmpeg)
+
+As a starting point, here is a sample ffmpeg command for creating video that complies with Mux standard input. Feel free to modify this by using things like 2-pass encoding, different presets, or different bitrates (as long as the total bitrate ends up below than 8Mbps).
+
+```shell
+ffmpeg -i input.mp4 -c:a copy -vf "scale=w=min(iw\,1920):h=-2" -c:v libx264 \
+-profile high -b:v 7000k -g 239 -pix_fmt yuv420p -maxrate 16000k -bufsize 24000k out.mp4
+```
+
+### Standard input for 4K
+
+If you are creating a 4K video, the resolution and bitrate limits are higher. Here is a sample ffmpeg command for creating video that complies with Mux standard input for 4K.
+
+```shell
+ffmpeg -i input.mp4 -c:a copy -vf "scale=w=min(iw\,4096):h=-2" -c:v libx264 \
+-profile high -b:v 18000k -g 239 -pix_fmt yuv420p -maxrate 36000k -bufsize 54000k out.mp4
+```
+
+## How to create standard input on mobile devices
+
+<Callout type="info" title="Mux mobile upload SDKs">
+  Mux's [iOS](https://www.mux.com/docs/guides/upload-video-directly-from-ios-or-ipados) and [Android](https://www.mux.com/docs/guides/upload-video-directly-from-android) upload SDKs are optimised to pre-process video files created on mobile devices to create standard input video files before uploading to Mux.
+</Callout>
+
+Many mobile devices capture H.264 8-bit 4:2:0 video by default. More recent mobile devices increasing use HEVC 4:2:0 by default (either 8-bit with HDR disabled, or 10-bit with HDR enabled). Here are the main things to watch out for:
+
+* Ensure that the total file bitrate is below 8 mbps.
+* Prefer recording video in SDR (standard dynamic range). Some newer devices capture video in HDR (High Dynamic Range), which requires 10-bit 4:2:0 color. This is also acceptable, but may be more likely to exceed the limited bitrate to be considered standard input. If you have the choice, you should record SDR.
+* Ensure the output file is smaller than 1080p (1920x1080) or 2K (2048x1152). Some cameras shoot 4K video, which by default is converted down to 1080p when using Mux Video. If you want to use 4K video, ensure you're enabling that in your API calls to Mux.
+* If possible, choose a keyframe interval of 5s or so, but certainly between 1 and 10 seconds, and enable closed-GOP encoding. (If you don't see these options in your app or camera, it's probably the default already.)
+
+
+## Non-standard input
+
+Mux Video works fine with video outside of the standard input specs. But because other videos cannot be easily streamed to many modern devices, Mux Video must perform an initial encoding operation on non-standard input to create a mezzanine file. This means that non-standard input will be slower to ingest.
+
+As soon as Mux Video detects that the input file is non-standard, it emits the `video.asset.non_standard_input_detected`. This lets you know right away that your video will need additional processing time, along with the specific reasons why it's considered non-standard.
+
+```json
+{
+  "type": "video.asset.non_standard_input_detected",
+  "data": {
+    "id": "{ASSET_ID}",
+    "status": "preparing",
+    "non_standard_input_reasons": {
+      "video_gop_size": "high"
+    }
+    // ... other asset fields
+  }
+}
+```
+
+_Note that `non_standard_input_reasons` may not be finalized as additional reasons maybe found later and will be included on the asset after ingest completion._
+
+Mux Video also exposes this information in all subsequent asset webhooks, including the `video.asset.ready` event. This information is also returned in the asset object when retrieved using the <ApiRefLink href="/docs/api-reference/video/assets/get-asset">Get Asset API</ApiRefLink>.
+
+### Understanding the transcoding progress of a non-standard input
+
+When an asset needs additional processing, you can use the `progress` field from the <ApiRefLink href="/docs/api-reference/video/assets/get-asset">Get Asset API</ApiRefLink> response, which returns the current `state` of and, the completion percentage of a transcode.
+
+```json
+// GET /video/v1/assets/{ASSET_ID}
+{
+  "id": "{ASSET_ID}",
+  "status": "preparing",
+  "non_standard_input_reasons": {
+    "video_gop_size": "high"
+  },
+  "progress": {
+    "state": "transcoding", 
+    "progress": 23.02
+  }
+  // ... other asset fields
+}
+```
+
+This field tells you both the current processing state and an estimated completion percentage from `0` to `100`, allowing you to keep your users informed with accurate progress indicators.
+
+The progress field can have the following `state`s:
+
+- `transcoding`: Asset is undergoing non-standard transcoding. `progress` will be between `0` and `100`.
+- `ingesting`: Asset is being ingested (initial processing before or after transcoding). Progress will be `0`.
+- `errored`: Asset has encountered an error (`status` is `errored`). Progress will be `-1`.
+- `completed`: Asset processing is complete (`status` is `ready`).  Progress will be `100`.
+- `live`: Asset is a live stream currently in progress.  Progress will be `-1`.
+
+## General limits
+
+The max duration for any single asset is 12 hours.

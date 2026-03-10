@@ -1,0 +1,134 @@
+---
+title: Handle Live Stream Disconnects
+product: video
+description: In this guide we will walk through how to handle disconnects that happen during live streams.
+seoTitle: How to Handle Live Stream Disconnects
+seoDescription: Bad network conditions can cause your live stream to disconnect at a moment's notice. Learn how you can best handle these disconnections within your application.
+steps:
+  - title: "How Mux handles disconnects"
+    description: Learn more about Reconnect Window and how to add a slate image
+  - title: "How to handle reconnects from the Player/Client side without a slate image"
+    description: Understand what happens to the encoder based on the `reconnect_window` parameter
+---
+
+<LinkedHeader step={steps[0]} />
+
+Before reading this guide, you created and set up a Live Stream by following these steps:
+
+- You have connected your encoder (for example OBS, Wirecast, your live streaming app) to an RTMP ingest server as covered in this guide: [Configure Broadcast Software](/docs/guides/configure-broadcast-software)).
+- Mux sends the `video.live_stream.connected` event to your environment.
+- When the encoder starts sending media to the ingest server, the webhook events `video.live_stream.recording` and then `video.live_stream.active` are delivered to your environment.
+
+If everything goes smoothly, the encoder will keep sending media and the server will keep processing it, creating video segments and
+updating the HLS playlists with new pieces of video (to understand how this
+works read [Reduce live stream latency](/docs/guides/reduce-live-stream-latency)).  Since all of
+this streaming is happening live, the ingest server needs to know what it should do when the encoder disconnects unexpectedly.
+
+What happens when the live stream disconnects either intentionally or due to a drop in the network? Mux sends the `video.live_stream.disconnected`
+event for the live stream to your environment. This is where the `reconnect_window` comes into play.
+
+# Reconnect Window
+
+When you <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">create the Live Stream</ApiRefLink> or <ApiRefLink href="/docs/api-reference/video/live-streams/update-live-stream">update the Live Stream</ApiRefLink>, you can set the `reconnect_window` parameter in the Request JSON.
+
+The Reconnect Window is the time in seconds that Mux should wait for the live stream broadcasting software to reconnect before considering the live stream finished
+and completing the recorded asset. As a default, Mux sets `reconnect_window` to 60 seconds for Standard Latency streams and zero seconds for Reduced and Low Latency streams, but this can be adjusted to any value between 0 to 1800 seconds.
+
+<Callout type="info">
+Reconnect Window is supported for all latency modes of the live stream, including "standard", "reduced" and "low".
+</Callout>
+
+### Reconnect Window and slates
+
+When you <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">create the Live Stream</ApiRefLink> or <ApiRefLink href="/docs/api-reference/video/live-streams/update-live-stream">update the Live Stream</ApiRefLink>,
+you can set the `reconnect_slate_url` parameter with the URL of the slate image.
+
+Slate insertion can help output a live stream for viewers without interruptions. Below are some examples where Mux receives an imperfect stream and how Mux handles the output:
+
+- If the input contains only audio for the relevant time, the most recent video frame is duplicated
+- If the input contains only video for the relevant time, Mux will output silent audio
+- If a slate is inserted and the input has no audio or video (including because the encoder was disconnected) a slate period begins where Mux will output silent audio, and duplicate the most recent video frame. After 0.5 seconds, Mux will switch to the slate image and continue to send silent audio. If the encoder is still connected, Mux will disconnect the encoder after 5 minutes. Mux will then continue inserting slates for up to the duration of the `reconnect_window` in seconds. Viewers may experience a maximum slate duration of up to 5 minutes over the `reconnect_window` duration
+
+When Mux stops receiving the media, Mux adds the slate image as a video frame to the live stream. This event of not receiving media disconnects the encoder and starts the `reconnect_window` time interval.
+Mux stops adding the slate image when Mux starts receiving media again or the reconnect window time interval expires.
+
+Enable slates for `standard`, `reduced`, and `low` latency mode live streams:
+ - For `standard` latency live streams, set the `use_slate_for_standard_latency` parameter to `true` and make sure the `reconnect_window` parameter value is greater than 0s. Live streams, created before the slate image functionality was available, will not automatically start using slates until this parameter is set.
+ - For `reduced` and `low` latency mode live streams, set the `reconnect_window` parameter value to greater than 0s.
+
+Mux selects one of the following images as the default slate image depending on the live stream's video aspect ratio. The default slate image is used unless you
+set the `reconnect_slate_url` parameter. We recommended setting the slate image whose aspect ratio matches the live stream's video aspect ratio. You can modify
+the `reconnect_slate_url` parameter using the <ApiRefLink href="/docs/api-reference/video/live-streams/update-live-stream">update the Live Stream</ApiRefLink>.
+
+
+<Image src="/docs/images/slate-laptop-illustration-horizontal.png" width={640} height={360} caption="Horizontal Laptop Illustration"/>
+<Image src="/docs/images/slate-laptop-illustration-vertical.png" width={360} height={640} caption="Vertical Laptop Illustration" sm />
+
+Mux downloads the slate image, hosted at the URL set as `reconnect_slate_url` parameter value, at the start of the live stream recording.
+So, you must ensure the image is always downloadable from the URL. When Mux can not download the image, the default slate image (shown above) is used
+and the video.live_stream.warning for the live stream as well as the `video.asset.warning` webhook event for the asset is fired. Below is an example
+of the webhook event body:
+```json
+{
+    "type": "video.live_stream.warning", // or "video.asset.warning"
+    "object": {
+      "type": "live",
+      "id": "CiinCsHA2EbsU00XwzherzjWAek3VmtUz8"
+    },
+    "id": "3a56ac3d-33da-4366-855b-f592d898409d",
+    "environment": {
+      "name": "Production",
+      "id": "j0863n"
+    },
+    "data": {
+      "warning": {
+        "type": "custom_slate_unavailable",
+        "message": "Unable to download custom reconnect slate image from URL 'http://example.com/bad_url.png' -- using black frames for slate if needed."
+      },
+      "stream_key": "5203dc64-074a-5914-0dfc-ce007f5db53a",
+      "status": "idle",  // or "preparing"
+      "id": "CiinCsHA2EbsU00XwzherzjWAek3VmtUz8",
+      "active_asset_id": "0201p02fGKPE7MrbC269XRD7LpcHhrmbu0002"
+    },
+    "created_at": "2022-07-14T21:08:27.000000Z",
+    "accessor_source": null,
+    "accessor": null,
+    "request_id": null
+  }
+```
+<Callout type="info">
+
+The `status` parameter in the webhook event body (shown above) is `idle` for the live stream and `preparing` for the asset
+event to match the corresponding `status` parameter values.
+
+</Callout>
+
+<LinkedHeader step={steps[1]} />
+
+When Mux is not receiving any media, the viewer experience depends on whether Mux starts receiving media before the reconnect window expires.
+We strongly recommend <ApiRefLink href="/docs/api-reference/video/live-streams/update-live-stream">updating the Live Stream</ApiRefLink> to add a slate image.
+However, there are two possible scenarios when you do not want to add the slate image.
+
+### In scenario 1, the encoder re-connects
+
+The ingest server will wait for the duration of the `reconnect_window` before it ends the live stream. While the encoder is disconnected, media is no longer being sent, so the HLS playlists are not getting new segments of video.
+
+<Callout type="info">
+
+# Stalled player during live stream
+
+A stalled player during a live stream happens when the live stream is still active, but the HLS manifest file is not getting new video segments appended to it.
+
+The player will enter a `stalled` state if it runs out of buffer. To avoid this, consider adding extra buffer to your player.
+
+</Callout>
+
+If the encoder reconnects before the `reconnect_window` expires then the HLS playlist will resume appending new video segments to the live stream.
+
+### In scenario 2, the encoder disconnects
+
+If the encoder does not reconnect before the `reconnect_window` expires, the following events will occur:
+
+1. Mux writes an `EXT-X-ENDLIST` tag to the HLS playlist. According to the HLS specification: *EXT-X-ENDLIST: Indicates that no more media files will be added to the playlist file*. This tells the player **this stream is over** and no more media is coming. Your player should emit an `ended` event, or something equivalent.
+2. The live stream will transition from `active` back to `idle`
+3.  Mux will create a new asset. The `active_asset_id` while the live stream was active will be finalized. If the same live stream goes live _again_ at a later time, then the live stream will get a new `active_asset_id` and a new asset will be created.

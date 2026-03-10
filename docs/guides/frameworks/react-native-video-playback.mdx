@@ -1,0 +1,1118 @@
+---
+title: Video playback in React Native
+product: video
+description: Build a production-ready video player with state management, error handling, and custom controls in React Native using expo-video.
+---
+
+This guide covers everything you need to know to build a robust, production-ready video player in React Native using Mux and expo-video. If you haven't already, start with the [quickstart guide](/docs/frameworks/react-native-quickstart) to get basic playback working.
+
+## Understanding HLS playback
+
+Mux delivers video using HLS (HTTP Live Streaming), which is natively supported on both iOS and Android. This means:
+
+- Videos stream in segments, not as a single large file
+- Quality automatically adapts to network conditions ([ABR - Adaptive Bitrate](https://www.mux.com/video-glossary/abr-adaptive-bitrate))
+- Playback can start before the entire video downloads
+- Works seamlessly on cellular networks
+
+<Callout type="info">
+  Learn more about [how Mux handles video streaming](/docs/guides/play-your-videos) in the main documentation.
+</Callout>
+
+## Playback IDs and URLs
+
+Every Mux video has a **playback ID** that you use to construct the streaming URL:
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8
+```
+
+### Public vs Signed playback
+
+Mux supports two types of playback policies:
+
+- **Public playback IDs**: Anyone with the URL can play the video
+- **Signed playback IDs**: Requires a JWT token for access control
+
+For signed playback, you'll need to generate a JWT on your backend and include it as a query parameter:
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8?token={JWT}
+```
+
+<Callout type="info">
+  Learn how to [secure video playback with signed URLs](/docs/guides/secure-video-playback) including JWT generation and domain restrictions.
+</Callout>
+
+For React Native apps, handle signed URLs by fetching the token from your backend before playing:
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+function SecureVideoPlayer({ playbackId }: { playbackId: string }) {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch signed URL from your backend
+    fetch('https://your-api.com/video/signed-url', {
+      method: 'POST',
+      body: JSON.stringify({ playbackId }),
+    })
+      .then(res => res.json())
+      .then(data => setVideoUrl(data.url));
+  }, [playbackId]);
+
+  const player = useVideoPlayer(videoUrl, player => {
+    player.play();
+  });
+
+  if (!videoUrl) {
+    return <ActivityIndicator />;
+  }
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.video}
+      nativeControls
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+});
+```
+
+## Managing player state
+
+Building a robust video player requires handling multiple states: loading, playing, paused, buffering, and errors. The `expo-video` library uses an event-based system with hooks from the `expo` package.
+
+```tsx
+import React from 'react';
+import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+interface VideoPlayerProps {
+  playbackId: string;
+}
+
+export default function VideoPlayer({ playbackId }: VideoPlayerProps) {
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.loop = false;
+      player.play();
+    }
+  );
+
+  const { status, error } = useEvent(player, 'statusChange', {
+    status: player.status,
+  });
+
+  const { isPlaying } = useEvent(player, 'playingChange', {
+    isPlaying: player.playing,
+  });
+
+  if (status === 'error') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>
+          {error?.message || 'Failed to load video. Please try again.'}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {status === 'loading' && (
+        <ActivityIndicator
+          size="large"
+          color="#fff"
+          style={styles.loader}
+        />
+      )}
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls
+        contentFit="contain"
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  loader: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -20,
+    zIndex: 10,
+  },
+  errorText: {
+    color: '#fff',
+    textAlign: 'center',
+    padding: 20,
+  },
+});
+```
+
+### Listening to player events
+
+The `expo-video` player emits events that you can listen to using hooks from the `expo` package:
+
+#### Using the `useEvent` hook
+
+Creates a listener that returns a stateful value for use in components:
+
+```tsx
+import { useEvent } from 'expo';
+
+const { status, error } = useEvent(player, 'statusChange', {
+  status: player.status,
+});
+
+const { isPlaying } = useEvent(player, 'playingChange', {
+  isPlaying: player.playing,
+});
+```
+
+#### Using the `useEventListener` hook
+
+For side effects when events occur:
+
+```tsx
+import { useEventListener } from 'expo';
+
+useEventListener(player, 'statusChange', ({ status, error }) => {
+  console.log('Player status changed:', status);
+  if (error) {
+    console.error('Player error:', error);
+  }
+});
+
+useEventListener(player, 'playToEnd', () => {
+  console.log('Video finished playing');
+  player.replay();
+});
+```
+
+### Key player events
+
+| Event | When it fires | Use case |
+|-------|---------------|----------|
+| `statusChange` | Player status changes (idle, loading, readyToPlay, error) | Show loading states, handle errors |
+| `playingChange` | Play/pause state changes | Update play/pause button |
+| `timeUpdate` | Periodically during playback | Update progress bar |
+| `sourceLoad` | Video source finishes loading | Get duration, available tracks |
+| `playToEnd` | Video finishes playing | Auto-play next video, show replay |
+
+## Poster images and thumbnails
+
+Mux automatically generates thumbnails for your videos. Display a poster image that users tap to start playback:
+
+```tsx
+import React, { useState } from 'react';
+import { View, Image, Pressable, StyleSheet } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function VideoWithPoster({ playbackId }: { playbackId: string }) {
+  const [showPoster, setShowPoster] = useState(true);
+  const posterUrl = `https://image.mux.com/${playbackId}/thumbnail.png?time=0`;
+
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.loop = false;
+      // Don't autoplay - wait for user to tap poster
+    }
+  );
+
+  const handlePosterPress = () => {
+    setShowPoster(false);
+    player.play();
+  };
+
+  return (
+    <View style={styles.container}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls
+        contentFit="contain"
+      />
+      {showPoster && (
+        <Pressable onPress={handlePosterPress} style={styles.poster}>
+          <Image
+            source={{ uri: posterUrl }}
+            style={styles.poster}
+            resizeMode="cover"
+          />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'relative',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  poster: {
+    position: 'absolute',
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+});
+```
+
+### Thumbnail URL options
+
+```
+https://image.mux.com/{PLAYBACK_ID}/thumbnail.{format}?{params}
+```
+
+**Common parameters:**
+
+- `time` - Timestamp in seconds (e.g., `time=5` for 5 seconds in)
+- `width` - Thumbnail width in pixels (e.g., `width=640`)
+- `height` - Thumbnail height in pixels (e.g., `height=360`)
+- `fit_mode` - How to resize: `preserve`, `stretch`, `crop`, `smartcrop`
+
+**Example:**
+
+```tsx
+const thumbnail = `https://image.mux.com/${playbackId}/thumbnail.jpg?time=5&width=1280&fit_mode=smartcrop`;
+```
+
+<Callout type="info">
+  Learn more about [thumbnail options and image transformations](/docs/guides/get-images-from-a-video) in the main docs.
+</Callout>
+
+## Aspect ratios for different use cases
+
+Choose the right aspect ratio based on your app's design:
+
+### Landscape video (16:9)
+
+Standard for most video content:
+
+```tsx
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9, // 1.777
+  },
+});
+```
+
+### Portrait video (9:16)
+
+For Stories, Reels, or TikTok-style feeds:
+
+```tsx
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 9 / 16, // 0.5625
+  },
+});
+```
+
+### Square video (1:1)
+
+For social feeds:
+
+```tsx
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 1, // 1.0
+  },
+});
+```
+
+### Dynamic aspect ratio
+
+Match the video's actual dimensions using the `sourceLoad` event:
+
+```tsx
+import { View, StyleSheet } from 'react-native';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function DynamicVideoPlayer({ playbackId = "TPsqaPkOFCKQHVGQ00Khp0256fLo4FAsEHjCTeWi02JyrM" }: { playbackId: string }) {
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  const loadedMetadata = useEvent(player, 'sourceLoad');
+
+  // Calculate aspect ratio from available video tracks
+  const aspectRatio = (() => {
+    const tracks = loadedMetadata?.availableVideoTracks;
+    if (tracks && tracks.length > 0) {
+      const { width, height } = tracks[0].size;
+      return width / height;
+    }
+    return 16 / 9; // Default fallback
+  })();
+
+  return (
+    <VideoView
+      player={player}
+      style={[styles.video, { aspectRatio }]}
+      nativeControls
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+  },
+});
+```
+
+<Callout type="warning">
+  The `sourceLoad` event and video track metadata work reliably on iOS and Android. On web, this event may not fire consistently. If you need dynamic aspect ratios across all platforms, consider fetching video dimensions from the Mux API or storing them alongside your playback ID.
+</Callout>
+
+## Fullscreen support
+
+Enable fullscreen mode using the `VideoView` ref methods:
+
+```tsx
+import React, { useRef } from 'react';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function VideoPlayerWithFullscreen({ playbackId }: { playbackId: string }) {
+  const videoRef = useRef<VideoView>(null);
+
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  const enterFullscreen = async () => {
+    await videoRef.current?.enterFullscreen();
+  };
+
+  const exitFullscreen = async () => {
+    await videoRef.current?.exitFullscreen();
+  };
+
+  return (
+    <View>
+      <VideoView
+        ref={videoRef}
+        player={player}
+        style={styles.video}
+        nativeControls={false}
+        allowsFullscreen
+        onFullscreenEnter={() => console.log('Entered fullscreen')}
+        onFullscreenExit={() => console.log('Exited fullscreen')}
+      />
+      <TouchableOpacity onPress={enterFullscreen} style={styles.button}>
+        <Text style={styles.buttonText}>Go big or go home</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  button: {
+    backgroundColor: '#ec9430ff',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+});
+```
+
+<Callout type="info">
+  Fullscreen behavior is handled natively by the platform. On iOS, this uses AVPlayerViewController. On Android, this uses ExoPlayer's fullscreen controller.
+</Callout>
+
+## Error handling
+
+Network issues are common on mobile. Implement robust error handling:
+
+```tsx
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+function VideoPlayerWithRetry({ playbackId }: { playbackId: string }) {
+  const [retryKey, setRetryKey] = useState(0);
+
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  const { status, error } = useEvent(player, 'statusChange', {
+    status: player.status,
+  });
+
+  const retry = useCallback(() => {
+    player.replay();
+    setRetryKey(prev => prev + 1);
+  }, [player]);
+
+  const getErrorMessage = (error: any) => {
+    // Categorize errors based on the error message
+    const message = error?.message || '';
+    if (message.includes('network') || message.includes('ENOTFOUND')) {
+      return 'Network error. Check your connection.';
+    } else if (message.includes('403') || message.includes('forbidden')) {
+      return 'This video is not available.';
+    }
+    return 'Failed to load video.';
+  };
+
+  if (status === 'error') {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{getErrorMessage(error)}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={retry}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <VideoView
+      key={retryKey}
+      player={player}
+      style={styles.video}
+      nativeControls
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  errorContainer: {
+    backgroundColor: '#000',
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    aspectRatio: 16 / 9,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+  },
+  retryText: {
+    color: '#000',
+    fontWeight: 'bold',
+  },
+});
+```
+
+### Common error scenarios
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| Network timeout | Slow/no connection | Show retry button, check network status |
+| 403 Forbidden | Invalid playback ID or signed URL expired | Refresh token, verify playback ID |
+| Video not loading | Asset still processing | Check asset status, show "processing" message |
+| Playback stalled | Poor network | HLS handles this automatically via ABR |
+
+## Custom controls
+
+Build custom video controls by setting `nativeControls={false}` and tracking playback state with events. This example creates a control bar with a play/pause button, scrubbing slider, and current/total time displays using `@react-native-community/slider`:
+
+```tsx
+import React from 'react';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import Slider from '@react-native-community/slider';
+
+export default function CustomControlsPlayer({ playbackId }: { playbackId: string }) {
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.timeUpdateEventInterval = 0.25; // Update every 250ms
+    }
+  );
+
+  const { isPlaying } = useEvent(player, 'playingChange', {
+    isPlaying: player.playing,
+  });
+
+  const timeUpdate = useEvent(player, 'timeUpdate');
+  const currentTime = timeUpdate?.currentTime ?? 0;
+  const duration = player.duration;
+
+  const handleSeek = (time: number) => {
+    player.currentTime = time;
+  };
+
+  const togglePlayback = () => {
+    if (isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <View style={styles.container}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls={false}
+        contentFit="contain"
+      />
+
+      <View style={styles.controls}>
+        <TouchableOpacity onPress={togglePlayback}>
+          <Text style={styles.controlText}>
+            {isPlaying ? '⏸' : '▶'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.time}>{formatTime(currentTime)}</Text>
+
+        <Slider
+          style={styles.slider}
+          value={currentTime}
+          minimumValue={0}
+          maximumValue={duration || 1}
+          onSlidingComplete={handleSeek}
+          minimumTrackTintColor="#fff"
+          maximumTrackTintColor="#666"
+          thumbTintColor="#fff"
+        />
+
+        <Text style={styles.time}>{formatTime(duration || 0)}</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  controlText: {
+    color: '#fff',
+    fontSize: 24,
+    marginRight: 10,
+  },
+  time: {
+    color: '#fff',
+    fontSize: 12,
+    marginHorizontal: 5,
+  },
+  slider: {
+    flex: 1,
+    marginHorizontal: 10,
+  },
+});
+```
+
+### Playback speed control
+
+Allow users to adjust playback speed for faster or slower viewing:
+
+```tsx
+import React, { useState, useCallback } from 'react';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+export default function VideoPlayerWithSpeed({ playbackId }: { playbackId: string }) {
+  const [speedIndex, setSpeedIndex] = useState(2); // Default to 1x
+
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  const cycleSpeed = useCallback(() => {
+    const nextIndex = (speedIndex + 1) % PLAYBACK_SPEEDS.length;
+    setSpeedIndex(nextIndex);
+    player.playbackRate = PLAYBACK_SPEEDS[nextIndex];
+  }, [player, speedIndex]);
+
+  return (
+    <View style={styles.container}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls
+        contentFit="contain"
+      />
+      <TouchableOpacity onPress={cycleSpeed} style={styles.speedButton}>
+        <Text style={styles.speedText}>
+          Speed: {PLAYBACK_SPEEDS[speedIndex]}x
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  speedButton: {
+    backgroundColor: '#ec9430ff',
+    padding: 12,
+    margin: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  speedText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+});
+```
+
+**Tip:** Use `player.preservesPitch = true` (default) to maintain audio pitch at higher speeds, or set to `false` for a "chipmunk" effect.
+
+## Picture-in-Picture support
+
+Enable Picture-in-Picture mode for background video playback:
+
+```tsx
+import React, { useRef, useState, useCallback } from 'react';
+import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
+import { useVideoPlayer, VideoView, isPictureInPictureSupported } from 'expo-video';
+
+export default function VideoPlayerWithPiP({ playbackId }: { playbackId: string }) {
+  const videoRef = useRef<VideoView>(null);
+  const [isInPiP, setIsInPiP] = useState(false);
+
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+    }
+  );
+
+  const togglePiP = useCallback(() => {
+    if (!isInPiP) {
+      videoRef.current?.startPictureInPicture();
+    } else {
+      videoRef.current?.stopPictureInPicture();
+    }
+  }, [isInPiP]);
+
+  // Check PiP support (function only exists on iOS and Android)
+  const pipSupported = Platform.OS !== 'web' && isPictureInPictureSupported();
+
+  if (!pipSupported) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>
+          Picture-in-Picture is not supported on this platform.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <VideoView
+        ref={videoRef}
+        player={player}
+        style={styles.video}
+        nativeControls
+        allowsPictureInPicture
+        startsPictureInPictureAutomatically
+        onPictureInPictureStart={() => setIsInPiP(true)}
+        onPictureInPictureStop={() => setIsInPiP(false)}
+      />
+      <TouchableOpacity onPress={togglePiP} style={styles.button}>
+        <Text style={styles.buttonText}>
+          {isInPiP ? 'Exit' : 'Enter'} Picture-in-Picture
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  button: {
+    backgroundColor: '#ec9430ff',
+    padding: 12,
+    margin: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#fff',
+    textAlign: 'center',
+    padding: 20,
+  },
+});
+```
+
+<Callout type="warning">
+  Picture-in-Picture requires configuration in your app.json:
+  ```json
+  {
+    "expo": {
+      "plugins": [
+        ["expo-video", { "supportsPictureInPicture": true }]
+      ]
+    }
+  }
+  ```
+</Callout>
+
+## iOS vs Android considerations
+
+While `expo-video` abstracts most platform differences, be aware of:
+
+### iOS (AVPlayer)
+- Native HLS support
+- Picture-in-Picture available on iOS 14+
+- Smooth fullscreen transitions
+- AirPlay support via `allowsExternalPlayback`
+- Respects system audio settings
+
+### Android (ExoPlayer)
+- Native HLS support via ExoPlayer
+- Picture-in-Picture on Android 12+
+- Configurable surface type (SurfaceView vs TextureView)
+- May require additional permissions for background playback
+
+<Callout type="warning">
+  Test your video player on both iOS and Android physical devices, not just simulators. Network behavior and video codecs can differ between simulators and real devices.
+</Callout>
+
+### Platform-specific configuration
+
+Optimize playback for each platform by detecting the OS and adjusting player settings. This example shows iOS-specific AirPlay support, platform-specific buffer configurations, and Android's TextureView for overlapping videos:
+
+```tsx
+import { Platform } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function PlatformAwarePlayer({ playbackId }: { playbackId: string }) {
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.play();
+
+      // iOS-specific settings
+      if (Platform.OS === 'ios') {
+        player.allowsExternalPlayback = true; // Enable AirPlay
+      }
+
+      // Configure buffer options
+      player.bufferOptions = {
+        preferredForwardBufferDuration: Platform.OS === 'ios' ? 0 : 20,
+        minBufferForPlayback: 2,
+      };
+    }
+  );
+
+  return (
+    <VideoView
+      player={player}
+      style={{ width: '100%', aspectRatio: 16 / 9 }}
+      nativeControls
+      // Android-specific: use TextureView for overlapping videos
+      surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
+    />
+  );
+}
+```
+
+## Performance tips
+
+### 1. Pause videos when not visible
+
+```tsx
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function VideoPlayer({ playbackId }: { playbackId: string }) {
+  const player = useVideoPlayer(
+    `https://stream.mux.com/${playbackId}.m3u8`,
+    player => {
+      player.staysActiveInBackground = false;
+    }
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        player.play();
+      } else {
+        player.pause();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [player]);
+
+  return (
+    <VideoView
+      player={player}
+      style={{ width: '100%', aspectRatio: 16 / 9 }}
+      nativeControls
+    />
+  );
+}
+```
+
+### 2. Preload videos for smoother transitions
+
+```tsx
+import { useVideoPlayer, VideoView, VideoSource } from 'expo-video';
+import { useState, useCallback } from 'react';
+import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+
+const video1: VideoSource = 'https://stream.mux.com/PLAYBACK_ID_1.m3u8';
+const video2: VideoSource = 'https://stream.mux.com/PLAYBACK_ID_2.m3u8';
+
+export default function PreloadingPlayer() {
+  // Create both players - the second one preloads in the background
+  const player1 = useVideoPlayer(video1, player => {
+    player.play();
+  });
+
+  const player2 = useVideoPlayer(video2, player => {
+    player.currentTime = 0; // Preload from the start
+  });
+
+  const [currentPlayer, setCurrentPlayer] = useState(player1);
+
+  const switchVideo = useCallback(() => {
+    currentPlayer.pause();
+    if (currentPlayer === player1) {
+      setCurrentPlayer(player2);
+      player2.play();
+    } else {
+      setCurrentPlayer(player1);
+      player1.play();
+    }
+  }, [currentPlayer, player1, player2]);
+
+  return (
+    <View>
+      <VideoView player={currentPlayer} style={styles.video} nativeControls />
+      <TouchableOpacity onPress={switchVideo} style={styles.button}>
+        <Text style={styles.buttonText}>Switch Video</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  button: {
+    backgroundColor: '#4630ec',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+});
+```
+
+### 3. Enable video caching
+
+If your app frequently replays the same videos, enable caching to minimize network usage and improve playback performance. The cache is persistent and managed on a least-recently-used (LRU) basis:
+
+```tsx
+import { useVideoPlayer, VideoView, VideoSource } from 'expo-video';
+
+function CachedVideoPlayer({ playbackId }: { playbackId: string }) {
+  const videoSource: VideoSource = {
+    uri: `https://stream.mux.com/${playbackId}.m3u8`,
+    useCaching: true,
+    metadata: {
+      title: 'My Video',
+    },
+  };
+
+  const player = useVideoPlayer(videoSource, player => {
+    player.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={{ width: '100%', aspectRatio: 16 / 9 }}
+      nativeControls
+    />
+  );
+}
+```
+
+**How caching works:**
+- The cache is persistent across app launches
+- Videos are evicted on a least-recently-used basis when the cache size limit is reached (default: 1GB)
+- The system may clear the cache when device storage is low
+- Cached videos can be played offline until the cached data is exhausted
+
+**Managing the cache:**
+```tsx
+import {
+  setVideoCacheSizeAsync,
+  getCurrentVideoCacheSize,
+  clearVideoCacheAsync
+} from 'expo-video';
+
+// Set cache size to 500MB (must be called when no players exist)
+await setVideoCacheSizeAsync(500 * 1024 * 1024);
+
+// Get current cache size
+const cacheSize = getCurrentVideoCacheSize();
+console.log(`Cache is using ${cacheSize} bytes`);
+
+// Clear all cached videos (must be called when no players exist)
+await clearVideoCacheAsync();
+```
+
+<Callout type="warning">
+  **Caching limitations:**
+  - HLS video sources cannot be cached on iOS due to platform limitations
+  - DRM-protected videos cannot be cached on Android and iOS
+  - Cache management functions can only be called when no `VideoPlayer` instances exist
+</Callout>
+
+### 4. Optimize poster image loading
+
+Use lower resolution thumbnails for poster images to reduce initial load time:
+
+```tsx
+const posterUrl = `https://image.mux.com/${playbackId}/thumbnail.jpg?width=640&time=0`;
+```
+
+## Additional expo-video features
+
+This guide covers the most common video playback patterns with Mux. The `expo-video` library offers many additional capabilities beyond what's covered here.
+
+For advanced features and patterns, see the official [expo-video examples repository](https://github.com/expo/expo/tree/main/apps/native-component-list/src/screens/Video):
+
+- **[Playback controls](https://github.com/expo/expo/blob/main/apps/native-component-list/src/screens/Video/VideoPlaybackControlsScreen.tsx)** - Volume sliders, AirPlay button, and `seekBy()` / `replay()` methods
+- **[DRM and content protection](https://github.com/expo/expo/blob/main/apps/native-component-list/src/screens/Video/VideoDRMScreen.tsx)** - Widevine and FairPlay integration
+- **[Subtitles and closed captions](https://github.com/expo/expo/blob/main/apps/native-component-list/src/screens/Video/VideoSubtitlesScreen.tsx)** - Adding text tracks to videos
+
+<Callout type="info">
+  Mux supports most of these features natively. For example, Mux can automatically generate subtitles, provide DRM protection, and deliver multiple audio tracks. Learn more in the [Video features documentation](/docs/guides/video).
+</Callout>
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Upload videos to Mux"
+    description="Learn how to upload videos from React Native or ingest videos from URLs for AI-generated content"
+    links={[
+      {title: "Read the guide", href: "/docs/frameworks/react-native-uploading-videos"},
+    ]}
+  />
+  <GuideCard
+    title="Build a Stories UI"
+    description="Create an Instagram Stories or TikTok-style vertical video feed with swipe navigation"
+    links={[
+      {title: "Read the guide", href: "/docs/frameworks/react-native-stories-reels-ui"},
+    ]}
+  />
+</GuideCards>

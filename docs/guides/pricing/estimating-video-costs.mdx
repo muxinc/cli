@@ -1,0 +1,75 @@
+---
+title: Estimating your Mux Video costs
+description: Learn how to use Mux's pricing to estimate costs under different scenarios
+---
+
+If there’s one thing to take away from Mux’s video pricing model, it’s that minutes are everything. Minutes encoded, minutes stored, and minutes delivered are the only things that matter when it comes to billing. We’ve [written previously](https://www.mux.com/blog/why-we-still-price-in-minutes-for-video) about why we think this is a better way of charging for video.
+
+You can find all of our costs on our [pricing page](/docs/pricing/video), but you may be wondering how you can calculate estimates using these numbers. We’re going to outline a couple ways you can do this so you can be confident that you can predict your costs at any time.
+
+### User-generated content platform
+
+If you’re building a user-generated content platform (UGC), then encoding & storage is going to be a big consideration for you. Most UGC platforms follow some kind of power-law distribution, where a small percentage of the content makes up a large amount of views (in YouTube’s case, for example, much less than 1% of the content uploaded makes up much more than 99% of the views.
+
+Your split might not be as extreme, maybe it’s close to 95/5, 90/10 or even 80/20, but this is the general tendency that we see for UGC platforms. You will want to consider using the [basic video quality level](/docs/guides/use-video-quality-levels), which is $0 encoding and pairing that with [Automatic Cold Storage](https://www.mux.com/blog/introducing-our-coolest-pricing-lever-yet-automatic-cold-storage) so that you get a cheaper storage rate for assets that are rarely viewed.
+
+### Use high, medium and low ranges to make your estimates
+
+If you have an existing application, you can use your existing usage patterns to estimate how much video your users might watch. If you don’t have any existing users to benchmark off of, estimating will be a little trickier. For example:
+
+- Out of 1,000 monthly active users, we think 25% of them will engage with our new video product. Out of that 250 users we think 100 of them will stream 10 minutes of video and 150 of them might stream 25 minutes of video.
+
+If you’re launching something entirely new, then we recommend making 3 separate estimates where you model scenarios that account for how popular your video might be. Here’s some examples:
+
+- Low end: we think in the first few months we’ll get 150 active users on our product. Out of those 150 we think they’ll each stream 45 minutes of video per month.
+- Middle of the road: we think in the first few months we’ll get 400 active users and they’ll be streaming an hour and a half of video per month.
+- Moonshot: in the best case scenario we think we’ll get 1,000 active users and they’ll stream 2 and a half hours of video per month
+
+Now, for each of those 3 scenarios you can plug the results into the calculator and get a range of costs. That range might be large, but you will have a good idea of how your costs will look depending on the uptake of your users.
+
+### Working with Gigabytes instead of minutes
+
+Some services charge for video based on file sizes, either stored or as bandwidth for delivery. There’s a couple ways you can compare these costs with Mux’s minute based pricing. These will only be a guide because 1GB of video can vary in duration depending on the bitrate, but we can use some estimates that will work for common video encoding settings and work from there.
+
+1 minute of 1080p video averages around 38MB (at 5Mbps), this works out at 25 minutes of video per Gigabyte.
+
+Here’s some example conversions based on how many gigabytes you might have using this as a base:
+
+| Video (1080p, 5Mbps) | Estimated minutes |
+| --- | --- |
+| 1GB | 25 minutes |
+| 10GB | 250 minutes |
+| 100GB | 2,500 minutes |
+
+Taking how many gigabytes you have and multiplying it by 25 for 1080p content should give you an estimate in minutes that you can plug into the calculator.
+
+Here’s some estimates you can use for different resolutions:
+
+| Resolution | Estimated minutes per GB |
+| --- | --- |
+| 720p (3.5Mbps) | 40 minutes |
+| 1080p (5Mbps) | 25 minutes |
+| 1440p (2K, 8Mbps) | 15 minutes |
+| 2160p (4K, 12Mbps) | 10 minutes |
+
+## What to consider when estimating your delivery
+
+### Views (mostly) don’t matter
+
+You might be used to thinking of delivery in terms of how many views a video had, as that’s a good metric for how popular a video is. From Mux’s perspective, 1 person viewing a video for 10 minutes is identical to 10 users watching a 1 minute video each. When you add it all up, 10 minutes of video has been delivered, and that’s how it will appear on your bill.
+
+### Minutes delivered, not minutes watched
+
+Mux bills on minutes delivered even if they weren’t watched. If a viewer starts playing a 20 minute video, they might only watch 5 minutes. Additionally, the player might have preloaded an extra minute of video that the viewer never saw. From a billing perspective, this is 6 minutes of delivery even though that extra minute was never seen, because we still had to deliver it to the client as requested by the player.
+
+### Are looping videos charged for each time they repeat?
+
+Whether a looping video is charged for one playthrough or for each time it repeats depends on the caching behavior of the browser and player being used. If the browser is not clearing out its buffers while the video is repeating then subsequent loops are not going to be charged for delivery, because we never see new requests for the video to our infrastructure as the video loops.
+
+It's difficult to predict and control this browser behavior though. There are also physical limitations as to how much video can be stored in memory before some has to be removed.
+
+In general, the shorter a video is, and the fewer renditions that are being switched between during playback, the more likely that the video will remain in the browsers buffers. Videos that are longer than roughly 60 seconds are likely to stretch what can fit in a browser's video buffer and lead to more requests (and delivery charges).
+
+Configuring your player to use a single rendition instead of multiple ones can make it easier for a browser to cache video, but at the cost of forcing a single resolution onto users regardless of their bandwidth. If your videos are particuarly short, you could try using [static MP4s](/docs/guides/enable-static-mp4-renditions) instead of the default HLS delivery.
+
+For more information about Mux video billing see our main [pricing page](/docs/pricing/video).

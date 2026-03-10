@@ -1,0 +1,76 @@
+---
+title: Add alternate audio tracks to videos
+product: video
+description: >-
+  Learn how to use multi-track audio to add alternate audio tracks to your
+  videos
+---
+
+## Introduction to multi-track audio
+
+The multi-track audio feature allows you to add alternate audio tracks to the video assets in your Mux account.
+
+Videos with multi-track audio can be used for increased accessibility or multi-language support, or just to allow viewers to opt into a different audio experience, like a director's commentary.
+
+## (Optional) Set the language and name for your primary audio track
+
+<Callout type="info">
+  Optional but highly recommended to increase accessibility if you're delivering alternate audio tracks.
+</Callout>
+
+When you <ApiRefLink href="/docs/api-reference/video/assets/create-asset">create an asset</ApiRefLink> in Mux, you can also specify the `language_code` and `name` of the primary audio track that's embedded in your first input file.
+
+```json
+// POST https://api.mux.com/video/assets
+
+{
+  "inputs": [
+    {
+      "url": "{VIDEO_INPUT_URL}",
+      "language_code" : "en",
+      "name" : "English"
+    }
+  ],
+  "playback_policies": [
+    "public"
+  ],
+  "video_quality": "basic"
+}
+```
+
+A `name` is optional but highly recommended. If you don't specify it, we'll generate it for you based on the `language_code` you provided. The `language_code` must be a [BCP-47 language tag](https://en.wikipedia.org/wiki/IETF_language_tag), such as `en` for English, or `es` for Spanish. You can find a list of common [BCP-47 language tags here](https://en.wikipedia.org/wiki/IETF_language_tag#List_of_common_primary_language_subtags).
+
+You can still use multi-track audio with assets that don't have a language or name set on your initial upload; we'll just call your primary audio track "Default," with no language.
+
+## Add alternate audio tracks to your asset
+
+Once you've created your asset with a primary audio track, you can add alternate audio tracks using the <ApiRefLink href="/docs/api-reference/video/assets/create-asset-track">create asset track API</ApiRefLink>, specifying the URL of the audio file you wish to add, and the `language_code` of the alternate audio track. This is the same API that you can use to add captions to your assets.
+
+Mux supports most audio file formats and codecs, such as M4A, WAV, or MP3 file.  but for fastest processing, you should [use standard inputs wherever possible](/docs/guides/minimize-processing-time).
+
+```json
+// POST https://api.mux.com/video/assets/${ASSET_ID/tracks
+
+{
+  "url": "https://example.com/bar.m4a",
+  "type": "audio",
+  "language_code": "fr",
+  "name": "Français"
+}
+```
+
+Assets must be in the `ready` state before you can use the create asset track API to add the alternate audio track.
+
+You always need to specify the `language_code` for an alternate audio track, but the `name` is optional. If you don't specify a `name`, we'll generate it for you based on the language code you provided.
+
+You will need to call the API once for each alternate audio track that you want to add.
+
+## Play your videos with multi-track audio
+
+When the alternate audio track has been processed, Mux will automatically add it to the HLS playback URL for your asset.
+
+Many video players already support multi-track audio right out of the box, including [Mux Player](/docs/guides/mux-player-web), Video.js, ExoPlayer, and AVPlayer. So just drop your usual playback URL into your favorite video player, and click play. If your player doesn't support multi-track audio, you'll just hear the primary audio track.
+
+Switching between audio tracks differs in each video player, but this will usually be a menu on the bottom right allowing you to change the track. For example below in Mux Player, you need to click the waveform icon.
+
+<Player playbackId="3x5wDUHxkd8NkEfspLUK3OpSQEJe3pom" thumbnailTime="0" title="Multi-track audio demo" />

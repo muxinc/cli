@@ -1,0 +1,66 @@
+---
+title: Understand Monitoring Metrics and Dimensions
+product: data
+description: Learn about Mux Data's real-time monitoring metrics and dimensions to measure viewer engagement and streaming performance
+---
+
+Mux Data Monitoring offers near real-time to measure streaming performance and current viewers. Mux Data Monitoring metrics are available to Mux Data customers on a Media plan. Monitoring Metrics are offered at sub 20 second latency and are available for 24 hours.
+
+## Monitoring Metrics
+
+### Current Concurrent Viewers (CCV)
+
+The number of viewers currently watching a video. This includes viewers currently waiting for the video to start playing, experiencing rebuffering, or who just experienced a playback failure. It does not include viewers that are paused or have been rebuffering more than five consecutive minutes.
+
+The Monitoring Dashboard includes CCV by geography and Top Titles by CCV. Additional breakdown dimensions are available via API. 
+
+### Video startup failures by startup attempts
+
+The number of viewers who have just experienced a video startup failure (an error that prevents the user from seeing the first frame of video, be it ads or content) as a percent of Start Attempts. Start Attempts is defined as the number of viewers who are in the video loading state or have just experienced a jump from the video loading state to video startup success, video startup failure, or exits before video starts.
+
+### Playback Failures by CCV
+
+The number of viewers who have just experienced a playback failure (a fatal error that prevents future playback) as a percent of Current Concurrent Viewers (CCV). Errors defined as non-fatal are not included in this metric. 
+
+The Playback Failures by CCV metric is measured differently from the Playback Failure Percentage in Mux QoE Metrics.
+
+### Exits Before Video Start by Start Attempts
+
+The number of viewers who have just abandoned a video view while waiting at least one second for the video to start playing, as a percent of Start Attempts. Examples where this may happen include closing the app/browser or clicking to a different video before playback begins.
+
+The Exits Before Video Start by Start Attempts metric is measured differently from Exits Before Video Start in the Mux QoE Metrics.
+
+### Current Rebuffering Percentage
+
+Current Rebuffering Percentage measures the amount of time viewers spent in the rebuffering state, from the last time measured to the current time, as a percentage of the total watch time. The total watch time is the amount of time viewers spent watching or attempting to watch video, which includes startup time, rebuffering time, and time actually watching the video (it does not include paused, errored, or exited states).
+
+Current Rebuffering Percentage is measured differently from the Rebuffer Percentage in the Mux QoE Metrics.
+
+### Current Average Bitrate
+
+The average of the video bitrates shown to viewers over the time period. The bitrate for a view is the value indicated in the video manifest for the rendition that is played for the viewer during the time period.
+
+### Video Startup Time
+
+Video Startup Time measures the current median startup time. This could be considered a "typical" startup time across viewers; half experience a faster startup time and half experience a slower startup time.
+
+
+## Monitoring Dimensions
+
+Current concurrent viewers, current rebuffering percentage, exits before video start, playback failure percentage, current average bitrate, video startup failure percentage can be filtered and broken down by the following dimensions. 
+| Dimension | Description |
+|-----------|-------------|
+| ASN | An autonomous system number (ASN) is a number assigned to a local network, registered into the carrier's routing community and placed under the umbrella of an administrative domain called an autonomous system. An ASN is often correlated with an ISP, though a single ISP may operate multiple ASNs. |
+| CDN | The Content Delivery Network used to deliver the video. If using an SDK that supports CDN header extraction, this value will be auto-populated. |
+| Operating System | Operating System (`iOS`, `Windows`, etc.) |
+| Player Name | You can provide a name for the player (e.g. `My Player`) if you want to compare different configurations or types of players around your site or application. This is different from the player software (e.g. `Video.js`), which is tracked automatically by the SDK. |
+| Region | A geographical subunit of a country. Examples include region, province, or state. |
+| Stream Type | The type of video stream (e.g: `live` or `on-demand`) |
+| Sub-property ID | A sub property is an optional way to group data within a property. For example, sub properties may be used by a video platform to group data by its own customers, or a media company might use them to distinguish between its many websites. |
+| Video Series | The series of the video (e.g.: `Season 1 or Awesome Show`) |
+| Video Title | Title of the video (e.g.: `Awesome Show: Pilot`) |
+| View Has Ad | Tracks if an ad is present during a view. |
+| Video ID | Your internal ID for the video |
+| Mux Asset ID | Mux generated ID for Mux Video Assets |
+| Mux Livestream ID | Mux generated ID for Mux Video Livestreams |
+| Mux Playback ID | Mux generated Playback ID enabling streaming videos and live streams from Mux. An Asset or Livestream may have more than one Mux Playback Id. |

@@ -1,0 +1,280 @@
+---
+title: Optimizing your Mux Video costs
+description: Learn how to use different pricing strategies and levers to optimize your costs under different scenarios
+---
+
+You can find all of our costs on our [pricing page](/pricing), but you may be wondering how you can optimize your costs and potentially find ways to reduce your bill. We’re going to outline a few ways you can optimize your usage of Mux so that you can keep your costs as low as possible.
+
+# Cost levers you can leverage through the Mux Video product
+
+Mux offers a few ways to optimize your costs depending on your use case. We have many features that you can take advantage of that will influence your encoding, storage, and delivery costs. There are also add-ons you can opt-in to using so that you only pay for the features you need.
+
+## Use Basic Video Quality
+
+There is no charge for video encoding when using basic quality. This makes encoding free when uploading videos that use this quality level.
+
+The basic video quality level uses a reduced encoding ladder with a lower target video quality and is suitable for simpler video use cases, particularly those that have a lot of user generated content.
+
+You can learn more about [video quality](/docs/guides/use-video-quality-levels#supported-features) and what features are supported.
+
+<Callout type="info">
+Basic quality level assets have a minimum storage charge of one month and are prorated thereafter. Storage is prorated by the percentage of the month that the video is stored. For example, if a 10-minute asset is stored for only half a month, you will be charged for only 5 minutes.
+</Callout>
+
+## Automatic Cold Storage
+
+With Automatic Cold Storage, we automatically transition a video or audio-only asset to a different storage level based on how long it has been since it was last viewed. The colder the asset gets, the lower the billing rate becomes.
+
+See more about [Automatic Cold Storage](/docs/pricing/video#automatic-cold-storage)
+
+## Capping maximum delivery resolution
+
+By setting a maximum delivery resolution, you can take advantage of our [resolution based pricing](https://www.mux.com/blog/introducing-resolution-based-pricing).
+
+The playback URL below with the `max_resolution` query parameter modifies the resolutions available for the player to choose from.
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8?max_resolution=720p
+```
+
+The `max_resolution` parameter can be set to `720p`, `1080p`, `1440p`, or `2160p`. You may want to do this in order to reduce your delivery costs, or build a feature to your product where only certain viewers get lower resolution video.
+
+See more [here](/docs/guides/modify-playback-behavior)
+
+## Capping upload resolution
+
+If the video being captured in your app doesn't need to be played back in full resolution, specify a lower resolution when recording to take advantage of Mux's resolution dependent pricing.
+
+When uploading from a mobile device ([Android](/docs/guides/upload-video-directly-from-android#setting-a-maximum-resolution), [iOS or iPadOS](/docs/guides/upload-video-directly-from-ios-or-ipados#setting-a-maximum-resolution)), you can utilize our upload SDKs to adjust the resolution of your video input locally before it is uploaded to Mux. By default the SDK will adjust the input resolution to 1920 x 1080 for any inputs that are larger.
+
+[Control recording resolution](/docs/guides/control-recording-resolution)
+
+## Preload
+
+If you want to reduce delivery costs for users who might delay watching a video (or not watch it at all), you can set `preload="none"` in Mux Player (or other compatible player). This means that no video will be pre-loaded until the user plays the video. You could also use `preload="metadata"` which will only load the minimum amount of data needed for the player to get basic information about the video, like its duration.
+
+The tradeoff with using `preload="metadata"` or `preload="none"` is that when the user plays the video they will experience a slower startup time because the video has to load before playback can start.
+
+<Callout type="info">
+Mobile browsers, especially on iOS and Android, often ignore auto and metadata due to data-saving policies.
+
+While preload serves as a hint, browsers ultimately decide how to handle video loading. If you need precise control, consider managing video loading via JavaScript.
+</Callout> 
+
+## Lazy loading
+
+Lazy loading can be beneficial because you can opt to only load the player when the user is ready to watch the video, like scrolling it into view. If the player isn't loaded, you're not charged for any video delivery yet. See our guide on how to implement lazy loading for Mux Player [here](/docs/guides/player-lazy-loading).
+
+## Delivery Usage API
+
+This is not a cost optimization feature, but is a way to get asset level delivery visibility. You can utilize the <ApiRefLink href="/docs/api-reference/video/delivery-usage">Delivery Usage API</ApiRefLink> to retrieve information about the delivery of a specific video in a given time period. The Delivery Usage API allows you to get delivery and streaming usage details for each asset and across all assets.
+
+Delivery usage details are aggregated every hour at the top of the hour and can be requested for a specified time window within the last 90 days starting at 12 hours prior to when the request is made.
+
+# Cost levers you can leverage on your own
+
+## Player buffer length
+
+A player has a buffer for the media it plays. Segments are downloaded into the buffer, decoded, and then played. The forward buffer is the media that has not yet been played. In most modern web players, you can set the buffer length of the playback engine. 
+
+The main tradeoff when customizing these parameters is performance. Shortening the buffer length leaves your player vulnerable to rebuffering and the viewer waiting if there's a temporary network disconnection or hiccup and that buffer runs out. This is an advanced option, so please keep that in mind.
+
+By reducing this value, you save on the delivered minutes portion of your bill because you're reducing the actual video delivery from the player. The mechanism to control this sometimes differs from player to player but in Mux Player and hls.js, you can set this in a couple of places by:
+
+```javascript
+const player = document.querySelector('mux-player');
+player._hls.config.maxBufferLength = { number in seconds }
+player._hls.config.maxBufferSize = { bytes }
+player._hls.config.maxMaxBufferLength = { number in seconds }
+```
+[maxBufferLength](https://github.com/video-dev/hls.js/blob/master/docs/API.md#maxmaxbufferlength) = Maximum buffer length in seconds. If buffer length becomes less than this value, a new fragment will be loaded.
+
+[maxBufferSize](https://github.com/video-dev/hls.js/blob/master/docs/API.md#maxbuffersize) = 'Minimum' maximum buffer size in bytes. If buffer size upfront is bigger than this value, no fragment will be loaded.
+
+[maxMaxBufferLength](https://github.com/video-dev/hls.js/blob/master/docs/API.md#maxmaxbufferlength) = Maximum buffer length in seconds. Hls.js will never exceed this value, even if maxBufferSize is not reached yet. hls.js tries to buffer up to a maximum number of bytes (60 MB by default) rather than to buffer up to a maximum nb of seconds.
+
+For more information, see the [hls.js documentation](https://github.com/video-dev/hls.js/blob/master/docs/API.md) on these options.
+
+<Callout type="error">
+These options are all via hls.js and Mux Player. Your own player and playback engine will differ.
+</Callout>
+
+## Delete live stream assets when streaming ends
+
+To save on storage costs, you can delete the resulting asset that gets created once your live stream has completed. This way you will limit storage charges and prevent further delivery costs. The ingest/encoding cost is still the same once the live stream has completed, this only affects storage.
+
+<Callout type="info">
+Storage is calculated by minutes of video stored. Storage is prorated by the percentage of the month that the video is stored. For example, if a 10-minute asset is stored for only half a month, you will be charged for only 5 minutes.
+</Callout>
+
+## Pause when out of viewport
+
+One way of reducing your delivery costs is to reduce the time viewers spend having your video play and buffer. You could implement a way to pause your video player when the viewer's browser window is out of focus or not visible. This can prevent unnecessary playback and delivery charges. 
+
+You can achieve this by listening to the `visibilitychange` event on the window object:
+
+```javascript
+document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") {
+        console.log("Window is inactive, pausing video player");
+        // replace the below with the corresponding pause method of the player you're using
+        player.pause()
+    }
+});
+```
+
+## Are you still watching?
+
+Many streaming services want to reduce their bandwidth and streaming delivery costs so they have implemented an "Are you still watching?" dialog popup that interrupts playback when the viewer has been watching on autoplay for an extended period of time with no interaction.
+
+You could implement this in your own application as well. Below is a small proof of concept on how you might achieve this using React.
+
+```jsx
+import { useState } from "react";
+import MuxPlayer from "@mux/mux-player-react";
+
+export default function App() {
+  const [lastPlayedTimestamp, setLastPlayedTimestamp] = useState();
+
+  const playbackId = "g11xsFT2MA9E92016CuQTSh8kv01aaUhJK"
+  const secondsToStopVideo = 10; // timer in seconds
+
+  const handleAllUserActivity = (event) => {
+    setLastPlayedTimestamp(event.target.currentTime) // reset the last played timestamp after each play
+  };
+
+  const handleTimeUpdate = (event) => {
+    const player = event.target;
+    const timeElapsed = player.currentTime - lastPlayedTimestamp;
+    if (!player.paused && timeElapsed > secondsToStopVideo) {
+      player.pause();
+      alert("Are you still watching?");
+    }
+  };
+
+  return (
+    <>
+      <MuxPlayer
+        playbackId={playbackId}
+        onPlaying={handleAllUserActivity}
+        onSeeking={handleAllUserActivity}
+        onRateChange={handleAllUserActivity}
+        onVolumeChange={handleAllUserActivity}
+        onTimeUpdate={handleTimeUpdate}
+      />
+    </>
+  );
+}
+```
+
+## Not loading multiple videos on one webpage
+
+Since Mux customers are charged for any delivered video, if a video player is loaded on a webpage it _may_ pre-load some amount of video before playback has been initiated.
+
+This would result in minutes delivered just on page load before the viewer even hits the play button.
+
+<Callout type="info">
+If you're displaying multiple videos on page load for each viewer, this could end up multiplying your bill as many videos are causing delivery charges at once. This could be very costly.
+</Callout>
+
+## Limit the duration of your uploads
+
+If you're a looking to put a duration cap on your videos, you can set duration limits upon upload. This is not supported directly in Mux's API, but you can set this up on your end by checking the duration of the video before you upload it to Mux and reject any videos that are too long. This is a good way to limit your costs by not uploading videos that are unnecessarily long.
+
+<Callout type="info">
+This is done usually by UGC platforms (social media) given the short form content focus, but also by platforms looking to make sure they're not paying for unnecessary ingests costs.
+</Callout>
+
+Below is a small proof of concept on how you might achieve this using React.
+
+```jsx
+import React, { useRef, useState } from 'react';
+import * as UpChunk from '@mux/upchunk';
+
+function VideoUpload() {
+  const pickerRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const getVideoDuration = (file) => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        resolve(video.duration);
+      };
+
+      video.src = URL.createObjectURL(file);
+    });
+  };
+
+  const getUploadUrl = () =>
+    fetch('/the-backend-endpoint').then((res) => res.text());
+
+  const handleUpload = async () => {
+    const file = pickerRef.current?.files[0];
+    
+    if (!file) {
+      alert('Please select a file');
+      return;
+    }
+
+    console.log(file);
+    const duration = await getVideoDuration(file);
+
+    if (duration > 300) {
+      // 5 minutes
+      console.log(duration);
+      alert('Video must be under 5 minutes');
+      pickerRef.current.value = '';
+      return;
+    }
+
+    setUploading(true);
+
+    const upchunkUpload = UpChunk.createUpload({
+      endpoint: getUploadUrl,
+      file: file,
+      chunkSize: 5120, // Uploads the file in ~5mb chunks
+    });
+
+    // subscribe to events
+    upchunkUpload.on('error', (err) => {
+      console.error('💥 🙀', err.detail);
+      setUploading(false);
+    });
+
+    upchunkUpload.on('success', () => {
+      console.log('Upload complete! 🎉');
+      setUploading(false);
+      pickerRef.current.value = '';
+    });
+
+    upchunkUpload.on('progress', (progress) => {
+      console.log(`Upload progress: ${progress.detail}%`);
+    });
+  };
+
+  return (
+    <div>
+      <input
+        ref={pickerRef}
+        id="picker"
+        type="file"
+        accept="video/*, audio/*"
+        disabled={uploading}
+      />
+      <button 
+        id="send" 
+        onClick={handleUpload}
+        disabled={uploading}
+      >
+        {uploading ? 'Uploading...' : 'Upload'}
+      </button>
+    </div>
+  );
+}
+
+export default VideoUpload;
+```

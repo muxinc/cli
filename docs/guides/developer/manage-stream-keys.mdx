@@ -1,0 +1,80 @@
+---
+title: Manage stream keys
+product: video
+description: Learn how to manage stream keys and enable/disable access to go live.
+seoTitle: Manage RTMP server stream keys
+seoDescription: >-
+  Use stream keys to manage access to Mux RTMP live streaming servers and
+  control when users are authorized to initiate live streams.
+---
+
+When live streaming, a stream key is used by a broadcaster to receive a live stream for a Mux account. Stream keys, by nature, are private and should be handled with care. This means that access to the stream key should be reserved for the broadcaster and hidden from end users.
+
+## 1. Use case - Single stream
+
+Single live stream configurations are great for when only one stream will ever be active at a time, or for disposable, single-use live streams.
+
+For example, if you are hosting a conference where the agenda is a back-to-back track of speakers, a single live stream is used in this scenario.
+
+## 2. Use case - Multiple streams
+
+Creating multiple live stream configurations are implemented in situations where multiple live streams are expected. Some reasons you might choose this live stream configuration would include—
+
+- Multiple concurrent streams that overlap in when they go live
+- User generated content where going live can happen at any time and there is no established schedule
+
+## Concurrent live streams
+
+When working with multiple streams that can overlap in realtime, use multiple live stream configurations. Each live stream configuration can be tied to each live stream event.
+
+For example, if you are hosting different concurrent events, each event would need an individual live stream configuration created.
+
+If you want to control the ability to accept a live stream, you can use the <ApiRefLink href="/docs/api-reference/video/live-streams/enable-live-stream">enable live stream</ApiRefLink> and <ApiRefLink href="/docs/api-reference/video/live-streams/disable-live-stream">disable live stream</ApiRefLink> API endpoints. These endpoints can be called based on your business logic from your CMS/backend to control your content creator's ability to go live.
+
+## User generated content
+
+If your solution allows your users to go live at any time, a live stream configuration for each potential content creator will need to be created. As you will see in the following, the Mux live stream configuration `id` will be tied to each content creator using your service.
+
+When provisioning your user as a content creator, <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">create a live stream</ApiRefLink> configuration that will be used solely by _this_ content creator. The `data.id` response value needs to be stored within your CMS so that it can be used to deliver the live stream to end users when the content creator goes live. A live stream configuration created for a content creator can be reused by that content creator over their life span.
+
+The `data.stream_key` value _could_ also be stored in the CMS in case the content creator wants to recall the stream key at a later time.
+
+Another option is to pass through the stream key to the content creator at provision time without storing the stream key. A common use-case that we support is for the ability to reset the stream key for a given live stream configuration. To do this, Mux offers a <ApiRefLink href="/docs/api-reference/video/live-streams/reset-stream-key">reset stream key</ApiRefLink> API.
+
+## Advanced options
+
+### Reset stream key
+
+If a stream key needs to be reset for a live stream configuration because it was lost or compromised, the <ApiRefLink href="/docs/api-reference/video/live-streams/reset-stream-key">reset stream key</ApiRefLink> can be used to regenerate the stream key.
+
+### Complete live stream
+
+Typically, when a content creator has end their live stream session by stopping a stream, Mux will wait for the duration configured for the live stream's `reconnect_window` before making it available as an on-demand asset.
+
+To make a live stream available immediately, you can <ApiRefLink href="/docs/api-reference/video/live-streams/signal-live-stream-complete">signal live stream complete</ApiRefLink> to immediately make the live stream available as an on-demand asset.
+
+<Callout type="info">
+  Mux does not close the encoder connection immediately. Encoders are often
+  configured to re-establish connections immediately which would result in a new
+  recorded asset. For this reason, Mux waits for 60s before closing the
+  connection with the encoder. This 60s timeframe is meant to give encoder
+  operators a chance to disconnect from their end.
+</Callout>
+
+## Enable live stream
+
+To enable a live stream configuration so that it is able to receive an RTMP session, call the <ApiRefLink href="/docs/api-reference/video/live-streams/enable-live-stream">enable live stream</ApiRefLink> API endpoint.
+
+<Callout type="info">
+  By default, all newly created live stream configurations are enabled.
+</Callout>
+
+## Disable live stream
+
+Should you want to disable a live stream configuration so that it no longer accepts RTMP sessions, the <ApiRefLink href="/docs/api-reference/video/live-streams/disable-live-stream">disable live stream</ApiRefLink> is used to achieve this use case.
+
+<Callout type="info">
+  Unlike <ApiRefLink href="/docs/api-reference/video/live-streams/signal-live-stream-complete">signal live stream complete</ApiRefLink>, Mux closes the encoder connection immediately with this API. Any attempt
+  from the encoder to re-establish the connection will fail until the live
+  stream is re-enabled.
+</Callout>

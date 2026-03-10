@@ -1,0 +1,80 @@
+---
+title: Brightcove (Android)
+product: data
+dataIntegration: true
+description: This guide walks through integration with Brightcove's Android player to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Install the Mux Data SDK
+    description: Install the Mux Data SDK for Brightcove.
+---
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+Brightcove's native SDK for Android has support for both the native `MediaPlayer` as well as `ExoPlayer`. In the case that you utilize `ExoPlayer` (via a class such as `BrightcoveExoPlayerVideoView`), monitoring basic video playback is relatively simple.
+
+# Requirements
+ - Brightcove SDK for Android 6.x
+ - ExoPlayer-based Brightcove Player (e.g. `BrightcoveExoPlayerVideoView`)
+
+# Integration Instructions
+
+Brightcove's SDK for Android encapsulates an underlying `SimpleExoPlayer` instance. In order to integrate, you need to create an instance of `MuxStats` for each new video loaded into the player. This is best done by listening for the `didSetVideo` event that the `EventEmitter` emits.
+
+Brightcove's current Android SDK (6.2.x) uses ExoPlayer r2.7.x, so you should include the appropriate AAR file from our releases page and in our [Monitor ExoPlayer guide](/docs/guides/monitor-exoplayer).
+
+Note: `didSetVideo` is used in order to get the updated `Video` in the case that a playlist of `Video` objects, so that you can retrieve the updated metadata.
+
+```java
+// MainFragment.java (or MainActivity.java, wherever
+// you have access to your `BrightcoveExoPlayerVideoView`
+
+import com.mux.stats.sdk.core.model.CustomerPlayerData;
+import com.mux.stats.sdk.core.model.CustomerVideoData;
+import com.mux.stats.sdk.muxstats.MuxStatsExoPlayer;
+
+public class MainFragment extends BrightcovePlayerFragment implements EventListener {
+
+  public static final String TAG = MainFragment.class.getSimpleName();
+  private MuxStatsExoPlayer muxStatsExoPlayer;
+
+  @Override
+  public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    View result = inflater.inflate(R.layout.fragment_main, container, false);
+    baseVideoView = (BrightcoveExoPlayerVideoView) result.findViewById(R.id.brightcove_video_view);
+    super.onCreateView(inflater, container, savedInstanceState);
+    baseVideoView.getEventEmitter().on("didSetVideo", this);
+
+    // Set up your videos for playback here
+    Video video = Video.createVideo("https://path/to/video.mp4", DeliveryType.HLS);
+
+    baseVideoView.add(video);
+    baseVideoView.start();
+    return result;
+  }
+
+  @Override
+  public void processEvent(Event event) {
+    ExoPlayerVideoDisplayComponent videoDisplayComponent = (ExoPlayerVideoDisplayComponent) baseVideoView.getVideoDisplay();
+    Video video = baseVideoView.getCurrentVideo();
+    ExoPlayer exoPlayer = videoDisplayComponent.getExoPlayer();
+
+    CustomerPlayerData customerPlayerData = new CustomerPlayerData();
+    CustomerVideoData customerVideoData = new CustomerVideoData();
+    customerVideoData.setVideoTitle(video.getId());
+    CustomerData customerData = new CustomerData(customerPlayerData, customerVideoData, null)
+
+    if (muxStatsExoPlayer != null) {
+      muxStatsExoPlayer.release();
+      muxStatsExoPlayer = null;
+    }
+
+    muxStatsExoPlayer = new MuxStatsExoPlayer(this, "YOUR_ENV_KEY_HERE", exoPlayer, baseVideoView, customerData);
+  }
+}
+```

@@ -1,0 +1,86 @@
+---
+title: Stream videos in 4K
+product: video
+description: Learn how to ingest, store, and deliver your videos in 4K resolutions
+---
+
+## Introduction to 4K
+
+Mux Video supports ingesting, storing, and delivering on-demand video assets in high resolutions up to and including 4K (2160p). At this time, 2K and 4K output is not supported for Mux [Live Streaming](https://www.mux.com/docs/guides/start-live-streaming). Live Streams will accept 2K and 4K input, but the output will be capped to 1080p (and will be billed as 1080p).
+
+Much premium video content is created in 4K, but more recently user-generated content is often in 4K as well, as mobile devices are increasingly capable of producing 4K video.
+
+Mux Video also supports [2K and 2.5K video on-demand video assets](/docs/guides/stream-videos-in-4k#stream-2k-and-25k-content).
+
+## Create a 4K asset
+
+To ingest, store, and deliver an asset in 4K, you'll need to set the new `max_resolution_tier` attribute on your <ApiRefLink href="/docs/api-reference/video/assets/create-asset">create-asset API call</ApiRefLink>.
+
+```json
+// POST /video/v1/assets
+{
+	"inputs": [
+		{
+			"url": "https://storage.googleapis.com/muxdemofiles/mux-4k.mp4"
+		}
+	],
+	"playback_policies": [
+		"public"
+	],
+	"video_quality": "basic",
+	"max_resolution_tier": "2160p"
+}
+```
+
+This field controls the maximum resolution that we'll encode, store, and deliver your media in. We do not to automatically ingest content at 4K so that you can avoid unexpectedly high ingest bills. If you send us 4K content today and don't set `max_resolution_tier`, nothing changes in your bill.
+
+This also allows you to build applications where some of your content creators are able to upload 4K content while others remain capped at 1080p.
+
+And of course you can use 4K with Direct Uploads, too; you just need to set the same `"max_resolution_tier": "2160p"` field in the `new_asset_settings` of your <ApiRefLink href="/docs/api-reference/video/direct-uploads/create-direct-upload">create-direct-upload API call</ApiRefLink>.
+
+```json
+// POST /video/v1/uploads
+{
+  "new_asset_settings": {
+    "playback_policies": [
+      "public"
+    ],
+    "video_quality": "basic",
+    "max_resolution_tier": "2160p"
+  },
+  "cors_origin": "*"
+}
+```
+
+## Play your assets in 4K
+
+For assets with 4K enabled at ingest, we'll automatically add 2K and 4K renditions to your HLS Playback URLs. Mux uses high-bitrate H.264 for delivering 4K content, which is supported on a wide range of devices, like Mux Player shown below.
+
+<Player playbackId="fss00bwClhYMynhxeE2Hv757J02VI68KY5" thumbnailTime="0" title="4K Video Demo" />
+
+While we've tested playback and built device detection rules that should protect you against unexpected playback failures, you should always test playback on your own device footprint before enabling 4K widely on your platform.
+
+## Limiting playback resolution below 4K
+
+Of course, you might not want all of your viewers to be able to view your content in 4K. Lots of streaming platforms choose to only offer 4K playback to their high subscription tiers. You can implement this by controlling playback resolution with the max_resolution query parameter on your playback URLs, as shown below.
+
+```
+https://stream.mux.com/${PLAYBACK_ID}.m3u8?max_resolution=1080p
+```
+
+## Preparing 4K inputs
+
+Mux uses just-in-time (JIT) encoding to make sure your assets are available as soon as possible after you create them, and this includes 4K assets.
+
+Most of the usual restrictions for standard inputs still apply when you're using 4K, but there are a few different restrictions you should be aware of:
+
+* The input must have a maximum dimension of 4096 pixels
+* The input must have a maximum keyframe interval of 10 seconds
+* The input must be 20 Mbps or less
+* The input must have a frame rate between 5 fps and 60 fps
+
+[You can find full details of the standard input specification for 1080p and 4K content in our documentation.](/docs/guides/minimize-processing-time#standard-input-specs)
+
+## Stream 2K and 2.5K content
+
+Mux Video also supports 2K and 2.5K (1440p) content. If you want your asset processed as 2/2.5K, you just need to set `"max_resolution_tier": "1440p"` in your create asset (or create direct upload) calls instead.

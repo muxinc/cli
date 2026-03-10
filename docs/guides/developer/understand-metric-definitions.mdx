@@ -1,0 +1,58 @@
+---
+title: Understand metric definitions
+product: data
+description: Understand the playback metrics Mux uses to measure viewership and quality of experience.
+seoTitle: Understand Mux Data metric definitions
+seoDescription: Learn about the metrics definitions Mux uses to measure video engagement and quality of experience so you can improve your viewers' video playback.
+---
+
+Engagement and Quality of Experience metrics are tracked during each playback attempt and a value for each metric is assigned to the view that is generated. Metrics reports aggregate the values from individual, completed views that match a specified filter to calculate the metric for analysis.
+
+Each report is defined by the metric being analyzed, the time range, and a filter that can focus the report on a specific subset of views. Engagement metrics use the start time of each view for determining if it should be included in a time range. Quality of Experience metrics are aggregated based on the end time of each view. Views are only included in a metric calculation if they have a valid value for the metric.
+
+# Views and Watch Time
+
+Views and Watch Time are key metrics that are often shown along with other engagement or Quality of Experience metrics in your Mux dashboard.
+
+## Definition of a View
+
+In Mux Data, a "View" is an attempt (successful or not) to play a video. A view is created when a viewer clicks play or if playback is started programmatically. If the user taps play, the video starts to load and fails, that counts as a single view. If a user taps play, starts watching the video, pauses, then resumes within 60 minutes, that counts as a single view.
+
+Each view is tracked until playback is explicitly ended or 60 minutes after playback stops. Playback can be explicitly ended by the SDK or if a viewer navigates off the page with the video being played.
+
+A single video can be watched multiple times in a single view by looping or seeking to the start of the video. If you see more views than expected in your dashboard or see duplicate views check on the code that initializes the Mux Data SDK to make sure you are initializing it once per playback attempt.
+
+After a view stops receiving playback events for 60 seconds, it is considered complete and is available in Metrics and exported via streaming exports. Playback events will be added to views if playback resumes within 60 minutes. After 60 minutes of inactivity, the view is finalized and new playback events will create a new view.
+
+## How Watch Time is calculated
+
+Watch Time is not currently an aggregated metric in Mux Data but is used in some of the metrics calculations. The Watch Time for a view is the cumulative amount of time the user spent watching or attempting to watch the video. This metric includes actively playing content, starting up, rebuffering, and seeking. It is similar to Playing Time, which is an aggregated metric available for analysis, but Watch Time also includes the time spent rebuffering.
+
+If user watches for 90 seconds, has 4 seconds of rebuffering, spends 2 seconds seeking by rewinding and then watches 60 more seconds that would total 156 seconds of watch time (90 + 4 + 2 + 60).
+
+If a user watches a 2 minute video at 2x speed, Watch Time will be 1 minute (assuming no buffering, seeking, startup time). This is because Watch Time is measuring how much time has elapsed during playback, not how much video duration was watched.
+
+# Metrics
+
+Mux has engagement metrics to track viewership and five top-level metrics to measure quality of experience. Detailed definitions and formulas can be found on these metric guide pages:
+
+* [Viewer Engagement](/docs/guides/data-engagement-metric)
+* [Overall Viewer Experience](/docs/guides/data-overall-viewer-experience-metric)
+* [Playback Success](/docs/guides/data-playback-success-metric)
+* [Startup Time](/docs/guides/data-startup-time-metric)
+* [Smoothness](/docs/guides/data-smoothness-metric)
+* [Video Quality](/docs/guides/data-video-quality-metric)
+
+These metrics are available in the Mux Data Dashboard and via the Mux Data API. They can be used by your team to track KPIs and optimize the viewing experience for your end users. 
+
+This is what the metrics look like on the Mux Data Dashboard:
+
+<Image
+  alt="Mux top 6 metrics"
+  width={321}
+  height={800}
+  src="/docs/images/top-6-metrics.png"
+/>
+
+In order to get the most value out of the metrics measured by Mux, make sure your data is actionable by providing [valuable metadata for each view](/docs/guides/make-your-data-actionable-with-metadata). Use this in conjunction with filters to segment data metrics.
+

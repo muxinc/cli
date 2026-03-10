@@ -1,0 +1,54 @@
+---
+title: Add high-performance video to your Elixir application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video
+  in your Elixir application
+---
+
+## Installation
+
+Add `mux` to your list of dependencies in `mix.exs`.
+
+```elixir
+def deps do
+  [
+    {:mux, "~> 3.2.1"}
+  ]
+end
+```
+
+## Quickstart
+
+To start, we'll need a Mux access token. We'll put our access token in our application configuration.
+
+```elixir
+# config/dev.exs
+config :mux,
+  access_token_id: "abcd1234",
+  access_token_secret: "efghijkl"
+```
+
+Then use this config to initialize a new client in your application.
+
+```elixir
+client = Mux.client()
+```
+
+You can also pass the access token ID and secret directly to client/2 function if you'd prefer:
+
+```elixir
+client = Mux.client("access_token_id", "access_token_secret")
+```
+
+Now we can use the client to upload new videos, manage playback IDs, etc.
+
+```elixir
+params = %{
+  input: "https://example.com/video.mp4"
+}
+{:ok, asset, _} = Mux.Video.Assets.create(client, params);
+```
+
+## Full documentation
+Check out the [Mux Elixir SDK docs](https://github.com/muxinc/mux-elixir) for more information.

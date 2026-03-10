@@ -1,0 +1,186 @@
+---
+title: Integrate with Supabase
+product: video
+description: >-
+  The Mux Supabase integration syncs your Mux assets, live streams, and uploads
+  to your Supabase database using webhooks and edge functions.
+seoTitle: Integrate Mux with Supabase Database
+seoDescription: >-
+  Sync your Mux video assets, live streams, and uploads to Supabase using the
+  @mux/supabase CLI and edge functions.
+---
+
+The `@mux/supabase` package provides a CLI that integrates your Mux account with Supabase. It creates a `mux` schema in your database with tables for assets, live streams, uploads, and webhook events, keeping everything in sync automatically.
+
+## What you'll get
+
+After setup, your Supabase database will have a `mux` schema containing:
+
+- **assets** - Mux video assets and their metadata
+- **live_streams** - Live stream configurations and status
+- **uploads** - Direct upload records
+- **webhook_events** - Webhook event history for debugging and auditing
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- A [Mux account](https://dashboard.mux.com/signup) with API credentials
+- A [Supabase project](https://supabase.com/dashboard)
+- The [Supabase CLI](https://supabase.com/docs/guides/cli) installed
+
+## 1. Initialize the integration
+
+First, make sure Supabase is initialized in your project, then run the Mux initialization:
+
+```bash
+npx supabase init
+npx @mux/supabase init
+```
+
+The initialization process will:
+
+1. Create a `mux` schema with tables for assets, live streams, uploads, and webhook events
+2. Generate an edge function at `supabase/functions/mux-webhook`
+3. Create a `.env` file at `supabase/functions/.env` with placeholder values for your Mux credentials
+4. Update `config.toml` to expose the `mux` schema and disable JWT verification for the webhook function
+
+## 2. Configure environment variables
+
+After initialization, update the `.env` file in the `supabase/functions` directory with your actual Mux API credentials:
+
+```bash
+MUX_TOKEN_ID=your-mux-token-id
+MUX_TOKEN_SECRET=your-mux-token-secret
+MUX_WEBHOOK_SECRET=your-webhook-secret
+```
+
+You can find your API credentials in the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens). The webhook secret will be generated when you configure the webhook in step 4.
+
+## 3. Local development
+
+Start your local Supabase instance:
+
+```bash
+npx supabase start
+```
+
+To test the webhook locally, serve the edge function:
+
+```bash
+npx supabase functions serve mux-webhook
+```
+
+<Callout type="info">
+
+To receive webhooks locally, you'll need to expose your local server using a tool like [ngrok](https://ngrok.com/). Configure the ngrok URL as your webhook endpoint in the Mux dashboard.
+
+</Callout>
+
+## 4. Configure the Mux webhook
+
+In the [Mux Dashboard](https://dashboard.mux.com/settings/webhooks), create a new webhook with the following settings:
+
+- **URL**: Your Supabase edge function URL (e.g., `https://your-project.supabase.co/functions/v1/mux-webhook`)
+- **Events**: Select the events you want to sync (recommended: all video asset and live stream events)
+
+After creating the webhook, copy the signing secret and add it to your environment variables as `MUX_WEBHOOK_SECRET`.
+
+## 5. Backfill existing data
+
+If you have existing assets in Mux that you want to sync to Supabase, run the backfill command:
+
+```bash
+npx @mux/supabase backfill
+```
+
+This will import all your existing Mux assets and live streams into your Supabase database.
+
+### Programmatic backfill
+
+You can also run the backfill programmatically using the sync engine:
+
+```typescript
+import { MuxSync } from '@mux/sync-engine';
+
+const muxSync = new MuxSync({
+  databaseUrl: 'your-supabase-database-url',
+  muxTokenId: 'your-mux-token-id',
+  muxTokenSecret: 'your-mux-token-secret',
+  muxWebhookSecret: 'your-mux-webhook-secret',
+});
+
+const result = await muxSync.syncBackfill({ object: 'all' });
+```
+
+## 6. Deploy to production
+
+When you're ready to deploy:
+
+1. **Push database migrations**:
+   ```bash
+   npx supabase db push
+   ```
+
+2. **Set production secrets**:
+   ```bash
+   npx supabase secrets set MUX_TOKEN_ID=your-token-id
+   npx supabase secrets set MUX_TOKEN_SECRET=your-token-secret
+   npx supabase secrets set MUX_WEBHOOK_SECRET=your-webhook-secret
+   ```
+
+3. **Deploy the edge function**:
+   ```bash
+   npx supabase functions deploy mux-webhook
+   ```
+
+4. **Update your Mux webhook URL** in the dashboard to point to your production edge function URL.
+
+## Querying your data
+
+Once synced, you can query your Mux data directly from Supabase. The `mux` schema uses Row Level Security (RLS) that blocks access from `anon` and `authenticated` roles by default, so you'll need to use the service role key for server-side queries:
+
+```typescript
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  'your-supabase-url',
+  'your-supabase-service-role-key',
+  { db: { schema: 'mux' } }
+);
+
+// Get all ready assets
+const { data: assets } = await supabase
+  .from('assets')
+  .select('*')
+  .eq('status', 'ready');
+
+// Get a specific asset by ID
+const { data: asset } = await supabase
+  .from('assets')
+  .select('*')
+  .eq('id', 'asset-id')
+  .single();
+```
+
+<Callout type="warning">
+
+The service role key bypasses RLS and should only be used in server-side code. Never expose it in client-side applications. If you need client-side access to Mux data, add your own RLS policies to the tables in the `mux` schema.
+
+</Callout>
+
+## Using with PostgreSQL
+
+If you're using PostgreSQL without Supabase, you can use the `@mux/sync-engine` package directly:
+
+```bash
+npm install @mux/sync-engine
+```
+
+The sync engine works with any PostgreSQL database and provides the same synchronization capabilities.
+
+## Resources
+
+- [GitHub repository](https://github.com/muxinc/supabase)
+- [Supabase documentation](https://supabase.com/docs)
+- [Mux API reference](/docs/api-reference)

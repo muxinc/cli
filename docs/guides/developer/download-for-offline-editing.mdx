@@ -1,0 +1,124 @@
+---
+title: Download for offline editing
+product: video
+description: Learn how to download a master quality video for editing and post production or archiving
+---
+## Why download the master
+
+When a video is ingested into Mux we store a version of the video that's equivalent in quality to the original video, we call this the master. The `max_resolution_tier` of an asset will determine the master file's resolution e.g. a `max_resolution_tier` of `2160p` will result in a 4K master file. All of the streamed versions of the video are created from the master, and the master itself is never streamed to a video player because it's not optimized for streaming.
+
+There are a few common use cases where Mux may have the only copy of the original video:
+* You're using Mux live streaming and the only copy is the recorded asset after the event
+* You're using Mux's [direct upload](/docs/guides/upload-files-directly) feature so Mux has the only copy
+* You deleted the original version from your own cloud storage because Mux is already storing a high quality version for you
+
+When this is the case, there are a number of reasons you may want to retrieve the master version from Mux, including:
+* Allowing users to download the video and edit it in a tool like Final Cut Pro
+* Archiving the video for the future, for example if you're un-publishing (deleting) a video asset from Mux
+* Moving your videos to another service
+
+Enabling master access will create a *temporary* URL to the master version as an MP4 file.
+You can use this URL to download the video to your own hosting, or provide the URL to a user to download directly from Mux.
+
+**The URL will expire after 24 hours, but you can enable master access on any asset at any time.**
+
+<Callout type="warning" title="API Only!">
+  The methods described here are available only via the Mux API; you won't find these features in the Mux Dashboard.
+</Callout>
+
+## Enable master access
+
+If you want the master be available soon after a video is uploaded, use the `master_access` property when <ApiRefLink href="/docs/api-reference/video/assets/create-asset">creating an asset</ApiRefLink>.
+
+```json
+{
+  "inputs": [
+    {
+      "url": "VIDEO_URL"
+    }
+  ],
+  "playback_policies": [
+    "public"
+  ],
+  "video_quality": "basic",
+  "master_access": "temporary"
+}
+```
+
+You can also add it afterward by <ApiRefLink href="/docs/api-reference/video/assets/update-asset-master-access">updating the asset</ApiRefLink>.
+
+### Enable master access when a live stream finishes
+
+If you want to download the recorded version of a live stream soon after the live stream is finished, use the `master_access` property in the `new_asset_settings` when <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">creating the live stream</ApiRefLink>.
+
+```json
+{
+  "playback_policies": [
+    "public"
+  ],
+  "new_asset_settings": {
+    "playback_policies": [
+      "public"
+    ],
+    "video_quality": "basic",
+    "master_access": "temporary"
+  }
+}
+```
+
+## Retrieving the URL to the master
+
+After master access has been requested, a new object called `master` will exist on the asset details object.
+
+```json
+{
+  ...all asset details...
+  "master_access": "temporary",
+  "master": {
+    "status": "preparing"
+  }
+}
+```
+
+Making the master available is an asynchronous process that happens after an Asset is `ready`, or in the case of a live streamed asset, after the `live_stream_completed` event. Because of this, the `master` object has a `status` property that gives the current state of the master, starting with `preparing`.
+
+In most cases, the master will be available very quickly. When it's ready the `status` will be updated to `ready`, and a new `url` property will exist on the object. This is the URL you can use to download the master yourself, or to let a user download the master.
+
+```json
+{
+  ...all asset details...
+  "master_access": "temporary",
+  "master": {
+    "status": "ready",
+    "url": "https://mezzanine.mux.com/ABC123/mezzanine.mp4?skid=foo&signature=bar"
+  }
+}
+```
+
+## Customizing the filename
+
+The filename of the downloaded file can be controlled by appending the `download` query parameter to the URL returned from the API, for example:
+
+```http
+https://mezzanine.mux.com/ABC123/mezzanine.mp4?skid=foo&signature=bar&download=desired_filename.mp4
+```
+
+This will cause the browser to download the file with the name `desired_filename.mp4` instead of the default name.
+
+<Callout type="warning" title="Important">
+  It is important that you do not modify the URL or query parameters returned from the API in any other way than to add the `download` parameter.
+</Callout>
+
+
+## Webhooks for master access
+
+Your application can be automatically updated with the status of master access for an asset through [webhooks](/docs/core/listen-for-webhooks).
+
+There are four related events you can receive.
+
+| Webhook       | Description   |
+| :------------ |:--------------|
+|`video.asset.master.preparing` | Received when master access is first requested |
+|`video.asset.master.ready` |Received when the URL to the master is available |
+|`video.asset.master.deleted` |Received if master access has been set to `none` via a PUT to the `master-access` endpoint |
+|`video.asset.master.errored` |Received if an unexpected error happens while making the master available |

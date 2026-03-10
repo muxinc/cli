@@ -1,0 +1,191 @@
+---
+title: Compose custom UIs with subcomponents
+product: uploader
+description: Learn how to use Mux Uploader's various subcomponents to compose even more bespoke user experiences and designs.
+---
+
+Although Mux Uploader is a single component that's easy to drop into your web application, it's actually built using several subcomponents
+"under the hood." If your application design or desired user experience requires more customization, you can use the individual web components that come packaged with Mux Uploader to build out a custom upload UI that meets your needs.
+
+To use this approach, add an `id` attribute to your `<mux-uploader>` element with a unique value.
+
+You can then associate the `<mux-uploader>` element with any of the packaged components by adding a `mux-uploader=""` attribute to each component and setting it to the `id` that you gave to the `<mux-uploader>` element.
+
+Here's a simple example for the web component:
+
+```html
+<!-- add a mux-uploader tag with an id attribute and hide it with CSS -->
+<mux-uploader id="my-uploader" style="display: none;"></mux-uploader>
+
+<!-- ...then, somewhere else in your app, add a reference back to it -->
+<mux-uploader-file-select mux-uploader="my-uploader">
+  <button slot="file-select">Pick a video</button>
+</mux-uploader-file-select>
+```
+
+Here's one for React:
+
+```jsx
+import MuxUploader, { MuxUploaderFileSelect } from "@mux/mux-uploader-react";
+
+export default function App() {
+  return (
+    <MuxUploader id="my-uploader" style={{ display: "none"}} />
+
+    {/* ...then, somewhere else in your app, add a reference back to it */}
+    <MuxUploaderFileSelect mux-uploader="my-uploader">
+      <button slot="file-select">Pick a video</button>
+    </mux-uploader-file-select>
+  );
+}
+```
+
+Because all of these are web components, you can use CSS to style them or
+any of their slotted children (discussed below).
+
+# Subcomponents
+
+## File Select
+
+The file select subcomponent is what tells Mux Uploader to open the file selection browser. The web component is
+`<mux-uploader-file-select>`, and the React component is `<MuxUploaderFileSelect>`.
+
+You can further customize it by slotting in your own `<button>` or other component in the `file-select` slot.
+
+Here's an example:
+
+<InteractiveCodeExample product="uploader" example="uploaderFileSelectSubcomponent" />
+
+## Drop
+
+The drop subcomponent is what implements the [drag and drop API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API)
+and tells Mux Uploader the relevant details about the file.
+The web component is `<mux-uploader-drop>`, and the React component is `<MuxUploaderDrop>`.
+
+Mux Uploader Drop provides a few slots for customization.
+
+- `heading` - By default this is a `<span>` with the text "Drop a video file here to upload".
+- `separator` - By default this is a `<span>` containing the text "or" placed between the heading and any additional children.
+- (default) - Any additional children that don't have a specified slot will show up below the two previous slots.
+
+Here's an example that puts all of these together, including CSS:
+
+<InteractiveCodeExample product="uploader" example="uploaderDropSubcomponent" />
+
+In addition, Mux Uploader Drop has attributes/properties for optionally showing an overlay whenever a file is
+dragged over it. These are on by default in Mux Uploader, and are:
+
+- `overlay` - A boolean attribute / property / React prop for enabling the overlay UI.
+- `overlay-text` (`overlayText` property and React prop) - Allows you to provide custom text to show on the overlay.
+
+If you'd like to further customize the overlay with a different background color, you can use the
+`--overlay-background-color` CSS variable (which is also available when [using Mux Uploader directly](/docs/guides/uploader-web-customize-look-and-feel#use-css-variables-for-additional-styling))
+
+Here's an example of these in action:
+
+<InteractiveCodeExample product="uploader" example="uploaderDropSubcomponentOverlay" />
+
+### Custom Drop
+You can even implement your own drag and drop completely separate from `<mux-uploader>` and as long as you dispatch a custom `file-ready` with the file in the `detail` property then `<mux-uploader>` will handle the upload upon receiving the event.
+
+```html
+<script>
+  const muxUploader = document.querySelector("mux-uploader");
+
+  // Dispatch custom event to trigger upload
+  muxUploader.dispatchEvent(
+    new CustomEvent("file-ready", {
+      composed: true,
+      bubbles: true,
+      detail: file,
+    })
+  );
+</script>
+```
+
+## Progress
+
+The progress subcomponent is what visualizes progress of your upload. In fact, it is used twice "under the hood" by the default `<mux-uploader>`:
+once for showing the %, and once for showing the progress bar.
+The web component is `<mux-uploader-progress>`, and the React component is `<MuxUploaderProgress>`.
+
+In addition, Mux Uploader Progress exposes the `type` attribute / property / React prop for choosing the particular kind of visualization you'd prefer. The
+available type values are:
+
+- `percentage` (default) - Show as a numeric % in text
+- `bar` - Show as a progress bar
+- `radial` (_**Experimental**_) - Show as a radial/circular progress indicator
+
+Each of these types also has CSS variables available for further customization:
+
+`percentage`:
+
+- `--progress-percentage-display` - Applies to the `display` of the underlying percentage element (default: `block`).
+
+`bar`:
+
+- `--progress-bar-height` - Applies to the `height` of the progress bar (default: `4px`).
+- `--progress-bar-fill-color` - Applies to the color of the progress bar's progress indication (default: `black`).
+
+`radial`:
+
+- `--progress-radial-fill-color` - Applies to the color of the radial progress indication (default: `black`).
+
+
+Here's an example of these in action:
+
+<InteractiveCodeExample product="uploader" example="uploaderProgressSubcomponentTypes" />
+
+## Status
+
+The status subcomponent is what indicates when the upload is completed, or an error has occurred, or when you're offline.
+The web component is `<mux-uploader-status>`, and the React component is `<MuxUploaderStatus>`.
+
+Here's an example with a bit of CSS customization, using Mux Uploader's [state attributes](/docs/guides/uploader-web-customize-look-and-feel#use-uploader-attributes-for-state-driven-styling)
+on the status component for additional state-driven styling:
+
+<InteractiveCodeExample product="uploader" example="uploaderStatusSubcomponent" />
+
+## Retry
+
+The retry subcomponent that is displayed when an error has occurred to retry uploading and will notify Mux Uploader to retry when clicked.
+The web component is `<mux-uploader-retry>`, and the React component is `<MuxUploaderRetry>`.
+
+Here's a simple example:
+
+<InteractiveCodeExample product="uploader" example="uploaderRetrySubcomponent" />
+
+## Pause
+
+The pause subcomponent that is displayed while an upload is in progress and will notify Mux Uploader to either pause or resume uploading
+when clicked, depending on the current uploading state.
+The web component is `<mux-uploader-pause>`, and the React component is `<MuxUploaderPause>`.
+
+Here's a simple example:
+
+<InteractiveCodeExample product="uploader" example="uploaderPauseSubcomponent" />
+
+# Advanced use cases
+
+Here are some more examples of working with the subcomponents directly, using multiple subcomponents together to demonstrate the versatility
+and composability of using the various subcomponents together in either React or vanilla HTML.
+
+## React CSS modules
+
+Just like you can do with the "batteries" usage of Mux Uploader, you can use [CSS-in-JS](/docs/guides/uploader-web-customize-look-and-feel#using-css-modules)
+to handle styling of your subcomponents in React. Here's an example of how you can style Mux Uploader using CSS modules:
+
+<InteractiveCodeExample product="uploader" example="uploaderReactSubcomponentsWithCssModules" />
+
+## React Tailwind CSS
+
+Also like Mux Uploader, you can use [Tailwind CSS](/docs/guides/uploader-web-customize-look-and-feel#using-tailwind-css) for your subcomponent styling. Here's an example in React:
+
+<InteractiveCodeExample product="uploader" example="uploaderReactSubcomponentsWithTailwind" />
+
+## Uploader Page
+
+In this example, we use the Mux Uploader Drop component as the parent for a full page upload experience, with the various subcomponents as descendants
+with their own customization for a more bespoke look and feel:
+
+<InteractiveCodeExample product="uploader" example="uploaderHtmlSubcomoponentsFullscreenDrop" />

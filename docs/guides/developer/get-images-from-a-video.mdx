@@ -1,0 +1,158 @@
+---
+title: Get thumbnails and images from a video
+product: video
+description: Learn how to get images from a video to show a preview thumbnail or poster image.
+videoWalkthrough:
+  src: i2601kxZN02xxWWBzkGspI97yO4CjrlX4vunqqtiFsbOw
+  thumbnailTime: 196
+  created: "2023-09-13T08:32:00Z"
+steps:
+  - title: Get an image from a video
+    description: Learn how to get images from a video to use in your project
+    topic: image
+  - title: Get an animated GIF from a video
+    description: Learn how to get an animated GIF from a video
+    topic: frames
+  - title: Common uses for image requests
+    description: See how images from videos can be used in your project
+    topic: reference
+  - title: Using signed URLs
+    description: Learn how to request images when using a signed playback policy
+    topic: general
+  - title: Getting the latest thumbnail from a live stream
+    description: Get a thumbnail of the leading edge of a live stream
+    topic: documentTime
+---
+
+<LinkedHeader step={steps[0]} />
+
+To get an image from Mux, use a `playback_id` to make a request to `image.mux.com` in the following format:
+
+<CodeExample
+  lang="curl"
+  code="https://image.mux.com/{PLAYBACK_ID}/thumbnail.{png|jpg|webp}"
+/>
+
+<Image src="/docs/images/thumbnail-1.png" width={1920} height={800} />
+
+Images can be served in either `webp`, `png`, or `jpg` format. Webp is an image format that uses lossy and lossless image compression methods to reduce image size while maintaining good quality. If your images are in the `webp` format, they will typically yield a smaller file size compared to using `png` or `jpg` images.
+
+You can control how the image is created by including the following query string parameters with your request. If you don't include any, Mux will default to choosing an image from the middle of your video.
+
+### Thumbnail Query String Parameters
+
+| Parameter     | Type          | Description                                           |
+| :-------------|:--------------|:------------------------------------------------------|
+| `time`        | `float`       | The time (in seconds) of the video timeline where the image should be pulled. Defaults to the middle of the original video.|
+| `width`       | `int32`       | The width of the thumbnail (in pixels). Defaults to the width of the original video. |
+| `height`      | `int32`       | The height of the thumbnail (in pixels). Defaults to the height of the original video. |
+| `rotate`      | `int32`       | Rotate the image clockwise by the given number of degrees. Valid values are `90`, `180`, and `270`. |
+| `fit_mode`    | `string`      | How to fit a thumbnail within width + height. Valid values are `preserve`, `stretch`, `crop`, `smartcrop`, and `pad` (see below). |
+| `flip_v`      | `boolean`     | Flip the image top-bottom after performing all other transformations. |
+| `flip_h`      | `boolean`     | Flip the image left-right after performing all other transformations. |
+| `latest`      | `boolean`     | When set to `true`, pulls the latest thumbnail from the playback ID of an ongoing live stream. Can only be used with live streams. [More details](#getting-the-latest-thumbnail-from-a-live-stream). |
+
+The `fit_mode` parameter can have the following values:
+- `preserve` : By default, Mux will preserve the aspect ratio of the video, while fitting the image within the requested width and height. For example if the thumbnail width is 100, the height is 100, and the video's aspect ratio is 16:9, the delivered image will be 100x56 (16:9).
+- `stretch` : The thumbnail will exactly fill the requested width and height, even if it distorts the image. Requires both width and height to be set. (Not very popular.)
+- `crop` : The video image will be scaled up or down until it fills the requested width and height box. Pixels then outside of the box will be cropped off. The crop is always centered on the image. Requires both width and height to be set.
+- `smartcrop` : An algorithm will attempt to find an area of interest in the image and center it within the crop, while fitting the requested width and height. Requires both width and height to be set.
+- `pad` : Similar to preserve but Mux will "letterbox" or "pillar box" (add black padding to) the image to make it fit the requested width and height exactly. This is less efficient than preserve but allows for maintaining the aspect ratio while always getting thumbnails of the same size. Requires both width and height to be set.
+
+#### Example with Query String Parameters
+
+Here is an example request for an image including query parameters which:
+- has a width of 400 and a height of 200
+- uses the `smartcrop` fit mode
+- is taken from the 35th second of the video
+- is a PNG
+
+<CodeExample
+  lang="curl"
+  code="https://image.mux.com/{PLAYBACK_ID}/thumbnail.png?width=400&height=200&fit_mode=smartcrop&time=35"
+/>
+
+<Image src="/docs/images/thumbnail-2.png" width={400} height={200} />
+
+<Callout type="info">
+  Note that there is a default limit of 1 thumbnail and 1 GIF for every 10 seconds of duration per asset. For assets under 100 seconds in duration, the limit is 10 thumbnails and 10 GIFs. For example, you can retrieve 30 thumbnails and 30 GIFs for a 5 minute asset or 10 thumbnails and 10 GIFs for a 30 second asset.
+</Callout>
+
+<LinkedHeader step={steps[1]} />
+
+To get an animated `gif` or `webp` from Mux, use a `playback_id` associated with an asset or live stream to make a request to `image.mux.com` in the following format:
+
+<CodeExample
+  lang="curl"
+  code="https://image.mux.com/{PLAYBACK_ID}/animated.{gif|webp}"
+/>
+
+<Image src="/docs/images/animated-image-1.gif" width={640} height={266} />
+
+You can control how the image is created by including the following query string parameters with your request.
+
+### Animated GIF Query String Parameters
+
+| Parameters    | Type          | Description   |
+| :------------ |:--------------|:--------------|
+| `start`       | `float`       | The time (in seconds) of the video timeline where the animated GIF should begin. Defaults to 0. |
+| `end`         | `float`       | The time (in seconds) of the video timeline where the GIF ends. Defaults to 5 seconds after the start. Maximum total duration of GIF is limited to 10 seconds; minimum total duration of GIF is 250ms. |
+| `width`       | `int32`       | The width in pixels of the animated GIF. Default is 320px, or if height is provided, the width is determined by preserving aspect ratio with the height. Max width is 640px. |
+| `height`      | `int32`       | The height in pixels of the animated GIF. The default height is determined by preserving aspect ratio with the width provided. Maximum height is 640px. |
+| `fps`         | `int32`       | The frame rate of the generated GIF. Defaults to 15 fps. Max 30 fps. |
+
+#### Example with Query String Parameters
+
+Here is an example request for a GIF including query parameters which:
+- set a width of 640
+- set a frame rate of 5fps
+
+<CodeExample
+  lang="curl"
+  code="https://image.mux.com/{PLAYBACK_ID}/animated.gif?width=640&fps=5"
+/>
+
+<Image src="/docs/images/animated-image-2.gif" width={640} height={360} />
+
+<LinkedHeader step={steps[2]} />
+
+Images and GIFs can be used anywhere in your project, but here are some examples of common ways you can use images from Mux.
+
+<Callout type="error">
+  Avoid using images for storyboards (timeline hover previews). To learn more about storyboards, you can view [this guide](/docs/guides/create-timeline-hover-previews).
+</Callout>
+
+### Add a poster image to your player
+
+Most video players will default to showing a black frame with a play icon and other video controls before a user presses play to start the video playback.
+You can add a poster image to the majority of video players where you could feed an image URL from Mux. Here's an example using a HTML5 video element
+with a poster image setup.
+
+```jsx
+<video id="my-video" width="640" height="360" poster="https://image.mux.com/{PLAYBACK_ID}/thumbnail.jpg" controls>
+```
+
+### Use a GIF to show a preview
+
+When a user is picking a video from a catalogue, you could show a preview of the video using an animated GIF whilst they hover over a thumbnail of the video.
+
+<Image src="/docs/images/animated-catalogue-example.gif" width={640} height={300} />
+
+You could use pure CSS, some JavaScript, or another method which best fits with your application to achieve a similar result (the example above used CSS).
+
+<LinkedHeader step={steps[3]} />
+
+Mux videos have two types of playback policy, `public` or `signed`. If your `playback_id` is `signed`, you will need to also sign requests made for images and animated GIFs.
+You can check out how to do that in our [signed URLs guide](/docs/guides/secure-video-playback).
+
+If you run into any trouble signing image requests, please [reach out](/support) and we'll be able to help.
+
+<LinkedHeader step={steps[4]} />
+
+When a live stream is active, you can use the `?latest=true` query string parameter to get the latest thumbnail from the live stream. This thumbnail is refreshed every 10 seconds.
+
+This is useful for building moderation and classification workflows when working with user-generated live streams, but can also be used to show a discovery experience, showing the active live streams in your application.
+
+Using the `latest` parameter on a VOD asset or non-live stream will return a 400 error.
+
+[Read the blog post for more details end examples for this feature.](/blog/latest-thumbnail)

@@ -1,0 +1,103 @@
+---
+title: Add watermarks to your videos
+product: video
+description: >-
+  This guide will show how to add watermarks (overlays) to your videos.
+  Watermarks can be added to assets, live streams and direct uploads.
+---
+
+A watermark is an image overlaid on a video, often used to brand a video or visually label a specific version of a video.
+<Image src="/docs/images/watermark-img.jpg" width={1920} height={1080} />
+
+You can add a watermark to your video using the `overlay_settings` in the <ApiRefLink href="/docs/api-reference/video/assets/create-asset">asset creation API</ApiRefLink>. The first input in your array of inputs must be the video file you want to apply the watermark to, and the second should be the URL to the source watermark image along with placement details. Multiple watermarks are possible using additional inputs as described in our <ApiRefLink href="/docs/api-reference/video/assets/create-asset">API documentation for creating an asset</ApiRefLink>.
+
+<Callout type="info">
+  Valid file types for watermarks are `.png` and `.jpg`.
+
+  Other file types such as `.gif`, `.webp`, and `.svg` are not supported at this time.
+</Callout>
+
+For a live stream, the `overlay_settings` must be embedded under the `input` array within `new_asset_settings` in the <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">live stream creation API</ApiRefLink>, and the overlays will apply both to playback through the live stream's playback IDs _and_ all assets created from the live stream. The watermark image will be retrieved from this URL at the start of each live stream, so you should make sure that the image will be available at that URL for as long as you plan to use the live stream.
+
+<CodeExamples product="video" example="overlay" />
+
+## Positioning with percents vs. pixels
+
+The overlay settings are made to help you position and size a watermark consistently no matter what the size or shape of the input video. When setting the width, height, and margins you have the option of using either percents or pixels.
+
+With percent values the watermark `width` and `horizontal_margin` will be relative to the width of the video while the `height` and `vertical_margin` will be relative to the height of the video. For example if you set the watermark `horizontal_margin` to 10% for a video that is 1920 pixels wide, the watermark will be 192 pixels from the edge.
+
+```json
+{
+  "inputs": [
+    {
+      "url": "{VIDEO_INPUT_URL}"
+    },
+    {
+      "url": "{WATERMARK_URL}",
+      "overlay_settings": {
+        "vertical_align": "top",
+        "vertical_margin": "10%",
+        "horizontal_align": "left",
+        "horizontal_margin": "10%"
+      }
+    }
+  ],
+  "playback_policies": ["public"]
+}
+```
+
+<Image src="/docs/images/watermark-percent.png" width={1280} height={1486} />
+
+While the result of using percents is probably easiest to understand, the one shortcoming is positioning a watermark with an exact margin. For example you may want your horizontal and vertical margins to be equal, or for there to be the same exact horizontal margin for vertical videos as with horizontal videos. Both of those examples can be a challenge with percents, where the actual result can be different depending on the width and height of the video.
+
+Setting margins with pixels allows you to get exact with your margins, widths, and heights. However, you can't always control the size of the input video, and a watermark that is 80px wide would look very different on a video that is 960 pixels wide compared to a video that is 1920 pixels wide. For that reason, when you use pixel values in your overlay settings they will always be applied as if the video is first scaled to fit 1920x1080 for horizontal videos or 1080x1920 for vertical videos. So in the previous example, the watermark would be 80px wide on the 1920px wide video, and 40px wide on the 960px wide video.
+
+```json
+{
+  "inputs": [
+    {
+      "url": "{INPUT_URL}"
+    },
+    {
+      "url": "{WATERMARK_URL}",
+      "overlay_settings": {
+        "width": "80px",
+        "vertical_align": "top",
+        "vertical_margin": "40px",
+        "horizontal_align": "left",
+        "horizontal_margin": "40px"
+      }
+    }
+  ],
+  "playback_policies": ["public"]
+}
+```
+
+<Image src="/docs/images/watermark-pixel.png" width={1330} height={1550} />
+
+The reason behind this is that your watermark should look the same no matter what the original size of the input video, and videos are most often scaled to fit the player window or the screen of the device.
+
+## Center a watermark
+
+<Image src="/docs/images/watermark-center.jpg" width={1920} height={1080} />
+
+To center a watermark on the video, simply set `vertical_align` to "middle" and `horizontal_align` to "center".
+
+```json
+{
+  "inputs": [
+    {
+      "url": "{INPUT_URL}"
+    },
+    {
+      "url": "{WATERMARK_URL}",
+      "overlay_settings": {
+        "vertical_align": "middle",
+        "horizontal_align": "center"
+      }
+    }
+  ],
+  "playback_policies": ["public"]
+}
+```

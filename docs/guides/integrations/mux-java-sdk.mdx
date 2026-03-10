@@ -1,0 +1,77 @@
+---
+title: Add high-performance video to your Java application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video
+  in your Java application
+---
+
+## Installation
+
+There are several ways to add the Mux Java SDK to your project:
+
+### Maven
+
+Add this dependency to your project's POM:
+
+```xml
+<dependency>
+  <groupId>com.mux</groupId>
+  <artifactId>mux-sdk-java</artifactId>
+  <version>1.0.0</version>
+  <scope>compile</scope>
+</dependency>
+```
+
+### Gradle
+
+Add this dependency to your project's build file:
+
+```gradle
+compile "com.mux:mux-sdk-java:1.0.0"
+```
+
+## Quickstart
+
+To start, you'll need a Mux access token. Once you've got that, you're off to the races!
+
+```java
+// Import classes:
+import com.mux.ApiClient;
+import com.mux.ApiException;
+import com.mux.Configuration;
+import com.mux.auth.*;
+import com.mux.models.*;
+import com.mux.sdk.AssetsApi;
+
+public class Example {
+  public static void main(String[] args) {
+    ApiClient defaultClient = Configuration.getDefaultApiClient();
+    defaultClient.setBasePath("https://api.mux.com");
+    
+    // Configure HTTP basic authorization: accessToken
+    HttpBasicAuth accessToken = (HttpBasicAuth) defaultClient.getAuthentication("accessToken");
+    accessToken.setUsername("YOUR USERNAME");
+    accessToken.setPassword("YOUR PASSWORD");
+
+    AssetsApi apiInstance = new AssetsApi(defaultClient);
+    CreateAssetRequest createAssetRequest = {"input":[{"url":"https://muxed.s3.amazonaws.com/leds.mp4"}],"playback_policy":["public"],"video_quality":"basic"}; // CreateAssetRequest | 
+    try {
+      AssetResponse result = apiInstance.createAsset(createAssetRequest)
+            .execute();
+      System.out.println(result);
+    } catch (ApiException e) {
+      System.err.println("Exception when calling AssetsApi#createAsset");
+      System.err.println("Status code: " + e.getCode());
+      System.err.println("Reason: " + e.getResponseBody());
+      System.err.println("Response headers: " + e.getResponseHeaders());
+      e.printStackTrace();
+    }
+  }
+}
+
+```
+
+## Full documentation
+Check out the [Mux Java SDK docs](https://github.com/muxinc/mux-java) for more information.
+

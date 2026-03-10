@@ -1,0 +1,107 @@
+---
+title: Mux Player for iOS releases
+product: player
+description: Every new release of Mux Player for iOS is posted here with release notes
+steps:
+---
+
+<Releases>
+# Current release
+
+## v1.5.0
+New:
+- Added `MuxPlayerContext` as a way to use an AVPlayer with Mux monitoring without needing to call `stopMonitoring` or do other teardown. Also supports AVQueuePlayer and has some basic Audio Session handling
+
+Fixes:
+- Fix several swift docs inaccuracies
+
+# Previous releases
+
+## v1.4.0
+
+Improvements
+- Resolves an issue where DRM playback would fail to start after a [media services reset](https://developer.apple.com/documentation/avfaudio/avaudiosession/mediaserviceswereresetnotification#Discussion). It is still required to recreate the player and assets after such an event.
+- Improvements to the DRM registration process for more consistent startup latency
+
+## v1.3.0
+
+Updates
+- Allow disabling Mux Data automatic error tracking via `MonitoringOptions` 
+- Allow creating `AVPlayerItem`s with Mux `PlaybackOptions` without using our `AVPlayerViewController` or `AVPlayerLayer` APIs. See the header docs for more details
+
+## v1.2.1
+
+Improvements
+- Updated and relaxed `mux-stats-sdk-avplayer` dependency
+- Added default message "No additional information." for `Monitor` `handleUpdatedPlayerError`
+
+## v1.2.0
+
+Improvements
+- Support instant clipping using relative time for publicly playable assets
+
+## v1.1.1
+
+Improvements
+- Capture additional details in Mux Data when experiencing an error playing video with DRM
+
+## v1.1.0
+
+Improvements
+- [Adds DRM support](/docs/guides/protect-videos-with-drm)
+
+## v1.0.0
+
+Improvements
+- Enable caching when streaming on-demand at a fixed resolution tier
+- Updated Mux Data dependencies to meet App Store privacy manifest requirements
+
+API Changes
+- Add convenience initializers to constrain playback to a single rendition with a preset resolution tier
+- Add additional `AVPlayerViewController` extensions that configure an already existing instance for playing back a video from Mux
+- Remove `ascending` option for `RenditionOrder` this parameter is not supported by Mux Video
+
+## v0.5.0
+
+Improvements
+- Sets player software name and version to default values when reporting playback events to Mux Data
+
+## v0.4.0
+
+API Changes
+- Add `1440p` max resolution playback modifier
+
+Fixes
+- Correct SDK version
+
+## v0.3.0
+
+API Changes
+- Add: maximum resolution playback modifiers for 1080p and 2160p
+
+## v0.2.0
+
+Additions
+- Initialize an `AVPlayerLayer` to stream and monitor video with a public or signed playback ID
+- Setup an already existing `AVPlayerLayer` to stream and monitor video with a public or signed playback ID
+
+Breaking
+- The SDK module has been renamed to `MuxPlayerSwift`.
+    - Update SPM package links from `https://github.com/muxinc/mux-avplayer-sdk` to `https://github.com/muxinc/mux-player-swift`
+    - Replace any import statements: `import MuxAVPlayerSDK` to `import MuxPlayerSwift`
+
+
+This SDK is pre-release software and may contain issues or missing functionality. We recommend against submitting apps based on it to the App Store.
+
+## v0.1.0
+
+Initial Release
+- Feature: setup `AVPlayerViewController` to stream and monitor video with a public or signed playback ID
+- Feature: automatic Mux Data monitoring setup
+- Feature: passthrough of all metadata supported by the `AVPlayer` Data SDK
+- Feature: custom domains for playback
+- Feature: support for limiting playback resolution to 720p
+
+Known Issues
+- Mux Data monitoring will not automatically stop when `AVPlayerViewController` is no longer in use, call `stopMonitoring` on `AVPlayerViewController` to stop monitoring manually.
+</Releases>

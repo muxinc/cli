@@ -1,0 +1,709 @@
+---
+title: Custom Objective-C integration
+product: data
+description: >-
+  This is a guide for building a custom integration with Mux Data in
+  Objective-C.
+---
+
+Mux has a pre-built integration with Apple's `AVPlayer` for iOS and tvOS applications; for these players, see here: [iOS Integration Guide](/docs/guides/monitor-avplayer).
+
+If the player that you use does not expose the `AVPlayer` instance directly, swaps between multiple instances during playback, or uses some other playback mechanism completely, a custom integration may be needed.
+
+## Important Related Docs
+Before proceeding, read the following overview: [Building a Custom Integration](/docs/guides/build-a-custom-data-integration).
+
+In addition, the source code for Mux's integration with Apple's AVPlayer is open source and can be found in the [Mux-Stats-AVPlayer GitHub repository](https://github.com/muxinc/mux-stats-sdk-avplayer). This project is a good example of how to use the Objective-C core library in building a player integration.
+
+## Include the Mux-Core library
+
+### Installing in Xcode with Swift Package Manager
+
+1. In your Xcode project click "File" > "Add Package"
+2. In the top-right corner of the modal window paste in the SDK repository URL:
+
+```
+https://github.com/muxinc/stats-sdk-objc.git
+```
+
+3. Click `Next`.
+4. Since the `MuxCore` follows SemVer, we recommend setting the "Rules" to install the latest version and choosing the option "Up to Next Major". [Here's an overview of the different SPM Dependency Rules and their semantics](https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app#Decide-on-package-requirements).
+
+### Installing in Package.swift
+
+Open your Package.swift file, add the following to `dependencies`:
+
+```swift
+    .package(
+      url: "https://github.com/muxinc/stats-sdk-objc",
+      .upToNextMajor(from: "5.0.1")
+    ),
+```
+
+### Installing with CocoaPods
+
+To include the core Objective-C library via CocoaPods, modify your Podfile to use frameworks by including `use_frameworks!` and then add the following pod to your Podfile:
+
+```ruby
+pod "Mux-Stats-Core", "~> 5.0"
+```
+
+This will include our current release of the [core Objective-C library](https://github.com/muxinc/stats-sdk-objc). There will be no breaking updates within major versions of this library, so you can safely run `pod update`.
+
+Since version 3, `Mux-Stats-Core` has been updated for Xcode 12 and [XCFrameworks bundle type](https://developer.apple.com/videos/play/wwdc2019/416/).
+
+### Including Manually (not preferred)
+
+If you do not you use CocoaPods and wish to include the library manually, view the `XCFramework` directory in the [Mux Objective-C Core SDK](https://github.com/muxinc/stats-sdk-objc) and dragging the framework into your Xcode project.
+
+## Initialize the SDK
+
+There is no need to initialize a player monitor for each player that is being tracked, as this happens automatically when events are emitted for a specific player. For the Objective-C library, the Environment and Viewer-specific data should be emitted to the SDK globally as follows.
+
+```objc
+MUXSDKEnvironmentData *environmentData = [[MUXSDKEnvironmentData alloc] init];
+[environmentData setMuxViewerId:[[[UIDevice currentDevice] identifierForVendor] UUIDString]];
+MUXSDKViewerData *viewerData = [[MUXSDKViewerData alloc] init];
+NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+if (bundleId) {
+  [viewerData setViewerApplicationName:bundleId];
+}
+// Set additional Viewer data as above
+MUXSDKDataEvent *dataEvent = [[MUXSDKDataEvent alloc] init];
+[dataEvent setEnvironmentData:environmentData];
+[dataEvent setViewerData:viewerData];
+[MUXSDKCore dispatchGlobalDataEvent:dataEvent];
+```
+
+The only field that should be modified within `MUXSDKEnvironmentData` is the `muxViewerId`, via `setMuxViewerId`, which should be a device-specific string. This field is used within the Mux Dashboard as the Viewer ID in the case that a user-specific value is not provided in the metadata, via `[MUXSDKCustomerViewerData setViewerUserId:]`.
+
+If you are monitoring playback and delivery of Mux Video assets, you may opt-in to Mux Data inferring your environment details from player HTTP traffic. To opt-in, initialize `MUXSDKCustomerPlayerData` with `environmentKey` set to `nil`.
+
+For `MUXSDKViewerData`, the fields that may be provided are the following.
+
+```objc
+@property (nullable) NSString *viewerApplicationEngine;
+@property (nullable) NSString *viewerApplicationName;
+@property (nullable) NSString *viewerApplicationVersion;
+@property (nullable) NSString *viewerConnectionType;
+@property (nullable) NSString *viewerDeviceCategory;
+@property (nullable) NSString *viewerDeviceManufacturer;
+@property (nullable) NSString *viewerDeviceName;
+@property (nullable) NSString *viewerOsArchitecture;
+@property (nullable) NSString *viewerOsFamily;
+@property (nullable) NSString *viewerOsVersion;
+```
+
+See the [AVPlayer integration](https://github.com/muxinc/mux-stats-sdk-avplayer/blob/a7459d7113a8427ddbe9fd7cb252d7bc891fe8d9/Sources/MUXSDKStats/MUXSDKStats.m#L86) for example values used.
+
+## Emit events
+
+For the Objective-C core SDK, there are two types of events that should be emitted: data events and playback events. Data events are events that update metadata about the video or view, whereas playback events are those described here: [Mux Playback Events](/docs/guides/mux-data-playback-events).
+
+All events are emitted to a specific `Player`, so make sure to include the unique player ID with each event emitted.
+
+### Data Events
+Data events are emitted via `[MUXSDKCore dispatchEvent: forPlayer:]`, and should be emitted when any of the following pieces of metadata change:
+
+ - `MUXSDKVideoData`
+  - `videoSourceWidth` - width of the video currently being played, in pixels
+  - `videoSourceHeight` - height of the video currently being played, in pixels
+  - `videoSourceIsLive` - whether the video currently being played is live or not
+  - `videoSourceDuration` - the duration, in milliseconds, of the video currently being played
+  - `videoSourceAdvertisedBitrate` - the bitrate of the current rendition being played, in bits per second
+  - `videoSourceFrameDrops` - the total number of dropped video frames for the current View
+ - Anything in `MUXSDKCustomerPlayerData`, as defined here: [Metadata](/docs/guides/make-your-data-actionable-with-metadata#iosandroid-metadata)
+ - Anything in `MUXSDKCustomerVideoData`, as defined here: [Metadata](/docs/guides/make-your-data-actionable-with-metadata#iosandroid-metadata)
+ - Anything in `MUXSDKCustomerViewData`, as defined here: [Metadata](/docs/guides/make-your-data-actionable-with-metadata#iosandroid-metadata)
+
+When any of the above fields change, do the following:
+ - Create one or more instances of `MUXSDKVideoData `, `MUXSDKCustomerPlayerData`, `MUXSDKCustomerVideoData`, and `MUXSDKCustomerViewData` depending on what changed
+ - Assign all properties with the most recent value via the helper methods to the appropriate instance of data
+ - Attach these to an instance of `MUXSDKDataEvent`
+ - Emit this `MUXSDKDataEvent` via `[MUXSDKCore dispatchEvent: forPlayer:]`
+
+For example, when the resolution of the video being played back changes (such as in adaptive streaming), the following should be done:
+
+```objc
+"code": "// Prepare the data update\nMUXSDKVideoData *videoData = [[MUXSDKVideoData alloc] init];\n[videoData setVideoSourceWidth:[NSNumber numberWithInt:width]];\n[videoData setVideoSourceHeight:[NSNumber numberWithInt:height]];\n// put it within a MUXSDKDataEvent\nMUXSDKDataEvent *dataEvent = [[MUXSDKDataEvent alloc] init];\n[dataEvent setVideoData:videoData];\n// Emit the event\n[MUXSDKCore dispatchEvent:dataEvent forPlayer:_playerName];",
+"language": "objectivec"
+```
+
+### Playback Events
+The [Mux Playback Events](/docs/guides/mux-data-playback-events) should be emitted as the events are defined in the referenced document. With regards to naming, the names should align with those in the document, with the following changes: `MUXSDK` is appended in front of the name, the name itself should be PascalCased, and `Event` is appended at the end. For instance, for playerready, the corresponding event is `MUXSDKPlayerReadyEvent`, as defined in `MUXSDKPlayerReadyEvent.h`.
+
+With each playback event that is emitted, the following fields within `MUXSDKPlayerData` should be included with the latest values:
+ - `playerMuxPluginName` - The name of the integration being built, as a string
+ - `playerMuxPluginVersion` - The version of the integration being built, as a string
+ - `playerSoftwareName` - The name of the player software (e.g. `AVPlayer`, `AVPlayerLayer`, etc)
+ - `playerSoftwareLanguageCode` - The language code (e.g. en-US) of the player UI localization
+ - `playerWidth` - The width of the player, in logical pixels
+ - `playerHeight` - The height of the player, in logical pixels
+ - `playerIsFullscreen` - Boolean of whether the player is currently displayed in full screen or not
+ - `playerIsPaused`- Boolean of whether the player is currently paused (i.e. not playing or trying to play)
+ - `playerPlayheadTime` - The current playhead time of the player, in milliseconds
+
+For instance, when emitting the `MUXSDKPlayerReady` event, it should look like the following:
+
+```objc
+// Get the player data
+MUXSDKPlayerData *playerData = [[MUXSDKPlayerData alloc] init];
+// Set the player data information
+[playerData setPlayerMuxPluginName:@"Sample Custom Player"];
+// ... repeat the above for all values within `MUXSDKPlayerData`
+// Emit the event
+MUXSDKPlayerReadyEvent *event = [[MUXSDKPlayerReadyEvent alloc] init];
+[event setPlayerData:playerData];
+[MUXSDKCore dispatchEvent:event forPlayer:_playerName];
+```
+
+In addition to the above data fields, for ad and network events there are additional data fields that should be sent. These are documented alongside the events described in [Mux Playback Events](/docs/guides/mux-data-playback-events), and follow similar naming conventions.
+
+In particular:
+ - Network throughput events should be emitted as `MUXSDKRequestBandwidthEvent`s, with the addition of `MUXSDKBandwidthMetricData` set on the event via `[MUXSDKRequestBandwidthEvent
+ setBandwidthMetricData:]`.
+ - If your player gives you access to your streams rendtion list, you can use the `renditionLists` property of `MUXSDKBandwidthMetricData`  track a stream's renditions with their resolution, framerate, bitrate, and RFC `CODECS` tag ([ref](https://datatracker.ietf.org/doc/html/rfc6381)).
+ - Ad events are emitted via a special method, `dispatchAdEvent`, and details can be seen within [Mux's IMA integration for AVPlayer](https://github.com/muxinc/mux-stats-google-ima/blob/master/Sources/MuxStatsGoogleIMAPlugin/MuxImaListener.m)
+
+Lastly, for the `MUXSDKRenditionChangeEvent`, you should make sure to dispatch a `MUXSDKDataEvent` with the latest updated `MUXSDKVideoData` immediately before dispatching the `MUXSDKRenditionChangeEvent`.
+
+## Sample event sequence
+
+There are multiple steps in setting up and tracking a view correctly. A very simple sequence of events to track a basic playback would look like the following steps:
+
+1. Dispatch a global data event with the environment and viewer data
+1. Dispatch the `MUXSDKViewInitEvent` with the current state of the player and video
+1. Dispatch a `MUXSDKDataEvent` with the updated `MUXSDKCustomerVideoData` and `MUXSDKCustomerPlayerData` for the current video view
+1. Dispatch the rest of the [Mux Playback Events](/docs/guides/mux-data-playback-events) (e.g. `MUXSDKPlayerReadyEvent`, `MUXSDKPlayEvent`, `MUXSDKPlayingEvent`, `MUXSDKTimeUpdateEvent`, etc), each time with the updated current state of the player
+
+Note: For each Playback Event and `MUXSDKViewInitEvent` that is dispatched, the current state of the player and video data (`MUXSDKPlayerData` and `MUXSDKVideoData` should be attached to the event prior to dispatching the event.
+
+```objc
+// First, emit the global data event setting up the information about
+// the player. This will likely only be called once within your application
+// and does not need to be called for each player that is tracked.
+MUXSDKDataEvent *dataEvent = [[MUXSDKDataEvent alloc] init];
+[dataEvent setEnvironmentData:environmentData];
+[dataEvent setViewerData:viewerData];
+[MUXSDKCore dispatchGlobalDataEvent:_dataEvent];
+
+// Prepare the view before you emit any other playback events
+MUXSDKViewInitEvent *event = [[MUXSDKViewInitEvent alloc] init];
+[event setPlayerData:playerData];
+[MUXSDKCore dispatchEvent:event forPlayer:playerName];
+
+// Dispatch data about the view itself.
+// Note: customerPlayerData must include your environment key.
+MUXSDKDataEvent *dataEvent = [[MUXSDKDataEvent alloc] init];
+[dataEvent setCustomerPlayerData:customerPlayerData];
+[dataEvent setCustomerVideoData:customerVideoData];
+[MUXSDKCore dispatchEvent:dataEvent forPlayer:_playerName];
+
+// Emit playback events
+MUXSDKPlayerReadyEvent *event = [[MUXSDKPlayerReadyEvent alloc] init];
+[event setPlayerData:playerData];
+[MUXSDKCore dispatchEvent:event forPlayer:_playerName];
+
+// When the player begins to attempt playback
+MUXSDKPlayEvent *event = [[MUXSDKPlayEvent alloc] init];
+[event setPlayerData:playerData];
+[MUXSDKCore dispatchEvent:event forPlayer:_playerName];
+
+// When the player actually displays first moving frame
+MUXSDKPlayingEvent *event = [[MUXSDKPlayingEvent alloc] init];
+[event setPlayerData:playerData];
+[MUXSDKCore dispatchEvent:event forPlayer:_playerName];
+
+// ... and repeat for all of the playback events
+```
+
+## Additional methods
+
+Most of the events are signaled as listed above. However, there are a few cases of events that require additional work.
+
+### Reporting Network Conditions
+
+Versions 5.8.0 and later include `MUXSDKNetworkChangeEvent`. This allows you to report changes in network connection type and optionally if the connection is in low data mode. This event should be posted as soon as network information is available after `viewinit` (`MUXSDKViewInitEvent`) and whenever connection type or low data mode changes.
+
+A complete example implementation is available in the [AVPlayer monitoring SDK's `NetworkMonitor.swift`](https://github.com/muxinc/mux-stats-sdk-avplayer/blob/master/Sources/MUXSDKStatsInternal/NetworkMonitor.swift).
+
+### Changing the Video
+In order to change the video within a player, there are a few events that need to be fired in sequence. You can see the implementation of this within the [muxinc/mux-stats-sdk-avplayer](https://github.com/muxinc/mux-stats-sdk-avplayer/blob/a7459d7113a8427ddbe9fd7cb252d7bc891fe8d9/Sources/MUXSDKStats/MUXSDKStats.m#L526) code. You should do the following:
+1. Dispatch a `viewend` event
+2. Dispatch a `viewinit` event
+3. Dispatch a `MUXSDKDataEvent` with the new video's `MUXSDKCustomerVideoData`, with the `videoChange` property set to `YES`.
+
+If at various times the same underlying video stream needs to be monitoried as effectively separate videos and separate Data views, two additional events: `play` and `playing` need to be dispatched
+
+See an example implementation of this in the [muxinc/mux-stats-sdk-avplayer](https://github.com/muxinc/mux-stats-sdk-avplayer/blob/a7459d7113a8427ddbe9fd7cb252d7bc891fe8d9/Sources/MUXSDKStats/MUXSDKStats.m#L565) code.
+
+The following are the required steps from start to finish:
+1. As before, dispatch a `viewend` event
+2. As before, dispatch a `viewinit` event
+3. As before, dispatch a `MUXSDKDataEvent` with the new video's `MUXSDKCustomerVideoData`, with the `videoChange` property set to `YES`.
+4. Dispatch a `play` event
+5. Dispatch a `playing` event
+
+### Sending Error events
+Your custom integration is able to dispatch error events associated with the current view. These errors can get alerted on and are also visually indicated on the event timeline shown for that view.
+
+When dispatching errors your custom integration can provide additional error metadata with Error Categorization. This section will cover several examples of dispatching errors using the Objective-C SDK. You can find [more general information on Error Categorization here](/docs/guides/error-categorization).
+
+<Callout type="info">
+Any error categories specified by your custom integration can be configured to be overridden based on the player error code. [See the Error Categorization guide for more details](/docs/guides/error-categorization#2-configuring-error-categorization).
+</Callout>
+
+This example dispatches an error event that Mux will categorize as a fatal playback error unless a different default for the player error code applies.
+
+```objc
+// Call this method from the source of the fatal playback error (such as an `AVPlayer` key-value property observer, for example) with parameters appropriate to your integration.
+- (void)dispatchPlaybackWarningWithPlayerName:(NSString *)playerName
+                              playerErrorCode:(NSString *)playerErrorCode
+                           playerErrorMessage:(NSString *)playerErrorMessage
+                           playerErrorContext:(NSString *)playerErrorContext
+                           playerPlayheadTime:(NSNumber *)playerPlayheadTime {
+  MUXSDKErrorEvent *errorEvent = [[MUXSDKErrorEvent alloc] initWithContext:playerErrorContext];
+
+  // Configure any custom video or view data if necessary
+  MUXSDKPlayerData *playerData = [[MUXSDKPlayerData alloc] init];
+  [playerData setPlayerErrorCode:playerErrorCode];
+  [playerData setPlayerErrorMessagae:playerErrorMessage];
+  [playerData setPlayerPlayheadTime: playerPlayheadTime];
+  // ... repeat for any other `MUXSDKPlayerData` properties if they've changed
+
+  [MUXSDKCore dispatchEvent:event
+                forPlayer:playerName];
+}
+```
+
+This example dispatches an error that Mux will categorize as a warning unless a different default for the player error code applies.
+
+```objc
+// Call this method from the source of the playback warning (such as an `AVPlayer` key-value property observer, for example) with parameters appropriate to your integration.
+- (void)dispatchPlaybackWarningWithPlayerName:(NSString *)playerName
+                              playerErrorCode:(NSString *)playerErrorCode
+                           playerErrorMessage:(NSString *)playerErrorMessage
+                           playerErrorContext:(NSString *)playerErrorContext
+                           playerPlayheadTime:(NSNumber *)playerPlayheadTime {
+  MUXSDKErrorEvent *errorEvent = [[MUXSDKErrorEvent alloc] initWithSeverity:MUXSDKErrorSeverityWarning
+                                                                    context:playerErrorContext];
+
+  // Configure any custom video or view data if necessary
+  MUXSDKPlayerData *playerData = [[MUXSDKPlayerData alloc] init];
+  [playerData setPlayerErrorCode:playerErrorCode];
+  [playerData setPlayerErrorMessagae:playerErrorMessage];
+  [playerData setPlayerPlayheadTime: playerPlayheadTime];
+  // ... repeat for any other `MUXSDKPlayerData` properties if they've changed
+
+  [MUXSDKCore dispatchEvent:errorEvent
+                  forPlayer:playerName];
+}
+```
+
+
+This example dispatches an error that Mux will catgeorize as a business exception unless a different default for the player error code applies.
+```objc
+// Call this method from the source of the business exception with parameters appropriate to your integration.
+- (void)dispatchBusinessExceptionWithPlayerName:(NSString *)playerName
+                                  playerErrorCode:(NSString *)playerErrorCode
+                                  playerErrorMessage:(NSString *)playerErrorMessage
+                                  playerErrorContext:(NSString *)playerErrorContext
+                                  playerPlayheadTime:(NSNumber *)playerPlayheadTime {
+
+  // This method does not set an explicit error severity, see below for an example method that does.
+  MUXSDKErrorEvent *errorEvent = [[MUXSDKErrorEvent alloc] initWithContext:playerErrorContext];
+  [errorEvent setIsBusinessException: YES];
+
+  // Configure any custom video or view data if necessary
+  MUXSDKPlayerData *playerData = [[MUXSDKPlayerData alloc] init];
+  [playerData setPlayerErrorCode:playerErrorCode];
+  [playerData setPlayerErrorMessage:playerErrorMessage];
+  [playerData setPlayerPlayheadTime:playerPlayheadTime];
+  // ... repeat for any other `MUXSDKPlayerData` properties if they've changed
+
+  [MUXSDKCore dispatchEvent:errorEvent
+                  forPlayer:playerName];
+}
+
+// Call this method from the source of the business exception with parameters appropriate to your integration.
+- (void)dispatchBusinessExceptionWithPlayerName:(NSString *)playerName
+                                  playerErrorSeverity:(MUXSDKErrorSeverity)errorSeverity
+                                  playerErrorCode:(NSString *)playerErrorCode
+                                  playerErrorMessage:(NSString *)playerErrorMessage
+                                  playerErrorContext:(NSString *)playerErrorContext
+                                  playerPlayheadTime:(NSNumber *)playerPlayheadTime {
+  MUXSDKErrorEvent *errorEvent = [[MUXSDKErrorEvent alloc] initWithContext:playerErrorContext];
+  [errorEvent setIsBusinessException: YES];
+
+  // Configure any custom video or view data if necessary
+  MUXSDKPlayerData *playerData = [[MUXSDKPlayerData alloc] init];
+  [playerData setPlayerErrorCode:playerErrorCode];
+  [playerData setPlayerErrorMessage:playerErrorMessage];
+  [playerData setPlayerPlayheadTime:playerPlayheadTime];
+  // ... repeat for any other `MUXSDKPlayerData` properties if they've changed
+
+  [MUXSDKCore dispatchEvent:errorEvent
+                  forPlayer:playerName];
+}
+```
+
+### Destroying the Monitor
+When you are tearing down the player and want to stop monitoring it, make sure to remove any listeners that you have on the player for sending events to `MUXSDKCore`. After this, make sure to call `[MUXSDKCore destroyPlayer: _name];` for the name of your player, so that the core library can clean up any monitoring and end the view session.
+
+
+<Releases>
+## Release notes
+
+### Current release
+
+#### v5.10.0
+
+Improvements
+
+* Continues tracking cumulative playing time after `MUXSDKSeekedEvent` and `MUXSDKRebufferEndEvent` when their `playerData.playerIsPaused` is true.
+* Updates the constant value for `MUXSDKConnectionTypeNoConnection`
+
+### Previous releases
+
+#### v5.9.0
+
+Improvements
+* Adds `viewerDeviceName` property to `MUXSDKCustomerViewerData`
+
+#### v5.8.1
+
+Fixes
+* Resolves a leak (retain cycle) involving an internal class (`MUXSDKCoreView`).
+
+#### v5.8.0
+
+Improvements
+* Adds `MUXSDKNetworkChangeEvent` and predefined values for connection type via `MUXSDKConnectionType`
+
+#### v5.7.1
+
+Fixes:
+* Ensure `playbackmodechange` events are sent
+* Restores tvOS-specific seeking detection behavior, where a best-effort attempt is made to count the preceding pause as part of the seek. This behavior was missing in 5.7.0, potentially causing changes in metrics.
+
+#### v5.7.0
+
+Updates:
+* `playbackmodechange` event added for tracking changes to the presentation of a video (ie, fullscreen, pip, etc)
+* Added timing metrics for playing time and ad playing time. These metrics track the wall-clock time spent playing (excluding startup time, rebuffering, seeking, etc)
+
+Improvements:
+* Added nullability annotations and nil-handling improvements to most public APIs
+* Made most properties of `MUXSDKPlayerData`, `MUXSDKVideoData`, `CustomerData`, et al `nonatomic`
+* Handle trackable events via typed delegate method
+* Enable link-time optimization by thinLTO
+* MUXSDKCore methods may now be called from any thread
+* Numerous internal improvements 
+
+Fixes:
+* Fix HTTP retry delay 1000x higher than intentional
+* Wait for HTTP connectivity for beacons
+
+#### v5.6.0
+
+Improvements:
+* Allow disabling playhead-based rebuffer tracking via `-[MUXSDKCore disablePlayheadRebufferTrackingForPlayerID:]` and manual dispatch of `MUXSDKRebufferStartEvent` and `MUXSDKRebufferEndEvent`
+
+Fixes:
+* Prevent overriding `muxEmbed`, `muxEmbedVersion`, and `muxApiVersion` from `MUXSDKEnvironmentData`
+* Individual frameworks within the XCFramework are no longer separately code signed. The parent XCFramework is still signed.
+
+#### v5.5.1
+
+Improvements:
+* Removes the deprecation on `MUXSDKCustomerVideoData.videoCDN` (added in v5.5.0)
+
+#### v5.5.0
+
+Improvements:
+* Adds CDN change tracking, including automatically via `X-CDN` headers
+* The MuxCore frameworks are now built as Mergeable Libraries. See this [WWDC session](https://developer.apple.com/videos/play/wwdc2023/10268/) and the [official docs](https://developer.apple.com/documentation/xcode/configuring-your-project-to-use-mergeable-libraries) for more info. This is not enabled for the CocoaPods build.
+
+Fixes:
+* Fixes missing videoData in some instances, including after a rendition change
+* Corrects a typo in `viewPrerollAdAssetHostname` causing it not to be sent
+* Fixes an issue leading to incorrect `viewPlayingTime` and/or `viewMaxPlayheadPosition`
+* Resolves a few naming issues that could cause builds to fail on case-sensitive filesystems
+
+#### v5.4.1
+Fixes:
+* fix rebuffering ending while player is still buffering in some cases
+
+#### v5.4.0
+Improvements:
+* Add customer viewer data to `MUXSDKDataEvent` and `MUXSDKTrackableEvent`
+* Use consistent umbrella header path so `#import <MuxCore/MuxCore.h>` works on all platforms
+
+#### v5.3.1
+Improvements:
+* Add `MUXSDKCustomerVideoData.videoCreatorId`
+
+#### v5.3.0
+Improvements:
+* adds additional dimensions
+
+Fixes:
+* adds missing macCatalyst platform to package spec
+
+#### v5.2.0
+Improvements:
+* expose additional custom dimensions
+
+#### v5.1.2
+Fixes:
+* dispatch queued up events when receiving `adbreakend`, `aderror` events
+* patch memory leak when a player monitor is created and destroyed
+
+#### v5.1.1
+Fixes:
+* Fully resets all player metrics associated with a previous view that had ended due to a time out when receiving a `viewinit` event.
+
+#### v5.1.0
+Improvements:
+* Include codec and rendition name in `renditionchange` events
+* Add safety checks when player identifier is `nil`
+
+#### v5.0.1
+Improvements:
+* Include privacy manifest file
+
+#### v5.0.0
+Improvements:
+* Error events can be categorized with warning or fatal severity levels
+* Error events can be categorized as business exceptions
+* An error translator can be configured to extend or customize the Core SDK error handling logic
+
+Fixes:
+* Player error details such as error code, error context, error message, error severity, and whether the error is a business exception are only sent to Mux when an error event is dispatched.
+* Player error details (same as listed above) are no longer deduplicated and are explicitly included with each error event sent to Mux.
+* The SDK continues to track watch time after an error event is dispatched based on player playhead progression. To explicitly indicate that watch time should no longer be tracked after an error during a playback session please dispatch a `ViewEnd` event.
+
+#### v4.7.1
+Improvements:
+* Include privacy manifest file
+
+#### v4.7.0
+Improvements:
+* Add support for monitoring media on `visionOS`. We recommend testing your `visionOS` SDK integration on both the simulator and a physical device prior to deploying to the App Store.
+
+Fixes:
+* Compute correct Video Startup Time if `AdPlayingEvent` occurs a significant time after the view has started
+* Ensure seeks are excluded from Video Startup Time in all cases
+
+Known Issues:
+* Installation using Cocoapods on `visionOS` is not currently supported. Installation on `iOS` and `tvOS` using Cocoapods is not affected.
+
+#### v4.6.0
+API Changes:
+* Expose player software name and player software version on `MUXSDKPlayerData`
+
+Improvements:
+* Bump beacon interval to 10 seconds to match the other Core SDKs
+
+#### v4.5.2
+Improvements:
+* Backfill header nullability annotations
+
+#### v4.5.1
+Fixes:
+* Include at playback time in the calculation for total playback time
+
+#### v4.5.0
+Updated:
+* Add DRM Type to `MUXSDKCustomerViewData` so you can specify it from another source
+
+Deprecated:
+* `MUXSDKDispatcher`'s `handleBatch beaconCollectionDomain: osFamily: jsonDict: callback:` has been deprecated in favor of an overload that takes headers for requests to the collection domain
+* `MUXSDKNetworkRequestBuilding` `buildRequestFromURL: eventsJsonDict: error:` has been deprecated in favor of an overload that takes headers for requests to the collection domain
+
+Improvements:
+* Performance + Reliability improvements during large events
+
+#### v4.4.2
+Fixes:
+* Fix ad metadata not being reported
+
+#### v4.4.1
+Improvements:
+* Update beacon interval from 5s to 10s
+
+#### v4.4.0
+- Ad per-ad metadata for Ad events
+- Fix strange views when a user seeks into an ad break
+
+#### v4.3.0
+- Add DRM Type and Error Context metadata fields
+
+#### v4.2.0
+- Add more Custom Dimensions
+
+#### v4.1.1
+- Fix Rendition::name misnamed
+
+#### v4.1.0
+- Add framerate, codec, and name to rendition properties
+
+#### v4.0.0
+- Due to Xcode 14, support for iOS and tvOS versions 9 and 10 have been removed. For more information see the last 'Deprecations' block in the release notes. This may result in a warning for client applications with deployment versions below iOS/tvOS 11
+
+#### v3.14.0
+- Split Views with >1 hour of inactivity into new views
+
+#### v3.11.0
+
+- Add inferred environment key support for users of Mux Data and Mux Video
+- Expose `MUXSDKEndedEvent` in the public headers
+
+
+#### v3.10.1
+
+- Add weak self/strong self in closure block to avoid any retain cycles
+
+#### v3.10.0
+
+- Capture experiments values from HLS Session Data
+
+#### v3.9.0
+
+- Add Experiment Fields
+- Log sent beacons in debug mode
+- Set Xcode build setting `APPLICATION_EXTENSION_API_ONLY` = YES
+
+#### v3.8.0
+
+- Add internal device detection properties
+- Add project binary specification file for Carthage support
+
+#### v3.7.0
+
+- Use synchronized to make query data objects thread safe.
+
+#### v3.6.0
+
+- Add transmission time and round trip time to beacon requests
+- Add `player_live_edge_program_time`
+- Add `player_program_time`
+
+#### v3.5.0
+
+- Allow overriding of viewer information (application name)
+- Add nullability specifiers
+- Custom beacon collection domains
+
+#### v3.4.0
+
+- Adds the `MUXSDKCustomerData` model
+- Adds support for setting custom dimensions
+
+#### v3.3.0
+
+- Automatically build statically linked frameworks
+- Remove dependency on `UIKit`
+
+#### v3.2.0
+
+- Add Swift PM support
+
+#### v3.1.0
+
+- Submits a new `mux_embed field`
+- Fixes bugs with video start-up time for midroll or postroll ads
+- Updates ad tracking to be more accurate
+- Tracks `view_playing_time`
+
+#### v3.0.3
+
+- No functional changes, just generating a new release on CocoaPods
+
+#### v3.0.2
+
+- Include linker flags that enable the framework to be built without support for modules.
+- Move instance variables out of headers
+
+#### v3.0.0
+
+This release moves the build process to use [XCFramework bundle type](https://developer.apple.com/videos/play/wwdc2019/416/). For iOS, there are no changes required to your application code.
+
+If you are using this SDK with TVOS the name of the module has changed (the `Tv` suffix is no longer needed):
+
+TVOS before 3.0:
+
+```obj-c
+@import MuxCoreTv;
+```
+
+TVOS after 3.0:
+
+```obj-c
+@import MuxCore;
+```
+
+#### v2.4.1
+
+- (bugfix) Works around an issue where a view with no pre-roll ads, but with midroll and/or postroll ads will cause Mux to update the TTFF value erroneously
+
+#### v3.0.0-beta.0
+
+This release moves the build process to use [XCFramework bundle type](https://developer.apple.com/videos/play/wwdc2019/416/). For iOS, there are no changes required to your application code.
+
+If you are using this SDK with TVOS the name of the module has changed (the `Tv` suffix is no longer needed):
+
+TVOS before 3.0:
+
+```obj-c
+@import MuxCoreTv;
+```
+
+TVOS after 3.0:
+
+```obj-c
+@import MuxCore;
+```
+
+#### v2.4.0
+
+* Adds support for `player_remote_played` and `view_session_id`.
+* In addition to existing options that are provided via the `MUXSDKCustomerPlayerData` and `MUXSDKCustomerVideoData` objects, there is now support for `MUXSDKCustomerViewData`. The `view_session_id` may be set on`MUXSDKCustomerViewData`.
+
+#### v2.3.0
+
+- Update build process for Xcode 12 to exclude arm_64 architectures when building for simulator. Before Xcode 12, xcodebuild never built arm_64 slices for the simulator. Now, it does (in preparation for Apple silicon). Because arm_64 slices now get built for the simulator, `lipo` errors out, because it can't have the same architecture for two different platforms (it already has arm_64 for the device platform). This is a temporary work around until a later major version release which will use the new `XCFramework` hotness
+- bump iOS deploy target to '9.0' in `podspec` and project build settings for Xcode 12 compatibility
+
+#### v2.2.0
+
+- bugfix: Removes erroneously committed logs from the compiled frameworks
+
+#### v2.2.1
+
+- bugfix - ignore scaling calculations when player or source width or height dimension is 0
+
+#### v2.2.0
+
+* Add support for `renditionchange` events
+* Add support for `orientationchange` events
+
+#### v2.1.3
+
+- bugfix for request metrics calculation. If we don't have `responseStart`, fallback to `requestStart` in order to calculate throughput
+
+#### v2.1.2
+
+- bugfix - Use monotonically increasing time in Objc client library. Avoids a bug if system time changes during a view.
+
+#### v2.1.1
+
+- Expose `videoSourceUrl` on `MUXSDKCustomerVideoData`. This allows a user to set the videoSourceUrl (along with their other VideoData, in which case any videoSourceUrl that is inferred from the player will be ignored.
+
+#### v2.1.0
+
+- Fix build process for Xcode 11
+- Make `player_instance_id` a full uuid-style string
+- Make sure to always send `player_instance_id`
+- Bump Mux API versions for new collectors/processors
+</Releases>

@@ -1,0 +1,464 @@
+---
+title: Database schema design
+product: video
+description: >-
+  Recommended database schemas for storing Mux video data in your application.
+  Copy-paste schemas for PostgreSQL, MySQL, and MongoDB.
+seoTitle: Database Schema Design for Mux Video
+seoDescription: >-
+  Recommended database schemas for storing Mux video assets, uploads, and
+  webhook events. Copy-paste SQL and NoSQL schemas for PostgreSQL, MySQL,
+  and MongoDB.
+---
+
+When you build a video application with Mux, the video infrastructure (encoding, storage, and delivery) is managed for you. Your application's database stores references to Mux resources (assets, uploads, webhook events) along with your own metadata like titles, user ownership, and visibility.
+
+This guide provides recommended schemas you can copy directly into your database.
+
+## What to store
+
+Most Mux integrations need these tables:
+
+| Table | Purpose |
+|---|---|
+| **mux_assets** | Video assets synced from Mux, including status, playback IDs, duration, and resolution |
+| **mux_uploads** | Direct upload records that track upload status and the resulting asset ID |
+| **mux_webhook_events** | Webhook event log for debugging and ensuring reliable event processing |
+| **videos** (optional) | Your app-level metadata like title, description, user ownership, visibility, and tags |
+
+The first three tables mirror data from the Mux API, kept in sync via [webhooks](/docs/core/listen-for-webhooks). The `videos` table is your application's layer on top, linking Mux assets to your users and adding metadata that Mux doesn't manage.
+
+<Callout type="info">
+If you're using [Supabase](/docs/integrations/supabase) or [Convex](/docs/integrations/convex), these tables are created for you automatically. This guide is for teams managing their own database schema.
+</Callout>
+
+## Recommended schema
+
+### Assets
+
+The `mux_assets` table stores video asset data synced from Mux. This is the most important table because it tracks every video in your system.
+
+<CodeExamples
+  examples={{
+    postgresql: `CREATE TABLE mux_assets (
+  mux_asset_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'preparing',
+  playback_ids JSONB DEFAULT '[]',
+  duration NUMERIC,
+  aspect_ratio TEXT,
+  resolution_tier TEXT,
+  max_stored_frame_rate NUMERIC,
+  video_quality TEXT,
+  upload_id TEXT,
+  live_stream_id TEXT,
+  passthrough TEXT,
+  tracks JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_mux_assets_status ON mux_assets (status);
+CREATE INDEX idx_mux_assets_upload_id ON mux_assets (upload_id);
+CREATE INDEX idx_mux_assets_created_at ON mux_assets (created_at);`,
+    mysql: `CREATE TABLE mux_assets (
+  mux_asset_id VARCHAR(255) PRIMARY KEY,
+  status VARCHAR(50) NOT NULL DEFAULT 'preparing',
+  playback_ids JSON DEFAULT ('[]'),
+  duration DECIMAL(12, 4),
+  aspect_ratio VARCHAR(20),
+  resolution_tier VARCHAR(20),
+  max_stored_frame_rate DECIMAL(8, 4),
+  video_quality VARCHAR(20),
+  upload_id VARCHAR(255),
+  live_stream_id VARCHAR(255),
+  passthrough VARCHAR(255),
+  tracks JSON DEFAULT ('[]'),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_mux_assets_status ON mux_assets (status);
+CREATE INDEX idx_mux_assets_upload_id ON mux_assets (upload_id);
+CREATE INDEX idx_mux_assets_created_at ON mux_assets (created_at);`,
+    mongodb: `db.createCollection("mux_assets");
+
+db.mux_assets.createIndex({ mux_asset_id: 1 }, { unique: true });
+db.mux_assets.createIndex({ status: 1 });
+db.mux_assets.createIndex({ upload_id: 1 });
+db.mux_assets.createIndex({ created_at: -1 });
+
+// Example document structure:
+// {
+//   mux_asset_id: "abc123",
+//   status: "ready",
+//   playback_ids: [{ id: "playback123", policy: "public" }],
+//   duration: 120.5,
+//   aspect_ratio: "16:9",
+//   resolution_tier: "1080p",
+//   max_stored_frame_rate: 29.97,
+//   video_quality: "plus",
+//   upload_id: "upload123",
+//   live_stream_id: null,
+//   passthrough: "my-custom-id",
+//   tracks: [
+//     { id: "track1", type: "video", max_width: 1920, max_height: 1080 },
+//     { id: "track2", type: "audio", max_channels: 2 }
+//   ],
+//   created_at: ISODate("2026-01-15T10:30:00Z"),
+//   updated_at: ISODate("2026-01-15T10:35:00Z")
+// }`
+  }}
+  args={{
+    postgresql: { displayName: "PostgreSQL", lang: "sql" },
+    mysql: { displayName: "MySQL", lang: "sql" },
+    mongodb: { displayName: "MongoDB", lang: "javascript" },
+  }}
+  exampleOrder="PostgreSQL,MySQL,MongoDB"
+/>
+
+#### Key fields
+
+| Field | Description |
+|---|---|
+| `mux_asset_id` | The unique identifier from Mux. Use this as your primary key or unique constraint. |
+| `status` | Asset lifecycle state: `preparing`, `ready`, or `errored`. Only serve videos with status `ready`. |
+| `playback_ids` | Array of `{ id, policy }` objects. The `id` is used to construct playback URLs. `policy` is `public`, `signed`, or `drm`. |
+| `duration` | Video length in seconds. |
+| `aspect_ratio` | Format string like `16:9` or `4:3`. Useful for sizing players before the video loads. |
+| `resolution_tier` | The highest resolution stored: `audio-only`, `720p`, `1080p`, `1440p`, or `2160p`. |
+| `video_quality` | Encoding quality tier: `basic`, `plus`, or `premium`. |
+| `upload_id` | Reference to the direct upload that created this asset, if applicable. |
+| `live_stream_id` | Reference to the live stream that created this asset, if applicable. |
+| `passthrough` | A string you set when creating the asset. Useful for storing your own external ID. |
+| `tracks` | Array of video, audio, and text track metadata. |
+
+### Uploads
+
+The `mux_uploads` table tracks [direct uploads](/docs/guides/upload-files-directly) from your users' browsers. When an upload completes, Mux creates an asset and sets the `mux_asset_id`.
+
+<CodeExamples
+  examples={{
+    postgresql: `CREATE TABLE mux_uploads (
+  mux_upload_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'waiting',
+  mux_asset_id TEXT REFERENCES mux_assets(mux_asset_id),
+  timeout INTEGER DEFAULT 3600,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_mux_uploads_status ON mux_uploads (status);
+CREATE INDEX idx_mux_uploads_asset_id ON mux_uploads (mux_asset_id);`,
+    mysql: `CREATE TABLE mux_uploads (
+  mux_upload_id VARCHAR(255) PRIMARY KEY,
+  status VARCHAR(50) NOT NULL DEFAULT 'waiting',
+  mux_asset_id VARCHAR(255),
+  timeout INTEGER DEFAULT 3600,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (mux_asset_id) REFERENCES mux_assets(mux_asset_id)
+);
+
+CREATE INDEX idx_mux_uploads_status ON mux_uploads (status);
+CREATE INDEX idx_mux_uploads_asset_id ON mux_uploads (mux_asset_id);`,
+    mongodb: `db.createCollection("mux_uploads");
+
+db.mux_uploads.createIndex({ mux_upload_id: 1 }, { unique: true });
+db.mux_uploads.createIndex({ status: 1 });
+db.mux_uploads.createIndex({ mux_asset_id: 1 });
+
+// Example document structure:
+// {
+//   mux_upload_id: "upload123",
+//   status: "asset_created",
+//   mux_asset_id: "abc123",
+//   timeout: 3600,
+//   created_at: ISODate("2026-01-15T10:30:00Z"),
+//   updated_at: ISODate("2026-01-15T10:30:00Z")
+// }`
+  }}
+  args={{
+    postgresql: { displayName: "PostgreSQL", lang: "sql" },
+    mysql: { displayName: "MySQL", lang: "sql" },
+    mongodb: { displayName: "MongoDB", lang: "javascript" },
+  }}
+  exampleOrder="PostgreSQL,MySQL,MongoDB"
+/>
+
+#### Key fields
+
+| Field | Description |
+|---|---|
+| `mux_upload_id` | The unique identifier for the direct upload. |
+| `status` | Upload state: `waiting`, `asset_created`, `errored`, `cancelled`, or `timed_out`. |
+| `mux_asset_id` | The asset created from this upload. Only set after status becomes `asset_created`. |
+| `timeout` | How long the upload URL remains valid, in seconds (default: 3600). |
+
+### Webhook events
+
+The `mux_webhook_events` table logs every [webhook](/docs/core/listen-for-webhooks) received from Mux. This is essential for debugging sync issues and ensuring you don't process the same event twice.
+
+<CodeExamples
+  examples={{
+    postgresql: `CREATE TABLE mux_webhook_events (
+  id SERIAL PRIMARY KEY,
+  mux_event_id TEXT UNIQUE,
+  type TEXT NOT NULL,
+  object_type TEXT,
+  object_id TEXT,
+  payload JSONB NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_mux_events_type ON mux_webhook_events (type);
+CREATE INDEX idx_mux_events_object ON mux_webhook_events (object_type, object_id);`,
+    mysql: `CREATE TABLE mux_webhook_events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mux_event_id VARCHAR(255) UNIQUE,
+  type VARCHAR(255) NOT NULL,
+  object_type VARCHAR(50),
+  object_id VARCHAR(255),
+  payload JSON NOT NULL,
+  received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_mux_events_type ON mux_webhook_events (type);
+CREATE INDEX idx_mux_events_object ON mux_webhook_events (object_type, object_id);`,
+    mongodb: `db.createCollection("mux_webhook_events");
+
+db.mux_webhook_events.createIndex({ mux_event_id: 1 }, { unique: true, sparse: true });
+db.mux_webhook_events.createIndex({ type: 1 });
+db.mux_webhook_events.createIndex({ object_type: 1, object_id: 1 });
+db.mux_webhook_events.createIndex({ received_at: -1 });
+
+// Example document structure:
+// {
+//   mux_event_id: "evt_abc123",
+//   type: "video.asset.ready",
+//   object_type: "asset",
+//   object_id: "abc123",
+//   payload: { /* full webhook body */ },
+//   received_at: ISODate("2026-01-15T10:35:00Z")
+// }`
+  }}
+  args={{
+    postgresql: { displayName: "PostgreSQL", lang: "sql" },
+    mysql: { displayName: "MySQL", lang: "sql" },
+    mongodb: { displayName: "MongoDB", lang: "javascript" },
+  }}
+  exampleOrder="PostgreSQL,MySQL,MongoDB"
+/>
+
+#### Key fields
+
+| Field | Description |
+|---|---|
+| `mux_event_id` | Unique event ID from Mux. Use this to deduplicate by checking if the event already exists before processing. |
+| `type` | Event type string, like `video.asset.ready` or `video.upload.asset_ready`. |
+| `object_type` | The resource type: `asset`, `upload`, or `live_stream`. |
+| `object_id` | The ID of the related resource. |
+| `payload` | The full webhook body. Store this as JSON so you can re-process events if your handler logic changes. |
+
+### Videos (application metadata)
+
+The `videos` table is optional but recommended. It stores your application-specific metadata, linking Mux assets to your users and adding information that Mux doesn't manage.
+
+<CodeExamples
+  examples={{
+    postgresql: `CREATE TABLE videos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mux_asset_id TEXT NOT NULL REFERENCES mux_assets(mux_asset_id),
+  user_id TEXT NOT NULL,
+  title TEXT,
+  description TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private',
+  tags TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_videos_mux_asset_id ON videos (mux_asset_id);
+CREATE INDEX idx_videos_user_id ON videos (user_id);
+CREATE INDEX idx_videos_visibility ON videos (visibility);`,
+    mysql: `CREATE TABLE videos (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  mux_asset_id VARCHAR(255) NOT NULL,
+  user_id VARCHAR(255) NOT NULL,
+  title TEXT,
+  description TEXT,
+  visibility VARCHAR(20) NOT NULL DEFAULT 'private',
+  tags JSON DEFAULT ('[]'),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (mux_asset_id) REFERENCES mux_assets(mux_asset_id)
+);
+
+CREATE INDEX idx_videos_mux_asset_id ON videos (mux_asset_id);
+CREATE INDEX idx_videos_user_id ON videos (user_id);
+CREATE INDEX idx_videos_visibility ON videos (visibility);`,
+    mongodb: `db.createCollection("videos");
+
+db.videos.createIndex({ mux_asset_id: 1 });
+db.videos.createIndex({ user_id: 1 });
+db.videos.createIndex({ visibility: 1 });
+db.videos.createIndex({ mux_asset_id: 1, user_id: 1 }, { unique: true });
+
+// Example document structure:
+// {
+//   mux_asset_id: "abc123",
+//   user_id: "user_456",
+//   title: "My First Video",
+//   description: "A short description",
+//   visibility: "public",
+//   tags: ["tutorial", "getting-started"],
+//   created_at: ISODate("2026-01-15T10:30:00Z"),
+//   updated_at: ISODate("2026-01-15T10:30:00Z")
+// }`
+  }}
+  args={{
+    postgresql: { displayName: "PostgreSQL", lang: "sql" },
+    mysql: { displayName: "MySQL", lang: "sql" },
+    mongodb: { displayName: "MongoDB", lang: "javascript" },
+  }}
+  exampleOrder="PostgreSQL,MySQL,MongoDB"
+/>
+
+#### Key fields
+
+| Field | Description |
+|---|---|
+| `mux_asset_id` | Foreign key to the `mux_assets` table. Links your metadata to the Mux video. |
+| `user_id` | Reference to the user in your application who owns this video. |
+| `title` / `description` | User-facing metadata for display in your UI. |
+| `visibility` | Access control: `public`, `unlisted`, or `private`. Enforce this in your application logic. |
+| `tags` | Categorization for filtering and search. |
+
+## Keeping data in sync
+
+Use [Mux webhooks](/docs/core/listen-for-webhooks) to keep your database in sync with Mux. When Mux finishes processing a video, delivers an upload, or encounters an error, it sends a webhook to your server.
+
+The key events to listen for:
+
+| Event | Action |
+|---|---|
+| `video.asset.created` | Insert a new row in `mux_assets` with status `preparing` |
+| `video.asset.ready` | Update the asset's status to `ready` and populate `playback_ids`, `duration`, `tracks` |
+| `video.asset.errored` | Update the asset's status to `errored` |
+| `video.asset.deleted` | Delete or mark the asset as deleted |
+| `video.upload.asset_ready` | Update the upload's `mux_asset_id` and status |
+| `video.upload.errored` | Update the upload's status to `errored` |
+
+Here's a simplified example of a webhook handler that syncs asset data:
+
+```javascript
+// Example: Webhook handler for syncing Mux assets
+app.post('/webhooks/mux', async (req, res) => {
+  const event = req.body;
+
+  // 1. Log the event for debugging
+  await db.muxWebhookEvents.create({
+    mux_event_id: event.id,
+    type: event.type,
+    object_type: event.object?.type,
+    object_id: event.object?.id,
+    payload: event,
+  });
+
+  // 2. Sync the resource
+  if (event.type.startsWith('video.asset.')) {
+    const asset = event.data;
+    await db.muxAssets.upsert({
+      mux_asset_id: asset.id,
+      status: asset.status,
+      playback_ids: asset.playback_ids,
+      duration: asset.duration,
+      aspect_ratio: asset.aspect_ratio,
+      resolution_tier: asset.resolution_tier,
+      tracks: asset.tracks,
+      passthrough: asset.passthrough,
+    });
+  }
+
+  res.status(200).send('ok');
+});
+```
+
+<Callout type="info">
+Always verify webhook signatures in production to ensure events are genuinely from Mux. See the [webhooks guide](/docs/core/listen-for-webhooks) for details on signature verification.
+</Callout>
+
+## Extending for live streaming
+
+If your application supports live streaming, add a `mux_live_streams` table to track stream configurations:
+
+<CodeExamples
+  examples={{
+    postgresql: `CREATE TABLE mux_live_streams (
+  mux_live_stream_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'idle',
+  stream_key TEXT,
+  playback_ids JSONB DEFAULT '[]',
+  reconnect_window_seconds INTEGER DEFAULT 60,
+  active_asset_id TEXT,
+  recent_asset_ids JSONB DEFAULT '[]',
+  latency_mode TEXT DEFAULT 'standard',
+  passthrough TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_mux_live_streams_status ON mux_live_streams (status);`,
+    mysql: `CREATE TABLE mux_live_streams (
+  mux_live_stream_id VARCHAR(255) PRIMARY KEY,
+  status VARCHAR(50) NOT NULL DEFAULT 'idle',
+  stream_key VARCHAR(255),
+  playback_ids JSON DEFAULT ('[]'),
+  reconnect_window_seconds INTEGER DEFAULT 60,
+  active_asset_id VARCHAR(255),
+  recent_asset_ids JSON DEFAULT ('[]'),
+  latency_mode VARCHAR(20) DEFAULT 'standard',
+  passthrough VARCHAR(255),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_mux_live_streams_status ON mux_live_streams (status);`,
+    mongodb: `db.createCollection("mux_live_streams");
+
+db.mux_live_streams.createIndex({ mux_live_stream_id: 1 }, { unique: true });
+db.mux_live_streams.createIndex({ status: 1 });
+
+// Example document structure:
+// {
+//   mux_live_stream_id: "stream123",
+//   status: "idle",
+//   stream_key: "sk_us-east-1_abc...",
+//   playback_ids: [{ id: "playback123", policy: "public" }],
+//   reconnect_window_seconds: 60,
+//   active_asset_id: null,
+//   recent_asset_ids: ["asset1", "asset2"],
+//   latency_mode: "standard",
+//   passthrough: null,
+//   created_at: ISODate("2026-01-15T10:30:00Z"),
+//   updated_at: ISODate("2026-01-15T10:30:00Z")
+// }`
+  }}
+  args={{
+    postgresql: { displayName: "PostgreSQL", lang: "sql" },
+    mysql: { displayName: "MySQL", lang: "sql" },
+    mongodb: { displayName: "MongoDB", lang: "javascript" },
+  }}
+  exampleOrder="PostgreSQL,MySQL,MongoDB"
+/>
+
+<Callout type="warning">
+The `stream_key` is sensitive. Treat it like a password. Anyone with the stream key can broadcast to your live stream. Store it encrypted or restrict access in your application.
+</Callout>
+
+## Next steps
+
+- [Integrate with Supabase](/docs/integrations/supabase): managed Postgres with automatic Mux sync
+- [Integrate with Convex](/docs/integrations/convex): real-time database with built-in Mux component
+- [Listen for webhooks](/docs/core/listen-for-webhooks): set up webhook handling for real-time sync
+- [Secure video playback](/docs/guides/secure-video-playback): protect your content with signed playback IDs
+- [API reference](/docs/api-reference): full details on all Mux resource fields

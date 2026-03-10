@@ -1,0 +1,44 @@
+name: Sync Mux Docs
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # Daily at 6am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CLI repo
+        uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MUX_COM_APP_ID }}
+          private-key: ${{ secrets.MUX_COM_APP_PRIVATE_KEY }}
+          owner: muxinc
+          repositories: mux.com
+
+      - name: Run sync script
+        run: bash scripts/sync-docs.sh
+        env:
+          MUX_COM_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'docs: sync guides from muxinc/mux.com'
+          title: 'docs: sync guides from muxinc/mux.com'
+          body: |
+            Automated sync of MDX guide files from `muxinc/mux.com`.
+
+            This PR was created automatically by the `sync-docs` workflow.
+          branch: docs-sync
+          delete-branch: true
+          labels: documentation

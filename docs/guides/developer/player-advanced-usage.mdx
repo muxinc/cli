@@ -1,0 +1,426 @@
+---
+title: Advanced usage of Mux Player
+product: player
+description: In this guide, you will learn about more advanced usage of Mux Player.
+---
+
+## Listen for events
+
+Mux Player emits all of events available on the [HTML5 video element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video#events).
+
+<Callout type="warning">
+Events are unavailable if you are using the Mux Player HTML embed through player.mux.com.
+</Callout>
+
+For example, if you want to keep track of how much of a particular video a user has watched, you probably want to use the `timeupdate` event like this:
+
+### HTML element
+
+<InteractiveCodeExample product="player" example="listenForEvent" />
+
+In React, the events are camel-cased and prefixed with `on\*`. For example `timeupdate` becomes `onTimeUpdate`:
+
+### React
+
+```jsx
+function saveWatchProgress(event) {
+  /* event */
+}
+
+<MuxPlayer onTimeUpdate={saveWatchProgress} />;
+```
+
+## Secure your playback experience
+
+Mux offers a couple of ways to secure your media content:
+- using signed URLs, which ensures only people with a valid, unexpired token can load your video in allowed playback contexts
+- using [Digital Rights Management](/docs/guides/protect-videos-with-drm) <BetaTag/>
+
+Both options are easy to use with Mux Player and are discussed below.
+
+### Use signed URLs
+
+If you followed the guide for [Secure video playback](/docs/guides/secure-video-playback) then you are using signed URLs and a few extra steps are required to use Mux Player (or any player for that matter).
+
+First off, you should already be creating JSON Web Tokens (JWTs) on your **server**. If you're not doing that already, head over to that guide and do that part first.
+
+Note that JWTs are granular, so a unique token is used for each resource:
+
+- **Playback** is used to get the actual video.
+- **Thumbnail** is used to get a still image from the video. Mux Player uses it for a poster image
+- **Storyboard** is used for [timeline hover previews](/docs/guides/create-timeline-hover-previews). This only works for on-demand video, live streams aren't supported.
+- **DRM** is used for playing DRM-protected content. See the [section below](#use-digital-rights-management-drm).
+
+Each JWT will look something like this below. These examples were created with playback ID `qIJBqaJPkhNXiHbed8j2jyx02tQQWBI5fL6WkIQYL63w`.
+
+**Playback token:**
+
+```
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFkamYzb2JpYURUcEF0QVlpS3NCMkpvRlkwMXBpbEJMTHdYcUQzaHpJYURJIn0.eyJleHAiOjE5NjE2NDY0MDMsImF1ZCI6InYiLCJzdWIiOiJxSUpCcWFKUGtoTlhpSGJlZDhqMmp5eDAydFFRV0JJNWZMNldrSVFZTDYzdyJ9.mukZou10_iwaqPeHVFbXwTZShMK1D8kWpFAFOl6bwuIMB7hx0bAqscZxj5FwrIB8dzB6s_9YtJEEVXcR6ezxOhOc_y2ij1XM4YQYCuGH-elJc3rapHbahv2K7L_asz9Bdu1Ld6i6Ux7keNpEuGSYCDmsPmvdII7_XAPmzU01ZTvaXqCgzCY2PO7xz6z3hu1HOww2eL41TSif_Zu0okNZlhfHE9U-nyr4OVpuS9Q-rTtVvfE2ILSd9Ezt02AuOK-JkBCeR3Xf-UrbXB33ZFHLJrYVA-B516Iym0CGRfVssZsAn80_PNaxS_3M_OmVzyaDJ4zudb-YjGcaNl0yf96h6w
+```
+
+**Thumbnail token:**
+
+```
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFkamYzb2JpYURUcEF0QVlpS3NCMkpvRlkwMXBpbEJMTHdYcUQzaHpJYURJIn0.eyJleHAiOjE5NjE2NTkzMzAsImF1ZCI6InQiLCJzdWIiOiJxSUpCcWFKUGtoTlhpSGJlZDhqMmp5eDAydFFRV0JJNWZMNldrSVFZTDYzdyJ9.zQ0tDimpgu7nsT9Tb7GBgitMpYSbLBodwS-fSc7U0K0WT-giCUgxXXSqXquwpHMjEEfSuCsCU3Y1gq2P7WaJUBGTOTLKT5GOwyhjeoJzTPXEQqW7T-tpKXhjEDVwy_H2UPNVdA9ZALos5R9rrWyiTQA53sxT56FWy-IhvaISpiB16nzankRKCAo98kh6lloexE8p3lXnUhLwIK8Hqco4hRmHSmWqUndnJrbq0_kag0o8R0drffSMj6CvKas8_f6v3MtHXDhW0JkJ1TZKwICt7W-jrSyMfhgAb9wltBCUXdNHYvQTXkFfFnsI1R-BuZodQL2zN3pVBqzuhQA0UPADMw
+```
+
+**Storyboard token** (only needed for `on-demand`):
+
+```
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFkamYzb2JpYURUcEF0QVlpS3NCMkpvRlkwMXBpbEJMTHdYcUQzaHpJYURJIn0.eyJleHAiOjE5NjE2NTkzMTQsImF1ZCI6InMiLCJzdWIiOiJxSUpCcWFKUGtoTlhpSGJlZDhqMmp5eDAydFFRV0JJNWZMNldrSVFZTDYzdyJ9.QxvtM-FBakS8IPl_mZloBKLKyHRU8md7IbSifAYbAVHrLwUre3-CXlOcsd6sKi0hVen_DnSqQeuuFTYF6o2TeS31gnBsf5U4W7JDpOjxAepj4ODM6bpPJBu6XDpZmMTduuwVrIXP9pQWSwiHSQ93hk6RR17YrPgGz6sCXIL5gt0re_WqkSEazwYEscu9eByMN3F_sM7W830C7Wzeatb1TMeEf6wQhbpKABLB33VM0FOuM5ojjI9DWmDhJksfFVrOxaZtoju4hjiWQtNPVBCFP28J9LHNLA7brRXvDGaIUxHG5-vrcVuImlghdWgPyrAOb0lWYSiklYx2ObHhNWJK1g
+```
+
+When you have generated the 3 tokens, pass them into Mux Player:
+
+<CodeExamples
+  product="player"
+  example="tokens"
+  exampleOrder="html,react,embed"
+/>
+
+If you are using JavaScript and the Mux Player Web Component or React component, you can use the `tokens` property too:
+
+```javascript
+const muxPlayer = document.querySelector("mux-player");
+muxPlayer.tokens = {
+  playback: "eyJhbGciOiJSUzI1NiI...",
+  thumbnail: "eyJhbGciOiJSUzI1N...",
+  storyboard: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsI...",
+};
+```
+
+Mux Player send errors to Mux Data when tokens are incorrect. The most common error cases with signed URLs that Mux Player detects are:
+
+- [Playback ID mismatch](https://github.com/muxinc/elements/blob/main/errors/403-playback-id-mismatch.md)
+- [Expired token](https://github.com/muxinc/elements/blob/main/errors/403-expired-token.md)
+- [Malformatted token](https://github.com/muxinc/elements/blob/main/errors/403-malformatted-token.md)
+
+These errors will be logged to the browser console and sent to your Mux Data dashboard.
+
+### Use Digital Rights Management (DRM)
+
+<Callout type="info">
+  This feature is currently in beta. [Learn more about DRM.](/docs/guides/protect-videos-with-drm) <BetaTag/>
+</Callout>
+
+<Callout type="info">
+  To play DRM protected content on iOS and iPadOS devices the device should be running the current minor and patch version of iOS or iPadOS.
+
+  We strongly recommend that viewers use the latest version of iOS/iPadOS 17 or 18 when viewing DRM protected content.
+
+  Playing DRM protected content on an OS version that is not the latest minor and patch version of a major release is known to result in playback failures.
+</Callout>
+
+If you've [setup your playback ID to be DRM-protected](/docs/guides/protect-videos-with-drm), playback is as simple as adding the DRM token to your set of tokens used.
+
+<CodeExamples
+  product="player"
+  example="tokensDrm"
+  exampleOrder="html,react,embed"
+/>
+
+If you are using JavaScript and the Mux Player Web Component or React component, you can use the `tokens` property too:
+
+```javascript
+const muxPlayer = document.querySelector("mux-player");
+muxPlayer.tokens = {
+  playback: "eyJhbGciOiJSUzI1NiI...",
+  drm: "eyJhbGciOiJSUzI1NiIs...",
+  thumbnail: "eyJhbGciOiJSUzI1N...",
+  storyboard: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsI...",
+};
+```
+
+## Controlling an iframe-embedded Mux Player with Player.js
+Mux Player embedded within an iframe with player.mux.com supports the Player.js spec. This means you can control the player from your own window's JavaScript. See the [Player.js docs](https://github.com/embedly/player.js#playerjs) for more information.
+
+## Preloading assets
+
+By default `preload` will behave similar to the HTML5 `<video>` element.
+
+Use the `preload=` attribute with values of `"none"`, `"metadata"` or `"auto"`.
+Or omit it for the default behavior.
+
+When there is no `preload` attribute, the player will use the behavior that the browsers set initially.
+Most browsers use `"auto"`, but some (like Chrome) use `"metadata"` instead.
+On mobile devices, `preload` is always `none`.
+For the most consistent user experience, we recommended providing the `preload` attribute.
+
+The value `"auto"` will start loading the video as soon as possible and give the user the best experience with the shortest startup time.
+
+If you want to preserve bandwidth (and delivery cost) set `preload="none"` (load nothing until the user tries to play) or `preload="metadata"` (load the minimum amount of data for the media to get basic information like its duration).
+
+The tradeoff with using `preload="metadata"` or `preload="none"` is that when the user plays the video they will experience a slower startup time because the video has to load before playback can start. You'll see the slower startup time reflected in your Mux Data dashboard and this will negatively impact the [Overall Viewer Experience metric](/docs/guides/data-overall-viewer-experience-metric).
+
+## Use custom video domains
+
+By default, all Mux Video assets will be hosted on mux.com. This includes things like posters, storyboards, and media sources.
+
+[Custom Domains](https://www.mux.com/blog/introducing-custom-domains), is a feature which allows you to stream these assets from a domain of your choice.
+
+Once you have your custom domain set up, provide it via the `custom-domain` attribute or `customDomain` property. If your custom domain is `media.example.com` then internally Mux Player will take that value and expand it to `image.media.example.com` for images and `stream.media.example.com` for video.
+
+<CodeExamples
+  product="player"
+  example="customDomains"
+  exampleOrder="html,react,embed"
+/>
+
+If you are using JavaScript and the Mux Player Web Component or React component, you can use the `customDomain` property too:
+
+```javascript
+const muxPlayer = document.querySelector("mux-player");
+muxPlayer.customDomain = "media.example.com";
+```
+
+## Access the underlying video element
+
+The `media.nativeEl` property is a reference to the underlying video element. When using the Mux Player Web Component or React component, Yyu can use this to access the video element's properties and methods.
+
+```jsx
+  <MuxPlayer
+    playbackId="EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs"
+    ref={(muxPlayerEl) => console.log(muxPlayerEl.media.nativeEl)}
+    metadata={{
+      video_id: "video-id-54321",
+      video_title: "Test video title",
+      viewer_user_id: "user-id-007",
+    }}
+  />
+```
+
+## Change playback engine
+
+Mux Player will automatically handle Adaptive Bitrate Streaming with your Mux Asset. For a beginner's guide on how this works, [howvideo.works](https://howvideo.works/) is an informational site that explains the basic concepts. Under the hood, Mux Player uses [HLS.js](https://github.com/video-dev/hls.js/) and Mux Player will pick the optimal HLS.js configuration based on the provided `stream-type`.
+
+On iOS, iPadOS, and MacOS, Mux Player will use Apple's native HLS streaming engine. On Android, Mux Player will use HLS.js.
+
+It is not recommended, but if you have a good reason to control whether Mux Player uses HLS.js (MSE, Media Source Extension) or native HLS playback you can with the `prefer-playback` attribute (in React `preferPlayback`). Values can be `"mse"` or `"native"`. When a value is provided for `prefer-playback`, Mux Player will use that playback strategy if available.
+
+Note that setting the `prefer-playback` attribute should be done with caution. If you are setting this, make sure you thoroughly test playback on the various operating systems and browsers that Mux Player will be running in. Also, keep an eye on Mux Data to verify that your playback metrics are on track.
+
+
+## Re-using player instances
+
+Mux Player instances can be re-used by re-setting the `playback-id`.
+
+In React, this is done by changing the `playbackId` prop to a new value.
+
+In the web component, this can be done by either calling `setAttribute` with a new value for the `playback-id` attribute or by assigning the `playbackId` property. Both are equally valid ways of interacting with the `<mux-player>` element instance.
+
+```js
+const muxPlayer = document.querySelector('mux-player');
+
+// using setAttribute
+muxPlayer.setAttribute('playback-id', 'new-playback-id-xxx');
+// using the `playbackId` prop
+muxPlayer.playbackId = 'new-playback-id-xxx';
+```
+
+## Debugging
+
+Add the `debug` attribute or React prop in order to print verbose logging to the developer console. This will enable verbose logging from:
+
+- Mux Player itself (prefixed with `[mux-player]`)
+- [HLS.js](https://github.com/video-dev/hls.js/)
+- Mux Data
+
+Note that this must be set before setting a `playback-id` to take full advantage of debug logging.
+
+## Disabling cookies
+
+Even though Mux Data cookies do not contain any personally identifiable information (PII) and are used for more reliable and informative QOE metrics, there are times when you may want or need cookies to be disabled.
+
+In those cases, you can use the `disable-cookies` attribute or `disableCookies` React prop to turn off use of cookies by Mux Data. Note this must be set before setting a `playback-id` to take effect.
+
+For more on the use of cookies in Mux Data, see [the docs](/docs/guides/monitor-html5-video-element#disable-cookies).
+
+## Custom storyboards
+
+By default Mux Player will use the [storyboard](/docs/guides/create-timeline-hover-previews#webvtt) WebVTT text track that corresponds to your `plaback-id`
+
+`https://image.mux.com/{PLAYBACK_ID}/storyboard.vtt?format=webp`
+
+If you want to use a different WebVTT source file for your storyboard, you can use the `storyboard-src` attribute or `storyboardSrc` React prop to override it. Keep in mind that the WebVTT source file must conform to our expectations for storyboards.
+
+## Add chapters and time-based metadata
+
+The Mux Player Web Component and React component support both chapters and time-based metadata (cue points). Chapters visually split the timeline into sections with titles that users can click to jump to. Cue points allow you to associate custom metadata with ranges of time in the timeline. Both support getting a callback when the chapter or cue point has become active. You can use either individually or both at the same time, depending on your use-case.
+
+If you omit `endTime` from a cue point or chapter, it will automatically end when the next one begins by joining them together without gaps. If you include an `endTime`, you can have gaps between your chapters or cue points.
+
+Both chapters and cue points will be removed if you unload the media or change the current playback ID.
+
+### Chapters example
+
+A chapter is defined as: `{startTime: number; endTime?: number; value: string}`, with the value containing the chapter's title and `endTime` being optional. Both `startTime` and `endTime` are in seconds.
+
+<Image src="/docs/images/chapter-example.png" width={1596 } height={ 438} caption="Mux Player chapter example with a gap between chapters" />
+
+```js
+const muxPlayerEl = document.querySelector('mux-player');
+
+function addChaptersToPlayer() {
+  // Chapters can also specify an `endTime` if we don't want them to automatically join up
+  muxPlayerEl.addChapters([
+    { startTime: 1, value: 'Chapter 1' },
+    { startTime: 3, value: 'Chapter 2' },
+    { startTime: 10, value: 'Chapter 3 - will span to the end' },
+  ]);
+}
+
+// NOTE: We need to wait until the player has loaded some data first
+// otherwise, we have no media to associate them with
+if (muxPlayerEl.readyState >= 1) {
+  addChaptersToPlayer();
+} else {
+  muxPlayerEl.addEventListener('loadedmetadata', addChaptersToPlayer, { once: true });
+}
+
+muxPlayerEl.addEventListener('chapterchange', () => {
+  console.log(muxPlayerEl.activeChapter);
+  console.log(muxPlayerEl.chapters);
+});
+```
+
+Chapters currently work with streaming assets (video on demand) and audio, but not live content.
+
+### Time-based metadata (cue points)
+
+A CuePoint is defined as: `{ startTime: number; endTime?: number; value: any; }`, with the `value` being a JSON-serializable value that you want to associate with that range of time. Like chapters, start and end times are in seconds and `endTime` is optional.
+
+```js
+const muxPlayerEl = document.querySelector('mux-player');
+function addCuePointsToPlayer() {
+  // CuePoints can also specify an `endTime` if we don't want them to automatically join up
+  const cuePoints = [
+    { startTime: 1, value: 'Simple Value' },
+    { startTime: 3, value: { complex: 'Complex Object', duration: 2 } },
+    { startTime: 10, value: true },
+    { startTime: 15, value: { anything: 'That can be serialized to JSON and makes sense for your use case' } }
+  ];
+
+  muxPlayerEl.addCuePoints(cuePoints);
+}
+
+// We're using `duration` and `'durationchange'` to determine if the `<mux-player>` element has loaded src.
+// This gives us the opportunity to compare our CuePoints against the duration of the media if needed.
+// You could use other events, such as `'loadedmetadata'` if that makes more sense for your use case.
+if (playerEl.duration) {
+  addCuePointsToPlayer();
+} else {
+  muxPlayerEl.addEventListener('durationchange', addCuePointsToPlayer, { once: true });
+}
+
+muxPlayerEl.addEventListener('cuepointchange', () => {
+  console.log(muxPlayerEl.activeCuePoint);
+  console.log(muxPlayerEl.cuepoints);
+});
+```
+
+If cue points are specified without an `endTime`, then like chapters they will automatically be joined up end-to-end. This means that if a user seeks anywhere between two cue points, the `cuepointchange` event will fire and the `activeCuePoint` will be the earlier cue point. If you only care about the `activeCuePoint` when the `currentTime` is roughly the same as the `startTime` of a cue point, you can add some custom logic to account for that, e.g.:
+
+```js
+function cuePointChangeListener() {
+  // Only do something with the activeCuePoint if we're "near" its `startTime`.
+  const cuePointBuffer = 1; // how close the playhead needs to be to the CuePoint, in seconds
+  if (Math.abs(muxPlayerEl.currentTime - muxPlayerEl.activeCuePoint.startTime) <= cuePointBuffer) {
+    console.log('Active CuePoint playing near its time!', muxPlayerEl.activeCuePoint);
+  }
+}
+```
+
+## Synchronize video playback
+
+To facilitate synchronizing video playback across players, Mux Player exposes `currentPdt` and `getStartDate()`.
+
+If the stream includes Program Date Time tags, `currentPdt` and `getStartDate()` will return a [Date][] object that corresponds to the PDT at the current time or at the begining of the stream.
+If there is no PDT, or if the video hasn't loaded yet, `currentPdt` and `getStartDate()` will return an Invalid Date object.
+
+See [Synchronize video playback](/docs/examples/synchronize-video-playback) for more information.
+
+<Callout type="info">
+  `currentPdt` and `getStartDate()` currently require that [Slates](/docs/guides/handle-live-stream-disconnects#reconnect-window-and-slates) are enabled on your stream.
+  If Slates are not enabled, it is possible that the times provided are not accurate.
+</Callout>
+
+Refer to this sample for the usage below:
+```text
+#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-TARGETDURATION:2
+#EXT-X-MAP:URI="https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/18446744073709551615.m4s?skid=default&signature=NjBmMjFkODBfYWVhMjIyZTdmMDU0ZmI0YWU2ZWJkZTJiYTY4MzhmYWQzNWQ2YzMyMTVlYjdjNmM0NzZiZjBmZGU0ODU1MTUyNQ=="
+#EXT-X-PLAYLIST-TYPE:VOD
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:25.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/0.m4s?skid=default&signature=NjBmMjFkODBfOWJkMzMyMTc5YzgwY2VmMTdlYzIwODgzZGI2NWFiMThiM2U1NDM0NzM0NDZhMmQwOThhZmI0NDQ5OWY5N2VmMA==
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:27.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/1.m4s?skid=default&signature=NjBmMjFkODBfMjA1ZWNmYzgzYWRhMzNjMTY5YmEyYmM2NzE4MDk5N2I1MWE3NzhjODlhNGIzNWI3NGIwNTA5ZTIxOWQyNjI5OQ==
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:29.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/2.m4s?skid=default&signature=NjBmMjFkODBfZTIyOTA5YWFjZjMzYTY4MzQ4YWEzZDBiNDkyODk1NTg2ODE2M2YwZjI3NmY2MTVhOTM5MTA2MzQ4ODIyNTNkOQ==
+
+#EXT-X-PROGRAM-DATE-TIME:2021-06-28T17:53:31.533+00:00
+#EXTINF:2,
+https://chunk-gce-us-east1-production.cfcdn.mux.com/v1/chunk/3aJUOua6jsMHYybcqXRBpcXH82aCYXTu02TPTKHzIokndAPmz300ZThlCZbeNAy1t73003iytFZNJdjcvjTsOrCVTaGZgQ9J00uU/3.m4s?skid=default&signature=NjBmMjFkODBfNDRkZTNhYTE5M2RhYTA4MTA4MWFkODc0YzgyMDcyMGMwODFmZWIxOGRiNWM4YzJhMTM0YTNiNGRhYmYyMWE1Nw==
+
+#EXT-X-ENDLIST
+```
+
+### `currentPdt`
+
+This will return a JavaScript [Date][] object that is based on the currentTime.
+If there is no PDT in the stream, an invalid date object is returned.
+
+```js
+const player = document.querySelector('mux-player');
+// assuming the above stream, the initial currentPdt would be
+player.currentPdt;
+// Mon Jun 28 2021 13:53:25 GMT-0400 (Eastern Daylight Time)
+player.currentPdt.getTime();
+// 1624902805533
+
+// now if we seek forward, by 10 seconds
+player.currentTime = 10;
+
+player.currentPdt;
+// Mon Jun 28 2021 13:53:35 GMT-0400 (Eastern Daylight Time)
+player.currentPdt.getTime();
+// 1624902815533
+```
+
+### `getStartDate()`
+
+This will return a JavaScript [Date][] object that is based on the beginning of the stream.
+This method is a reflection of the [HTML specified method](https://html.spec.whatwg.org/multipage/media.html#dom-media-getstartdate).
+
+```js
+const player = document.querySelector('mux-player');
+// assuming the above stream, getStartDate() would return
+player.getStartDate();
+// Mon Jun 28 2021 13:53:25 GMT-0400 (Eastern Daylight Time)
+player.getStartDate().getTime();
+// 1624902805533
+// notice that when currentTime is 0, getStartDate() is equivalent to currentPdt
+
+// now if we seek forward, by 10 seconds
+player.currentTime = 10;
+
+player.getStartDate();
+// Mon Jun 28 2021 13:53:25 GMT-0400 (Eastern Daylight Time)
+player.getStartDate().getTime();
+// 1624902805533
+// notice that even though we seeked forward, we still get the same value.
+```
+
+
+[Date]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date
+
+## Full API reference
+
+Any features or settings not mentioned above can be found in our [full API reference](/docs/guides/player-api-reference) covering all of the available events, attributes, properties, and methods exposed by the player.

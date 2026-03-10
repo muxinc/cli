@@ -1,0 +1,277 @@
+---
+title: Add Auto-Generated Live Captions
+product: video
+description: In this guide you will learn how to add auto-generated live captions to your Mux live stream.
+seoTitle: Add your own live stream closed captions
+seoDescription: Learn how to use Mux's auto-generated closed caption integration for live streaming video and how it improves accessibility.
+steps:
+  - title: Overview
+    description: We use A.I. based speech-to-text technology to automatically generate the closed captions.
+    topic: overview
+  - title: 1. Is my content suitable for auto-generated live closed captions?
+    description: Non technical content with clear audio and minimal background noise is most suitable for auto-generated live captions.
+  - title: 2. Increase accuracy of captions with transcription vocabulary
+    description: Providing vocabulary for technical terms and proper nouns can increase accuracy of auto-generated live captions
+  - title: 3. Create a new transcription vocabulary
+    description:
+  - title: 4. Enable auto-generated live closed captions
+    description: Get started with adding auto-generated live closed captions to your Mux live stream.
+  - title: 5. Update stream to not auto-generate closed captions for future connections
+    description: Let Mux know to not auto-generate closed captions when the live stream starts again.
+  - title: 6. Manage and update your transcription vocabulary
+  - title: FAQs
+    description:
+    topic: FAQ
+---
+
+<LinkedHeader step={steps[0]} />
+
+Mux is excited to offer auto-generated live closed captions in English, French, German, Italian, Portuguese, and Spanish. Closed captions make video more accessible to people who are deaf or hard of hearing, but the benefits go beyond accessibility. Captions empower your viewers to consume video content in whichever way is best for them, whether it be audio, text, or a combination.
+
+For auto-generated live closed captions, we use artificial intelligence based speech-to-text technology to generate the closed captions. Closed captions refer to the visual display of the audio in a program.
+
+<LinkedHeader step={steps[1]} />
+
+Non technical content with clear audio and minimal background noise is most suitable for auto-generated live captions. Content with music and multiple speakers speaking over each other are not good use cases for auto-generated live captions.
+
+<Callout type="info">Accuracy ranges for auto-generated live captions range from 70-95%.</Callout>
+
+<LinkedHeader step={steps[2]} />
+
+For all content, we recommend you provide transcription vocabulary of technical terms (e.g. CODEC) and proper nouns. By providing the transcription vocabulary beforehand, you can **increase the accuracy** of the closed captions.
+
+The transcription vocabulary helps the speech to text engine transcribe terms that otherwise may not be part of general library. Your use case may involve brand names or proper names that are not normally part of a language model’s library (e.g. "Mux"). Or perhaps you have a term, say "Orchid" which is a brand name of a toy. The engine will recognize "orchid" as a flower but you would want the word transcribed with proper capitalization in the context as a brand.
+
+Please note that it can take up to 20 seconds for the transcription vocabulary to be applied to your live stream.
+
+<LinkedHeader step={steps[3]} />
+
+You can create a new transcription library by making a `POST` request to `/video/v1/transcription-vocabularies` endpoint API and define the input parameters. Each transcription library can have up to 1,000 phrases.
+
+## Request Body Parameters
+
+| Input parameters | Type     | Description                                                                                                                                           |
+| ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name             | `string` | The human readable description of the transcription library.                                                                                          |
+| phrases          | `array`  | An array of phrases to populate the transcription library. A phrase can be one word or multiple words, usually describing a single object or concept. |
+
+### API Request
+
+```json
+POST /video/v1/transcription-vocabularies
+{
+  "name": "TMI vocabulary",
+  "phrases": ["Mux", "Demuxed", "The Mux Informational", "video.js", "codec", "rickroll"]
+}
+```
+
+### API Response
+
+```json
+{
+  "data": {
+    "updated_at": "1656630612",
+    "phrases": ["Mux", "Demuxed", "The Mux Informational", "video.js", "codec", "rickroll"],
+    "name": "TMI vocabulary",
+    "id": "4uCfJqluoYxl8KjXxNF00TgB56OyM152B5ZR00cLKXFlc",
+    "created_at": "1656630612"
+  }
+}
+```
+
+<LinkedHeader step={steps[4]} />
+
+Add the `generated_subtitles` array at time of stream creation or to an existing live stream.
+
+## Request Body Parameters
+
+| Input parameters               | Type     | Description                                                                                                                                                                                                                 |
+| ------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                         | `string` | The human readable description for the generated subtitle track. This value must be unique across all the text type and subtitles text type tracks. If not provided, the name is generated from the chosen `language_code`. |
+| `passthrough`                  | `string` | Arbitrary metadata set for the generated subtitle track.                                                                                                                                                                    |
+| `language_code`                | `string` | BCP-47 language tag for captions. Defaults to `"en"`.                                                                       |
+| `transcription_vocabulary_ids` | `array`  | The IDs of existing Transcription Vocabularies that you want to be applied to the live stream. If the vocabularies together contain more than 1,000 unique phrases, only the first 1,000 will be used.                      |
+
+Mux supports the following languages and corresponding language codes for live generated captions.
+
+| Language | Language Code |
+| :-- | :-- |
+| English | `"en"` |
+| Spanish | `"es"` |
+| Italian | `"it"` |
+| Portuguese | `"pt"` |
+| German | `"de"` |
+| French | `"fr"` |
+
+<Callout type="info">Locale codes such as `"en-US"` or `"es-MX"` are accepted and will be parsed down to their language code (e.g., `"en-US"` → `"en"`).</Callout>
+
+# Step 1A: Create a live stream in Mux
+
+Create a live stream using the <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">Live Stream Creation API</ApiRefLink>. Let Mux know that you want auto-generated live closed captions.
+
+### API Request
+
+```json
+POST /video/v1/live-streams
+
+Request Body
+{
+  "playback_policy" : ["public"],
+  "generated_subtitles": [
+    {
+      "name": "English CC (auto)",
+      "passthrough": "English closed captions (auto-generated)",
+      "language_code": "en",
+      "transcription_vocabulary_ids": ["4uCfJqluoYxl8KjXxNF00TgB56OyM152B5ZR"]
+    }
+  ],
+  "new_asset_settings" : {
+    "playback_policy" : ["public"]
+  }
+}
+```
+
+### API Response
+
+```json
+Response
+{
+  "data": {
+    "stream_key": "5bd28537-7491-7ffa-050b-bbb506401234",
+    "playback_ids": [
+      {
+        "policy": "public",
+        "id": "U00gVu02hfLPdaGnlG1dFZ00ZkBUm2m0"
+      }
+    ],
+    "new_asset_settings": {
+      "playback_policies": [
+        "public"
+      ]
+    },
+    "generated_subtitles" : [
+      "name": "English CC (auto)",
+      "passthrough": "English closed captions (auto-generated)",
+      "language_code": "en",
+      "transcription_vocabulary_ids": ["4uCfJqluoYxl8KjXxNF00TgB56OyM152B5ZR"]
+    ],
+    "id": "e00Ed01C9ws015d5SLU00ZsaUZzh5nYt02u",
+    "created_at": "1624489336"
+  }
+}
+
+```
+
+# Step 1B: Configure live captions for an existing live stream
+
+Use the Generated Subtitles API to configure generated closed captions to an existing live stream. Live closed captions can not be configured to an active live stream.
+
+### API Request
+
+```json
+PUT /video/v1/live-streams/{live_stream_id}/generated-subtitles
+
+Request Body
+{
+  "generated_subtitles": [
+    {
+      "name": "English CC (auto)",
+      "passthrough": "{\"description\": \"English closed captions (auto-generated)\"}",
+      "language_code": "en",
+      "transcription_vocabulary_ids": ["4uCfJqluoYxl8KjXxNF00TgB56OyM152B5ZR"]
+    }
+  ]
+}
+```
+
+### API Response
+
+```json
+Response
+{
+  "data": {
+    "stream_key": "5bd28537-7491-7ffa-050b-bbb506401234",
+    "playback_ids": [
+      {
+        "policy": "public",
+        "id": "U00gVu02hfLPdaGnlG1dFZ00ZkBUm2m0"
+      }
+    ],
+    "new_asset_settings": {
+      "playback_policies": [
+        "public"
+      ]
+    },
+    "generated_subtitles": [
+      {
+        "name": "English CC (auto)",
+        "passthrough": "{\"description\": \"English closed captions (auto-generated)\"}",
+        "language_code": "en",
+        "transcription_vocabulary_ids": ["4uCfJqluoYxl8KjXxNF00TgB56OyM152B5ZR"]
+      }
+    ]
+  }
+}
+```
+
+# Step 2: Start your live stream
+
+- At the start of the Live Stream, two text tracks will be created for the active asset, with `text_source` attributes of `generated_live` and `generated_live_final`, respectively.
+
+- While the stream is live, the `generated_live` track will be available and include predicted text for the audio.
+
+- At the end of the stream, the `generated_live_final` track will transition from the preparing to ready state; this track will include finalized predictions of text and result in higher-accuracy, better-timed text.
+
+- After the live event has concluded, the playback experience of the asset created will only include the more accurate `generated_live_final` track, but the sidecar VTT files for both tracks will continue to exist.
+
+<LinkedHeader step={steps[5]} />
+
+To prevent future connections to your live stream from receiving auto-generated closed captions, update the `generated_subtitles` configuration to `null` or an empty array.
+
+### API Request
+
+```json
+PUT /video/v1/live-streams/{live_stream_id}/generated-subtitles
+
+Request Body
+{
+  "generated_subtitles" : []
+}
+```
+
+<LinkedHeader step={steps[6]} />
+
+### Update phrases in a transcription vocabulary
+
+Phrases can be updated at any time, but won't go into effect to active live streams with auto-generated live closed captions enabled where the transcription vocabulary has been applied. If the updates are applied to an active live stream, they will not be applied until the next time the stream is active.
+
+### API Request
+
+```json
+PUT /video/v1/transcription-vocabularies/$ID
+{
+  "phrases": ["Demuxed", "HLS.js"]
+}
+```
+
+<LinkedHeader step={steps[7]} />
+
+### What happens if my live stream has participants speaking languages other than the caption stream I've chosen?
+
+If you've added an auto-generated English caption stream and your audio contains a non-English language, we will attempt to auto-generate captions for all the content in English. e.g. If French and English are spoken, we will create captions for the French language content using the English model and the output would be incomprehensible.
+
+### When can I edit my live caption configuration?
+
+Only when the live stream is idle. You cannot make any changes while the live stream is active.
+
+### How do I download my auto-generated closed caption track?
+
+```json
+https://stream.mux.com/{PLAYBACK_ID}/text/{TRACK_ID}.vtt
+```
+
+More details can be found at [Advanced Playback features](/docs/guides/play-your-videos#advanced-playback-features)
+
+### Do live captions work with low latency live streams?
+
+Not at this time.

@@ -1,0 +1,456 @@
+---
+title: Mux Player for Android
+product: player
+description: This guide walks through integration with Mux's Player SDK for Android, which is built on media3
+steps:
+  - title: 1. Install the Mux Player SDK
+    description: Add the SDK to your project and app
+  - title: 2. Play a Mux Asset
+    description: Play an asset from Mux Video in a native Android app
+  - title: Control Your Usage and Quality
+    description: Build for your specific bandwidth, cost, and quality needs using playback parameters
+    topic: configure
+  - title: Add or customize Mux Data metadata
+    description: Enrich your included Mux Data integration with additional metadata
+    topic: metadata
+  - title: Secure your playback experience
+    description: Play Mux Video content securely using the option that works best for you and your users
+    topic: lock
+  - title: Advanced Features
+    description: Advanced customization and features for the Mux Player SDK
+    topic: code
+---
+
+The Mux Player SDK is a thin wrapper on top of Google's media3 player SDK with convenient tools for Mux Video users. This SDK is not required to use Mux Video, but it can help you do things like controlling your data and delivery usage, playing Mux assets by ID, automatically supporting player features like caching, and transparently tracking performance and engagement with [Mux Data](https://data.mux.com/)
+
+This guide will help you install the Mux Video SDK in your app, use it to play a Mux Video asset, configure Mux Player for your specific app and media, and show you how to handle less-common scenarios like using Mux Video's [custom domains](/docs/guides/use-a-custom-domain-for-streaming).
+
+<LinkedHeader step={steps[0]} />
+
+## Add our repository to your Gradle project
+
+Add Mux's maven repository to your gradle files. Newer projects require declaring this in `settings.gradle`, and older projects require it to be set in the project-level `build.gradle`.
+
+<CodeExamples product="data" example="media3AddRepo" exampleOrder="gradle_kts,gradle_groovy"/>
+
+## Add the dependency to your app
+
+Add our library to the `dependencies` block for your app.
+
+<CodeExamples
+  examples={{
+    gradle_kts: `
+implementation("com.mux.player:android:1.0.0")
+    `,
+    gradle_groovy: `
+implementation "com.mux.player:android:1.0.0"
+    `,
+  }}
+  exampleOrder="gradle_kts,gradle_groovy"
+/>
+
+<LinkedHeader step={steps[1]} />
+
+## Create a MuxPlayer
+
+To use the SDK, you must create a `MuxPlayer` object using its `Builder`. The basic configuration will enable all of Mux Video's features, and you can make additional config changes using our `Builder`. Almost all of our default config options are the same as ExoPlayer's. We only change things about the default configuration when we need to in order to support a Mux Player feature.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+val player: MuxPlayer = MuxPlayer.Builder(context = this)
+  .enableLogcat(true) // Optional. Only applies to Mux. Media3 logging is not touched
+  .applyExoConfig {
+    // Call ExoPlayer.Builder methods here (but not build()!)
+    setHandleAudioBecomingNoisy(true)
+  }
+.build()
+    `,
+    java: `
+MuxPlayer player = new MuxPlayer.Builder(context)
+  .enableLogcat(true) // Optional. Only applies to Mux. Media3 logging is not touched
+  .plusExoConfig((config) -> {
+    // Call ExoPlayer.Builder methods here (but not build()!)
+    config.setHandleAudioBecomingNoisy(true);
+  })
+  .build();
+    `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Play a Mux Video asset
+
+To play a Mux Video asset using this SDK, you can use our `MediaItems` API to create new instances of media3's `MediaItem` or `MediaItem.Builder`. For the basic example, we'll leave everything default and play an asset you've already uploaded to Mux Video
+
+<CodeExamples
+  examples={{
+    kotlin: `
+// Use the MediaItems class instead of MediaItem.Builder()
+val mediaItem = MediaItems.builderFromMuxPlaybackId("YOUR PLAYBACK ID")
+  // It's just a MediaItem from here, so you can configure it however you like
+  .setMediaMetadata(
+    MediaMetadata.Builder()
+      .setTitle("Hello from Mux Player on Android!")
+      .build()
+  )
+  .build()
+
+// From here, everything is exactly the same as ExoPlayer
+player.setMediaItem(mediaItem)
+player.prepare()
+player.playWhenReady = true
+    `,
+    java: `
+MediaMetadata metadata = new MediaMetadata.Builder()
+  .setTitle("Hello from Mux Player on Android")
+  .build();
+// Use the MediaItems class instead of MediaItem.Builder()
+MediaItem item = MediaItems.builderFromMuxPlaybackId("YOUR PLAYBACK ID")
+  // It's just a MediaItem from here, so you can configure it however you like
+  .setMediaMetadata(metadata)
+  .build();
+
+// From here, everything is exactly the same as ExoPlayer
+player.setMediaItem(item);
+player.setPlayWhenReady(true);
+player.prepare();
+    `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+### Protecting your content
+
+Mux Video offers options for securing your content from unauthorized playing or recording. For more information, [see below](/docs/guides/mux-player-android#secure-your-playback-experience)
+
+<LinkedHeader step={steps[2]} />
+
+## Enable smart caching to improve experience and decrease usage
+
+Mux Player can cache content as it is requested from Mux Video and store it for later requests. Caching can reduce overall data usage and costs by storing some streamed video locally in a private directory on the device. This way content doesn't need to be downloaded again if the user watches the content over, when playback loops, or during seeking. Mux Player's caching is automatic when enabled, and we manage the cache files for you.
+
+If you are interested in Mux Player's caching features, you can enable them when you build your `MuxPlayer`.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+val player: MuxPlayer = MuxPlayer.Builder(context)
+  // disabled by default
+  .enableSmartCache(true)
+  .build()
+    `, java: `
+MuxPlayer player = new MuxPlayer.Builder(context)
+    // disabled by default
+    .enableSmartCache(true)
+    .build()
+    `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Limit data and delivery usage
+
+Depending on your use case and app, you may need to control your either Mux Video usage or your app's data bandwidth usage. Doing this can allow you to save costs and minimize playback interruptions for users on slower devices or data plans. Mux provides some tools to manage costs and resource usage by limiting the maximum resolution your app can stream from Mux Video. To take advantage of this feature, you can supply a `PlaybackResolution` to our `MediaItems` class.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+val mediaItem = MediaItems.builderFromMuxPlaybackId(
+  "YOUR PLAYBACK ID",
+  maxResolution = PlaybackResolution.FHD_1080, // limit playback resolution to 1080p
+  )
+  // .. configure your MediaItem further if required
+  .build()
+
+// .. Add the MediaItem to your MuxPlayer like you normally would
+    `, java: `
+MediaItem mediaItem = MediaItems.builderFromMuxPlaybackId(
+        "YOUR PLAYBACK ID",
+        PlaybackResolution.FHD_1080 // limit playback resolution to 1080p
+    )
+    // .. configure your MediaItem further if required
+    .build();
+
+// .. Add the MediaItem to your MuxPlayer like you normally would
+  `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Guarantee a minimum resolution
+
+Some use cases require a minimum playback resolution. Applications like screen-sharing for instance, may wish to preserve a certain level of visual quality even if play has to be interrupted to buffer more data. Apps that need their video playback to always be above a certain resolution, regardless of network conditions, can request a minium resolution.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+val mediaItem = MediaItems.builderFromMuxPlaybackId(
+  "YOUR PLAYBACK ID",
+  minResolution = PlaybackResolution.HD_720,
+  )
+  // .. configure your MediaItem further if required
+  .build()
+
+// .. Add the MediaItem to your MuxPlayer like you normally would
+    `, java: `
+MediaItem mediaItem = MediaItems.builderFromMuxPlaybackId(
+      "YOUR PLAYBACK ID",
+      null, // null for default
+      /*minResolution =*/ PlaybackResolution.HD_720
+  )
+  // .. configure your MediaItem further if required
+  .build();
+    `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+
+For more information about controlling your data and platform usage, please see our [guide](/docs/guides/control-playback-resolution) on controlling playback resolution.
+
+<LinkedHeader step={steps[3]} />
+
+The Mux Player SDK transparently integrates with Mux Data in order to monitor for issues and track engagement with your content. To verify this is working, you can simply play the video in your app, and wait for your session to appear on the Mux Data dashboard. Your session should appear in your Mux Data environment automatically in the same environment as your video asset.
+
+## Automatically-Detected Metadata
+
+Mux will automatically collect information about your stream, playback environment, and current playback session ("view") to send to Mux Data. Examples of the kind of information collected are Mux Asset and Playback IDs, player and stream resolution, the start and end times of the view, and some basic information about the end users device like OS and model number. 
+
+## Customize metadata about your player, viewer, or playback session 
+
+The SDK can automatically detect a lot of information about the media you're playing, but you can customize this information if you need to, via the `CustomerData` class. Anything you specify this way will override metadata values that would ordinarily be detected automatically.
+
+You can initialize your player with whatever custom metadata you like, and you can also update that metadata at any time.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+private fun createPlayer(context: Context): MuxPlayer {
+  return MuxPlayer.Builder(context)
+    .addMonitoringData(
+      CustomerData().apply {
+        customerViewData = CustomerViewData().apply {
+          viewSessionId = UUID.generateUUID()
+        }
+        customerVideoData = CustomerVideoData().apply {
+          videoSeries = "My Series"
+          videoId = "abc1234zyxw"
+        }
+        customData = CustomData().apply { 
+          customData1 = "my custom metadata field"
+          customData2 = "another custom metadata field"
+          customData10 = "up to 10 custom fields"
+        }
+      }
+    )
+    .build()
+}
+    `, java: `
+private MuxPlayer createPlayer(Context context) {
+  CustomerData customerData = new CustomerData();
+  CustomerVideoData videoData = new CustomerVideoData();
+  videoData.setVideoTitle("Lots of custom data");
+  videoData.setVideoSeries("my series");
+  videoData.setVideoId("my app's id for the media");
+  CustomData customData = new CustomData();
+  customData.setCustomData1("my custom data field");
+  customData.setCustomData2("another custom metadata field");
+  customData.setCustomData10("up to 10 custom fields");
+  
+  customerData.setCustomerVideoData(videoData);
+  customerData.setCustomData(customData);
+
+  return new MuxPlayer.Builder(context)
+    .addMonitoringData(customerData)
+    .build();
+}
+    `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+<LinkedHeader step={steps[4]} />
+
+Depending on the needs of your business and your users, you may need to secure your videos against unauthorized copying or viewing. Mux Video offers options for securing your playback experience. The right option for your app depends on your own use case. Your best option, if any, is a trade-off between security, complexity, and loading time for the end user. 
+
+## Signed Playback URLs
+
+Mux Player supports playing Mux Video assets with signed playback. Signed playback uses a JSON web token (JWT) signed on your application server, created using a key identifier created using our APIs. For more information about how to set up signed playback, check out our [secure video playback guide](/docs/guides/secure-video-playback). 
+
+For this guide, we'll focus on what to do on the client, once you have the JWT from your app's backend server. To play the asset securely you can supply your JWT to `MediaItems.fromMuxPlaybackId` or `MediaItems.builderFromMuxPlaybackId`. The resulting `MediaItem` will be configured to play the asset securely using your token.
+
+
+<CodeExamples
+  examples={{
+    kotlin: `
+private fun playSomething(jwt: String, context: Context) {
+  val player = createPlayer(context)
+  val mediaItem = MediaItems.builderFromMuxPlaybackId(
+    PlaybackIds.TEARS_OF_STEEL,
+    playbackToken = jwt,
+  )
+    .setMediaMetadata(
+      MediaMetadata.Builder()
+        .setTitle("Private Playback ID Example")
+        .build()
+    )
+    .build()
+  player.setMediaItem(mediaItem)
+
+  // .. Then prepare and play your media as normal
+}    
+  `,
+  java: `
+MuxPlayer player = createPlayer(context);
+MediaItem mediaItem = MediaItems.builderFromMuxPlaybackId(
+      PlaybackIds.TEARS_OF_STEEL,
+      PlaybackResolution.QHD_1440,
+      PlaybackResolution.LD_540,
+      RenditionOrder.Descending,
+      /* domain = */ null, // null for default
+      // put your Signed Playback Token here
+      /*playbackToken = */ jwt
+  )
+  .setMediaMetadata(
+      new MediaMetadata.Builder()
+          .setTitle("Private Playback ID Example")
+          .build()
+  )
+  .build();
+player.setMediaItem(mediaItem);
+
+// .. Then prepare and play your media as normal
+  `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Digital Rights Management (DRM)
+
+Mux Player for Android can be configured to protect videos from unauthorized use via Widevine DRM. Support for DRM is automatically enabled in the player. As long as you have both a signed playback token (see above) and a DRM token, your DRM-protected asset can be played using Mux Player. The process of setting up DRM is somewhat complex, and is detailed here in our [DRM Guide](/docs/guides/protect-videos-with-drm). This guide will focus on what to do once you have obtained a Playback Token and DRM Token from your application server.
+
+### 1. Setting up DRM for an asset
+
+To use DRM playback for your asset, you'll need to set up a DRM configuration and DRM-enabled playback ID. The process for doing this is the same regardless of your player, and you can read more about it in our [DRM Guide](/docs/guides/protect-videos-with-drm). Once you have an environment and asset set up with DRM, you can use your that asset's DRM Token, Playback Token, and Playback ID with Mux Player to do DRM playback transparently.
+
+### 2. Playing a DRM-protected asset 
+
+To play your DRM-protected asset, simply provide the Playback Token and DRM Token you generated in the last step. You can provide them as parameters to `MediaItems.fromMuxPlaybackId()`. No other configuration is required in order to use DRM with Mux Player. 
+
+<CodeExamples
+  examples={{
+    kotlin: `
+private fun playSomething(myPlaybackId: String, myPlaybackToken: String, myDrmToken: String, context: Context) {
+  val player = createPlayer(context)
+  val mediaItem = MediaItems.builderFromMuxPlaybackId(
+    playbackId,
+    playbackToken = myPlaybackToken,
+    drmToken = myDrmToken,
+  )
+    .setMediaMetadata(
+      MediaMetadata.Builder()
+        .setTitle("DRM playback Example")
+        .build()
+    )
+    .build()
+  player.setMediaItem(mediaItem)
+
+  // .. Then prepare and play your media as normal
+}    
+  `,
+  java: `
+MuxPlayer player = createPlayer(context);
+MediaItem mediaItem = MediaItems.builderFromMuxPlaybackId(
+      PlaybackIds.TEARS_OF_STEEL,
+      PlaybackResolution.QHD_1440,
+      PlaybackResolution.LD_540,
+      RenditionOrder.Descending,
+      /* domain = */ null, // null for default
+      // put your Signed Playback Token here
+      /*playbackToken = */ jwt,
+      /*drmToken = */ drmToken,
+  )
+  .setMediaMetadata(
+      new MediaMetadata.Builder()
+          .setTitle("Private Playback ID Example")
+          .build()
+  )
+  .build();
+player.setMediaItem(mediaItem);
+
+// .. Then prepare and play your media as normal
+  `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+<LinkedHeader step={steps[5]} />
+
+## Enable smart caching to improve experience and decrease usage
+
+Mux Player can cache content as it is requested from Mux Video and store it for later requests. This caching is automatic, and we manage the cache content and cache files for you. To enable smart caching, all you need to do is set the parameter when you build your `MuxPlayer`.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+val player: MuxPlayer = MuxPlayer.Builder(context)
+  .enableSmartCache(true)
+  .build()
+    `,
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Use a custom Mux Video domain
+
+If you are using a Mux Video [Custom Domain](/docs/guides/use-a-custom-domain-for-streaming), you can specify the domain on a per-`MediaItem` basis. The URL of the stream will have the specified domain and the `stream.` subdomain
+
+<CodeExamples
+  examples={{
+    kotlin: `
+val mediaItem = MediaItems.builderFromMuxPlaybackId(
+  "YOUR PLAYBACK ID",
+  domain = "customdomain.com", // https://stream.customdomain.com/...
+  )
+  // .. configure your MediaItem further if required
+  .build()
+
+// .. Add the MediaItem to your MuxPlayer like you normally would
+    `,
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Use a specific Mux Data Environment Key
+
+Ordinarily, Mux Data will record views and monitoring data in the same Environment as the Mux Video asset being played. If you are using a different Mux Data environment for some reason, you can specify another Mux Data Env Key for your player to use.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+private fun createPlayer(context: Context): MuxPlayer {
+  return MuxPlayer.Builder(context)
+    .setMuxDataEnv("Another Mux Data Env Key") // replace with your other key  
+    .build()
+}
+    `, java: `
+MuxPlayer player = new MuxPlayer.Builder(context)
+    .setMuxDataEnv("Another Mux Data Env Key") // replace with your other key  
+    .build()
+    `
+  }}
+  exampleOrder="kotlin, java"
+/>
+
+## Instant Clipping
+
+### Instant Clips
+
+Instant clips are an alternative to our [long-standing asset-based clipping feature](/docs/guides/create-clips-from-your-videos). Requesting instant clips using relative time is now [available for use with all video on-demand (VOD) assets](https://www.mux.com/blog/instant-clipping-update).
+
+Instant clipping allows you to request a stream whose start time is at some later point in the video, relative to the start time of the asset. Likewise you're able to request a stream that ends sooner than when the underlying asset completes. Instant clips do not incur the wait time or expense of a creating a new asset.
+
+Unlike asset-based clipping, instant clipping is done by trimming your VOD assets HLS manifest. This means that instant clipping operates at the segment level of accuracy. You should expect that the content that you clip out may be several seconds longer than you’ve requested. We always make sure to include the timestamps that you request, but your content may start a few seconds earlier, and end a few seconds later.
+
+Assets that originate from a livestream can also be converted into instant clips using program date time epochs. Support for these clips will be available in a future Mux Player Android release.

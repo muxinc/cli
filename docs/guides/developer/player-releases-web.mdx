@@ -1,0 +1,563 @@
+---
+title: Mux Player for web releases
+product: player
+description: Every new release of Mux Player for web is posted here with release notes
+steps:
+---
+
+<Releases>
+# Current release
+
+## 3.10.1
+
+- Fix: Default playback to MSE except for Safari to cover all Chromium browsers which support native HLS playback now
+
+# Previous releases
+
+## 3.10.0
+
+- Feature: Add `max-auto-resolution` attribute for automatic resolution capping
+- Fix: Improvements to DRM for Airplay playback
+
+## 3.9.2
+
+- Fix: Upgrade ce-la-react to fix missing key warning
+
+## 3.9.1
+
+- Fix: Upgrade hls.js to 1.6.15
+
+## 3.9.0
+
+- Feature: Add typed CSSProperties for mux-player custom CSS vars
+- Fix: Add MENU_ITEM constant for styling of menu items with CSS
+- Fix: Upgrade media-chrome to 4.16.0 and media-tracks to 0.3.4
+
+## 3.8.0
+
+- Feature: Add `nomutedpref` prop to mux player
+- Feature: Add support to define custom fullscreen element
+- Fix: Default playback to MSE check for Google Chrome 142+
+- Fix: Upgrade media-chrome to 4.15.1
+
+## 3.7.0
+
+- Feature: Expose centered layout in themes
+- Fix: Default playbackto MSE for Google Chrome which supports native HLS playback now
+- Fix: Upgrade hls.js to 1.6.13
+
+## 3.6.1
+
+- Fix: Upgrade media-chrome to 4.14.0
+
+## 3.6.0
+
+- Feature: Add switch to control the behavior of the ended event
+- Feature: Add classic theme video title
+- Fix: Disable spacebar shortcut if `nohotkeys` enabled
+- Fix: Remove error dialog for audio only
+
+## 3.5.3
+
+- Fix: Stop-gap solution to some architectural layer + src-related prop setting causing early and incorrect playback-core initialization
+
+## 3.5.2
+
+- Fix: Update order of props setting so playback id always comes first to resolve session-based expectations (e.g. mux data metadata)
+
+## 3.5.1
+
+- Fix: Upgrade hls.js to 1.6.6, remove workaround for MTA (multi-track audio)
+
+## 3.5.0
+
+- Feature: Add Google IMA support for mux-player and mux-video variants
+- Feature: Add retry logic for 412 not playable errors
+- Feature: Add free plan logo to the player
+
+## 3.4.1
+
+- Fix: Bring back cast button for drm protected videos
+- Fix: Change default of `preferCmcd` to `'none'` for improved cacheability
+- Fix: `rendition-menu` visual improvements
+
+## 3.4.0
+
+- Feature: Add fullscreen API on player element
+- Feature: Add `video-title` attribute & `videoTitle` property
+- Fix: `defaultHiddenCaptions` property bug for React
+- Fix: Casting devices discovery after new video load
+
+## 3.3.4
+
+- Fix: Allow extension less Mux m3u8 url as src
+
+## 3.3.3
+
+- Feature: Add optional Mux logo to Mux video
+- Fix: Remove redundant FPS DRM generateRequest() for native playback
+
+## 3.3.2
+
+- Fix: `default-hidden-captions` attribute bug for Vue
+
+## 3.3.1
+
+- Fix: Player controls unresponsive after casting prompt
+
+## 3.3.0
+
+- Feature: Implement Mux badge that can be enabled via a `proudly-display-mux-badge` attribute
+- Fix: Update hls.js version to fix multi-DRM playready bug
+- Fix: Update media-chrome to fix a bug with the error dialog not hiding on error recovery
+- Fix: Media Chrome theme flicker on load
+
+## 3.2.0
+
+- Feature: Set Mux data default player init time for greater accuracy. Expose attribute and property for externally defined player init time
+- Feature: Use Media Chrome's error dialog
+- Feature: NPM package includes provenance statements from now on
+- Fix: Slot behavior of child elements
+
+## 3.1.0
+
+- Feature: Error handling rearchitecture (including more granular and DRM error cases)
+- Feature: Add asset start and end time props and attrs
+- Fix: Chapters disapearing after preload none
+- Fix: Menu CSS vars to hide menu button
+- Fix: Update peer dependencies for React 19 RC
+- Chore: Upgrade to [Media Chrome v4.2.1](https://github.com/muxinc/media-chrome/releases/tag/v4.2.1)
+
+## 3.0.0
+
+- Fix: `addChapters` and `addCuepoints` now have correct TypeScript method types
+- Fix: Removed seek forwards and backwards buttons from mobile pre-playback UI
+- Fix: Added missing buttons to mobile live audio view (play, live and mute)
+- Chore: Upgrade to [Media Chrome v4.1.1](https://github.com/muxinc/media-chrome/releases/tag/v4.1.1)
+- Feature: New tooltips for buttons in the UI, enabled by default
+
+## 2.8.1
+
+- Fix: Use CSS to disable subtitle shifting for iOS in fullscreen
+- Chore: Upgrade to [Media Chrome v3.2.5](https://github.com/muxinc/media-chrome/releases/tag/v3.2.5)
+
+## 2.8.0
+
+- Feature: [Adds DRM support](/docs/guides/protect-videos-with-drm)
+- Fix: Pseudo-ended eval case where media is not attached
+- Fix: Hide cast button by default when using DRM
+- Chore: Upgrade to [Media Chrome v3.2.3](https://github.com/muxinc/media-chrome/releases/tag/v3.2.3)
+- Chore: Upgrade hls.js, custom-media-element, castable-video, and media-tracks
+
+## 2.7.0
+
+- Feature: PDT Clipping Support
+- Feature: Add [`addChapters()`](/docs/guides/player-advanced-usage#add-chapters-and-time-based-metadata) API
+
+## 2.6.0
+
+- Feature: Add `'use client'` to components for better out of box functionality with Next.JS
+- Fix: Cleanup TypeScript types
+
+## 2.5.0
+
+- Chore: Upgrade to mux-embed v5.2.0 & [Media Chrome v3.2.0](https://github.com/muxinc/media-chrome/releases/tag/v3.2.0),
+- Chore: Upgrade hls.js and React TypeScript types
+- Feature: Add `disable-tracking` / `disableTracking` attribute / property to disable Mux Data tracking
+
+## 2.4.1
+
+- Fix: Make sure we do not apply holdback to seekable when live streams have ended
+
+## 2.4.0
+
+- Chore: Upgrade to [Media Chrome v3.1.1](https://github.com/muxinc/media-chrome/releases/tag/v3.1.1) (major version bump)
+- Fix: Cleanup various issues with DVR UI (including seekable time updates for time range and time display cases)
+- Fix: Polish new time preview w/ shifting arrow
+- Fix: Polish using easing gradients for UI backdrop
+- Feature: `forward-seek-offset` / `forwardSeekOffset` + `backward-seek-offset` / `backwardSeekOffset` attributes / properties now also update keyboard hotkeys offsets
+
+## 2.3.3
+
+- Chore: Upgrade Media Chrome
+- Fix: Enable chapters & metadata tracks if cloned and appended to native video element
+- Fix: Fire an ended event if playback is stalled near the end of playback
+
+## 2.3.2
+- Chore: Upgrade Media Chrome
+- Fix: Subtitles selection edge cases
+
+## 2.3.1
+
+- Fix: Remove unneeded `target-live-window="NaN"` attribute sprouting
+- Fix: Upgrade media-chrome to 2.0.1 fixing an undefined type error
+- Fix: Upgrade custom-media-element and media-tracks packages improving types
+
+## 2.3.0
+
+- Feature: Upgrade to [Media Chrome v2](https://github.com/muxinc/media-chrome/releases/tag/v2.0.0) and [castable-video v1](https://github.com/muxinc/castable-video)
+  The Google cast framework script is now automatically loaded, [see guide](/docs/guides/player-core-functionality#chromecast)
+  Usage of the standard [Remote Playback API](https://developer.mozilla.org/en-US/docs/Web/API/Remote_Playback_API)
+- Feature: Add `extra-source-params` / `extraSourceParams` attribute / property for advanced usage
+- Feature: Add the ability to set `default-duration` / `defaultDuration` before media loads
+- Feature: Allow forcibly showing buttons that we usually hide at small sizes via CSS vars
+- Feature: Add unofficial `_hlsConfig` property to media elements and playback core
+- Feature: Add additional CSS parts for export
+- Fix: Audio controls styling, controlbar background color and timerange width
+- Fix: Attributes mismatch to make sure controls don't overlap
+- Fix: Android tap issues on show and hide of controls
+
+## 2.2.0
+
+- Feature: Use playback rate `selectmenu` for the new theme
+- Fix: Use solid accent color in rate menu
+- Fix: Upgrade Media Chrome
+- Fix: Update menu styles
+
+## 2.1.0
+
+- Feature: Add support for manifest manipulation and other media stream query param properties
+- Fix: Prevent clicks on background gradients
+- Fix: Add volume slider to live player UI
+
+## 2.0.1
+
+- Fix: Make sure `accent-color` gets set properly
+
+## 2.0
+
+- Feature: New default theme named `gerwig` 🎉
+  No functional breaking changes, only visual changes
+- See [Upgrade guide from 1.x to 2.0](https://github.com/muxinc/elements/blob/bfea94bcbdfc9e3c68afb24d2b3414d83bf4639b/packages/mux-player/UPGRADING_V1_to_V2.md)
+- See [blog post](https://www.mux.com/blog/mux-player-2-0-for-web-and-coming-soon-for-ios-and-android)
+- See [Twitter / X.com thread](https://twitter.com/MuxHQ/status/1709628018216358194)
+
+## 1.14.1
+
+- Fix: Resolve regression so `title` will be used by Mux Data as `video_title` if not overridden by explicit metadata
+- Fix: Resolve issue where MTA implementation could cause load issues/hangs in playback for LL-HLS streams
+
+## 1.13.0
+
+- Feature: Add custom poster slot to mux-player and mux-player-react to allow for server-side progressive enhancement 🎉 See [issue #590](https://github.com/muxinc/elements/issues/590)
+- Feature: Add muti-track audio selector 🗣️ ([see guide](/docs/guides/player-core-functionality#multi-track-audio-selector))
+
+## 1.12.1
+
+- Fix: Improve dist exports for greater compatibility with different build tools, including not declaring non-existent exports in package.json
+
+## 1.12.0
+
+- Feature: Add quality selector [see guide](/docs/guides/player-core-functionality#quality-selector)
+- Feature: Expose underlying poster image CSS part for advanced styling
+- Fix: Fix bug around loading themes in React
+
+## 1.11.4
+
+- Fix issue with edge case assets when used in Next.js production builds in Chrome causing hundreds of requests for `0.ts` segment. See [issue #688](https://github.com/muxinc/elements/issues/688)
+
+## 1.11.3
+
+- Chore: media chrome version bump, fixes a resize observer crash that can happen in CodeSandbox
+
+## 1.11.2
+
+- Chore: bump media chrome and Hls.js to latest versions
+
+## 1.11.1
+
+- Chore: bump media chrome and Hls.js to latest versions
+
+## 1.11.0
+
+- Fix: Upgrade hls.js to [`v1.4.1`](https://github.com/video-dev/hls.js/releases/tag/v1.4.1).
+- Feat: Add no-volume-pref attribute to turn off saving the user selected volume in [local storage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage).
+
+## 1.10.1
+
+- Fix: Force theme to be ltr direction.
+- Fix: Use webkit pseudo element for captions movement, where available.
+
+## 1.10.0
+
+- Feature: Add support for synchronizing video playback (`currentPdt` and `getStartDate()`)
+- Fix: Fix resetting currentTime to `0` in `mux-player-react`.
+
+## 1.9.0
+
+- Feature: Add support for Media Chrome themes.
+- Feature: Add `minimal` and `microvideo` theme exports.
+- Feature: Add cuepoint event handlers for `mux-player-react`.
+- Feature: Use Mux Data `player_error_context` to get better error grouping.
+- Feature: Add `--dialog` and `--loading-indicator` CSS vars.
+- Fix: Upgrade hls.js to [`v1.4.0-beta.2`](https://github.com/video-dev/hls.js/releases/tag/v1.4.0-beta.2).
+- Fix: Update hls.js configs to optimize streaming performance.
+- Fix: Update types and improve support for Angular projects.
+
+## 1.8.0
+
+- Feature: Add `max-resolution` attribute on mux-player and mux-video.
+- Feature: Add API for CuePoints metadata.
+- Fix: Typescript error for Vite based apps like Sveltekit, Nuxt, Vue.
+- Fix: Explicitly clean up text tracks, even for native (non-hls.js) playback.
+
+## 1.7.1
+
+- Fix: Only initialize with setupCuePoints when using hls.js for playback (resolves Safari playback error)
+
+## 1.7.0
+
+- Feature: Introduce a captions menu button.
+- Fix: Bring back play button to the control bar for small player size.
+- Fix: Migrate to use new Media Chrome media-live-button.
+- Fix: Improve attribute empty behavior.
+- Fix: Upgrade Media Chrome v0.18.1.
+- Fix: Use new Media Chrome template syntax.
+
+## 1.6.0
+
+- Feature: Add `storyboard-src` attribute and corresponding prop
+- Fix: Use webp format instead of jpg, less bandwidth
+- Fix: Memory leaks related to the playback engine not being torn down properly.
+
+## 1.5.1
+
+- Fix: Allow setting of a Media Chrome theme template via a property.
+
+## 1.5.0
+
+- Feature: Mux player uses a new HTML based templating syntax as preparation for
+  Media Chrome theme compatibility which will give developers an easy way to change
+  the look and feel of the player.
+- Feature: Allow `<mux-player>` web component to receive any Mux Data `metadata-*` fields, beyond `metadata-video-title`, `metdata-video-id` and `metadata-viewer-user-id`, now things like `metadata-sub-property-id` and any other Mux Data fields can be passed with this syntax. Note the `muxPlayer.metadata = { video_title: "My Title", sub_property_id: "Sub prop 123" }` syntax also still works.
+- Fix: Prevent the player of duplicate rendering the top-level internal elements in edge cases.
+
+## 1.4.0
+
+- Feature: Player design update: removed the backdrop shade by default.
+- Fix: Attributes set after the `playback-id` are now correctly passed in playback core.
+
+## 1.3.0
+
+- Feature: Add `disable-cookies` attribute and `disableCookies` property.
+- Feature: Add `experimental-cmcd` attribute and `experimentalCmcd` property for headers-based CMCD usage.
+- Feature: Add ability to unset poster
+- Feature: Conditionally use title for title metadata in Mux Data
+- Feature: Add storyboard getter on player
+- Fix: Check JWT before setting poster and storyboard urls
+- Fix: Don't register prop for --controls-backdrop-color CSS var
+- Fix: Upgrade to Media Chrome v0.15.1
+- Fix: Various edge case fixes in Media Chrome UI
+- Fix: Improve hiding controls behavior when interacting with play or fullscreen buttons.
+
+## 1.2.0
+
+- Feature: Implement React lazy for `mux-player-react`
+- Feature: Add type-compliant `seekable` property to the API
+- Fix: `playbackRate` for `mux-player-react`
+
+## 1.1.3
+
+- Fix: Add default values to object-fit and object-position
+
+## 1.1.2
+
+- Fix: Upgrade Media Chrome to v0.14.0
+- Fix: Properly check iPhones for fullscreen unavailability
+- Fix: Properly unset poster image sources when they're removed
+
+## 1.1.1
+
+- Fix: Add `--media-object-fit` and `--media-object-position` to `mux-video`
+
+## 1.1.0
+
+- Feature: Add ability to unset `poster` by setting it to an empty string
+- Fix: Turn off backdrop color when controls are disabled
+
+## 1.0.0 🎉
+
+- Feature: Replace `prefer-mse` with `prefer-playback` for more control
+- Feature: Add default width 100% to avoid unexpected CLS and resizing scenarios
+- Feature: Disable unusable controls when `playback-id` is unset
+- Feature: Add hotkey for toggling closed captions (`c`)
+- Fix: Google Chrome v106 caption positioning bug
+- Fix: Disable all controls when error dialog is open (a11y)
+- Fix: Hide fullscreen button when fullscreen is unavailable (e.g. `iframe` usage)
+- Fix: Ignore Safari for captions movement.
+- Fix: `audio` UI height bugs
+- Fix: Add missing setter for defaultHiddenCaptions prop.
+- Fix: Clean up `crossOrigin` and `playsInline` usage while respecting defaults/availability.
+- Fix: Make player interface compliant with more of `HTMLVideoElement` type expectations, even on initialization
+- Fix: Handle removing/nil `playback-id`
+- Fix: Add `preload` property support
+- Fix: `title` property bug
+- Fix: Use `CSS.registerProperty` on vars to declare them as colors for better resilience/fallback
+- Fix: (Mux Player React) Resolve issues with `currentTime` prop
+- Fix: (Mux Player React) Remove vestigial code for `tertiaryColor` prop
+
+## 1.0.0-beta.0
+
+- Feature: add `video` CSS part for styling the `<video>` element
+- Feature: add `--controls-backdrop-color` CSS var to allow changing the backdrop color
+- Feature: upgrade hls.js to version `v1.2.3`
+- Feature: prefer Media Source Extensions on Android
+- Feature: refresh seek backward and forward icons
+- Fix: memory leak of hls.js instances
+- Fix: `start-time` attribute now works on iOS
+- Fix: a11y tab order of player controls
+- Fix: control bar icon alignment was off by a few pixels
+- Fix: restore right-click video menu
+
+## 0.1.0-beta.27
+
+- Feature: configure playback rates for the player
+- Feature: add a title component to the player
+- Feature: allow hiding controls based on CSS variables
+- Feature: allow turning off keyboard shortcuts via the hotkeys attribute, don't allow seeking in live streams with the arrow keys
+- Feature: use Media Chrome's poster image element for posters
+- Fix: don't pollute global in SSR
+- Fix: change position of the live indicator
+
+## 0.1.0-beta.26
+
+- Improvement: update the warning logged when an incorrect stream type is passed to the player.
+
+## 0.1.0-beta.25
+
+- Feature: add keyboard shortcuts and a `nohotkeys` attribute to turn off keyboard shortcuts.
+- Feature: expose CSS parts for targeting controls via CSS.
+
+## 0.1.0-beta.24
+
+- Improvement: Improve time range behavior; add preview time code, smooth playhead progress and fine seek control, keep preview thumb in player bounding box.
+- Improvement: Add Mux flavored cast icon.
+- Feature: Add `defaultMuted` and `defaultPlaybackRate` properties.
+- Feature: Add `textTracks` property, `addTextTrack()` and `removeTextTrack()` methods.
+
+## 0.1.0-beta.23
+
+- Update: Rely on Media Chrome availability states where appropriate.
+  Remove unneeded code from `mux-player`.
+
+## 0.1.0-beta.22
+
+- Improvement: Optimize `mux-player` tests.
+
+## 0.1.0-beta.21
+
+- Update: Mux Player (and all Mux Elements) are now published under the `@mux` NPM scope. Please update `@mux/mux-player` references to `@mux/mux-player` as of `0.1.0-beta.21`.
+
+## 0.1.0-beta.20
+
+- Feature: Chromecast is built in -- via [castable-video](https://github.com/muxinc/castable-video). See docs in the Core Features section for details on how to enable it.
+
+## 0.1.0-beta.19
+
+- Fix: import for [castable-video](https://github.com/muxinc/castable-video) while we hammer on Chromecast.
+
+## 0.1.0-beta.18
+
+- Fix: Some captions shifting jankyness on live streams when shifting wasn't necessary.
+- Fix: Captions offset for Safari
+- Feature: Support for audio-only Mux assets with the `audio` attribute
+- Feature: Experimental Chromecast support added with [castable-video](https://github.com/muxinc/castable-video). This is intentionally undocumented while we work out the kinks.
+- Improvement: Better progress bar alignment.
+
+## 0.1.0-beta.17
+
+- Fix: Some recoverable errors were incorrectly being sent to Mux Data -- this caused an inflated playback error percentage metric in your Mux Data dashboard. This incorrect error tracking was especially prevalent on live streams. We fixed this after it was discovered at [TMI](https://tmi.mux.com/).
+
+## 0.1.0-beta.16
+
+- Fix: Log an error if a token is passed in with playback-id (playback tokens should be passed in via `playback-token` attribute)
+
+## 0.1.0-beta.15
+
+- Fix: update `commonjs` import files to cjs.js. This fixes some build systems that rely on the cjs.js extension
+
+## 0.1.0-beta.14
+
+- Improvement: Tweaked a few Hls.js configuration settings for live and low-latency live based on some recent testing (backed up by Mux Data, of course). This is the kind of thing the team working on Mux Player worries about so that you don't have to!
+
+## 0.1.0-beta.13
+
+- Fix: For live streams on non-Safari browsers the red (live) / gray (behind live) dot indicator was being a little too aggressive about switching to gray, which indicates the viewer is behind the live edge. This is fixed now, you shouldn't fall back from the live edge unless you pause or rebuffer.
+
+## 0.1.0-beta.12
+
+- Important fix for fullscreen. In previous versions if you entered fullscreen you would get stuck there
+- Improve interaction so that clicks (not taps) anywhere on the video player will play/pause. Many people expected and asked for this behavior, so now you have it.
+
+## 0.1.0-beta.11
+
+- Added `thumbnail-time` optional attribute that can be used to set the poster image thumbnail (if you're not using signing tokens)
+- Point to [github/template-parts@0.5.2](https://github.com/github/template-parts/releases/tag/v0.5.2) instead of Mux's fork because they were so kind to [get a fix in for us](https://github.com/github/template-parts/pull/55). Thanks GitHub!
+
+## 0.1.0-beta.10
+
+- Improvement: The progress bar now shows above the controls, it's cleaner 💅🏼
+- Fix: when changing playback-id on an existing mux-player instance we had some leftover state around
+- Fix: full screen was incorrectly using the controls layout depending on the size of the player before it entered full screen. That meant if the player was small and you went full screen you still saw the small controls. Bad!
+
+## 0.1.0-beta.9
+
+- Your beautiful errors will now flow nicely into Mux Data. Your Mux Data errors dashboard just got a whole lot more useful. This is a big one.
+- Mux Player is now implemented as a Media Chrome "theme" under the hood. Laying some groundwork for some exciting Media Chrome things to come
+- Fix for adding event listeners on `mux-player`, if mux-player JavaScript was loaded after your HTML, events wouldn't get registered. Sorry about that -- fixed now. And we have tests to make sure we don't accidentally introduce a regression down the road.
+- The `.hls` property on `mux-player` is super-secret and should not be used unless you are a serious professional. We make no guarantee and your warranty is void if you use this property. To reflect this stance, it has been renamed to `_hls`.
+- Fixed some seek to live behavior
+- When the error dialog is open we no longer steal the focus of the document. Much better.
+
+## 0.1.0-beta.8
+
+- If you're using Webpack 4, maybe upgrade? But if not, we got you covered. Fixed package.json to point browser field at `mjs` so that Webpack 4 is happy
+
+## 0.1.0-beta.7
+
+- Fix: make mux-player size based on video element
+- Fix: make mux-player errors more uniform
+
+## 0.1.0-beta.6
+
+- Fix: messed up the release in beta.5, quick follow-on
+
+## 0.1.0-beta.5
+
+- Fix: clear out some state that was hanging around when playback-id is changed on an existing Mux Player instance, and add some test coverage for this sort of thing
+- Fix: mux-player web component metadata- attributes were not always propagating down
+- Fix: prevent non-fatal Hls.js errors from propagating and causing error states
+
+## 0.1.0-beta.4
+
+- Paid off some technical debt to handle web components being upgraded after existing in the DOM
+- Fix `primary-color` attribute so that it is used for all controls, both icons + text. Previously it was only being applied to icon colors
+
+## 0.1.0-beta.3
+
+- Fix developer log links that go to GitHub
+- Make sure internal state monitoring setup happens when the element exists. Fixes a bug in React when the captions button was sometimes not showing.
+
+## 0.1.0-beta.2
+
+- Added descriptive error handling. This is important so that you and your viewers are able to easily and quickly understand why a video is not playing. Is your local network connection offline? Is the signed URL expired? Maybe you mixed up PlaybackIDs and you have the wrong signed URL? Is it a problem specific to the media on your device? Often times video-related playback errors are cryptic and difficult to understand the root cause of. We put extra effort into this and we hope it helps you when things go wrong 💖.
+- Fix conditional rendering bug when attributes are removed sometimes the template wasn't updating.
+
+## 0.1.0-beta.1
+
+- When the control bar is engaged, slide the captions/subtitles up so they are still visible and don't get obscured
+
+## 0.1.0-beta.0
+
+First beta tag release 🎉
+
+- Extended autoplay options `autoplay`, `autoplay="muted"` and `autoplay="any"` are all options now. See docs above for details.
+- Started tracking [Player Startup Time](/docs/guides/data-startup-time-metric#player-startup-time) with Mux Data. The mo' QoE data we can get, the better!
+- Changed the behavior of the time display, it now defaults to ascending time (current time) and on click will toggle to show remaining time. Previously it showed only remaining time and that was confusing.
+- Fixed a bug related to storyboards on the thumbnails track when the underlying source changed. This should have impacted exactly 0 developers but we wanted to make sure to squash it anyway. If you somehow ran into this bug then you're welcome.
+
+## 0.1.0-alpha.7
+
+- Support for Signed URLs (see advanced usage section)
+- No longer require `env-key` to be passed in (Mux Data will infer environment based on the PlaybackID)
+</Releases>

@@ -1,0 +1,408 @@
+---
+title: Upload files directly
+product: video
+description: Allow your users to upload content directly to Mux.
+---
+
+## Overview
+
+Direct Uploads allow you to provide an authenticated upload URL to your client applications so content can be uploaded directly to Mux without needing any intermediary steps. You still get to control who gets an authenticated URL, how long it's viable, and, of course, the Asset settings used when the upload is complete.
+
+The most common use-case for Direct Uploads is in client applications, such as native mobile apps and the browser, but you could also use them to upload directly from your server or in a command line tool. Any time you don't feel the need to store the original on your own, just generate a signed URL and push the content directly.
+
+Let's start by walking through the simplest use case of getting a file directly into Mux.
+
+## Upload a file directly into Mux
+
+### 1. Create an authenticated URL
+
+The first step is creating a new Direct Upload with the Mux Asset settings you want. The Mux API will return an authenticated URL that you can use directly in your client apps, as well as an ID specific to that Direct Upload so you can check the status later via the API.
+
+<CodeExamples
+  product="video"
+  example="createUpload"
+/>
+
+### 2. Use the URL to upload in your client
+
+Once you've got an upload object, you'll use the authenticated URL it includes to make a `PUT` request that includes the file in the body. The URL is resumable, which means if it's a _really_ large file you can send your file in pieces and pause/resume at will.
+
+<CodeExamples
+  product="video"
+  example="uploadFile"
+/>
+
+If you were following along with these examples, you should find new Assets in the Mux Dashboard with the settings you specified in the original upload create request, but the video you uploaded in the second step!
+
+If the upload doesn't work via cURL, be sure that you've put quotes around the upload URL.
+
+## Using Direct Uploads in your application
+
+The examples above are a great way to upload a one-off file into Mux, but let's talk about how this workflow looks in your actual application. Typically you're going to want to do a few things:
+
+- Authenticate the request that gives the user a signed URL so random people don't start ingesting Assets into your Mux account.
+- Save information in your application about the file when the user creates the upload, such as who uploaded it and when, details about the video like title, tags, etc.
+- Make sure the Asset that's ultimately created from that upload is associated with that information.
+
+Just like Assets, Direct Uploads have their own events, and then the Asset created off the upload has the usual events as well. When you receive the `video.upload.asset_created` event you'll find an `asset_id` key that you could use in your application to tie the Asset back to the upload, but that gets tricky if your application misses events or they come out of order. To keep things simple, we like to use the `passthrough` key when creating an Asset. Let's look at how the passthrough workflow would work in a real application.
+
+<Callout type="info" title="Upload reliably with our Upload SDKs">
+
+We provide SDKs for Android, iOS, iPadOS, and web frontend that handle difficult parts of the upload process, such has handling large files and preprocessing video for size and cost. Once your backend has created an authenticated URL for the upload, you you can give it to one of our Upload SDKs to reliably process and upload the the video.
+
+For more information, check out our upload SDK guides:
+- [Upload directly from an Android app](/docs/guides/upload-video-directly-from-android)
+- [Upload directly from iOS or iPadOS](/docs/guides/upload-video-directly-from-ios-or-ipados)
+- [Upload directly from your Web App](/docs/guides/mux-uploader)
+
+</Callout>
+
+
+<Callout type="info" title="Next.js React example">
+
+[with-mux-video](https://github.com/vercel/next.js/tree/canary/examples/with-mux-video) is a full open-source example application that uses direct uploads
+
+`npx create-next-app --example with-mux-video with-mux-video-app`
+
+Another open-source example application is [stream.new](https://stream.new). GitHub repo link: [muxinc/stream.new](https://github.com/muxinc/stream.new)
+
+`git clone git@github.com:muxinc/stream.new.git`
+
+Both of these example applications use [Next.js](https://nextjs.org/), UpChunk, Mux Direct Uploads and Mux playback.
+
+</Callout>
+
+### Creating an `/upload` route in the application
+
+In the route we build to create and return a new Direct Upload, we'll first create a new object in our application that includes a generated ID and all the additional information we want about that Asset. _Then_ we'll create the Direct Upload and include that generated ID in the `passthrough` field.
+
+```node
+const { json, send } = require('micro');
+const uuid = require('uuid/v1');
+
+// This assumes you have MUX_TOKEN_ID and MUX_TOKEN_SECRET
+// environment variables.
+const mux = new Mux();
+
+// All the 'db' references here are going to be total pseudocode.
+const db = yourDatabase();
+
+module.exports = async (req, res) => {
+  const id = uuid();
+  // Go ahead and grab any info you want from the request body.
+  const assetInfo = await json(req);
+
+  // Create a new upload using the Mux SDK.
+  const upload = await mux.video.uploads.create({
+    // Set the CORS origin to your application.
+    cors_origin: 'https://your-app.com',
+
+    // Specify the settings used to create the new Asset after
+    // the upload is complete
+    new_asset_settings: {
+      passthrough: id,
+      playback_policy: ['public'],
+      video_quality: 'basic'
+    }
+  });
+
+  db.put(id, {
+    // save the upload ID in case we need to update this based on
+    // 'video.upload' webhook events.
+    uploadId: upload.id,
+    metadata: assetInfo,
+    status: 'waiting_for_upload',
+  });
+
+   // Now send back that ID and the upload URL so the client can use it!
+  send(res, 201, { id, url: upload.url });
+}
+```
+
+Excellent! Now we've got a working endpoint to create new Mux uploads that we can use in our Node app or deploy as a serverless function. Next we need to make sure we have an endpoint that handles the Mux webhooks when they come back.
+
+```node
+const { json, send } = require('micro');
+
+// More db pseudocode.
+const db = yourDatabase();
+
+module.exports = async (req, res) => {
+  // We'll grab the request body again, this time grabbing the event
+  // type and event data so we can easily use it.
+  const { type: eventType, data: eventData } = await json(req);
+
+  switch (eventType) {
+    case 'video.asset.created': {
+      // This means an Asset was successfully created! We'll get
+      // the existing item from the DB first, then update it with the
+      // new Asset details
+      const item = await db.get(eventData.passthrough);
+      // Just in case the events got here out of order, make sure the
+      // asset isn't already set to ready before blindly updating it!
+      if (item.asset.status !== 'ready') {
+        await db.put(item.id, {
+          ...item,
+          asset: eventData,
+        });
+      }
+      break;
+    };
+    case 'video.asset.ready': {
+      // This means an Asset was successfully created! This is the final
+      // state of an Asset in this stage of its lifecycle, so we don't need
+      // to check anything first.
+        const item = await db.get(eventData.passthrough);
+      await db.put(item.id, {
+        ...item,
+        asset: eventData,
+        });
+      break;
+    };
+    case 'video.upload.cancelled': {
+      // This fires when you decide you want to cancel an upload, so you
+      // may want to update your internal state to reflect that it's no longer
+      // active.
+      const item = await db.findByUploadId(eventData.passthrough);
+      await db.put(item.id, { ...item, status: 'cancelled_upload' });
+    }
+    default:
+      // Mux sends webhooks for *lots* of things, but we'll ignore those for now
+      console.log('some other event!', eventType, eventData);
+  }
+}
+```
+
+Great! Now we've got our application listening for events from Mux, then updating our DB to reflect the relevant changes. You could also do cool things in the webhook handler like send your customers events via [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) or [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API).
+
+## Handle large files with UpChunk
+
+In general, just making a `PUT` request with the file in the body is going to work fine for most client applications and content. When the files start getting a little bigger, you can stretch that by making sure to stream the file from the disk into the request. With a reliable connection, that can take you to gigabytes worth of video, but if that request fails, you or your customer are going to have to start the whole thing over again.
+
+In those scenarios where you have really big files and potentially need to pause/restart a transfer, you can chunk up the file and use the resumable features of the upload endpoint! If you're doing it in a browser we wrote [UpChunk](https://github.com/muxinc/upchunk) to help, but the process isn't nearly as scary as it sounds.
+
+### Installing UpChunk
+
+**With NPM**
+```shell
+npm install --save @mux/upchunk
+```
+
+**With yarn**
+```shell
+yarn add @mux/upchunk
+```
+
+**With CDN**
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mux/upchunk@2"></script>
+```
+
+### Using UpChunk
+<CodeExamples
+  product="video"
+  example="usingUpchunk"
+/>
+
+### Alternatives to UpChunk
+
+- Split the file into chunks that are a multiple of 256KB (`256 * 1024` bytes). For example, if you wanted to have 20MB chunks, you'd want each one to be 20,971,520 bytes (`20 * 1024 * 1024`). The exception is the final chunk, which can just be the remainder of the file. Bigger chunks will be a faster upload, but think about each one as its own upload in the sense of needing to restart that one if it fails, but needing to upload fewer chunks can be faster.
+- Set a couple of headers:
+    - `Content-Length`: the size of the current chunk you're uploading.
+    - `Content-Range`: what bytes you're currently uploading. For example, if you've got a 10,000,000 byte file and you're uploading in ~1MB chunks, this header would look like `Content-Range: bytes 0-1048575/10000000` for the first chunk.
+- Now use a `PUT` request like we were for "normal" uploads, just with those additional headers and each individual chunk as the body.
+- If the server responds with a `308`, you're good to continue uploading! It will respond with as `200 OK` or `201 Created` when the upload is completed.
+
+## Upload streamed data as it becomes available
+
+When dealing with streaming data where the total file size is unknown until the end—such as live recordings or streaming AI generated data—you can upload the data to Mux in chunks as it becomes available.
+
+This approach has several benefits:
+
+- No need to know the total file size upfront
+- Reduced memory usage on the client, because you're uploading chunks and releasing them instead of buffering the entire file in memory
+- Faster uploads, because you're uploading chunks in parallel with the client instead of waiting for the entire file to be recorded
+
+### Example: MediaRecorder
+
+When recording media directly from a user's device using the [MediaRecorder API](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder), the total file size is unknown until the recording is complete. To handle this, you can upload the media data to Mux in chunks as it becomes available, without needing to know the total size up front.
+
+Let's look at an example of how to do this with a web app. First, we'll set up the MediaRecorder to capture media data in chunks. Each chunk will be passed to the `uploadChunk` function, which will upload it to Mux.
+
+<Callout type="info" title="Open source example repository">
+
+You can find a complete example repository demonstrating this approach in our [examples repo](https://github.com/muxinc/examples/tree/main/mediarecorder-streaming-uploads).
+
+</Callout>
+
+Start by declaring some global variables to track recording state and upload progress.
+```javascript
+// Global variables to track recording state and upload progress
+let mediaRecorder;
+let mediaStream;
+let nextByteStart = 0;
+const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks - must be multiple of 256KB
+const maxRetries = 3; // Number of upload retry attempts
+const lockName = 'uploadLock'; // Used by Web Locks API for sequential uploads
+let activeUploads = 0; // Track number of chunks currently uploading
+let isFinalizing = false; // Flag to prevent new uploads during finalization
+```
+
+Next, configure the MediaRecorder to capture media data in chunks.
+
+```javascript
+async function startRecording() {
+  // Request access to user's media devices
+  mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+
+  // Use a widely supported MIME type for maximum compatibility
+  const mimeType = 'video/webm';
+
+  // Initialize MediaRecorder with optimal settings
+  mediaRecorder = new MediaRecorder(mediaStream, {
+    mimeType,
+    videoBitsPerSecond: 5000000, // 5 Mbps video bitrate
+    audioBitsPerSecond: 128000   // 128 kbps audio bitrate
+  });
+
+  // Buffer to accumulate media data until we have enough for a chunk
+  let buffer = new Blob([], { type: mimeType });
+  let bufferSize = 0;
+
+  // Handle incoming media data
+  mediaRecorder.ondataavailable = async (event) => {
+    // Only process if we have data and aren't in the finalization phase
+    if (event.data.size > 0 && !isFinalizing) {
+      // Combine the new data with our existing buffer
+      // We use a Blob to efficiently handle large binary data
+      // The type must match what we specified when creating the MediaRecorder
+      buffer = new Blob([buffer, event.data], { type: mimeType });
+      bufferSize += event.data.size;
+
+      // Keep processing chunks as long as we have enough data
+      // This ensures we maintain a consistent chunk size of 8MB (CHUNK_SIZE)
+      // which is required by Mux's direct upload API
+      while (bufferSize >= CHUNK_SIZE) {
+        // Extract exactly CHUNK_SIZE bytes from the start of our buffer
+        const chunk = buffer.slice(0, CHUNK_SIZE);
+        
+        // Keep the remainder in the buffer for the next chunk
+        buffer = buffer.slice(CHUNK_SIZE);
+        bufferSize -= CHUNK_SIZE;
+
+        // Upload this chunk, passing false for isFinalChunk since we're still recording
+        // nextByteStart tracks where in the overall file this chunk belongs
+        await uploadChunk(chunk, nextByteStart, false);
+        
+        // Increment our position tracker by the size of the chunk we just uploaded
+        nextByteStart += chunk.size;
+      }
+      // Any remaining data stays in the buffer until we get more from ondataavailable
+    }
+  };
+
+  // Start recording, getting data every 500ms
+  mediaRecorder.start(500);
+}
+```
+
+Uploaded chunks need to be delivered in multiples of 256KB (`256 * 1024` bytes). Since the chunks provided by the `MediaRecorder` API can be smaller than that, you'll need to collect them in a buffer until you have an aggregate chunk that is at least 256KB in size. 8MB is a good size for a chunk, so we'll use that as our chunk size in this example.
+
+When the recording is complete, call the `stopRecording` function to upload the final chunk and clean up the MediaRecorder.
+
+```javascript
+async function stopRecording() {
+  // Only proceed if we have an active mediaRecorder
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    // Stop recording new data
+    mediaRecorder.stop();
+    // Set flag to prevent new uploads from starting during finalization
+    isFinalizing = true;
+
+    // Wait for any in-progress chunk uploads to complete
+    // Check every 100ms until all uploads are done
+    while (activeUploads > 0) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // If there's any remaining data in the buffer that hasn't been uploaded yet
+    // Upload it as the final chunk (isFinalChunk = true)
+    if (buffer.size > 0) {
+      await uploadChunk(buffer, nextByteStart, true);
+      nextByteStart += buffer.size;
+    }
+
+    // Clean up by stopping all media tracks (camera, mic etc)
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+    }
+
+    // Reset finalization flag now that we're done
+    isFinalizing = false;
+  }
+}
+```
+
+Within the `uploadChunk` function, perform a `PUT` request to the authenticated Mux upload URL. Use the `Content-Range` header to indicate the byte range of the chunk being uploaded. Since the total file size is unknown, use `*` as the total size until the final chunk is uploaded.
+
+```javascript
+async function uploadChunk(chunk, byteStart, isFinalChunk) {
+  // Calculate the end byte position for this chunk by adding chunk size to start position
+  // Subtract 1 since byte ranges are inclusive (e.g. bytes 0-499 is 500 bytes)
+  const byteEnd = byteStart + chunk.size - 1;
+
+  // For the total size in the Content-Range header:
+  // - If this is the final chunk, use the actual total size (byteEnd + 1)
+  // - Otherwise use '*' since we don't know the final size yet
+  const totalSize = isFinalChunk ? byteEnd + 1 : '*';
+
+  // Set required headers for resumable upload:
+  // - Content-Length: Size of this chunk in bytes
+  // - Content-Range: Byte range being uploaded in format "bytes START-END/TOTAL"
+  const headers = {
+    'Content-Length': chunk.size.toString(),
+    'Content-Range': `bytes ${byteStart}-${byteEnd}/${totalSize}`,
+  };
+
+  let attempt = 0;
+  let success = false;
+
+  // Use Web Locks API to enforce sequential uploads
+  await navigator.locks.request(lockName, async () => {
+    activeUploads++;
+    while (attempt < maxRetries && !success) {
+      try {
+        const response = await fetch('MUX_DIRECT_UPLOAD_URL_HERE', {
+          method: 'PUT',
+          headers,
+          body: chunk
+        });
+
+        if (response.ok || response.status === 308) {
+          success = true;
+        } else {
+          throw new Error(`Upload failed with status: ${response.status}`);
+        }
+      } catch (error) {
+        attempt++;
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000)); // Exponential backoff
+        } else {
+          throw error;
+        }
+      }
+    }
+    activeUploads--;
+  });
+
+  return success;
+}
+```
+
+<Callout type="warning" title="Maintain sequential uploads with the Web Locks API">
+
+In the provided example, the [`navigator.locks.request`](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) method is used to enforce sequential chunk uploads. This is necessary because if the `MediaRecorder` is stopped, the `ondataavailable` event can trigger multiple times simultaneously, which would cause multiple concurrent uploads if not properly synchronized. If you attempt to upload the final chunk before the previous uploads have completed, the upload will fail.
+
+</Callout>
+
+The final chunk is indicated by the `isFinalChunk` parameter, which is passed to the `uploadChunk` function. When `isFinalChunk` is `true`, the function will upload the remaining data in the buffer as the final chunk and modify the `totalSize` to reflect the total amount of data that was uploaded.

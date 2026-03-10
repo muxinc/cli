@@ -1,0 +1,210 @@
+---
+title: Monitor Android MediaPlayer
+product: data
+dataIntegration: true
+description: This guide walks through integration with Android MediaPlayer to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Install the Mux Data SDK
+    description: Download the latest version of Mux Stats MediaPlayer ARR
+  - title: 2. Initialize the monitor with your MediaPlayer instance
+    description: Attach MuxMediaPlayer to your player so that Mux can collect playback metrics.
+  - title: 3. Set up required events
+    description: Set up required events so that MuxMediaPlayer can hook into the underlying player behavior.
+  - title: 4. Make your data actionable
+    description: Use metadata fields to make the data collected by Mux actionable and useful.
+  - title: 5. Advanced options
+    description: Depending on the details of your implementation, you may want to leverage some of the advanced options of mux-embed.
+  - title: Release notes
+    topic: notes
+---
+
+This documents integration instructions for Android's MediaPlayer class. This integration supports Android 4.2 (API level 17) and newer, though older versions of Android have spotty support for streaming protocols such as HLS and Dash.
+
+The Mux integration with MediaPlayer is built on top of Mux's core Java SDK, and the full code can be seen here: [muxinc/mux-stats-sdk-mediaplayer](https://github.com/muxinc/mux-stats-sdk-mediaplayer).
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+The easiest way to get the AAR is to download the latest version from: [muxinc/mux-stats-sdk-mediaplayer releases](https://github.com/muxinc/mux-stats-sdk-mediaplayer/releases).
+
+If you would prefer to build it yourself, first clone [the repo](https://github.com/muxinc/mux-stats-sdk-mediaplayer). Then, you can do one of the following:
+
+1. Open the project in Android Studio and build the release variant of the `MuxMediaPlayer` module. You can then Find the AAR in `mux-stats-sdk-mediaplayer/MuxMediaPlayer/build/outputs/aar/MuxMediaPlayer-release.aar`
+2. Build the AAR directly:
+
+```sh
+./gradlew :MuxMediaPlayer:assembleRelease
+```
+
+We recommend using Android Studio's new module tool which can be accessed via `File > New > New Module...`. Select the `Import .JAR/.AAR Package` and then select the `mux.aar` that you downloaded or built. This should correctly configure the IDE as well as modify your build configuration (Gradle/Maven).
+
+For an example integration, you can see the demo application within [this repo](https://github.com/muxinc/mux-stats-sdk-mediaplayer) which integrates Mux into the MediaPlayer demo application.
+
+<LinkedHeader step={steps[2]} />
+
+<MdxImport snippet="envKeyCallout" />
+
+First, create the `CustomerPlayerData` and `CustomerVideoData` objects as appropriate for your current playback, and be sure to set your `ENV_KEY`.
+
+```java
+import com.mux.stats.core.models.CustomerPlayerData;
+import com.mux.stats.core.models.CustomerVideoData;
+// ...
+CustomerPlayerData customerPlayerData = new CustomerPlayerData();
+customerPlayerData.setEnvironmentKey("ENV_KEY");
+CustomerVideoData customerVideoData = new CustomerVideoData();
+customerVideoData.setVideoTitle("My great video");
+```
+
+Next, Create the `MuxStatsMediaPlayer` object by passing your Android `Context` (typically your `Activity`), the `MediaPlayer` instance, a player name, and the customer data objects.
+
+```java
+import com.mux.stats.sdk.muxstats.mediaplayer.MuxStatsMediaPlayer;
+...
+muxStatsMediaPlayer = new MuxStatsMediaPlayer(this, player, "demo-player", customerPlayerData, customerVideoData);
+```
+
+In order to correctly monitor if the player is full-screen, provide the screen size to the `MuxStatsMediaPlayer` instance.
+
+```java
+Point size = new Point();
+getWindowManager().getDefaultDisplay().getSize(size);
+muxStatsMediaPlayer.setScreenSize(size.x, size.y);
+```
+
+In order to determine a number of viewer context values as well as track the size of the video player, set the player view.
+
+```java
+muxStatsMediaPlayer.setPlayerView(playerView);
+```
+
+To allow `MuxStatsMediaPlayer` to listen for various `MediaPlayer` events, add it as a listener. `MediaPlayer` only allows single listeners, so if your activity or application also needs to listen to these events, use the helper methods to wrap your listener implementation with `MuxStatsMediaPlayer`'s listener implementation.
+
+```java
+player.setOnCompletionListener(muxStatsMediaPlayer.getOnCompletionListener(myCompletionListener));
+player.setOnErrorListener(muxStatsMediaPlayer.getOnErrorListener(myErrorListener));
+player.setOnPreparedListener(muxStatsMediaPlayer.getOnPreparedListener(this));
+player.setOnInfoListener(muxStatsMediaPlayer.getOnInfoListener(null));  // No wrapped listener.
+player.setOnSeekCompleteListener(muxStatsMediaPlayer.getOnSeekCompleteListener(null));  // No wrapped listener.
+player.setOnVideoSizeChangedListener(muxStatsMediaPlayer.getOnVideoSizeChangedListener(myVideoSizeChangedListener));
+```
+
+Finally, when you are destroying the player, call the `MuxStatsMediaPlayer.release()` method.
+
+```java
+muxStatsMediaPlayer.release()
+```
+
+<LinkedHeader step={steps[3]} />
+
+`MediaPlayer` does not provide listener callbacks for all necessary events, so you must add explicit calls into `MuxStatsMediaPlayer` at the same time that certain `MediaPlayer` methods are invoked:
+
+* `start`: [view docs](https://developer.android.com/reference/android/media/MediaPlayer.html#start%28%29)
+* `pause`: [view docs](https://developer.android.com/reference/android/media/MediaPlayer.html#pause%28%29)
+* `seekTo`: [view docs](https://developer.android.com/reference/android/media/MediaPlayer.html#seekTo%28int%29)
+
+For example, in the demo, a [MediaController view](https://developer.android.com/reference/android/widget/MediaController) is used to control the `MediaPlayer` instance, and the appropriate `MuxStatsMediaPlayer` methods are invoked in the
+[MediaPlayerControl](https://developer.android.com/reference/android/widget/MediaController.MediaPlayerControl) implementation used to link the two instances.
+
+```java
+private class MediaPlayerControl implements MediaController.MediaPlayerControl,
+        MediaPlayer.OnBufferingUpdateListener {
+    @Override
+    public void start() {
+        if (player != null) {
+            player.start();
+            muxStats.play();
+        }
+    }
+
+    @Override
+    public void pause() {
+        if (player != null) {
+            player.pause();
+            muxStats.pause();
+        }
+    }
+
+    @Override
+    public void seekTo(int pos) {
+        if (player != null) {
+            player.seekTo(pos);
+            muxStats.seeking();
+        }
+    }
+}
+```
+
+After you've integrated, start playing a video in your player. A few minutes after you stop watching, you'll see the results in your Mux data dashboard. Login to the dashboard and find the environment that corresponds to your `env_key` and look for video views.
+
+<LinkedHeader step={steps[4]} />
+
+In the MediaPlayer SDK, options are provided via the CustomerPlayerData and CustomerVideoData objects.
+
+All metadata details except for envKey are optional, however you'll be able to compare and see more interesting results as you include more details. This gives you more metrics and metadata about video streaming, and allows you to search and filter on important fields like the player version, CDN, and video title.
+
+For more information, see the [Metadata Guide](/docs/guides/make-your-data-actionable-with-metadata).
+
+<LinkedHeader step={steps[5]} />
+
+## Changing the video
+
+There are two cases where the underlying tracking of the video view need to be reset. First, when you load a new source URL into an existing player, and second when the program within a singular stream changes (such as a program within a live stream).
+
+Note: You do not need to change the video info when changing to a different source of the same video content (e.g. different resolution or video format).
+
+### New Source
+When you change to a new video (in the same player) you need to update the information that Mux knows about the current video. Examples of when this is needed are:
+
+* The player advances to the next video in a playlist
+* The user selects a different video to play
+
+This is done by calling `muxStatsMediaPlayer.videoChange(CustomerVideoData)` which will remove all previous video data and reset all metrics for the video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+It's best to change the video info immediately after telling the player which new source to play.
+
+### New Program (in single stream)
+In some cases, you may have the program change within a stream, and you may want to track each program as a view on its own. An example of this is a live stream that streams multiple programs back to back, with no interruptions.
+
+In this case, call `muxStatsMediaPlayer.programChange(CustomerVideoData)`. This will remove all previous video data and reset all metrics for the video view, creating a new video view. See [Metadata](/docs/guides/make-your-data-actionable-with-metadata) for the list of video details you can provide. You can include any metadata when changing the video but you should only need to update the values that start with `video`.
+
+## Error tracking
+
+By default, Mux's integration with MediaPlayer automatically tracks fatal errors as thrown by MediaPlayer. In some applications, however, you may want to disable this and track errors on your own, especially if you have retry logic in your application to try to recover from errors that MediaPlayer encounters.
+
+In this case, there are two things that you need to do:
+
+1. Turn off the automatic error tracking. To do this, call `muxStatsExoPlayer.setAutomaticErrorTracking(false)`
+2. When your application encounters a fatal error that you cannot recover from, call `muxStatsExoPlayer.error(MuxErrorException e)`, including a message and a code.
+
+The following is an example of firing a custom error.
+
+```java
+// Error code: integer value for the generic type of error that
+// occurred.
+// Error message: String providing more information on the error
+// that occurred.
+// For an example, the HTML5 video element uses the
+// following: https://developer.mozilla.org/en-US/docs/Web/API/MediaError
+// for codes and messages. Feel free to use your own codes and messages
+int errorCode = 1;
+String errorMessage = "A fatal error was encountered during playback";
+MuxErrorException error = new MuxErrorException(errorCode, errorMessage);
+muxStatsMediaPlayer.error(error);
+```
+
+It is important that you only trigger an error when the playback has to be abandoned or aborted in an unexpected manner, as Mux tracks fatal playback errors only.
+
+<Releases>
+<LinkedHeader step={steps[6]} />
+
+### Current release
+
+#### v0.1.0
+ - Initial integration with MediaPlayer
+ </Releases>

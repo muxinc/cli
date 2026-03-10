@@ -1,0 +1,271 @@
+---
+title: Mux Uploader for web
+product: uploader
+description: Mux Uploader is a drop in component for uploading videos to Mux from your web application
+---
+
+**Mux Uploader** is a drop-in web component that makes it easy to upload video files to Mux.
+
+This component allows you to build a fully-functional, customizable video upload UI in your application using a single line of code. Mux Uploader supports:
+
+- Manual file selection
+- Drag and drop for files
+- Optional pausing and resuming of uploads
+- Automatic offline/online detection with upload resumes
+- And more!
+
+<Player playbackId={"XYND6DHqq7A01ziIbLWuPH02d004GoqYhHgBucY3M6Tydo"} muted autoPlay loop style={{'--controls': 'none' }} thumbnailTime={0} />
+
+Mux Uploader can be used as either a web component (`<mux-uploader>` from `@mux/mux-uploader`), or a React component (`<MuxUploader />` from `@mux/mux-uploader-react`).
+
+## Quick start
+
+Here are some examples of Mux Uploader in action.
+
+### Mux Uploader HTML element
+
+Install with either npm, yarn or load Mux Uploader from the hosted script.
+
+#### NPM
+
+```shell
+npm install @mux/mux-uploader@latest
+```
+
+#### Yarn
+
+```shell
+yarn add @mux/mux-uploader@latest
+```
+
+#### Hosted
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mux/mux-uploader"></script>
+```
+
+#### Example HTML element implementation
+
+```html
+<script
+  src="https://cdn.jsdelivr.net/npm/@mux/mux-uploader"
+></script>
+<mux-uploader></mux-uploader>
+```
+
+### Mux Uploader React component
+
+You will need to select one of the package options below. Both examples will automatically update the uploader. You can always anchor the package to a specific version if needed.
+
+#### NPM
+
+```shell
+npm install @mux/mux-uploader-react@latest
+```
+
+#### Yarn
+
+```shell
+yarn add @mux/mux-uploader-react@latest
+```
+
+#### Example React Usage
+
+```jsx
+import MuxUploader from "@mux/mux-uploader-react";
+
+export default function App() {
+  return (
+    <MuxUploader/>
+  );
+}
+```
+
+## Upload a video
+
+Mux Uploader allows you to use upload URLs provided by Mux's <ApiRefLink href="/docs/api-reference/video/direct-uploads">Direct Uploads</ApiRefLink> in your web application.
+It takes care of rendering a file selector, uploading your video file, displaying progress updates to the user, handling retries, and more.
+
+This does mean that you'll need to provide a new upload URL whenever a user will be uploading a new video file in your application. You provide that URL value via the `endpoint` attribute or property. It looks like this:
+
+### HTML example
+
+<InteractiveCodeExample product="uploader" example="uploaderHtmlIntegration" />
+
+The `endpoint` indicates the direct upload URL that will receive the video file you're uploading.
+
+You can generate a signed direct upload URL by making a server-side API call to Mux's <ApiRefLink href="/docs/api-reference/video/direct-uploads/create-direct-upload">Create Direct Upload</ApiRefLink> endpoint,
+or you can use `curl` based on the example from the link if you just want to test it out.
+
+In a successful API response, you will receive a unique signed upload URL that can then be passed along to your client application and set as the `endpoint` property on a `mux-uploader` element. The URL for a Direct Upload looks like `"https://storage.googleapis.com/video..."`.
+
+<Callout type="info">
+In the following examples, you will replace the value of the `endpoint` property with your unique direct upload URL.
+</Callout>
+
+### React example
+<InteractiveCodeExample product="uploader" example="uploaderReactIntegration" />
+
+## Overview of the upload process
+
+Video uploads and processing take time. Processing time can vary depending on the file size and type of video that you upload.
+
+Mux uses [webhooks ](/docs/core/listen-for-webhooks)to keep your application informed about what's happening with your uploaded video — from when the upload completes to when the video is ready to be played.
+
+<Callout type="info">
+To minimize processing time, consider following [Mux's guide for handling standard video input](/docs/guides/minimize-processing-time).
+</Callout>
+
+
+The overall flow generally looks like this:
+
+### 1. Set up webhooks
+- Set up a public webhook endpoint in your application to receive events from Mux
+- Configure the webhook in your Mux dashboard to send events to this endpoint
+
+### 2. Upload the video
+- Create a direct upload URL using the Mux API
+- Save the upload ID to your database
+- Pass the URL to the `endpoint` property on the Mux Uploader component
+
+### 3. Wait for video to be ready
+- When the upload completes, show a "processing" indicator to the user.
+- Poll your database to check if the video is ready for playback.
+
+### 4. Handle webhook events
+
+Listen for specific webhook events, particularly:
+
+- `video.upload.asset_created` which indicates that the upload has completed and an asset has been created
+- `video.asset.ready` which indicates that the video has been processed and is ready for playback
+
+The `video.upload.asset_created` event contains the `asset_id` in the event payload.
+The `video.asset.ready` event contains the `playback_id` in the event payload.
+
+### 5. Store the information in your database
+
+Save the `asset_id` and `playback_id` to your database, associating them with the user or relevant entity in your application.
+
+Here's an example of how you might structure your database table schema:
+
+| videos                    |                        |            |
+|--------------------------|------------------------|------------|
+| id                       | uuid (primary key)     |            |
+| user_id                  | uuid (foreign key)     | References users.id |
+| upload_id                | string                 | From initial upload |
+| asset_id                 | string                 | From Mux webhook |
+| playback_id              | string                 | From Mux webhook |
+| title                    | string                 | Optional metadata |
+| status                   | enum                   | e.g. `preparing`, `ready` |
+| created_at               | timestamp              |            |
+| updated_at               | timestamp              |            |
+
+### 6. Use the IDs
+
+While Mux generates several IDs during the upload and processing flow, there are two key IDs you'll primarily work with:
+
+1. The `asset_id`: This is used when you need to manage your video through the Mux API (like deleting the video or checking its status)
+2. The `playback_id`: This is what you'll use to actually play your video, either by:
+   - Adding it to Mux Player
+   - Creating a URL where your video can be played
+
+<Callout type="info">
+Note that this process happens asynchronously, so your application should be designed to handle the delay between the initial upload and when the video becomes available for playback.
+</Callout>
+
+For more detailed implementations, you can refer to the examples provided in the Mux documentation for various frameworks:
+
+- [Next.js](/docs/frameworks/next-js)
+- [SvelteKit](/docs/frameworks/sveltekit)
+- [Astro](/docs/frameworks/astro)
+- [Remix](/docs/frameworks/remix-js)
+
+
+## Fetching the upload URL async
+
+At the time you render the `<mux-uploader>`, you may not have the direct upload URL yet. Instead, you might want to retrieve it async from your server after a user selects a file. You can do that by setting the `endpoint` property value to a custom function instead of a URL.
+
+```html
+<mux-uploader></mux-uploader>
+
+<script>
+  const muxUploader = document.querySelector("mux-uploader");
+  /*
+    Endpoint should be a function that returns a promise and resolves
+    with a string for the upload URL.
+  */
+  muxUploader.endpoint = function () {
+    /*
+      In this example, your server endpoint would return the upload URL
+      in the response body "https://storage.googleapis.com/video..."
+    */
+    return fetch("/your-server/api/create-upload").then(res => res.text());
+  };
+</script>
+```
+
+This is even easier using React props:
+
+```jsx
+import MuxUploader from "@mux/mux-uploader-react";
+
+export default function App() {
+  return (
+    <MuxUploader
+      endpoint={() => {
+        return fetch("/your-server/api/create-upload")
+          .then(res => res.text());
+      }}
+    />
+  );
+}
+```
+
+## Customizing the UI
+
+As you can see in the examples above, Mux Uploader provides a fairly feature rich and reasonably styled (albeit basic) UI by default.
+
+It will automatically update based on different stages or states of uploading, like showing a UI for file selection before a video has been picked,
+showing progress as the file is uploaded, showing when the file upload has completed, and showing error state with the option to retry if something
+goes wrong with the upload.
+
+In addition, Mux Uploader provides many ways to customize this look and feel, including:
+
+- attributes / properties like `no-drop` or `pausable` to enable/disable UI components
+- intuitive styling with CSS, just like any other HTML element.
+- state transition attributes like `upload-in-progress` or `upload-error` for responsive styling
+- attribute / property based data customization for things like `dynamic-chunk-size` or `max-file-size`
+- overridable and composable components like `<mux-uploader-file-select>` or `<mux-uploader-drop>` for full flexibility of UI
+
+<GuideCards>
+  <GuideCard
+    title="Core functionality"
+    description="Understand the features and core functionality of Mux Uploader"
+    links={[
+      {
+        title: "Read the guide",
+        href: "/docs/guides/uploader-web-core-functionality",
+      },
+    ]}
+  />
+  <GuideCard
+    title="Integrate Mux Uploader"
+    description="Interate Mux Uploader in your web application. See examples in popular front end frameworks."
+    links={[
+      {
+        title: "Read the guide",
+        href: "/docs/guides/uploader-web-integrate-in-your-webapp",
+      },
+    ]}
+  />
+  <GuideCard
+    title="Customize the look and feel"
+    description="Customize Mux Uploader to match your brand and needs"
+    links={[
+      {
+        title: "Read the guide",
+        href: "/docs/guides/uploader-web-customize-look-and-feel",
+      },
+    ]}
+  />
+</GuideCards>

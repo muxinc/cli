@@ -1,0 +1,133 @@
+---
+title: Embed videos for social media
+product: video
+description: Learn how to embed your videos using Open Graph cards
+---
+
+## Introduction to Open Graph
+
+The Open Graph protocol is initialized by using HTML meta tags in the ```<head>``` section of a webpage, allowing you to define objects
+from your webpage as thumbnails. These can be used in social media posts or appear in search results. Open Graph also helps search engines
+find videos on your webpage that might be otherwise hidden due to JavaScript.
+
+Here is a list of Open Graph properties for video optimization:
+
+
+| Property        | Description                                            |
+| :---------------| :----------------------------------------------------- |
+| ```og:type```         | The object’s type e.g video, audio                  |
+| ```og:url```          | The URL of the webpage                                 |
+| ```og:title```       | Title of the video                                     |
+| ```og:description```  | Description of the video                               |
+| ```og:image```        | Thumbnail of the video                                 |
+| ```og:video```        | The URL of the video                                   |
+| ```og:video:width```  | Width of the video in pixels                           |
+| ```og:video:height``` | Height of the video in pixels                          |
+| ```og:site_name```    | The website name the contains the video                |
+
+### Object types
+
+You can also use sub types, for example, if your object type is video and you want to create a open graph card
+for an episode or movie you can use video.episode or video.movie.
+
+
+```html
+<meta property="og:type" content="video.episode">
+<meta property="og:type" content="video.movie">
+<meta property="og:type" content="video.tv_show">
+```
+
+### Optional meta tags
+
+Use additional properties to provide additional metadata about your object such as the actor and director.
+
+| Property        | Description                                         |
+| :----------- | :----------------------------------------------------- |
+| ```video:actor``` | profile array - Actors in the movie. |
+| ```video:actor:role``` | string - The role they played. |
+| ```video:director``` | profile array - Directors of the movie. |
+| ```video:writer``` | profile array - Writers of the movie. |
+| ```video:duration``` | integer >=1 - The movie's length in seconds. |
+| ```video:release_date``` | datetime - The date the movie was released. |
+| ```video:tag``` | string array - Tag words associated with this movie. |
+
+
+### Integrate the Open Graph meta tags
+
+To add the Open Graph meta tags into your website, simply implement new meta tags in the ```<head>``` section of the webpage.
+Below is an example of Open Graph tags:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta property="og:title" content="Mux Video" />
+    <meta property="og:type" content="video.episode" />
+    <meta property="og:description" content="MP4 video asset for Open Graph Cards" />
+    <meta property="og:image" content="https://image.mux.com/aYKMM7VxaD2InrbhrKlhi00V6R9EpRmQNmBJ10200AK02bE/thumbnail.png" />
+    <meta property="og:video" content="https://stream.mux.com/F9cP5Xgdcp7028hN4gQrOmlF62ZDHNloCTQQao8Pk00kk/medium.mp4" />
+    <meta property="og:video:width" content="350">
+    <meta property="og:video:height" content="200">
+    <meta property="og:video:duration" content="300">
+    <meta property="og:url" content="http://mux.com">
+  </head>
+  <body>
+    <video
+      id="my-player"
+      controls
+      style="width: 100%; max-width: 500px;"
+    />
+  </body>
+</html>
+```
+## Creating Twitter/X cards
+
+Twitter cards are implemented using meta tags, but unlike Open Graph cards, they use different property names.
+
+There are four different types of cards to choose from which is defined in the meta tag property twitter:card:
+
+- photo card
+- player card
+- summary card
+- app card
+
+The player card provides functionality to play external media files inside of Twitter. Below are the definitions of other Twitter meta tags you can use with the player card.
+
+### Twitter/X meta tags
+
+| Property        | Description                                         |
+| :----------- | :----------------------------------------------------- |
+| ```twitter:card``` | Type of Twitter card e.g., "player." |
+| ```twitter:title``` | The title of your content as it should appear in the card |
+| ```twitter:site``` | The Twitter @username the card should be attributed to |
+| ```twitter:description``` | Description of the content (optional) |
+| ```twitter:player``` | HTTPS URL to I-frame player; this must be a HTTPS URL which does not generate active mixed content warnings in a web browser (URL to the page hosting the player) |
+| ```twitter:player:width``` | Width of I-frame specified in twitter:player in pixels |
+| ```twitter:player:height``` | Height of I-frame specified in twitter:player in pixels |
+| ```twitter:image``` | Image to be displayed in place of the player on platforms that don’t support I-frame or inline players; you should make this image the same dimensions as your player |
+
+### Example HTML
+
+```html
+<meta name="twitter:card" content="player" />
+<meta name="twitter:title" content="Some great video" />
+<meta name="twitter:site" content="@twitter_username">
+<meta name="twitter:description" content="Great video by @twitter_username" />
+<meta name="twitter:player" content="https://link-to-a-videoplayer.com" />
+<meta name="twitter:player:width" content="360" />
+<meta name="twitter:player:height" content="200" />
+<meta name="twitter:image" content="https://link-to-a-image.com/image.jpg" />
+```
+
+
+## Preview your Open Graph cards
+
+You can preview your Open Graph cards using any one of many services that allow you to simply enter
+a URL that generates a preview.
+
+One such service is [Opengraph.xyz](https://opengraph.xyz) that allows you to not only preview
+what you have configured, but also helps you to generate more Open Graph meta tags.
+
+Below is a preview of the example above in [Opengraph.xyz](https://opengraph.xyz)
+
+<Image src="/docs/images/OpenGraph_preview.png" width={1790} height={491} alt="Preview Open Graph cards" />

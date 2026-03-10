@@ -1,0 +1,171 @@
+---
+title: Add metadata to your videos
+product: video
+description: >-
+  Learn how to add titles and other metadata to your videos for better organization,
+    discoverability, and actionable analytics.
+steps:
+  - title: What is asset metadata?
+    description: Learn what asset metadata is, and how it can help you organize your video assets
+    topic: start
+  - title: Manage metadata through the Dashboard
+    description: Learn how to add and modify asset metadata when you're using the Mux dashboard
+    topic: info
+  - title: Manage metadata through the API
+    description: Learn how to add and modify asset metadata when you're using the Mux Video API
+    topic: API
+---
+
+<LinkedHeader step={steps[0]} />
+
+Metadata provides additional descriptive information about your video assets. Mux currently supports three key optional metadata fields that help you organize and manage your video content across the API and dashboard:
+
+* `title`: A descriptive name for your video content. We limit this to 512 code points.
+* `creator_id`: A value you set to identify the creator or owner of the video. We limit this to 128 code points.
+* `external_id`: Another value you set to reference this asset in your system, such as the video ID in your database. We limit this to 128 code points.
+
+<Callout id="code-points" type="info">
+    **What is a code point?** Many of us use the term "characters" when referring to letters in a string, but when storing those characters some cost more than others. This cost is called a "code point". <br /><br />While each ASCII character can be stored with a single code point, some unicode characters, such as `é`, are stored as two code points. One for the `e`, and one for the ` ́`. You can easily test this in JavaScript. JavaScript's `.length` property counts code points, not characters, so `"é".length` will be `2`.
+</Callout>
+
+Here's an example of what a `meta` object might look like:
+
+```json
+{
+   "title": "Guide: Adding metadata to videos",
+   "creator_id": "user_23456",
+   "external_id": "cdef2345"
+}
+```
+
+<Callout type="info">
+    **Note:** Do not include personally identifiable information in these fields. They will be accessible by browsers to display player UI.
+</Callout>
+
+Once set on an asset, you'll find this metadata on assets across the Mux API and dashboard, including asset management, [engagement](/beta/engagement) and [data](/data).
+
+<LinkedHeader step={steps[1]} />
+
+We've deeply integrated asset metadata throughout the Mux dashboard:
+
+<Player
+    playbackId="trRCuyNyUHeYdQ5ZbvSsRf34Reuc301CDQzAxDUqog1w"
+    thumbnailTime="10"
+    title="Asset metadata demo"
+    className="flex"
+/>
+
+* When uploading, we use your filename as the title - but you can change it at any time
+* For live streams, you can set the default metadata for recordings on the stream details page
+* When viewers watch your content, all metadata flows into Mux Data and the engagement dashboard - making it easy to find videos by title, or filter by creator id.
+
+<LinkedHeader step={steps[2]} />
+
+## Create an asset with metadata
+
+When creating an asset you can include your metadata in the body of the request.
+
+#### Example request
+
+```json
+// POST /video/v1/assets
+{
+    "inputs": [
+        {
+            "url": "https://storage.googleapis.com/muxdemofiles/mux.mp4"
+        }
+    ],
+    "playback_policies": [
+        "public"
+    ],
+    "video_quality": "basic",
+    "meta": {
+        "title": "Mux demo video",
+        "creator_id": "abcd1234",
+        "external_id": "bcde2345"
+    }
+}
+```
+
+#### Need more help?
+
+- Check out our [getting started guide](/docs/core/stream-video-files) for a more thorough introduction to creating assets.
+- Check out our <ApiRefLink href="/docs/api-reference/video/assets/create-asset">Create an asset</ApiRefLink> for a list of all possible parameters.
+
+## Update the metadata on an asset
+
+Once an asset has been created the metadata can be changed at any time. Make a request to update the asset and include your metadata in the request body.
+
+#### Example request
+
+```json
+// PATCH /video/v1/assets/{ASSET_ID}
+{
+    "meta": {
+        "title": "Updated Mux demo video",
+        "creator_id": "cdef3456",
+        "external_id": "defg4567"
+    }
+}
+```
+
+#### Need more help?
+
+- Check out our <ApiRefLink href="/docs/api-reference/video/assets/update-asset">Update asset API reference</ApiRefLink> for more details.
+
+## Directly upload a video with metadata
+
+Direct uploads are a [multi-step process](/docs/guides/upload-files-directly), and metadata should be attached in the very first step. When creating your authenticated URL in that first step you can include your metadata alongside the rest of the asset settings in `new_asset_settings`.
+
+#### Example Request
+
+```json
+// POST /video/v1/uploads
+{
+    "new_asset_settings": {
+        "playback_policies": [
+            "public"
+        ],
+        "video_quality": "basic",
+        "meta": {
+            "title": "Mux demo video",
+            "creator_id": "abcd1234",
+            "external_id": "bcde2345"
+        }
+    },
+    "cors_origin": "*",
+}
+```
+
+#### Need more help?
+
+- Check out our [direct upload guide](/docs/guides/upload-files-directly) for details on every step.
+
+## Set live stream metadata defaults for creating assets
+
+Mux automatically creates a new asset each time you connect to a live stream. When creating or updating your live stream you can include metadata that gets automatically set on the generated assets in the request body, under `new_asset_settings`.
+
+#### Example "Create Live Stream" request
+
+```json
+// POST /video/v1/live-streams
+{
+    "playback_policies": [
+        "public"
+    ],
+    "new_asset_settings": {
+        "playback_policies": [
+            "public"
+        ],
+    },
+    "meta": {
+        "title": "Mux demo live stream recording",
+        "creator_id": "abcd1234",
+        "external_id": "bcde2345"
+    }
+}
+```
+
+#### Need more help?
+
+- Check out our "[start live streaming](/docs/guides/start-live-streaming)" guide for a deeper walkthrough.

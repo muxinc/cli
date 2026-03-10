@@ -1,0 +1,75 @@
+---
+title: Control playback resolution
+product: video
+description: Control the video resolution your users receive in order to give the best user experience as well as take advantage of Mux's resolution based pricing.
+---
+
+# Default playback URL
+
+The default playback URL will contain all available resolutions of your video. The resolutions available will depend on the video source file.
+
+By default if the source file contains 1080p or higher, then the highest resolution provided by Mux will be 1080p. If the source file is lower than 1080p, the highest resolution available will be the resolution of the source.
+
+You can also stream 4K content using Mux Video, which will be delivered at higher resolutions including 2.5K and 4K. For more details see the [guide to streaming 4K videos](/docs/guides/stream-videos-in-4k).
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8
+```
+
+Use the default playback URL for most use cases. The video player will determine the best resolution based on the available bandwidth of the viewer.
+
+# Using playback modifiers to manipulate playback resolution
+
+Mux exposes a set of [playback modifiers](/docs/guides/modify-playback-behavior), which give you extra control over the availiable resolutions of your content. 
+
+## Specify maximum resolution
+
+The playback URL below with the `max_resolution` query parameter modifies the resolutions available for the player to choose from.
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8?max_resolution=720p
+```
+
+The `max_resolution` parameter can be set to `270p`, `360p`, `480p`, `540p`, `720p`, `1080p`, `1440p`, or `2160p`. You may want to do this in order to reduce your delivery costs, or build a feature to your product where only certain viewers get lower resolution video.
+
+_Please note that not all resolutions are available for all assets. If you specify a max resolution that is not available for the asset, Mux will limit the resolution to the highest resolution available below the one you specified. For example, if you specify `max_resolution=1080p` but the highest resolution available for the asset is 720p, then the manifest will be capped at 720p._
+
+## Specify minimum resolution
+
+The playback URL below with the `min_resolution` query parameter modifies the resolutions available for the player to choose from.
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8?min_resolution=720p
+```
+
+The `min_resolution` parameter can be set to `270p`, `360p`, `480p`, `540p`, `720p`, `1080p`, `1440p`, or `2160p`. You may want to use this to omit the lowest quality renditions from the HLS manifest when the visual quality of your content is critical to the delivery, for example in live streams where detailed screen share content is present.
+
+_Please note that not all resolutions are available for all assets. If you specify a min resolution that is not available for the asset, Mux will limit the resolution to the next highest resolution available below the one you specified. For example, if you specify `max_resolution=270p` but the lowest resolution available for the asset is 360p, then the manifest will start at at 360p._
+
+## Specify rendition order
+
+By default the top resolution in the playlist is one of the middle resolutions. Many players will start with the first one listed so this default behavior strikes a balance by giving the player something that's not too low in terms of quality but also not too high in terms of bandwidth. 
+
+You may want to change this behavior by specifying `rendition_order=desc` which will sort the list of renditions from highest (highest quality, most bandwidth) to lowest (lowest quality, least bandwidth). Players that start with the first rendition in the list will now attempt to start playback with the highest resolution. The tradeoff is that users on slow connections will experience increaesed startup time.
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8?rendition_order=desc
+```
+
+# Usage with signed URLs
+
+If you are using `signed` Playback IDs according to the [Secure video playback guide](/docs/guides/secure-video-playback) then your playback modifiers must be encoded in the `token` that you generate on your server. [See the modify playback behaviour guide](/docs/guides/modify-playback-behavior) about embedding extra params in your JWT.
+
+# Using playback modifiers in Mux Player
+
+Mux Player supports  `min_resolution`, `max_resolution` and `rendition_order` as attributes on the web component and props on the React component.
+
+For example to set the `max_resolution=` parameter with Mux Player, you can set `max-resolution="720p"` attribute (`maxResolution="720p"` in React). When setting this attribute Mux Player will internally add it on as a query parameter on the streaming URL.
+
+As with all playback modifiers, if you're using signed URLs, your parameters should be encoded in the `playback-token` attribute (`tokens.playback` in React).
+
+# When using AVPlayer on iOS
+
+Set the playback modifier by appending a `URLQueryItem` to the playback `URL`. [Initialize `AVPlayer` using the `URL` itself](https://developer.apple.com/documentation/avfoundation/avplayer/1385706-init) as shown in an example below using `max_resolution` or [initialize with an `AVPlayerItem` constructed with the URL](https://developer.apple.com/documentation/avfoundation/avplayer/1387104-init).
+
+<CodeExamples product="video" example="avplayerPlaybackControl" exampleOrder="swift, objc" />

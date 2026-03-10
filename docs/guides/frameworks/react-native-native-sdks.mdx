@@ -1,0 +1,518 @@
+---
+title: Bridging Native Mux SDKs
+product: video
+description: Use native Mux Player and Uploader SDKs in React Native for advanced features
+---
+
+# Bridging Native Mux SDKs
+
+This guide covers when and how to bridge native Mux SDKs (iOS/Android) into your React Native app. Most developers won't need this - JavaScript solutions work great for 95% of use cases. But if you need advanced features or maximum performance, native bridging is an option.
+
+<Callout type="warning">
+**Start with JavaScript first.** Only consider native bridging if you have specific needs that can't be met with `react-native-video` and the patterns in this documentation.
+</Callout>
+
+## When to Use Native SDKs
+
+Consider native Mux SDKs when you need:
+
+### Advanced Features
+- **DRM (Digital Rights Management)** - Full FairPlay (iOS) and Widevine (Android) support
+- **Advanced analytics** - Native Mux Data integration with more detailed metrics
+- **Picture-in-picture** - Better PiP support than JavaScript solutions
+- **Background playback** - Robust background audio/video
+- **Offline playback** - Download and play DRM-protected content offline
+
+### Performance
+- **Lower overhead** - Native video rendering without JavaScript bridge
+- **Better memory management** - Native memory handling for large video apps
+- **Smoother playback** - Fewer dropped frames on older devices
+
+### Native Features
+- **AirPlay (iOS)** - Seamless AirPlay integration
+- **Cast (Android)** - Chromecast support
+- **System controls** - Native lock screen controls
+- **Closed captions** - Native caption rendering
+
+## When NOT to Use Native SDKs
+
+❌ **Don't use native SDKs if:**
+- Your JavaScript solution works fine
+- You don't need DRM
+- You want to avoid native development complexity
+- Your team lacks iOS/Android experience
+- You want easier maintenance and updates
+
+✅ **Stick with react-native-video if:**
+- Basic playback meets your needs
+- You're using public or signed playback (no DRM)
+- You want simpler codebases
+- You need to ship quickly
+- Cross-platform consistency is important
+
+<Callout type="info">
+**95% of React Native video apps work great with react-native-video.** Only invest in native bridging if you have specific requirements that justify the added complexity.
+</Callout>
+
+---
+
+## Available Native SDKs
+
+### Mux Player iOS
+
+**Features:**
+- Native AVPlayer with Mux optimizations
+- Full DRM support (FairPlay)
+- Picture-in-picture
+- AirPlay
+- Native Mux Data integration
+
+**GitHub**: [github.com/muxinc/mux-player-ios](https://github.com/muxinc/mux-player-ios)
+
+**Installation** (if bridging):
+```ruby
+# ios/Podfile
+pod 'MuxPlayerSwift', '~> 2.0'
+```
+
+---
+
+### Mux Player Android
+
+**Features:**
+- Native ExoPlayer with Mux optimizations
+- Full DRM support (Widevine)
+- Picture-in-picture
+- Chromecast support
+- Native Mux Data integration
+
+**GitHub**: [github.com/muxinc/mux-player-android](https://github.com/muxinc/mux-player-android)
+
+**Installation** (if bridging):
+```gradle
+// android/app/build.gradle
+dependencies {
+    implementation 'com.mux:stats-muxplayer:1.0.0'
+}
+```
+
+---
+
+### Mux Uploader iOS
+
+**Features:**
+- Chunked uploads with resume capability
+- Background uploads
+- Client-side transcoding
+- Progress tracking
+
+**GitHub**: [github.com/muxinc/mux-uploader-ios](https://github.com/muxinc/mux-uploader-ios)
+
+---
+
+### Mux Uploader Android
+
+**Features:**
+- Chunked uploads with resume capability
+- Background uploads
+- Progress tracking
+
+**GitHub**: [github.com/muxinc/mux-uploader-android](https://github.com/muxinc/mux-uploader-android)
+
+---
+
+## Creating a Native Module
+
+Bridging native Mux SDKs requires creating React Native native modules. Here's a high-level overview:
+
+### Architecture
+
+```
+JavaScript (React Native)
+    ↕ (Bridge)
+Native Module (Objective-C/Swift or Java/Kotlin)
+    ↓
+Native Mux SDK (iOS/Android)
+```
+
+### Example: Bridging Mux Player iOS
+
+**Step 1: Create Native Module** (`ios/MuxPlayerModule.swift`)
+
+```swift
+import Foundation
+import MuxPlayerSwift
+import React
+
+@objc(MuxPlayerModule)
+class MuxPlayerModule: RCTEventEmitter {
+
+  var player: MuxPlayer?
+
+  @objc
+  func initializePlayer(
+    _ playbackId: String,
+    resolver: @escaping RCTPromiseResolveBlock,
+    rejecter: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      // Initialize Mux Player
+      let playerView = MuxPlayerView()
+      playerView.playbackId = playbackId
+
+      self.player = playerView.player
+
+      // Set up event listeners
+      self.setupPlayerListeners()
+
+      resolver(["success": true])
+    }
+  }
+
+  @objc
+  func play(
+    _ resolver: @escaping RCTPromiseResolveBlock,
+    rejecter: @escaping RCTPromiseRejectBlock
+  ) {
+    player?.play()
+    resolver(["playing": true])
+  }
+
+  @objc
+  func pause(
+    _ resolver: @escaping RCTPromiseResolveBlock,
+    rejecter: @escaping RCTPromiseRejectBlock
+  ) {
+    player?.pause()
+    resolver(["playing": false])
+  }
+
+  private func setupPlayerListeners() {
+    // Listen for player events and send to JavaScript
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(playerDidFinishPlaying),
+      name: .AVPlayerItemDidPlayToEndTime,
+      object: player?.currentItem
+    )
+  }
+
+  @objc
+  private func playerDidFinishPlaying() {
+    sendEvent(withName: "onVideoEnd", body: [:])
+  }
+
+  // Required for RCTEventEmitter
+  override func supportedEvents() -> [String]! {
+    return ["onVideoEnd", "onProgress", "onError"]
+  }
+
+  override static func requiresMainQueueSetup() -> Bool {
+    return true
+  }
+}
+```
+
+**Step 2: Bridge to JavaScript** (`ios/MuxPlayerModule.m`)
+
+```objc
+#import <React/RCTBridgeModule.h>
+#import <React/RCTEventEmitter.h>
+
+@interface RCT_EXTERN_MODULE(MuxPlayerModule, RCTEventEmitter)
+
+RCT_EXTERN_METHOD(
+  initializePlayer:(NSString *)playbackId
+  resolver:(RCTPromiseResolveBlock)resolve
+  rejecter:(RCTPromiseRejectBlock)reject
+)
+
+RCT_EXTERN_METHOD(
+  play:(RCTPromiseResolveBlock)resolve
+  rejecter:(RCTPromiseRejectBlock)reject
+)
+
+RCT_EXTERN_METHOD(
+  pause:(RCTPromiseResolveBlock)resolve
+  rejecter:(RCTPromiseRejectBlock)reject
+)
+
+@end
+```
+
+**Step 3: Create React Native Component**
+
+```tsx
+// MuxPlayer.tsx
+import { NativeModules, NativeEventEmitter, requireNativeComponent } from 'react-native';
+
+const { MuxPlayerModule } = NativeModules;
+const MuxPlayerView = requireNativeComponent('MuxPlayerView');
+
+interface MuxPlayerProps {
+  playbackId: string;
+  onVideoEnd?: () => void;
+  onProgress?: (progress: number) => void;
+  onError?: (error: Error) => void;
+}
+
+export function MuxPlayer({ playbackId, onVideoEnd, onProgress, onError }: MuxPlayerProps) {
+  useEffect(() => {
+    // Initialize player
+    MuxPlayerModule.initializePlayer(playbackId);
+
+    // Set up event listeners
+    const eventEmitter = new NativeEventEmitter(MuxPlayerModule);
+
+    const endListener = eventEmitter.addListener('onVideoEnd', () => {
+      onVideoEnd?.();
+    });
+
+    const progressListener = eventEmitter.addListener('onProgress', (event) => {
+      onProgress?.(event.currentTime);
+    });
+
+    const errorListener = eventEmitter.addListener('onError', (event) => {
+      onError?.(new Error(event.message));
+    });
+
+    return () => {
+      endListener.remove();
+      progressListener.remove();
+      errorListener.remove();
+    };
+  }, [playbackId]);
+
+  return (
+    <MuxPlayerView
+      style={{ width: '100%', height: 300 }}
+      playbackId={playbackId}
+    />
+  );
+}
+
+// Export native methods
+export const MuxPlayerAPI = {
+  play: () => MuxPlayerModule.play(),
+  pause: () => MuxPlayerModule.pause(),
+};
+```
+
+**Step 4: Use in React Native**
+
+```tsx
+import { MuxPlayer, MuxPlayerAPI } from './MuxPlayer';
+
+export function VideoScreen() {
+  const playbackId = 'EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs';
+
+  return (
+    <View>
+      <MuxPlayer
+        playbackId={playbackId}
+        onVideoEnd={() => console.log('Video ended')}
+        onProgress={(time) => console.log('Progress:', time)}
+      />
+
+      <Button title="Play" onPress={() => MuxPlayerAPI.play()} />
+      <Button title="Pause" onPress={() => MuxPlayerAPI.pause()} />
+    </View>
+  );
+}
+```
+
+---
+
+## Bridging Complexity
+
+Creating native bridges involves:
+
+### iOS (Swift/Objective-C)
+- ✅ Swift/Objective-C knowledge required
+- ✅ Understanding of AVPlayer and AVKit
+- ✅ React Native bridging APIs
+- ✅ Memory management and threading
+- ✅ CocoaPods for dependencies
+- ⏱ **Time investment**: 1-2 weeks for full implementation
+
+### Android (Kotlin/Java)
+- ✅ Kotlin/Java knowledge required
+- ✅ Understanding of ExoPlayer
+- ✅ React Native bridging APIs
+- ✅ Activity lifecycle management
+- ✅ Gradle for dependencies
+- ⏱ **Time investment**: 1-2 weeks for full implementation
+
+### Maintenance
+- Regular updates to match native SDK releases
+- Testing on both platforms for each change
+- Handling breaking changes in React Native or native SDKs
+- Debugging across JavaScript ↔ Native bridge
+
+---
+
+## Alternative: Use Expo Modules
+
+For Expo users, [Expo Modules](https://docs.expo.dev/modules/overview/) provides a better developer experience:
+
+```typescript
+// MuxPlayerModule.ts (Expo Module)
+import { requireNativeViewManager } from 'expo-modules-core';
+import { ViewProps } from 'react-native';
+
+export interface MuxPlayerViewProps extends ViewProps {
+  playbackId: string;
+  onVideoEnd?: () => void;
+}
+
+export default requireNativeViewManager<MuxPlayerViewProps>('MuxPlayer');
+```
+
+Expo Modules offer:
+- Better TypeScript support
+- Easier native module creation
+- Cleaner bridging APIs
+- Built-in event handling
+
+**Learn more**: [Expo Modules Documentation](https://docs.expo.dev/modules/overview/)
+
+---
+
+## Pros and Cons
+
+### Pros of Native Bridging
+
+✅ **Access to advanced features** - DRM, PiP, native controls
+✅ **Better performance** - Direct native rendering
+✅ **Platform features** - AirPlay, Chromecast, system integration
+✅ **More control** - Fine-grained control over player behavior
+✅ **Offline support** - DRM-protected offline playback
+
+### Cons of Native Bridging
+
+❌ **Increased complexity** - Two codebases (iOS + Android)
+❌ **Maintenance burden** - Keep native modules updated
+❌ **Harder debugging** - Debug across JavaScript and native layers
+❌ **Slower iteration** - Native changes require rebuilds
+❌ **Team requirements** - Need iOS and Android developers
+❌ **Risk of bugs** - More code = more potential issues
+
+---
+
+## Decision Framework
+
+Use this decision tree to determine if you need native bridging:
+
+```
+Do you need DRM?
+├─ Yes → Consider native bridging
+└─ No → Do you need advanced features (PiP, AirPlay, Chromecast)?
+    ├─ Yes → Consider native bridging
+    └─ No → Do you have performance issues with react-native-video?
+        ├─ Yes → Try optimization first, then consider native
+        └─ No → **Stick with react-native-video** ✅
+```
+
+**Questions to ask:**
+1. Can I achieve this with react-native-video?
+2. Have I exhausted optimization options?
+3. Do I have iOS/Android developers on the team?
+4. Is the added complexity worth it?
+5. Can I maintain this long-term?
+
+If you answered "no" to questions 3, 4, or 5, **stick with JavaScript solutions**.
+
+---
+
+## Third-Party Solutions
+
+Before building your own bridge, check for existing solutions:
+
+### React Native Video DRM
+Some community packages add DRM support to react-native-video:
+- `react-native-video` (has basic DRM support built-in)
+- Check npm for DRM extensions
+
+### Expo Video
+Expo's video package includes some native features:
+- `expo-av` - Basic native video support
+- Works in Expo Go
+- No custom bridge needed
+
+### Commercial Solutions
+- **Bitmovin Player** - Commercial player with React Native SDK
+- **THEOplayer** - Another commercial option
+- Often include support and maintenance
+
+---
+
+## Resources
+
+### Official Documentation
+- [Mux Player iOS](https://github.com/muxinc/mux-player-ios)
+- [Mux Player Android](https://github.com/muxinc/mux-player-android)
+- [React Native Native Modules (iOS)](https://reactnative.dev/docs/native-modules-ios)
+- [React Native Native Modules (Android)](https://reactnative.dev/docs/native-modules-android)
+- [Expo Modules](https://docs.expo.dev/modules/overview/)
+
+### Tutorials
+- [Building Native Modules for React Native](https://reactnative.dev/docs/native-modules-intro)
+- [React Native Bridging Tutorial](https://reactnative.dev/docs/communication-ios)
+- [Expo Modules Tutorial](https://docs.expo.dev/modules/get-started/)
+
+---
+
+## Recommendation
+
+**For most React Native + Mux apps:**
+
+1. **Start with react-native-video** ✅
+   - Covers 95% of use cases
+   - Simple to implement
+   - Easy to maintain
+
+2. **Optimize JavaScript first**
+   - Follow [Best Practices guide](/docs/guides/react-native/best-practices)
+   - Profile and fix performance issues
+   - Consider caching and preloading
+
+3. **Only consider native bridging if:**
+   - You absolutely need DRM
+   - JavaScript performance is insufficient after optimization
+   - You have iOS/Android developers available
+   - You're prepared for ongoing maintenance
+
+4. **If you do bridge:**
+   - Start with Expo Modules if using Expo
+   - Focus on one platform first (iOS or Android)
+   - Thoroughly document your bridge code
+   - Set up comprehensive tests
+   - Plan for long-term maintenance
+
+---
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Best Practices"
+    description="Optimize your JavaScript solution before considering native bridging"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/best-practices"},
+    ]}
+  />
+  <GuideCard
+    title="Example App"
+    description="See a complete implementation using JavaScript solutions"
+    links={[
+      {title: "View the example", href: "/docs/guides/react-native/example-app"},
+    ]}
+  />
+  <GuideCard
+    title="React Native Native Modules"
+    description="Official React Native documentation for building native modules"
+    links={[
+      {title: "Read the docs", href: "https://reactnative.dev/docs/native-modules-intro"},
+    ]}
+  />
+</GuideCards>

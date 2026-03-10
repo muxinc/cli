@@ -1,0 +1,483 @@
+---
+title: Samsung-Tizen
+product: data
+dataIntegration: true
+description: This guide walks through integration with Samsung Tizen to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Include the Mux Data SDK
+    description: Install `tizen-mux` either from our CDN or include the script in your application.
+  - title: 2. Initialize Mux Data
+    description: Attach `tizen-mux` to your player so that Mux can collect playback metrics.
+  - title: 3. Make your data actionable
+    description: Use metadata fields to make the data collected by Mux actionable and useful.
+  - title: 4. Advanced options
+    description: Depending on the details of your implementation, you may want to leverage some of the advanced options.
+  - title: Release notes
+    topic: notes
+---
+
+Mux Data is the best way to monitor video streaming performance.
+
+Integration is easy - just initialize the Mux SDK, pass in some metadata, and you're up and running in minutes.
+
+This documents integration instructions for Samsung Tizen TVs. For other players, see the additional Integration Guides.
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+Mux Data supports applications built for Samsung Tizen TVs using JavaScript and Tizen's [AVPlay API](https://developer.samsung.com/tv/develop/api-references/samsung-product-api-references/avplay-api). The Samsung Tizen Smart TV SDK supports C++, JavaScript, and Microsoft .NET; this SDK is only compatible with JavaScript applications using AVPlay.
+
+Include the Mux Data SDK by including the `tizen-mux.js` JavaScript file within your `index.html` file defining your application. You can use the Mux-hosted version of the script to receive automatic updates. (The API will not change within major versions, as in `tizen/MAJOR_VERSION/tizen-mux.js`.)
+
+```html
+<!-- place within the <head> of your index.html -->
+<script src="//src.litix.io/tizen/2/tizen-mux.js"></script>
+```
+
+<LinkedHeader step={steps[2]} />
+
+To monitor video playback within your Tizen application, pass the AVPlay player instance to `monitorTizenPlayer` along with SDK options and metadata.
+
+```js
+// Place in your application initialization code, around
+// where you call `prepare`
+
+var player = $('#my-player').get(0);
+player.url = this.url;
+var playerInitTime = monitorTizenPlayer.utils.now();
+this.prepare();
+monitorTizenPlayer(player, {
+  debug: true,
+  data: {
+    env_key: 'ENV_KEY', // required
+    // Metadata
+    player_name: 'Custom Player', // ex: 'My Main Player'
+    player_init_time: playerInitTime,
+    // ... additional metadata
+  },
+  // Optional passthrough listener
+  playbackListener: playbackListener
+});
+```
+
+Tizen's AVPlay API does not allow multiple AVPlayPlaybackCallback listeners to be registered to a player. If you require your own listener to be registered, you must pass this in as `playbackListener` as shown above. Mux's SDK will proxy the calls to your listener. (Note: the location of this changed with v1.0.0)
+
+To stop monitoring your player (e.g. when playback is complete), call `player.mux.stopMonitor()`.
+
+Log in to the Mux dashboard and find the environment that corresponds to your `env_key` and look for video views. It takes about a minute or two from tracking a view for it to show up on the Metrics tab.
+
+**If you aren't seeing data**, check to see if you have an ad blocker, tracking blocker or some kind of network firewall that prevents your player from sending requests to Mux Data servers.
+
+<LinkedHeader step={steps[3]} />
+
+[Detailed Documentation](/docs/guides/make-your-data-actionable-with-metadata)
+
+Options are provided via the data object passed in the call to `monitorTizenPlayer`.
+
+All metadata details except for `env_key` are optional, however you'll be able to compare and see more interesting results as you include more details. This gives you more metrics and metadata about video streaming, and allows you to search and filter on important fields like the player version, CDN, and video title.
+
+```js
+monitorTizenPlayer(player, {
+  debug: false,
+  data: {
+    env_key: 'ENV_KEY', // required
+    // Site Metadata
+    viewer_user_id: '', // ex: '12345'
+    experiment_name: '', // ex: 'player_test_A'
+    sub_property_id: '', // ex: 'cus-1'
+    // Player Metadata
+    player_name: '', // ex: 'My Main Player'
+    player_version: '', // ex: '1.0.0'
+    player_init_time: '', // ex: 1451606400000
+    // Video Metadata
+    video_id: '', // ex: 'abcd123'
+    video_title: '', // ex: 'My Great Video'
+    video_series: '', // ex: 'Weekly Great Videos'
+    video_duration: '', // in milliseconds, ex: 120000
+    video_stream_type: '', // 'live' or 'on-demand'
+    video_cdn: '' // ex: 'Fastly', 'Akamai'
+  }
+});
+```
+
+For more information, see the [Metadata Guide](/docs/guides/make-your-data-actionable-with-metadata).
+
+<LinkedHeader step={steps[4]} />
+
+### Customize beacon collection domain
+
+<MdxImport snippet="sdkWebCustomizeBeaconCollection" />
+
+```js
+monitorTizenPlayer(player, {
+  debug: false,
+  beaconCollectionDomain: 'CUSTOM_DOMAIN', //ex: 'foo.bar.com'
+  data: {
+    env_key: 'ENV_KEY', // required
+    // ,,,
+  }
+});
+```
+
+<Releases>
+<LinkedHeader step={steps[5]} />
+
+### Current release
+
+#### v2.15.18
+
+- fix issue where playing time might accumulate for paused players
+  - Updated dependency: `mux-embed` to v5.17.1
+
+### Previous releases
+
+#### v2.15.17
+
+- add compatibility for dash.js 5
+  - Updated dependency: `mux-embed` to v5.17.0
+
+#### v2.15.16
+
+- Update parsing of initial value for player_playback_mode
+  - Updated dependency: `mux-embed` to v5.16.1
+
+#### v2.15.15
+
+- Add Playback Range Tracker for new engagement metrics
+  - Updated dependency: `mux-embed` to v5.16.0
+
+#### v2.15.14
+
+- Automatically detect playback mode changes for HTML 5 Video
+  - Updated dependency: `mux-embed` to v5.15.0
+
+#### v2.15.13
+
+- Emit a renditionchange event at the start of views to eanble updated rendition tracking.
+  - Updated dependency: `mux-embed` to v5.14.0
+
+#### v2.15.12
+
+- Add ad type metadata to Ad Events
+- Add support for the upcoming Playback Mode changes:
+  - Updated dependency: `mux-embed` to v5.13.0
+
+#### v2.15.11
+
+- SDKs will no longer immediately send error events that are flagged as warnings. Fatal errors will still immediately be sent.
+  - Updated dependency: `mux-embed` to v5.12.0
+
+#### v2.15.10
+
+- Allow dev to specify page starting load and page finished loading times to calculate Page Load Time
+  - Updated dependency: `mux-embed` to v5.11.0
+
+#### v2.15.9
+
+- Adds support for cdnchange events
+  - Updated dependency: `mux-embed` to v5.10.0
+
+#### v2.15.8
+
+- Submit Aggregate Startup Time when autoplay is set
+  - Updated dependency: `mux-embed` to v5.9.1
+
+#### v2.15.7
+
+- Update `mux-embed` to v5.9.0
+
+#### v2.15.6
+
+- Update `mux-embed` to v5.8.3
+
+#### v2.15.5
+
+- Update `mux-embed` to v5.8.2
+
+#### v2.15.4
+
+- Update `mux-embed` to v5.8.1
+
+#### v2.15.3
+
+- Update `mux-embed` to v5.8.0
+
+#### v2.15.2
+
+- Update `mux-embed` to v5.7.0
+
+#### v2.15.1
+
+- Update `mux-embed` to v5.6.0
+
+#### v2.15.0
+
+- Update mechanism for generating unique IDs, used for `view_id` and others
+
+- Update `mux-embed` to v5.5.0
+
+#### v2.14.3
+
+- [chore] internal build process fix (no functional changes)
+- Update `mux-embed` to v5.4.3
+
+#### v2.14.2
+
+- Update `mux-embed` to v5.4.2
+
+#### v2.14.1
+
+- Update `mux-embed` to v5.4.1
+
+#### v2.14.0
+
+- Add updateData function that allows Mux Data metadata to be updated mid-view.
+
+- Update `mux-embed` to v5.4.0
+
+#### v2.13.6
+
+- Update `mux-embed` to v5.3.3
+
+#### v2.13.5
+
+- Update `mux-embed` to v5.3.2
+
+#### v2.13.4
+
+- Update `mux-embed` to v5.3.1
+
+#### v2.13.3
+
+- Update `mux-embed` to v5.3.0
+
+#### v2.13.2
+
+- Update `mux-embed` to v5.2.1
+
+#### v2.13.1
+
+- Update `mux-embed` to v5.2.0
+
+#### v2.13.0
+
+- Target ES5 for bundles and validate bundles are ES5
+
+- Update `mux-embed` to v5.1.0
+
+#### v2.12.5
+
+- Update `mux-embed` to v5.0.0
+
+#### v2.12.4
+
+- Update `mux-embed` to v4.30.0
+
+#### v2.12.3
+
+- Update `mux-embed` to v4.29.0
+
+#### v2.12.2
+
+- Update `mux-embed` to v4.28.1
+
+#### v2.12.1
+
+- Update `mux-embed` to v4.28.0
+
+#### v2.12.0
+
+- fix an issue where seek latency could be unexpectedly large
+- fix an issue where seek latency does not include time at end of a view
+
+- Update `mux-embed` to v4.27.0
+
+#### v2.11.3
+
+- Update `mux-embed` to v4.26.0
+
+#### v2.11.2
+
+- Update `mux-embed` to v4.25.1
+
+#### v2.11.1
+
+- Update `mux-embed` to v4.25.0
+
+#### v2.11.0
+
+- Fix an issue where beacons over a certain size could get hung and not be sent
+
+- Update `mux-embed` to v4.24.0
+
+#### v2.10.0
+
+- Fix an issue where tracking rebuffering can get into an infinite loop
+
+- Update `mux-embed` to v4.23.0
+
+#### v2.9.5
+
+- Update `mux-embed` to v4.22.0
+
+#### v2.9.4
+
+- Update `mux-embed` to v4.21.0
+
+#### v2.9.3
+
+- Update `mux-embed` to v4.20.0
+
+#### v2.9.2
+
+- Update `mux-embed` to v4.19.0
+
+#### v2.9.1
+
+- Update `mux-embed` to v4.18.0
+
+#### v2.9.0
+
+- Support `player_error_context` in `errorTranslator`
+
+- Update `mux-embed` to v4.17.0
+
+#### v2.8.0
+
+- Adds support for new and updated fields: `renditionchange`, error, DRM type, dropped frames, and new custom fields
+
+- Update `mux-embed` to v4.16.0
+
+#### v2.7.0
+
+- Expose `utils` on SDK initialization function to expose `utils.now()` for `player_init_time`
+
+- Update `mux-embed` to v4.15.0
+
+#### v2.6.5
+
+- Update `mux-embed` to v4.14.0
+
+#### v2.6.4
+
+- Update `mux-embed` to v4.13.4
+
+#### v2.6.3
+
+- Update `mux-embed` to v4.13.3
+
+#### v2.6.2
+
+- Update `mux-embed` to v4.13.2
+
+#### v2.6.1
+
+- Fixes an issue with accessing the global object
+- Update `mux-embed` to v4.13.1
+
+#### v2.6.0
+
+- Upgraded internal webpack version
+
+- Update `mux-embed` to v4.13.0
+
+#### v2.5.8
+
+- Publish package to NPM
+
+#### v2.5.7
+
+- Update `mux-embed` to v4.12.1
+
+#### v2.5.6
+
+- Update `mux-embed` to v4.12.0
+
+#### v2.5.5
+
+- Update `mux-embed` to v4.11.0
+
+#### v2.5.4
+
+- Update `mux-embed` to v4.10.0
+
+#### v2.5.3
+
+- Update `mux-embed` to v4.9.4
+
+#### v2.5.2
+
+- Use common function for generating short IDs
+- Update `mux-embed` to v4.9.3
+
+#### v2.5.1
+
+- Update `mux-embed` to v4.9.2
+
+#### v2.5.0
+
+- Improve rebuffering metrics by using Tizen buffering events instead of playhead tracking
+
+#### v2.4.6
+
+- Update `mux-embed` to v4.9.1
+
+#### v2.4.5
+
+- Update `mux-embed` to v4.9.0
+
+#### v2.4.4
+
+- Update `mux-embed` to v4.8.0
+
+#### v2.4.3
+
+- Update `mux-embed` to v4.7.0
+
+#### v2.4.2
+
+- Update `mux-embed` to v4.6.2
+
+#### v2.4.1
+
+- Update `mux-embed` to v4.6.1
+
+#### v2.4.0
+
+- Bump mux-embed to 4.6.0
+
+#### v2.2.0
+
+- Update mux-embed to v4.2.0
+- Fix an issue where views that resulted from `programchange` may not have been tracked correctly
+- Fix an issue where if `destroy` was called multiple times, it would raise an exception
+
+#### v2.1.0
+
+- Update mux-embed to v4.1.1
+
+#### v2.0.0
+
+- Update mux-embed to v4.0.0
+- Support server-side device detection
+
+#### v1.0.0
+
+- Update to `mux-embed` v3.1.0
+- The mechanism for registering your own AVPlayPlaybackCallback listener changed. Previously, you set this on the player itself, but in v1.0.0 and newer, simply pass it in when you call `monitorTizenPlayer`, alongside the `debug` and `data` options, as `playbackListener`
+
+#### v0.3.0
+
+- Support `programchange`
+- Update to `mux-embed` v2.8.0
+- Fix an issue where `play` event may not have been sent appropriately
+
+#### v0.1.0
+
+- Initial SDK released.
+</Releases>

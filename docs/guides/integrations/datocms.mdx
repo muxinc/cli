@@ -1,0 +1,41 @@
+---
+title: Integrate with DatoCMS
+product: video
+description: >-
+  With every DatoCMS project you also get a native integration with Mux without
+  any manual intervention.
+image:
+  src: /docs/images/datocms-logo-color.svg
+  alt: DatoCMS logo
+  width: 218.641
+  height: 75.889
+---
+
+Mux is by default enabled in every new DatoCMS project. The integration allows you to upload videos directly from DatoCMS dashboard or using the [REST API](https://www.datocms.com/docs/content-management-api). The CMS interface will then allow you to use the videos in the content, while on the API side you’ll be able to retrieve the Mux Video URLs and the thumbnail.
+
+## 1. Upload video
+
+Just drag and drop a video in DatoCMS media area, like this:
+
+<Image src="/docs/images/datocms-upload.gif" width={640} height={360} />
+
+## 2. Fetch video information via GraphQL
+
+For every video that you upload, you can get on the API a custom video object with the following properties:
+
+- HLS video streaming URL.
+- High, medium and low quality MP4 versions of the video to support legacy browsers that do not support HLS.
+- Duration and frame rate of the video.
+- Thumbnail URL: resizable, cropable and available in JPEG, PNG and GIF format.
+
+See the full page of this embedded example [here in the GraphQL explorer](https://cda-explorer.datocms.com/?embed=&apitoken=faeb9172e232a75339242faafb9e56de8c8f13b735f7090964&query=%7B%0A%20%20allUploads%28filter%3A%20%7Btype%3A%20%7Beq%3A%20video%7D%2C%20resolution%3A%20%7B%7D%2C%20smartTags%3A%20%7B%7D%7D%29%20%7B%0A%20%20%20%20video%20%7B%0A%20%20%20%20%20%20streamingUrl%0A%20%20%20%20%20%20mp4High%3A%20mp4Url%28res%3A%20high%29%0A%20%20%20%20%20%20mp4Med%3A%20mp4Url%28res%3A%20medium%29%0A%20%20%20%20%20%20mp4Low%3A%20mp4Url%28res%3A%20low%29%0A%20%20%20%20%20%20duration%0A%20%20%20%20%20%20framerate%0A%20%20%20%20%20%20thumbJpg%3A%20thumbnailUrl%28format%3A%20jpg%29%0A%20%20%20%20%20%20thumbPng%3A%20thumbnailUrl%28format%3A%20png%29%0A%20%20%20%20%20%20thumbGif%3A%20thumbnailUrl%28format%3A%20gif%29%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D%0A).
+
+<iframe
+  src="https://cda-explorer.datocms.com/?embed=&apitoken=faeb9172e232a75339242faafb9e56de8c8f13b735f7090964&query=%7B%0A%20%20allUploads%28filter%3A%20%7Btype%3A%20%7Beq%3A%20video%7D%2C%20resolution%3A%20%7B%7D%2C%20smartTags%3A%20%7B%7D%7D%29%20%7B%0A%20%20%20%20video%20%7B%0A%20%20%20%20%20%20streamingUrl%0A%20%20%20%20%20%20mp4High%3A%20mp4Url%28res%3A%20high%29%0A%20%20%20%20%20%20mp4Med%3A%20mp4Url%28res%3A%20medium%29%0A%20%20%20%20%20%20mp4Low%3A%20mp4Url%28res%3A%20low%29%0A%20%20%20%20%20%20duration%0A%20%20%20%20%20%20framerate%0A%20%20%20%20%20%20thumbJpg%3A%20thumbnailUrl%28format%3A%20jpg%29%0A%20%20%20%20%20%20thumbPng%3A%20thumbnailUrl%28format%3A%20png%29%0A%20%20%20%20%20%20thumbGif%3A%20thumbnailUrl%28format%3A%20gif%29%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D%0A"
+  title="CDA GraphQL Explorer | DatoCMS"
+  width="100%"
+  height="500px"
+  style={{ border: "none" }}
+></iframe>
+
+<MdxImport snippet="cmsIntegrationGuideCards" />

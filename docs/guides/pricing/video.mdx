@@ -1,0 +1,432 @@
+---
+title: Understanding Mux Video Pricing
+description: Learn how Mux Video pricing works and what levers and modifiers there are for you to control costs.
+steps:
+  - title: Input
+    description: Understand what happens when a video is uploaded to Mux and how much it costs. Explore Mux's video quality levels and what they mean for pricing.
+    topic: upload
+  - title: Storage
+    description: Learn about how Mux stores video, what storage costs, and what's included with that price. Control your costs with automatic cold storage.
+    topic: storage
+  - title: Delivery
+    description: Learn about what happens when a viewer watches your video, and how Mux charges for that usage.
+    topic: playback
+  - title: Pricing levers and add-ons
+    description: Explore additional ways to modify the price of video and do more with your assets.
+    topic: settings
+  - title: FAQs
+    description: Get answers to the most common pricing questions.
+    topic: FAQ
+---
+
+Mux pricing is split up into three categories: input, storage, and delivery. In other words, you're charged by how much video you upload every month, how much video you store every month, and how much video your users stream every month.
+
+As you read, keep your eye out for what we call "pricing levers": ways you can suit your costs to your use case. For example, we offer discounts based on volume and resolution. More on those [near the end](#pricing-levers-and-add-ons).
+
+Finally, Mux charges by minute of video inputted, stored, and delivered. [Learn more](https://www.mux.com/blog/why-we-still-price-in-minutes-for-video) about why we charge in minutes instead of bytes. 
+
+Let's get started by talking about the first category of pricing: Input.
+
+<Callout id="higher-usage">
+If you find yourself with higher usage than the tiers described below, [we'd love to talk to you about how we can customize your pricing.](https://www.mux.com/sales-contact?utm_source=docs&utm_campaign=video-pricing)
+</Callout>
+
+<LinkedHeader step={steps[0]}/>
+
+Videos can come in all sorts of different formats, containers, codecs, or countless other variations. When a video is uploaded to Mux, we process it and create a high-quality, standardized version of the video through a process called "encoding." We use that standardized version to deliver any number of bitrates and resolutions based on the viewer's needs, but more on that [later](#delivery).
+
+Mux supports a configurable video quality level on each asset, with three levels, basic, plus, and premium.
+
+The **basic** video quality level uses a reduced encoding ladder, with a lower target video quality, suitable for simpler video use cases. There is no charge for video input when using basic quality. Basic assets are optimized for video use cases with simpler streaming needs, such as social or user-generated content, where high encoding costs may limit your business model.
+
+The **plus** video quality level encodes your video at a consistent high-quality level. Assets encoded with the plus quality use an AI-powered per-title encoding technology that boosts bitrates for high-complexity content, ensuring high-quality video, while reducing bitrates for lower-complexity content to save bandwidth without sacrificing on quality. Plus assets are enhanced quality, perfect for professional or branded content. The plus quality level incurs a cost per video minute of encoding.
+
+The **premium** video quality level uses the same AI-powered per-title encoding technology as plus, but is tuned to optimize for the presentation of premium media content, where the superior video quality is required, including use cases such as studio or cinematic projects. The premium quality level incurs a higher cost per video minute of encoding.
+
+<Callout id="live-streams">
+Live Streams are not available with the basic video quality level; Mux only supports plus and premium video quality levels for Live Streams.
+</Callout>
+
+The default video quality level for assets in new accounts is basic. You can configure your organization's default video quality level in the Settings pane in the dashboard, or after confirming the payment method when you change your plan. This configuration option is only available to account admins. You can also override the default video quality level on a per-asset basis at the time of asset creation.
+
+
+[Learn more about setting video quality levels.](/docs/guides/use-video-quality-levels)
+
+Mux charges by minute of video encoded.
+
+### Basic quality input
+
+[Learn more about setting video quality levels.](/docs/guides/use-video-quality-levels)
+
+On-demand video only.
+
+<PricingTable hideNote>
+| Monthly volume tiers  | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :-------------------- | :--------- | :---- | :------    | :--------- | :---------
+| All volumes | Free | Free | Free | Free | Free
+</PricingTable>
+
+### Plus quality input
+
+[Learn more about setting video quality levels.](/docs/guides/use-video-quality-levels)
+
+Live video is supported up to 1080p and on-demand video up to 4K.
+
+Pricing is per minute.
+
+<PricingTable>
+| Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :------------------- | :--------- | :---- | :--------- | :--------- | :---------
+| First 5,000 minutes | $0.025000 | $0.031250 | $0.050000 | $0.100000 | $0.002500
+| Next 10,000 minutes | $0.023750 | $0.029688 | $0.047500 | $0.095000 | $0.002375
+| Next 10,000 minutes | $0.023125 | $0.028906 | $0.046250 | $0.092500 | $0.002313
+| Over 25,000 minutes | $0.022500 | $0.028125 | $0.045000 | $0.090000 | $0.002250
+</PricingTable>
+
+### Premium quality input
+
+[Learn more about setting video quality levels.](/docs/guides/use-video-quality-levels)
+
+Live video is supported up to 1080p, on-demand video up to 4K.
+
+Pricing is per minute.
+
+<PricingTable>
+| Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :------------------- | :--------- | :---- | :--------- | :--------- | :---------
+| First 5,000 minutes | $0.037500 | $0.046875 | $0.075000 | $0.150000 | $0.002500
+| Next 10,000 minutes | $0.035625 | $0.044531 | $0.071250 | $0.142500 | $0.002375
+| Next 10,000 minutes | $0.034688 | $0.043359 | $0.069375 | $0.138750 | $0.002313
+| Over 25,000 minutes | $0.033750 | $0.042188 | $0.067500 | $0.135000 | $0.002250
+</PricingTable>
+
+## Advanced static rendition (MP4s) preparation
+
+Advanced static renditions are priced per minute of content, per static rendition, based on the resolution of the static rendition that is generated. 
+
+Note that there is no charge for generating standard static rendition MP4s. See the [enabling static MP4 renditions](/docs/guides/enable-static-mp4-renditions) guide for more information.
+
+### Basic and plus quality advanced static rendition preparation
+
+<PricingTable hideNote>
+| Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K)
+| :------------------- | :--------- | :---- | :--------- | :---------
+| First 5,000 minutes | $0.008000 | $0.010000 | $0.016000 | $0.032000
+| Next 10,000 minutes | $0.007600 | $0.009500 | $0.015200 | $0.030400
+| Next 10,000 minutes | $0.007400 | $0.009250 | $0.014800 | $0.029600
+| Over 25,000 minutes | $0.007200 | $0.009000 | $0.014400 | $0.028800
+</PricingTable>
+
+### Premium quality advanced static rendition preparation
+
+<PricingTable hideNote>
+| Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K)
+| :------------------- | :--------- | :---- | :--------- | :---------
+| First 5,000 minutes | $0.012000 | $0.015000 | $0.024000 | $0.048000
+| Next 10,000 minutes | $0.011400 | $0.014250 | $0.022800 | $0.045600
+| Next 10,000 minutes | $0.011100 | $0.013875 | $0.022200 | $0.044400
+| Over 25,000 minutes | $0.010800 | $0.013500 | $0.021600 | $0.043200
+</PricingTable>
+
+<LinkedHeader step={steps[1]}/>
+
+When we talked about input, we mentioned that Mux creates a single, high-quality, standardized version of each video. That step is when most traditional video solutions or providers will create all the different versions of your video for streaming to different devices, which means storing all those different versions indefinitely. Mux, on the other hand, only creates and stores one version of your video because Mux is able to deliver the right versions of the video when your viewers need it. 
+
+With [Automatic Cold Storage](#automatic-cold-storage), Mux automatically applies discounts to infrequently accessed assets. 
+
+Storage is calculated by minute of video stored. Storage is prorated by the percentage of the month that the video is stored. For example, if a 10-minute asset is stored for only half a month, you will be charged for only 5 minutes.
+
+The cost of video storage also includes the storage of primary audio, metadata, and captions. When you pay for the storage of a video, you can also transcode or transmux to normalize inputs, create metadata or thumbnails, and access it in the dashboard or through the API.
+
+Mux Live Streams have the choice to use the plus or premium quality level. Mux offers live streaming up to 1080p.
+
+Mux will automatically start creating an on-demand asset in the background when you begin broadcasting to your live stream. These assets are created and stored as assets with the video quality level you chose for encoding.
+
+### Basic and plus quality storage
+
+[Learn more about setting video quality levels.](/docs/guides/use-video-quality-levels)
+
+**Basic quality** level assets have a minimum storage charge of one month and are prorated thereafter. Basic supports on-demand video only, up to 4K.
+**Plus quality** level does not have a minimum storage change. Plus supports Live video supported up to 1080p and on-demand video up to 4K.
+
+Pricing is per minute per month.
+
+<PricingTable>
+| Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :------------------- | :--------- | :---- | :--------- | :--------- | :---------
+| First 50,000 minutes | $0.002400 | $0.003000 | $0.004800 | $0.009600 | $0.000240
+| Next 100,000 minutes | $0.002320 | $0.002900 | $0.004640 | $0.009280 | $0.000232
+| Next 100,000 minutes | $0.002280 | $0.002850 | $0.004560 | $0.009120 | $0.000228
+| Over 250,000 minutes | $0.002240 | $0.002800 | $0.004480 | $0.008960 | $0.000224
+</PricingTable>
+
+### Premium quality storage
+
+[Learn more about setting video quality levels.](/docs/guides/use-video-quality-levels)
+
+Live video supported up to 1080p and on-demand video up to 4K.
+
+Pricing is per minute per month.
+
+<PricingTable>
+| Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :------------------- | :--------- | :---- | :--------- | :--------- | :---------
+| First 50,000 minutes | $0.003600 | $0.004500 | $0.007200 | $0.014400 | $0.000240
+| Next 100,000 minutes | $0.003480 | $0.004350 | $0.006960 | $0.013920 | $0.000232
+| Next 100,000 minutes | $0.003420 | $0.004275 | $0.006840 | $0.013680 | $0.000228
+| Over 250,000 minutes | $0.003360 | $0.004200 | $0.006720 | $0.013440 | $0.000224
+</PricingTable>
+
+## Static rendition (MP4s) storage
+
+Static renditions are priced per minute of content, per static rendition, per month stored. The pricing is also based on the resolution of the static rendition.
+
+Static rendition storage also benefits from the automatic cold storage feature when content is not viewed, see [Automatic Cold Storage](#automatic-cold-storage) for more information.
+
+### Basic and plus quality static rendition storage
+
+<PricingTable hideNote>
+| Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :--------- | :---- | :--------- | :--------- | :---------
+| $0.000600 | $0.000750 | $0.001200 | $0.002400 | $0.000060
+</PricingTable>
+
+### Premium quality static rendition storage
+
+<PricingTable hideNote>
+| Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :--------- | :---- | :--------- | :--------- | :---------
+| $0.000900 | $0.001125 | $0.001800 | $0.003600 | $0.000060
+</PricingTable>
+
+## Automatic cold storage
+
+With Automatic Cold Storage, we programmatically transition a video or audio-only asset to a different storage level based on how long it has been since it was last viewed. The colder the asset gets, the lower the billing rate becomes.
+
+An asset transitions to `Infrequent` if it has not been played in the last 30 days, and will receive a 40% discount off of the applicable usage-based rate.
+
+An asset transitions to `Cold` if it has not been played in the last 90 days, and will receive a 60% discount off of the applicable usage-based rate.
+
+When an asset is first created, it instantly transitions into the `Cold` tier until the first time it is played.
+
+All assets, including those with static rendition (MP4s) enabled, are eligible for Automatic Cold Storage. Viewing an asset through either the static rendition or the HLS URL will reset the cold storage timer for the entire asset.
+
+Note: [Downloading a master](/docs/guides/download-for-offline-editing) of an asset in infrequent or cold storage will cause the asset to be returned to the frequent storage class, and the cold storage timer to be reset.
+
+### Basic and plus quality automatic cold storage
+
+Pricing is per minute per month.
+
+<PricingTable hideNote>
+| Asset last viewed | Storage tier | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :---------------- | :----------- | :--------- | :---- | :--------- | :--------- | :---------
+| 30+ days ago | `Infrequent` | $0.001440 | $0.001800 | $0.002880 | $0.005760 | $0.000144
+| 90+ days ago | `Cold` | $0.000960 | $0.001200 | $0.001920 | $0.003840 | $0.000096
+</PricingTable>
+
+### Premium quality automatic cold storage
+
+Pricing is per minute per month.
+
+<PricingTable hideNote>
+| Asset last viewed | Storage tier | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :---------------- | :----------- | :--------- | :---- | :--------- | :--------- | :---------
+| 30+ days ago | `Infrequent` | $0.002160 | $0.002700 | $0.004320 | $0.008640 | $0.000144
+| 90+ days ago | `Cold` | $0.001440 | $0.001800 | $0.002880 | $0.005760 | $0.000096
+</PricingTable>
+
+### Basic and plus quality static rendition automatic cold storage
+
+Pricing is per minute per month.
+
+<PricingTable hideNote>
+| Asset last viewed | Storage tier | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :---------------- | :----------- | :--------- | :---- | :--------- | :--------- | :---------
+| 30+ days ago | `Infrequent` | $0.000360 | $0.000450 | $0.000720 | $0.001440 | $0.000036
+| 90+ days ago | `Cold` | $0.000240 | $0.000300 | $0.000480 | $0.000960 | $0.000024
+</PricingTable>
+
+### Premium quality static rendition automatic cold storage
+
+Pricing is per minute per month.
+
+<PricingTable hideNote>
+| Asset last viewed | Storage tier | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+| :---------------- | :----------- | :--------- | :---- | :--------- | :--------- | :---------
+| 30+ days ago | `Infrequent` | $0.000540 | $0.000675 | $0.001080 | $0.002160 | $0.000036
+| 90+ days ago | `Cold` | $0.000360 | $0.000450 | $0.000720 | $0.001440 | $0.000024
+</PricingTable>
+
+<LinkedHeader step={steps[2]}/>
+
+When someone wants to watch a video on Mux, we use a process called “just-in-time encoding,” where we turn that standard, single video file into any number of bitrates and resolutions based on the viewer's needs. This process happens instantly.
+
+In order to deliver video, Mux partners with multiple [CDNs](https://www.mux.com/video-glossary/cdn-content-delivery-network). Videos are delivered over HTTP-based streaming formats like [HLS](https://www.mux.com/video-glossary/hls-http-live-streaming). Video can be delivered to all major video players. If you're looking for a place to start with players, we suggest [Mux Player](https://www.mux.com/player). [Mux Data](https://data.mux.com/) is included with delivery, giving you the ability to monitor your video, including user engagement and quality of experience.
+
+Cost is per minute of video delivered. To calculate video delivered, we measure the number of seconds of video delivered to a video player. Note that if a segment of video is delivered, it is charged, even if the viewer doesn't actually watch the video. For example, if a video player buffers 20 seconds of video ahead of the player, Mux Video still has to deliver those 20 seconds regardless of whether they are watched, and so those seconds are charged.
+
+Mux Live Streams have the choice to use the plus or premium quality level. Mux offers live streaming up to 1080p.
+
+### Basic and plus quality delivery
+
+**Basic quality** level assets support on-demand video only, up to 4K.
+**Plus quality** level supports live video up to 1080p, on-demand video up to 4K.
+
+**The first 100,000 minutes delivered each month, regardless of quality or resolution, are free.**
+
+Pricing is per minute.
+
+<PricingTable>
+Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+:------------------- | :--------- | :---- | :--------- | :--------- | :---------
+First 500,000 minutes | $0.000800 | $0.001000 | $0.001600 | $0.003200 | $0.000080
+Next 500,000 minutes | $0.000760 | $0.000950 | $0.001520 | $0.003040 | $0.000076
+Next million minutes | $0.000720 | $0.000900 | $0.001440 | $0.002880 | $0.000072
+Next 4 million minutes | $0.000670 | $0.000838 | $0.001340 | $0.002680 | $0.000067
+Next 4 million minutes | $0.000610 | $0.000763 | $0.001220 | $0.002440 | $0.000061
+Over 10 million minutes | $0.000560 | $0.000700 | $0.001120 | $0.002240 | $0.000056
+</PricingTable>
+
+### Premium quality delivery
+
+Live video supported up to 1080p, on-demand video up to 4K.
+
+**The first 100,000 minutes delivered each month, regardless of quality or resolution, are free.**
+
+Pricing is per minute.
+
+<PricingTable>
+Monthly volume tiers | Up to 720p | 1080p | 1440p (2K) | 2160p (4K) | Audio-only
+:------------------- | :--------- | :---- | :--------- | :--------- | :---------
+First 500,000 minutes | $0.001200 | $0.001500 | $0.002400 | $0.004800 | $0.000080
+Next 500,000 minutes | $0.001140 | $0.001425 | $0.002280 | $0.004560 | $0.000076
+Next million minutes | $0.001080 | $0.001350 | $0.002160 | $0.004320 | $0.000072
+Next 4 million minutes | $0.001005 | $0.001256 | $0.002010 | $0.004020 | $0.000067
+Next 4 million minutes | $0.000915 | $0.001144 | $0.001830 | $0.003660 | $0.000061
+Over 10 million minutes | $0.000840 | $0.001050 | $0.001680 | $0.003360 | $0.000056
+</PricingTable>
+
+<LinkedHeader step={steps[3]}/>
+
+Mux offers a few ways to suit your pricing to your use case: pricing levers you can pull to move our standard encoding, storage, and delivery pricing up and down, and add-ons you can use to do more with your assets.
+
+### Video quality level
+
+The first pricing lever you should consider is video quality level. Whether you should pick basic, plus, or premium video quality depends on your streaming needs. Read more in the [Input section](#input).
+
+### Resolution-based pricing
+
+Resolution-based pricing tiers are determined by the number of pixels in the video, calculated by multiplying height by width. Tiers apply to encoding, storage, and delivery. An asset may be delivered in multiple resolutions, in which case it will be billed based on minutes delivered in each resolution. Resolution-based discounts are automatically applied.
+
+<PricingTable hideNote>
+| Pricing tier | Pixels | Typical resolution |
+| :----------- | :----- | :----------------- |
+| Up to 720p | Up to 921,600 pixels | 1280x720 |
+| 1080p | Up 921,601 to 2,073,600 pixels | 1920x1080 |
+| 1440p (2K) | 2,073,601 to 4,194,304 pixels | 2560x1440 |
+| 2160p (4K) | 4,194,305 to 8,294,400 pixels | 3840x2160 |
+</PricingTable>
+
+You can control what resolution gets played with [playback modifiers](/docs/guides/modify-playback-behavior). 
+
+2K and 4K resolutions are available for on-demand assets only. 
+
+### Volume discounts
+
+You have a total of 300,000 stored minutes. They're broken down into the following:
+
+- 5,000 basic minutes at 720p
+- 55,000 basic minutes at 1080p
+- 100,000 plus minutes at 1080p 
+- 140,000 plus minutes at 4K 
+
+With volume discounts automatically applied, your storage discounts would be applied like this:
+
+- 5,000 basic quality minutes at 720p - Because those minutes fall into your “first 50,000 minutes, no volume discounts applicable”
+- 55,000 basic quality minutes at 1080p - The first 50,000 minutes of 1080p assets are charged at the first tier. The rest, 5,000 of those minutes, fall into the next tier. 
+- 100,000 plus quality minutes at 1080p - Similarly, discounts aren't available for the first 50,000 minutes of smart 1080p, but are available for the next 50,000 minutes.
+- 140,000 plus quality minutes at 4K - 50,000 of the minutes get no discount, 90,000 do.
+
+If you find yourself with higher usage than the tiers outlined in the Input, Storage, and Delivery above, [we'd love to talk to you about how we can customize your pricing.](https://www.mux.com/sales-contact?utm_source=docs&utm_campaign=video-pricing)
+
+### Audio-only
+
+All on-demand audio-only assets and alternate audio tracks are calculated at 1/10th the cost of 720p basic video for encoding, storage, and delivery, no matter quality level assigned to that asset.
+
+When an asset is set to the basic quality level, encoding is free for both audio-only and video assets.
+
+Your free first 100,000 minutes delivered each month include video and audio minutes.
+
+### Auto-generated live captions
+
+6,000 minutes per month free. 
+$0.024 per minute after. 
+
+Learn how to [add auto-generated live captions](/docs/guides/add-autogenerated-live-captions).
+
+### Live simulcasting
+
+$0.020 per minute per simulcast target.
+
+Learn about [simulcasting](/docs/guides/stream-live-to-3rd-party-platforms).
+
+### Multi-track audio
+
+The primary audio track uploaded with your video file will be included with the encoding, storage, and delivery cost as part of your video. Any additional audio tracks uploaded will be charged at the audio-only rates for encoding, storage, and delivery.
+
+Learn more about [multi-track audio](/docs/guides/add-alternate-audio-tracks-to-your-videos).
+
+### Static renditions (MP4s)
+
+Static renditions are a paid add-on feature.
+
+[Static renditions come in two types: standard and advanced](/docs/guides/enable-static-mp4-renditions). Standard static renditions are free to generate, while advanced static renditions are charged per minute of preparation. [See advanced static rendition preparation pricing.](#advanced-static-rendition-mp4s-preparation).
+
+All static renditions are billed per static rendition, per month stored. Billing is based on the resolution of the static rendition. See static rendition storage pricing in the [Storage section](#static-rendition-mp4s-storage).
+
+For static renditions, each minute downloaded counts as a minute streamed and will be charged according to the video quality level. [Learn more about cost of delivery](/docs/pricing/video#delivery).
+
+[Learn more about enabling MP4 renditions](/docs/guides/enable-static-mp4-renditions).
+
+### Digital Rights Management (DRM)
+
+DRM is an add-on feature to Mux Video, with a $100/month access fee + $0.003 "per license", and discounts available for high volumes. For more details on DRM licenses, see our [DRM pricing documentation](/docs/guides/protect-videos-with-drm#what-is-a-drm-license). 
+
+Learn more about [DRM](/docs/guides/protect-videos-with-drm).
+
+<LinkedHeader step={steps[4]}/>
+
+### What's the difference between the pay as you go plan and pre-pay credits?
+When you pre-pay for credits you get Mux usage at a discounted rate. For example, with Launch credits you get $100 of monthly usage for $20 a month or Scale credits, $1000 of monthly usage for $500 a month.  
+
+Credits are automatically applied to your invoice at the usage rates outlined above. For any usage above your credit amount, you will be billed at pay as you go rates. Credits reset at the beginning of your billing cycle, as long as you’re subscribed to that credits plan.
+
+API access, features, etc, are all the same otherwise. 
+
+You don’t need to purchase pre-pay credits, if you expect your spend to be less than $40, we encourage you to stay on pay as you go. You can upgrade to a pre-pay credit at any time. 
+
+### If pricing is per minute, what happens if I upload a 30-second video? 
+You pay for the exact number of seconds of video. We don't have a minimum or round to the nearest minute.
+
+### Do I pay for every quality/bitrate that is delivered?
+No - if you encode a two-minute video, you pay for two minutes, even if Mux Video delivers that same video in 8 different formats or qualities.
+
+### Is support included in my price?
+Our engineers provide hands-on support via email and chat for everyone. We also offer support packages with Slack and phone support. [Reach out](https://www.mux.com/sales-contact?utm_source=docs&utm_campaign=video-pricing) to us for more information about support packages. 
+
+### How does Mux Data fit in?
+As a Mux Video customer, monitoring your views with Mux Data is included at no additional charge as long as the videos are hosted on Mux. You have access to all data features available on the Data Pay As You Go Plan. When you integrate Mux Data SDKs into your video player or use Mux Player, you'll start getting engagement and QoE data for your videos.
+
+### Do you offer non-profit discounts?
+We offer one-time credits for non-profit customers to help them start using Mux. [Get in touch](https://www.mux.com/sales-contact?utm_source=docs&utm_campaign=video-pricing) to find out more.
+
+### Do you offer custom, contract pricing? 
+Yes! We do have custom plans that are well-suited for scaling and enterprise customers. These plans begin at $3,000/month. [Get in touch](https://www.mux.com/sales-contact?utm_source=docs&utm_campaign=video-pricing) to find out more.
+
+### Do you charge for MP4 downloads?
+
+Yes, see the [Static Renditions (MP4s) section](#static-renditions-mp4s) for more information.
+
+### Does Low-Latency Live Streaming cost extra?
+
+Nope! At Mux, all live streamed video, whether it's standard or low latency, have the same pricing.

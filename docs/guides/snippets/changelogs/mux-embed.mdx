@@ -1,0 +1,453 @@
+### Current release
+
+#### v5.17.1
+
+- fix issue where playing time might accumulate for paused players
+
+### Previous releases
+
+#### v5.17.0
+
+- add compatibility for dash.js 5
+
+#### v5.16.1
+
+- Update parsing of initial value for player_playback_mode
+
+#### v5.16.0
+
+- Add Playback Range Tracker for new engagement metrics
+
+#### v5.15.0
+
+- Automatically detect playback mode changes for HTML 5 Video
+
+#### v5.14.0
+
+- Emit a renditionchange event at the start of views to eanble updated rendition tracking.
+
+#### v5.13.0
+
+- Add ad type metadata to Ad Events
+- Add support for the upcoming Playback Mode changes:
+  - New playbackmodechange event
+  - Two new metrics, ad_playing_time_ms_cumulative and view_playing_time_ms_cumulative, to track playing time by wall clock time
+
+#### v5.12.0
+
+- SDKs will no longer immediately send error events that are flagged as warnings. Fatal errors will still immediately be sent.
+
+#### v5.11.0
+
+- Allow dev to specify page starting load and page finished loading times to calculate Page Load Time
+
+#### v5.10.0
+
+- Adds support for cdnchange events
+
+#### v5.9.1
+
+- Submit Aggregate Startup Time when autoplay is set
+
+#### v5.9.0
+
+- Improve scaling calculation accuracy by using more events for tracking
+
+#### v5.8.3
+
+- add custom 11 through 20 to types
+
+#### v5.8.2
+
+- remove duplicate video_source_mime_type from types
+
+#### v5.8.1
+
+- fix typo in types for viewer_plan
+
+#### v5.8.0
+
+- Add support for video_creator_id
+
+#### v5.7.0
+
+- Add keys for new customer-defined dimensions
+
+#### v5.6.0
+
+- Fix issue where firefox did not send beacons, and some final beacons might not be sent
+
+#### v5.5.0
+
+- Update mechanism for generating unique IDs, used for `view_id` and others
+- Use crypto.randomUUID(), when available, for generating UUID values
+
+#### v5.4.3
+
+- [chore] internal build process fix (no functional changes)
+
+#### v5.4.2
+
+- feat(google-ima): Beta implementation of google-ima extension to mux-embed
+- feat(mux-embed): Add methods for post-initialization overrides of functionality (for internal use only).
+- fix(mux-embed): typecheck for dashjs.getSource is incorrect.
+
+#### v5.4.1
+
+- Expose `updateData` globally and fix types
+- Fix an issue where views were not ended cleanly on long resume detection
+
+#### v5.4.0
+
+- Add updateData function that allows Mux Data metadata to be updated mid-view.
+
+#### v5.3.3
+
+- expose HEARTBEAT and DESTROY under mux.events
+
+#### v5.3.2
+
+- Fix type issues for error severity and business exception
+
+#### v5.3.1
+
+- fix(mux-embed): Remove 3rd party dependencies and replace with appropriately equivalent functionality.
+
+#### v5.3.0
+
+- Ignore request events when emitting heartbeat events
+- Fix an issue where video quality metrics may not be calculated correctly on some devices
+
+#### v5.2.1
+
+- Send hb events regardless of errors
+
+#### v5.2.0
+
+- Bug fix to not de-dupe error event metadata
+- Extend `errorTranslator` to work with `player_error_severity` and `player_error_business_exception`
+
+#### v5.1.0
+
+- Target ES5 for bundles and validate bundles are ES5
+
+- fix an issue where seeking time before first play attempt counted towards video startup time
+
+#### v5.0.0
+
+- Add opt-in TypeScript Types to Mux Embed and use + refactor for other dependent data SDKs. Update published dists to include CJS and ESM.
+- Mux Embed now provides (opt in) TypeScript types in its published package, as well as publishes CJS and ESM versions of the package.
+- This allows us to provide a lower risk and iterative roll out of official TypeScript types for `mux-embed`. The export types updates were required to ensure actual matches between the dist package and corresponding TypeScript types.
+- This _should_ have no direct impact on users, though different build tools will now potentially select one of the new export types (e.g. the ESM "flavor" of `mux-embed`). TypeScript types _should not_ be applied unless they are explicitly referenced in app (discussed in docs updates).
+
+#### v4.30.0
+
+- fix an issue causing certain network metrics to not be available for dashjs v4.x
+
+- fix an issue where certain IDs used may cause a DOM exception to be raised
+
+#### v4.29.0
+
+- fix(mux-embed): avoid using element id for muxId. attach muxId to element.
+
+#### v4.28.1
+
+- fix an issue where beaconDomain deprecation line was incorrectly logged
+
+#### v4.28.0
+
+- Deprecate `beaconDomain` in favor of `beaconCollectionDomain`. The `beaconDomain` setting will continue to function, but integrations should change to `beaconCollectionDomain` instead.
+
+#### v4.27.0
+
+- Fix an issue where playback time was incorrectly counted during seeking and other startup activities
+- Add events for the collection of ad clicks
+- fix an issue where seek latency could be unexpectedly large
+- fix an issue where seek latency does not include time at end of a view
+- Add events for the collection of ad skips
+
+#### v4.26.0
+
+- muxData cookie expiration should be one year
+
+#### v4.25.1
+
+- Do not deduplicate ad IDs in ad events
+
+#### v4.25.0
+
+- Include ad watch time in playback time
+
+#### v4.24.0
+
+- Fix an issue where beacons over a certain size could get hung and not be sent
+
+#### v4.23.0
+
+- Collect Request Id from the response headers, when available, for HLS.js (`requestcompleted` and `requestfailed`) and Dash.js (`requestcompleted`). The following headers are collected: `x-request-Id`, `cf-ray` (Cloudflare), `x-amz-cf-id` (CloudFront), `x-akamai-request-id` (Akamai)
+- Fix an issue where tracking rebuffering can get into an infinite loop
+
+- Update Headers type
+
+#### v4.22.0
+
+- Send errors, `requestfailed`, and `requestcancelled` events on Dash.js. Because of this change, you may see the number of playback failures increase as we now automatically track additional fatal errors.
+
+#### v4.21.0
+
+- Include Ad metadata in ad events
+
+#### v4.20.0
+
+- Support for new dimension, `view_has_ad`
+
+#### v4.19.0
+
+- End views after 5 minutes of rebuffering
+
+#### v4.18.0
+
+- Add audio, subtitle, and encryption key request failures for HLS.js
+- Capture ad metadata for Video.js IMA
+- Capture detailed information from HLS.js for fatal errors in the Error Context
+
+#### v4.17.0
+
+- Extend `errorTranslator` to work with `player_error_context`
+
+#### v4.16.0
+
+- Add new `renditionchange` fields to Shaka SDK
+- Adds support for new and updated fields: `renditionchange`, error, DRM type, dropped frames, and new custom fields
+- Add frame drops to Shaka SDK
+- Add new `renditionchange` info to Web SDKs
+- Adds the new Media Collection Enhancement fields
+
+#### v4.15.0
+
+- update `mux.utils.now` to use `navigationStart` for timing reference
+
+- fix issue where views after `videochange` might incorrectly accumulate rebuffering duration
+- Resolved issue sending beacons when view is ended
+- Record `request_url` and `request_id` with network events
+
+#### v4.14.0
+
+- Tracking FPS changes if specified in Manifest
+
+#### v4.13.4
+
+- Resolved issue sending beacons when paused
+
+#### v4.13.3
+
+- Fixed issue with monitoring network events for hls.js monitor
+
+#### v4.13.2
+
+- Fix an issue with sending unnecessary heartbeat events on the window `visibilitychange` event
+
+#### v4.13.1
+
+- Fixes an issue with accessing the global object
+
+#### v4.13.0
+
+- Collect the `x-request-id` header from segment responses to make it easier to correlate client requests to other logs
+- Upgraded internal webpack version
+
+- Flush events on window `visibilitychange` event
+
+#### v4.12.1
+
+- Use Fetch API for sending beacons
+
+#### v4.12.0
+
+- Generate a new unique view if the player monitor has not received any events for over an hour.
+
+#### v4.11.0
+
+- Detect fullscreen and player language
+
+#### v4.10.0
+
+- Replace query string dependency to reduce package size
+- Remove `ImageBeacon` fallback, removing support for IE9
+
+#### v4.9.4
+
+- Generate all `view_id`'s internally
+
+#### v4.9.3
+
+- Use common function for generating short IDs
+
+#### v4.9.2
+
+- Fixed an issue around the `disablePlayheadRebufferTracking` option
+
+#### v4.9.1
+
+- Fix issue where `getStartDate` does not always return a date object
+
+#### v4.9.0
+
+- Support PDT and player_live_edge_program_time for Native Safari
+
+- Set a max payload size in mux-embed
+
+#### v4.8.0
+
+- Add option `disablePlayheadRebufferTracking` to allow players to disable automatic rebuffering metrics.
+  Players can emit their own `rebufferstart` or `rebufferend` events and track rebuffering metrics.
+
+- Fix an issue with removing `player_error_code` and `player_error_message` when the error code is `1`.
+  Also stops emitting `MEDIA_ERR_ABORTED` as errors.
+- Now leaving Player Software Version for HTML5 Video Element unset rather than "No Versions" as it is no longer needed.
+
+#### v4.7.0
+
+- Add an option to specify beaconCollectionDomain for Data custom domains
+
+#### v4.6.2
+
+- Fix an issue with emitting heartbeat events while the player is not playing
+
+#### v4.6.1
+
+- Fix an issue with removing event listeners from window after the player monitor destroy event
+
+#### v4.6.0
+
+- Update hls.js monitor to record session data with fields prefixed as `io.litix.data.`
+- Update the manifest parser to parse HLS session data tags
+
+#### v4.5.0
+
+- Add short codes to support internal video experiments
+- Collect request header prefixed with `x-litix-*`
+- Capture fatal hls.js errors
+- Make `envKey` an optional parameter
+
+#### v4.4.4
+
+- Add a player events enum on the `mux` object (e.g. `mux.events.PLAY`)
+- Use the browser `visibilitychange` listener instead of `unload` to handle destructuring the player monitor.
+
+#### v4.4.3
+
+- Fix: Specify `video_source_is_live` for HLS.js monitor
+
+#### v4.4.2
+
+- Group events into 10 second batches before sending a beacon
+
+#### v4.4.1
+
+- Exclude latency metrics from beacons if `video_source_is_live` is not `true`
+
+#### v4.4.0
+
+- Add a lightweight HLS manifest parser to capture latency metrics for player's that don't expose an API for accessing the manifest.
+- Allow players to emit `player_program_time` instead of calculating internally
+
+#### v4.3.0
+
+- Add support for calculating latency metrics when streaming using HLS
+
+#### v4.2.5
+
+- Remove default `video_id` when not specified by the developer.
+
+#### v4.2.4
+
+- Add minified keys for latency metrics
+
+#### v4.2.3
+
+- Add minified keys for new program time metrics
+
+#### v4.2.2
+
+- Fix bug causing missing bitrate metrics using HLS.js {'>'}v1.0.0
+
+#### v4.2.1
+
+- (video element monitor) Fix an issue where some non-fatal errors thrown by the video were tracked as playback failures
+
+#### v4.2.0
+
+- Fix an issue where views triggered by `programchange` may not report metrics correctly
+- Fix an issue where calling `el.mux.destroy()` multiple times in a row raised an exception
+
+#### v4.1.1
+
+- Fix an issue where `player_remote_played` wasn't functioning correctly
+
+#### v4.1.0
+
+- Add support for custom dimensions
+
+#### v4.0.1
+
+- Support HLS.js v1.0.0
+
+#### v4.0.0
+
+- Enable sending optional ad quartile events through.
+- Move device detection server-side, improving data accuracy and reducing client SDK size.
+- Fix an issue where jank may be experienced in some web applications when the SDK is loaded.
+
+#### v3.4.0
+
+- Setting to disable rebuffer tracking `disableRebufferTracking` that defaults to `false`.
+
+#### v3.3.0
+
+- Adds `viewer_connection_type` detection.
+
+#### v3.2.0
+
+- Adds support for `renditionchange`.
+
+#### v3.1.0
+
+- Add checks for window being undefined and expose a way for SDKs to pass in platform information. This work is necessary for compatibility with react-native-video.
+
+#### v3.0.0
+
+- Setting to disable Mux Data collection when Do Not Track is present now defaults to off
+- Do not submit the source URL when a video is served using the data: protocol
+
+#### v2.10.0
+
+- Use Performance Timing API, when available, for view event timestamps
+
+#### v2.9.1
+
+- Fix an issue with server side rendering
+
+#### v2.9.0
+
+- Support for Dash.js v3
+
+#### v2.8.0
+
+- Submit Player Instance Id as a unique identifier
+
+#### v2.7.3
+
+- Fixed a bug when using `mux.monitor` with Hls.js or Dash.js the source hostname was not being properly collected.
+
+
+
+
+
+
+
+
+
+
+
+

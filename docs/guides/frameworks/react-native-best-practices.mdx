@@ -1,0 +1,737 @@
+---
+title: Best Practices & Optimization
+product: video
+description: Production-ready patterns for React Native + Mux video apps
+---
+
+# Best Practices & Optimization
+
+This guide covers production best practices for building high-quality video experiences with Mux in React Native. Follow these patterns to ensure your app is performant, secure, and accessible.
+
+## Performance Optimization
+
+### Video Preloading Strategies
+
+Preload the next video's metadata without downloading the entire video. HLS handles adaptive streaming automatically, so focus on reducing startup time.
+
+```tsx
+import { useEffect, useRef } from 'react';
+import Video from 'react-native-video';
+
+function PreloadManager({ videos, currentIndex }: Props) {
+  const nextVideoRef = useRef<Video>(null);
+
+  useEffect(() => {
+    // Preload next video by mounting a hidden Video component
+    // This initializes the HLS connection without auto-playing
+  }, [currentIndex]);
+
+  return (
+    <>
+      {/* Current video (visible) */}
+      <Video
+        source={{ uri: videos[currentIndex].playbackUrl }}
+        style={styles.video}
+      />
+
+      {/* Preload next video (hidden) */}
+      {currentIndex + 1 < videos.length && (
+        <Video
+          ref={nextVideoRef}
+          source={{ uri: videos[currentIndex + 1].playbackUrl }}
+          style={{ display: 'none' }}
+          paused={true}
+          playInBackground={false}
+        />
+      )}
+    </>
+  );
+}
+```
+
+<Callout type="info">
+Don't preload more than 1-2 videos at a time. The HLS protocol handles adaptive bitrate streaming automatically, so you don't need to download entire videos in advance.
+</Callout>
+
+### Memory Management in FlatLists
+
+Properly configure FlatList to avoid memory issues with video feeds:
+
+```tsx
+import { FlatList, Dimensions } from 'react-native';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+<FlatList
+  data={videos}
+  renderItem={({ item, index }) => (
+    <VideoItem
+      video={item}
+      isVisible={index === currentIndex}
+    />
+  )}
+  // Memory optimization
+  windowSize={3} // Render 3 screens worth of content (1 above, current, 1 below)
+  maxToRenderPerBatch={2} // Render 2 items per batch
+  removeClippedSubviews={true} // Remove off-screen views
+  initialNumToRender={1} // Only render first item initially
+
+  // Improve scroll performance
+  getItemLayout={(data, index) => ({
+    length: SCREEN_HEIGHT,
+    offset: SCREEN_HEIGHT * index,
+    index,
+  })}
+
+  // Proper key extraction
+  keyExtractor={(item) => item.id}
+/>
+```
+
+### Avoiding Re-renders
+
+Use React.memo and proper dependency arrays to prevent unnecessary re-renders:
+
+```tsx
+import React, { memo } from 'react';
+
+interface VideoItemProps {
+  video: Video;
+  isActive: boolean;
+  onLike: (videoId: string) => void;
+}
+
+const VideoItem = memo(({ video, isActive, onLike }: VideoItemProps) => {
+  // This component will only re-render if props change
+  return (
+    <Video
+      source={{ uri: video.playbackUrl }}
+      paused={!isActive}
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.isActive === nextProps.isActive
+  );
+});
+
+export default VideoItem;
+```
+
+<Callout type="warning">
+Video components are expensive to render. Always use React.memo for VideoItem components in lists to prevent unnecessary re-renders when sibling items change.
+</Callout>
+
+### Cleanup Video References
+
+Properly cleanup video references to prevent memory leaks:
+
+```tsx
+import { useRef, useEffect } from 'react';
+
+function VideoPlayer({ videoUrl, paused }: Props) {
+  const videoRef = useRef<Video>(null);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup when component unmounts
+      if (videoRef.current) {
+        videoRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <Video
+      ref={videoRef}
+      source={{ uri: videoUrl }}
+      paused={paused}
+    />
+  );
+}
+```
+
+## Network Optimization
+
+### Cellular vs WiFi Detection
+
+Adapt video quality or warn users when on cellular:
+
+```tsx
+import NetInfo from '@react-native-community/netinfo';
+import { useState, useEffect } from 'react';
+
+function useNetworkType() {
+  const [networkType, setNetworkType] = useState<string>('unknown');
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setNetworkType(state.type);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  return networkType;
+}
+
+function VideoPlayer({ videoUrl }: Props) {
+  const networkType = useNetworkType();
+  const [showWarning, setShowWarning] = useState(false);
+
+  useEffect(() => {
+    if (networkType === 'cellular') {
+      setShowWarning(true);
+    }
+  }, [networkType]);
+
+  return (
+    <>
+      {showWarning && (
+        <Callout type="info">
+          You're on cellular data. Video streaming may use significant data.
+        </Callout>
+      )}
+      <Video source={{ uri: videoUrl }} />
+    </>
+  );
+}
+```
+
+### Adaptive Bitrate (ABR)
+
+<Callout type="info">
+HLS automatically handles adaptive bitrate streaming. Mux will serve the appropriate quality based on network conditions. **Don't force quality settings** - let Mux and HLS handle it.
+</Callout>
+
+When using react-native-video, the player automatically adapts quality:
+
+```tsx
+<Video
+  source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+  // NO NEED to set quality manually - HLS handles it
+  resizeMode="contain"
+/>
+```
+
+## Battery Optimization
+
+### Pause Videos When App Backgrounds
+
+Stop video playback when the app goes to background:
+
+```tsx
+import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
+
+function useAppState() {
+  const [appState, setAppState] = useState(AppState.currentState);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      setAppState(nextAppState);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  return appState;
+}
+
+function VideoPlayer({ videoUrl }: Props) {
+  const appState = useAppState();
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    // Pause when app goes to background
+    if (appState === 'background' || appState === 'inactive') {
+      setPaused(true);
+    }
+  }, [appState]);
+
+  return (
+    <Video
+      source={{ uri: videoUrl }}
+      paused={paused}
+    />
+  );
+}
+```
+
+### Reduce Re-renders
+
+Minimize component re-renders to save CPU and battery:
+
+```tsx
+import { useMemo, useCallback } from 'react';
+
+function VideoFeed({ videos }: Props) {
+  // Memoize expensive computations
+  const sortedVideos = useMemo(() => {
+    return videos.sort((a, b) => b.createdAt - a.createdAt);
+  }, [videos]);
+
+  // Memoize callbacks to prevent child re-renders
+  const handleLike = useCallback((videoId: string) => {
+    // Like logic
+  }, []);
+
+  return (
+    <FlatList
+      data={sortedVideos}
+      renderItem={({ item }) => (
+        <VideoItem video={item} onLike={handleLike} />
+      )}
+    />
+  );
+}
+```
+
+## Error Handling Patterns
+
+### Retry Logic for Network Failures
+
+Implement exponential backoff for failed video loads:
+
+```tsx
+import { useState, useEffect } from 'react';
+
+function useVideoWithRetry(videoUrl: string, maxRetries = 3) {
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [currentUrl, setCurrentUrl] = useState(videoUrl);
+
+  const handleError = (err: any) => {
+    if (retryCount < maxRetries) {
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = Math.pow(2, retryCount) * 1000;
+
+      setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        // Force reload by adding cache-busting parameter
+        setCurrentUrl(`${videoUrl}?retry=${retryCount + 1}`);
+      }, delay);
+    } else {
+      setError('Failed to load video after multiple attempts');
+    }
+  };
+
+  return { currentUrl, error, handleError, retryCount };
+}
+
+function VideoPlayer({ videoUrl }: Props) {
+  const { currentUrl, error, handleError, retryCount } = useVideoWithRetry(videoUrl);
+
+  if (error) {
+    return <ErrorView message={error} />;
+  }
+
+  return (
+    <>
+      <Video
+        source={{ uri: currentUrl }}
+        onError={handleError}
+      />
+      {retryCount > 0 && (
+        <Text style={styles.retryText}>
+          Retrying... ({retryCount}/3)
+        </Text>
+      )}
+    </>
+  );
+}
+```
+
+### Fallback UI for Errors
+
+Always provide clear error states:
+
+```tsx
+function ErrorView({ message, onRetry }: Props) {
+  return (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorIcon}>⚠️</Text>
+      <Text style={styles.errorTitle}>Unable to play video</Text>
+      <Text style={styles.errorMessage}>{message}</Text>
+      {onRetry && (
+        <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+          <Text style={styles.retryButtonText}>Tap to retry</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+```
+
+### Logging Errors
+
+Log video errors for debugging:
+
+```tsx
+import { Platform } from 'react-native';
+
+function VideoPlayer({ video }: Props) {
+  const handleError = (error: any) => {
+    // Log to your error tracking service
+    console.error('Video playback error:', {
+      videoId: video.id,
+      playbackId: video.playbackId,
+      platform: Platform.OS,
+      error: error.error,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Show user-friendly error
+    setError('Unable to play video');
+  };
+
+  return (
+    <Video
+      source={{ uri: video.playbackUrl }}
+      onError={handleError}
+    />
+  );
+}
+```
+
+## Accessibility
+
+### Captions and Subtitles
+
+Always provide captions for accessibility. Mux supports WebVTT captions:
+
+```tsx
+<Video
+  source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+  textTracks={[
+    {
+      title: 'English Subtitles',
+      language: 'en',
+      type: 'text/vtt',
+      uri: `https://stream.mux.com/${playbackId}/text/en.vtt`,
+    },
+  ]}
+  selectedTextTrack={{ type: 'title', value: 'English Subtitles' }}
+/>
+```
+
+<Callout type="info">
+Learn how to add captions to your Mux videos in the [Captions and Subtitles guide](/docs/guides/add-captions-subtitles).
+</Callout>
+
+### Screen Reader Support
+
+Provide descriptive labels for screen readers:
+
+```tsx
+import { View, Text } from 'react-native';
+
+<View accessible={true} accessibilityLabel={`Video by ${username}: ${title}`}>
+  <Video
+    source={{ uri: videoUrl }}
+    accessible={true}
+    accessibilityLabel="Video player"
+    accessibilityHint="Double tap to play or pause"
+  />
+  <Text accessibilityRole="text">{title}</Text>
+</View>
+```
+
+### Audio Descriptions
+
+For videos with important visual information, consider audio descriptions:
+
+```tsx
+<Video
+  source={{ uri: videoUrl }}
+  audioOnly={false}
+  textTracks={[
+    {
+      title: 'English Subtitles',
+      language: 'en',
+      type: 'text/vtt',
+      uri: subtitleUrl,
+    },
+    {
+      title: 'Audio Description',
+      language: 'en',
+      type: 'text/vtt',
+      uri: audioDescriptionUrl,
+    },
+  ]}
+/>
+```
+
+## Security
+
+### Use Signed URLs for Private Content
+
+Never expose private videos with public playback IDs. Use signed playback IDs instead:
+
+```tsx
+// Backend: Generate signed URL
+import Mux from '@mux/mux-node';
+
+const mux = new Mux();
+
+function generateSignedUrl(playbackId: string, userId: string) {
+  const token = Mux.JWT.signPlaybackId(playbackId, {
+    keyId: process.env.MUX_SIGNING_KEY_ID!,
+    keySecret: process.env.MUX_SIGNING_KEY_SECRET!,
+    expiration: '1h', // Token expires in 1 hour
+    params: {
+      aud: userId, // Tie token to specific user
+    },
+  });
+
+  return `https://stream.mux.com/${playbackId}.m3u8?token=${token}`;
+}
+
+// React Native: Use signed URL
+<Video source={{ uri: signedUrl }} />
+```
+
+<Callout type="warning">
+**Never expose Mux API keys, signing keys, or secrets in React Native code.** Always generate signed URLs on your backend and send them to the client.
+</Callout>
+
+Learn more in the [Secure Video Playback guide](/docs/guides/secure-video-playback).
+
+### Never Expose API Keys in Client Code
+
+All Mux API calls should go through your backend:
+
+```tsx
+// ❌ NEVER DO THIS
+import Mux from '@mux/mux-node';
+const mux = new Mux({
+  tokenId: 'YOUR_TOKEN_ID', // NEVER in client code!
+  tokenSecret: 'YOUR_TOKEN_SECRET', // NEVER in client code!
+});
+
+// ✅ DO THIS INSTEAD
+async function createUploadUrl() {
+  const response = await fetch('https://your-api.com/generate-upload-url', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${userAuthToken}`,
+    },
+  });
+  return response.json();
+}
+```
+
+## Testing
+
+### Test on Real Devices
+
+Always test video playback on real devices, not just simulators:
+
+- **iOS Simulator**: Works but may have performance differences
+- **Android Emulator**: Often has video codec issues
+- **Real iOS device**: Test on iPhone (different screen sizes)
+- **Real Android device**: Test on multiple manufacturers (Samsung, Google, etc.)
+
+### Test on Slow Networks
+
+Use network throttling to test on poor connections:
+
+```tsx
+// In development, test with React Native debugger network throttling
+// Or use Charles Proxy to simulate slow networks
+
+function VideoPlayer({ videoUrl }: Props) {
+  const [isBuffering, setIsBuffering] = useState(false);
+
+  return (
+    <>
+      <Video
+        source={{ uri: videoUrl }}
+        onBuffer={({ isBuffering }) => setIsBuffering(isBuffering)}
+      />
+      {isBuffering && (
+        <View style={styles.bufferingOverlay}>
+          <ActivityIndicator size="large" />
+          <Text>Buffering...</Text>
+        </View>
+      )}
+    </>
+  );
+}
+```
+
+Test scenarios:
+- 3G network (slow)
+- WiFi with high latency
+- Switching between WiFi and cellular
+- Network interruption and recovery
+
+### Test Video Error States
+
+Manually test error scenarios:
+
+```tsx
+function TestErrorScenarios() {
+  const scenarios = [
+    {
+      name: 'Invalid playback ID',
+      url: 'https://stream.mux.com/invalid.m3u8',
+    },
+    {
+      name: 'Network timeout',
+      url: 'https://stream.mux.com/EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs.m3u8?timeout=1',
+    },
+  ];
+
+  return scenarios.map(scenario => (
+    <TestCase key={scenario.name} scenario={scenario} />
+  ));
+}
+```
+
+## Debugging
+
+### Common Issues and Solutions
+
+**Video won't play:**
+- ✅ Check if asset is in `ready` state (not `preparing`)
+- ✅ Verify playback ID is correct
+- ✅ Check network connectivity
+- ✅ Test on real device (simulator may have codec issues)
+
+**Playback errors:**
+- ✅ Check HLS URL format: `https://stream.mux.com/${playbackId}.m3u8`
+- ✅ Verify CORS headers (if using signed playback)
+- ✅ Check if asset has been deleted
+
+**Performance issues:**
+- ✅ Reduce `windowSize` in FlatList
+- ✅ Use `React.memo` for VideoItem components
+- ✅ Check for memory leaks with React DevTools
+- ✅ Profile with Xcode Instruments (iOS) or Android Profiler
+
+**Upload failures:**
+- ✅ Check file size (Mux supports up to 500GB but mobile apps should limit)
+- ✅ Verify network stability
+- ✅ Implement retry logic with exponential backoff
+- ✅ Check upload URL hasn't expired
+
+### Using Mux Data for Debugging
+
+Mux Data provides insights into playback issues:
+
+```tsx
+import muxReactNativeVideo from '@mux/mux-data-react-native-video';
+
+const MuxVideo = muxReactNativeVideo(Video);
+
+<MuxVideo
+  source={{ uri: videoUrl }}
+  muxOptions={{
+    application_name: 'MyApp',
+    data: {
+      env_key: MUX_DATA_ENV_KEY,
+      video_id: videoId,
+      video_title: videoTitle,
+      // Add debug metadata
+      player_init_time: Date.now(),
+      player_version: '1.0.0',
+    },
+  }}
+/>
+```
+
+Check the Mux Dashboard for:
+- Video startup time
+- Buffering events
+- Error rates
+- Playback failures
+- Quality of experience metrics
+
+### React Native Debugger with Video
+
+When debugging, be aware that video playback may behave differently with remote debugging enabled:
+
+```tsx
+import { Platform } from 'react-native';
+
+const IS_DEBUGGING = __DEV__ && Platform.OS === 'ios';
+
+function VideoPlayer({ videoUrl }: Props) {
+  useEffect(() => {
+    if (IS_DEBUGGING) {
+      console.log('Video debugging enabled:', {
+        url: videoUrl,
+        platform: Platform.OS,
+      });
+    }
+  }, [videoUrl]);
+
+  return <Video source={{ uri: videoUrl }} />;
+}
+```
+
+<Callout type="warning">
+Video performance in the iOS Simulator with remote debugging enabled is significantly slower than on a real device. Always test performance on actual hardware.
+</Callout>
+
+## Production Checklist
+
+Before launching your app, verify:
+
+### Performance
+- [ ] Videos play smoothly on 3G networks
+- [ ] FlatList doesn't cause memory issues with 100+ videos
+- [ ] App doesn't drain battery excessively
+- [ ] Videos pause when app backgrounds
+- [ ] No memory leaks in video components
+
+### Error Handling
+- [ ] Network failures show clear error messages
+- [ ] Retry logic works for transient failures
+- [ ] Invalid playback IDs handled gracefully
+- [ ] Errors logged to tracking service
+
+### Accessibility
+- [ ] Captions available for videos
+- [ ] Screen reader support for video controls
+- [ ] Proper ARIA labels on interactive elements
+
+### Security
+- [ ] No API keys in client code
+- [ ] Private videos use signed playback IDs
+- [ ] Signed URLs have appropriate expiration times
+- [ ] User authentication checked before video access
+
+### Testing
+- [ ] Tested on iOS (multiple screen sizes)
+- [ ] Tested on Android (multiple manufacturers)
+- [ ] Tested on slow networks
+- [ ] Tested error scenarios
+- [ ] Tested with screen reader
+
+### Analytics
+- [ ] Mux Data integrated for all videos
+- [ ] Custom metadata includes user_id, video_id
+- [ ] Dashboard metrics reviewed regularly
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Troubleshooting & FAQ"
+    description="Solutions to common issues and frequently asked questions about React Native + Mux"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/troubleshooting"},
+    ]}
+  />
+  <GuideCard
+    title="Example App"
+    description="Complete reference implementation with all features demonstrated"
+    links={[
+      {title: "See the example", href: "/docs/guides/react-native/example-app"},
+    ]}
+  />
+</GuideCards>

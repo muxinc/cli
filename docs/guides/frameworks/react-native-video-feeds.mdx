@@ -1,0 +1,861 @@
+---
+title: Building Video Feeds
+product: video
+description: Create scrollable video feeds with auto-play like YouTube and Instagram
+---
+
+# Building Video Feeds
+
+This guide shows you how to build performant scrollable video feeds in React Native with Mux. You'll learn patterns for auto-play, preloading, memory management, and infinite scrolling - the foundation for apps like YouTube, Instagram, and TikTok's main feeds.
+
+<Callout type="info">
+This guide covers **horizontal scrolling feeds** (like YouTube) and **vertical scrolling feeds** (like Instagram). For full-screen vertical swiping (Stories/Reels), see the [Stories/Reels UI guide](/docs/guides/react-native/stories-reels-ui).
+</Callout>
+
+## FlatList Fundamentals
+
+React Native's `FlatList` is the foundation for performant video feeds:
+
+```tsx
+import { FlatList } from 'react-native';
+import { VideoCard } from './VideoCard';
+
+interface Video {
+  id: string;
+  playbackId: string;
+  title: string;
+  thumbnailUrl: string;
+  duration: number;
+  views: number;
+}
+
+export function VideoFeed() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item }) => (
+        <VideoCard
+          video={item}
+          isPlaying={item.id === currentlyPlayingId}
+        />
+      )}
+      keyExtractor={(item) => item.id}
+      // Performance optimizations
+      initialNumToRender={3}
+      maxToRenderPerBatch={5}
+      windowSize={5}
+      removeClippedSubviews={true}
+    />
+  );
+}
+```
+
+---
+
+## Visibility Tracking (Auto-Play)
+
+Auto-play videos when they become visible in the viewport:
+
+```tsx
+import { useRef, useState } from 'react';
+import { FlatList, ViewabilityConfig } from 'react-native';
+
+export function VideoFeed() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
+
+  // Configure what counts as "visible"
+  const viewabilityConfig: ViewabilityConfig = {
+    itemVisiblePercentThreshold: 50, // Video is visible when 50% is on screen
+    minimumViewTime: 500, // Must be visible for 500ms
+  };
+
+  // Track which video is currently visible
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      // Get the first fully visible video
+      const visibleVideo = viewableItems.find(
+        (item) => item.isViewable && item.item.playbackId
+      );
+
+      if (visibleVideo) {
+        setVisibleVideoId(visibleVideo.item.id);
+      }
+    } else {
+      // No videos visible, pause all
+      setVisibleVideoId(null);
+    }
+  }).current;
+
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item }) => (
+        <VideoCard
+          video={item}
+          shouldPlay={item.id === visibleVideoId}
+        />
+      )}
+      keyExtractor={(item) => item.id}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+    />
+  );
+}
+```
+
+---
+
+## Video Card Component
+
+Individual video item with auto-play support:
+
+```tsx
+import Video from 'react-native-video';
+import { useState, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+
+interface VideoCardProps {
+  video: Video;
+  shouldPlay: boolean;
+}
+
+export function VideoCard({ video, shouldPlay }: VideoCardProps) {
+  const [paused, setPaused] = useState(!shouldPlay);
+  const [showControls, setShowControls] = useState(false);
+  const [muted, setMuted] = useState(true); // Start muted for auto-play
+
+  const playbackUrl = `https://stream.mux.com/${video.playbackId}.m3u8`;
+  const thumbnailUrl = `https://image.mux.com/${video.playbackId}/thumbnail.jpg`;
+
+  // Sync paused state with shouldPlay prop
+  useEffect(() => {
+    setPaused(!shouldPlay);
+  }, [shouldPlay]);
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => setPaused(!paused)}
+        style={styles.videoContainer}
+      >
+        <Video
+          source={{ uri: playbackUrl }}
+          style={styles.video}
+          resizeMode="cover"
+          paused={paused}
+          muted={muted}
+          repeat={false}
+          poster={thumbnailUrl}
+          posterResizeMode="cover"
+        />
+
+        {/* Mute toggle */}
+        <TouchableOpacity
+          style={styles.muteButton}
+          onPress={() => setMuted(!muted)}
+        >
+          <Text style={styles.muteIcon}>{muted ? '🔇' : '🔊'}</Text>
+        </TouchableOpacity>
+
+        {/* Play/Pause overlay */}
+        {paused && (
+          <View style={styles.pausedOverlay}>
+            <View style={styles.playButton}>
+              <Text style={styles.playIcon}>▶️</Text>
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* Video metadata */}
+      <View style={styles.metadata}>
+        <Text style={styles.title} numberOfLines={2}>
+          {video.title}
+        </Text>
+        <Text style={styles.views}>
+          {video.views.toLocaleString()} views
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 24,
+  },
+  videoContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#000',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+  },
+  pausedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  playButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playIcon: {
+    fontSize: 24,
+  },
+  muteButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muteIcon: {
+    fontSize: 18,
+  },
+  metadata: {
+    marginTop: 12,
+    paddingHorizontal: 4,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4,
+  },
+  views: {
+    fontSize: 14,
+    color: '#666',
+  },
+});
+```
+
+---
+
+## Preloading Strategy
+
+Preload video metadata for smooth playback starts:
+
+```tsx
+import { useEffect, useRef } from 'react';
+
+export function VideoCard({ video, shouldPlay }: VideoCardProps) {
+  const videoRef = useRef<Video>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Preload video when component mounts
+  useEffect(() => {
+    // Video component loads metadata automatically
+    // We just need to track when it's ready
+  }, []);
+
+  return (
+    <Video
+      ref={videoRef}
+      source={{ uri: playbackUrl }}
+      paused={!shouldPlay || !isReady}
+      onLoad={() => setIsReady(true)} // Video is ready to play
+      onBuffer={({ isBuffering }) => {
+        // Handle buffering states
+        if (isBuffering) {
+          setIsLoading(true);
+        }
+      }}
+      onReadyForDisplay={() => {
+        // Video is ready to display
+        setIsReady(true);
+      }}
+    />
+  );
+}
+```
+
+<Callout type="info">
+HLS (the format Mux uses) handles adaptive streaming automatically. You don't need to preload entire videos - just let the HLS manifest load and the player will handle the rest.
+</Callout>
+
+---
+
+## Memory Management
+
+Properly manage memory in video feeds to prevent crashes:
+
+```tsx
+import { FlatList } from 'react-native';
+import React, { memo } from 'react';
+
+// Memoize VideoCard to prevent unnecessary re-renders
+const VideoCard = memo(({ video, shouldPlay }: VideoCardProps) => {
+  return (
+    <Video
+      source={{ uri: `https://stream.mux.com/${video.playbackId}.m3u8` }}
+      paused={!shouldPlay}
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if video ID or shouldPlay changes
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.shouldPlay === nextProps.shouldPlay
+  );
+});
+
+export function VideoFeed() {
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item }) => <VideoCard video={item} />}
+
+      // Memory management
+      windowSize={3} // Render 3 screens worth of content
+      maxToRenderPerBatch={3} // Render 3 items per batch
+      initialNumToRender={2} // Only render 2 items initially
+      removeClippedSubviews={true} // Remove off-screen views (Android)
+
+      // Performance optimizations
+      getItemLayout={(data, index) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+      })}
+    />
+  );
+}
+```
+
+### Cleanup Video References
+
+```tsx
+export function VideoCard({ video, shouldPlay }: VideoCardProps) {
+  const videoRef = useRef<Video>(null);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup when component unmounts
+      if (videoRef.current) {
+        videoRef.current = null;
+      }
+    };
+  }, []);
+
+  return <Video ref={videoRef} />;
+}
+```
+
+---
+
+## Pagination and Infinite Scroll
+
+Load more videos as the user scrolls:
+
+```tsx
+export function VideoFeed() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+
+  // Load initial videos
+  useEffect(() => {
+    loadVideos();
+  }, []);
+
+  const loadVideos = async () => {
+    if (loading || !hasMore) return;
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/videos?page=${page}&limit=10`);
+      const newVideos = await response.json();
+
+      if (newVideos.length === 0) {
+        setHasMore(false);
+      } else {
+        setVideos((prev) => [...prev, ...newVideos]);
+        setPage((prev) => prev + 1);
+      }
+    } catch (error) {
+      console.error('Failed to load videos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEndReached = () => {
+    loadVideos();
+  };
+
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item }) => <VideoCard video={item} />}
+      keyExtractor={(item) => item.id}
+      onEndReached={handleEndReached}
+      onEndReachedThreshold={0.5} // Load more when 50% from bottom
+      ListFooterComponent={
+        loading ? (
+          <View style={styles.loader}>
+            <ActivityIndicator size="large" />
+          </View>
+        ) : null
+      }
+    />
+  );
+}
+```
+
+---
+
+## Pull to Refresh
+
+Allow users to refresh the feed:
+
+```tsx
+import { RefreshControl } from 'react-native';
+
+export function VideoFeed() {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+
+    try {
+      const response = await fetch(`${API_URL}/videos?page=1&limit=10`);
+      const newVideos = await response.json();
+
+      setVideos(newVideos);
+      setPage(2);
+      setHasMore(true);
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item }) => <VideoCard video={item} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor="#007AFF"
+        />
+      }
+    />
+  );
+}
+```
+
+---
+
+## Empty and Error States
+
+Handle empty feeds and errors gracefully:
+
+```tsx
+export function VideoFeed() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Empty state
+  if (!loading && videos.length === 0 && !error) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyIcon}>📹</Text>
+        <Text style={styles.emptyTitle}>No videos yet</Text>
+        <Text style={styles.emptyText}>
+          Check back later for new content!
+        </Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorIcon}>⚠️</Text>
+        <Text style={styles.errorTitle}>Unable to load videos</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => loadVideos()}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Loading state
+  if (loading && videos.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading videos...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item }) => <VideoCard video={item} />}
+    />
+  );
+}
+```
+
+---
+
+## Complete Video Feed Implementation
+
+Here's a complete, production-ready video feed:
+
+```tsx
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  FlatList,
+  View,
+  Text,
+  ActivityIndicator,
+  RefreshControl,
+  StyleSheet,
+  ViewToken,
+} from 'react-native';
+import { VideoCard } from './VideoCard';
+
+interface Video {
+  id: string;
+  playbackId: string;
+  title: string;
+  views: number;
+  duration: number;
+}
+
+const ITEM_HEIGHT = 280; // Approximate height for getItemLayout
+
+export function VideoFeed() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
+
+  // Load initial videos
+  useEffect(() => {
+    loadVideos();
+  }, []);
+
+  const loadVideos = async (isRefresh = false) => {
+    if ((loading && !isRefresh) || !hasMore) return;
+
+    if (isRefresh) {
+      setRefreshing(true);
+      setPage(1);
+      setHasMore(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const currentPage = isRefresh ? 1 : page;
+      const response = await fetch(
+        `${API_URL}/videos?page=${currentPage}&limit=10`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load videos');
+      }
+
+      const newVideos: Video[] = await response.json();
+
+      if (newVideos.length === 0) {
+        setHasMore(false);
+      } else {
+        if (isRefresh) {
+          setVideos(newVideos);
+        } else {
+          setVideos((prev) => [...prev, ...newVideos]);
+        }
+        setPage((prev) => prev + 1);
+      }
+
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Visibility tracking
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 300,
+  }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0) {
+        const visibleItem = viewableItems[0];
+        if (visibleItem.item && visibleItem.isViewable) {
+          setVisibleVideoId(visibleItem.item.id);
+        }
+      } else {
+        setVisibleVideoId(null);
+      }
+    }
+  ).current;
+
+  // Render item
+  const renderItem = ({ item }: { item: Video }) => (
+    <VideoCard
+      video={item}
+      shouldPlay={item.id === visibleVideoId}
+    />
+  );
+
+  // Empty state
+  const renderEmpty = () => {
+    if (loading) return null;
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyIcon}>📹</Text>
+        <Text style={styles.emptyTitle}>No videos yet</Text>
+        <Text style={styles.emptyText}>Check back later for new content!</Text>
+      </View>
+    );
+  };
+
+  // Footer (loading indicator)
+  const renderFooter = () => {
+    if (!loading || videos.length === 0) return null;
+
+    return (
+      <View style={styles.footer}>
+        <ActivityIndicator size="small" color="#007AFF" />
+      </View>
+    );
+  };
+
+  // Error state
+  if (error && videos.length === 0) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorIcon}>⚠️</Text>
+        <Text style={styles.errorTitle}>Unable to load videos</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => loadVideos()}
+        >
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={videos}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.id}
+      // Visibility tracking
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+      // Pagination
+      onEndReached={() => loadVideos()}
+      onEndReachedThreshold={0.5}
+      // Pull to refresh
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => loadVideos(true)}
+        />
+      }
+      // Empty state
+      ListEmptyComponent={renderEmpty}
+      // Footer
+      ListFooterComponent={renderFooter}
+      // Performance
+      initialNumToRender={3}
+      maxToRenderPerBatch={5}
+      windowSize={5}
+      removeClippedSubviews={true}
+      getItemLayout={(data, index) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+      })}
+      // Styling
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={true}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  errorIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  footer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+});
+```
+
+---
+
+## Performance Tips
+
+### Do's ✅
+- Use `React.memo` for VideoCard components
+- Implement proper `getItemLayout` for FlatList
+- Set reasonable `windowSize` (3-5 screens)
+- Use `removeClippedSubviews` on Android
+- Mute videos by default for auto-play
+- Only play one video at a time
+- Cleanup video refs on unmount
+
+### Don'ts ❌
+- Don't render all videos at once
+- Don't play multiple videos simultaneously
+- Don't forget to pause videos when scrolled away
+- Don't load entire videos in advance (HLS handles streaming)
+- Don't skip `keyExtractor` (causes render issues)
+
+---
+
+## Horizontal Video Feed
+
+For YouTube-style horizontal scrolling:
+
+```tsx
+export function HorizontalVideoFeed() {
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item }) => <VideoCard video={item} />}
+      horizontal
+      pagingEnabled
+      showsHorizontalScrollIndicator={false}
+      snapToAlignment="center"
+      decelerationRate="fast"
+      snapToInterval={CARD_WIDTH + CARD_MARGIN}
+    />
+  );
+}
+```
+
+---
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Stories/Reels UI"
+    description="Build full-screen vertical video swiper like TikTok and Instagram Stories"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/stories-reels-ui"},
+    ]}
+  />
+  <GuideCard
+    title="Mux Data Analytics"
+    description="Track video performance and display engagement metrics"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/mux-data-analytics"},
+    ]}
+  />
+  <GuideCard
+    title="Best Practices"
+    description="Optimize video feed performance for production"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/best-practices"},
+    ]}
+  />
+</GuideCards>

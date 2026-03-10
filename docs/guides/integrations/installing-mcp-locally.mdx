@@ -1,0 +1,226 @@
+---
+title: Install the local Mux MCP Server
+description: Set up the Mux Model Context Protocol (MCP) Server locally to bring Mux's Video and Data platform capabilities directly to your AI tools.
+---
+
+<Callout type="info">
+  If you're interested in getting started quickly, and to read more about the MCP server, check out [this guide](/docs/integrations/mcp-server). This guide walks you through building and installing the Mux MCP Server locally on your machine and connecting it to various AI clients.
+</Callout>
+
+The Mux MCP ([Model Context Protocol](https://modelcontextprotocol.io/introduction)) Server brings Mux's Video and Data platform capabilities directly to your AI tools. Once installed, you can upload videos, manage live streams, analyze video performance, and access practically all of Mux's video infrastructure through natural language prompts in supported AI clients.
+
+## Prerequisites
+
+Before installing the Mux MCP Server, make sure you meet the following prerequisites:
+
+- Node.js installed on locally on your machine (instructions available [here](https://nodejs.org/en/download))
+- A Mux account (sign up at [mux.com](https://mux.com/) if you don't have one)
+- Your Mux API access token and secret key from the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens) (detailed instructions are available below)
+- Claude Desktop, Cursor, or any other client that supports local MCP servers, installed and updated to the latest version
+
+## Installation
+
+### Get your Mux API credentials and configure access
+
+1. Log into your [Mux Dashboard](https://dashboard.mux.com/)
+2. Navigate to Settings → Access Tokens
+3. Generate a new access token or use an existing one
+4. Copy your **Access Token ID** and **Secret Key** - you'll need both for the configuration
+
+#### Required Scopes
+
+- Your Mux access token should be configured for your desired Environment and read/write access
+- We recommend clearly labeling this access token in Mux, for example: `MCP Access Token`
+
+**Important:** Replace the placeholder values when adding to your AI client's config using the templates provided below:
+
+- Replace `your_access_token_id` with your actual Mux Access Token ID
+- Replace `your_secret_key` with your actual Mux Secret Key
+
+<Callout type="info">
+  **Note:** If you're using a tool that manages Node versions like Mise, you'll probably need to make sure you execute the npx commands found in the following examples from within that context. An example Mise command could look something like this:
+
+`mise x node@20 -- npx -y @mux/mcp@latest`
+
+Accordingly, the following examples would need to be changed similarly to below:
+
+```json
+      "command": "mise",
+      "args": ["x", "node@20", "--", "npx", "-y", "@mux/mcp@latest","--tools=dynamic","--client=claude"],
+```
+</Callout>
+
+### For Claude
+
+* You must use Claude's Desktop app to install local MCP servers.
+
+We support the recently released [Claude Desktop Extensions](https://www.anthropic.com/engineering/desktop-extensions) format, so you can download [this DXT file](https://github.com/muxinc/mux-node-sdk/releases/download/v12.1.0/mux-mcp.dxt) and open it with Claude Desktop to install it. Once it's installed, configure the environment variables you need and you're good to go.
+
+If you'd like to configure it manually, follow the next steps.
+
+#### Step A: Configure Claude Desktop
+
+Follow [Claude's instructions](https://docs.anthropic.com/en/docs/agents-and-tools/mcp) to locate your Claude Desktop configuration file on your machine.
+
+**macOS/Linux:**
+
+```
+~/Library/Application\ Support/Claude/claude_desktop_config.json
+```
+
+**Windows:**
+
+```
+%APPDATA%\Claude\claude_desktop_config.json
+```
+
+#### Step B: Add the MCP Server configuration
+
+Add this configuration block to your `claude_desktop_config.json` file:
+
+```json
+{
+  "globalShortcut": "",
+  "mcpServers": {
+    "mux": {
+      "command": "npx",
+      "args": ["-y", "@mux/mcp@latest","--tools=dynamic","--client=claude"],
+      "env": {
+        "MUX_TOKEN_ID": "your_access_token_id",
+        "MUX_TOKEN_SECRET": "your_secret_key"
+      }
+    }
+  }
+}
+```
+
+#### Step C: Restart Claude Desktop
+
+Close and reopen Claude Desktop to load the new MCP server configuration.
+
+### For Cursor
+
+#### Step A: Locate the Settings File
+
+Follow the paths below to locate your Cursor MCP configuration file. If the file does not exist, you can create it.
+
+**macOS/Linux:**
+
+```
+~/.cursor/mcp.json
+```
+
+**Windows:**
+
+```
+C:/Users/<username>/.cursor/mcp.json
+```
+
+#### Step B: Add the MCP Server Configuration
+```json
+{
+  "mcpServers": {
+    "mux": {
+      "command": "npx",
+      "args": ["-y", "@mux/mcp@latest","--tools=dynamic","--client=cursor"],
+      "env": {
+        "MUX_TOKEN_ID": "your_access_token_id",
+        "MUX_TOKEN_SECRET": "your_secret_key"
+      }
+    }
+  }
+}
+```
+
+### For VSCode
+
+To add the server to all of your workspaces globally, add the server configuration to your `settings.json` file.
+
+#### Step A: Locate the Settings File
+
+**macOS:**
+
+```
+~/Library/Application\ Support/Code/User/settings.json
+```
+
+**Linux:**
+
+```
+~/.config/Code/User/settings.json
+```
+
+**Windows:**
+
+```
+%APPDATA%\Code\User\settings.json
+```
+
+#### Step B: Add the MCP Server Configuration
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "mux": {
+        "command": "npx",
+        "args": ["-y", "@mux/mcp@latest","--tools=dynamic"],
+        "env": {
+          "MUX_TOKEN_ID": "your_access_token_id",
+          "MUX_TOKEN_SECRET": "your_secret_key"
+        }
+      }
+    }
+  }
+}
+```
+#### Step C: Starting the MCP Server
+
+In VSCode, make sure to click on the `Start` button in the MCP Server to start the server. You can do this directly from the settings file, or from the Command Palette with `MCP: List Servers` .
+
+## Verify installation
+
+Test that the Mux MCP Server is working by asking your AI client:
+
+> Give me the details for the most recently created Mux Video asset (using the Mux tool)
+
+or
+
+> Using the Mux MCP, list the best performing countries for video streaming over the last month using Mux Data
+
+If the installation was successful, Claude will connect to the Mux API through the MCP server and return information about your video performance or assets.
+
+
+## Troubleshooting
+
+**Build Issues**
+
+If you encounter errors during the build process:
+
+- Make sure you have the correct Node.js version installed, and that npx is accessible in your PATH (`npx -v`)
+
+**Connection Issues**
+
+If Claude can't connect to the MCP server:
+
+- Double-check that your file path in the `args` field is correct and points to the built MCP server file
+- Verify your Mux credentials are correct and properly formatted
+- Make sure there are no extra spaces or characters in your token values
+- Confirm your API tokens have the necessary permissions in your Mux account
+
+**Claude Desktop Issues**
+
+If MCP features don't appear in Claude:
+
+- Ensure you're using the latest version of Claude Desktop - older versions may not support MCP
+- Verify your JSON configuration is valid (no missing commas or brackets)
+- Check that Claude Desktop has restarted completely after configuration changes
+
+## Getting help
+
+If you run into issues or have questions:
+
+- Check the [Model Context Protocol documentation](https://modelcontextprotocol.io/quickstart/user) for general MCP setup guidance
+- Review [Claude's MCP documentation](https://docs.anthropic.com/en/docs/agents-and-tools/mcp) for Claude-specific configuration
+- Visit our [API reference](https://docs.mux.com/api-reference) for detailed endpoint documentation
+- Contact support: [mux.com/support](/support)

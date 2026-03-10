@@ -1,0 +1,50 @@
+---
+title: Autoplay your videos
+product: video
+description: Use this guide to understand how to autoplay your videos on web-based players.
+steps:
+---
+
+If you are autoplaying videos with any web based players that use the video element it will help to understand how browsers handle autoplay so that you can provide the best experience for your users. This applies to video elements with the autoplay attribute and anytime you are calling `play()` on a video element (this includes all HTML5 players like VideoJS, JWPlayer, Shaka player, etc.).
+
+Browser vendors are frequently changing their policies when autoplay is allowed and not allowed, so your application should be prepared to deal with both scenarios, and we want to make sure we're tracking your views and errors accurately.
+
+<Callout title="Autoplay with Mux Player">
+Mux Player has some extra options for helping with autoplay that do some of the following recommendations for you. Check out the [Mux Player autoplay guide](/docs/guides/player-core-functionality#autoplay) for details.
+</Callout>
+
+## Increase your chance of autoplay working
+
+There's a few conditions that will increase your chance of autoplay working.
+
+* Your video is muted with the muted attribute.
+* The user has interacted with the page with a click or a tap.
+* (Chrome - desktop) The user’s [Media Engagement Index](https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#mei) threshold has been crossed. Chrome keeps track of how often a user consumes media on a site and if a user has played a lot of media on this site then Chrome will probably allow autoplay.
+* (Chrome - mobile) The user has added the site to their home screen.
+* (Safari) Device is not in power-saving mode.
+
+<Callout type="error" title="Autoplay will never work 100% of the time">
+
+Even if autoplay works when you test it out, you can never rely on it working for every one of your users. Your application must be prepared for autoplay to fail.
+</Callout>
+
+## Avoid the `autoplay` attribute
+
+When you use the `autoplay` attribute on a `<video>` element (it looks like `<video autoplay>`), you have no way to know if the browser blocked or didn't block autoplay.
+
+It is recommended to use `video.play()` instead, which returns a promise and allows you to know if playback played successfully or not. If autoplay worked, the promise will resolve, if autoplay did not work then the promise will reject with an error. The great thing about this approach is that you can choose what to do with the error.
+
+For example: you can report the error to your own error tracking tools or update the UI to reflect this error. Note that Mux's custom error tracking is for tracking fatal errors, so you wouldn't want to report an autoplay failure to Mux because then it will be considered a fatal error.
+
+
+```js
+const video = document.querySelector('#my-video');
+
+video.play().then(function () {
+  // autoplay was successful!
+}).catch(function (error) {
+  // do something if you want to handle or track this error
+});
+```
+
+For further reading, see [the mux blog post](https://mux.com/blog/video-autoplay-considered-harmful/) about this topic.

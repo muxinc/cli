@@ -1,0 +1,396 @@
+---
+title: Play video in React Native
+product: video
+description: Get a Mux video playing in your React Native app in five minutes or less.
+steps:
+  - title: 1. Install `expo-video`
+    description: Install the `expo-video` package to play HLS videos in your React Native application.
+  - title: 2. Create a video player component
+    description: Create a simple video player component that plays a Mux video using a playback ID.
+  - title: 3. Run your app
+    description: Launch your app on iOS or Android to see your video playing.
+---
+
+<LinkedHeader step={steps[0]} />
+
+Mux delivers video using HLS (HTTP Live Streaming), which is natively supported on both iOS and Android. To play Mux videos in React Native, you'll use [`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/), a cross-platform, performant video component with native support for React Native and Expo.
+
+Install the package using your preferred package manager:
+
+```bash
+# npm
+npm install expo-video
+
+# yarn
+yarn add expo-video
+
+# pnpm
+pnpm add expo-video
+```
+
+<Callout type="info">
+  This guide assumes you're using Expo. If you're using bare React Native without Expo, you'll need to install the `expo` package first and configure your project for Expo modules. See the [Expo documentation](https://docs.expo.dev/bare/installing-expo-modules/) for details.
+</Callout>
+
+For iOS in a bare workflow, install the native dependencies:
+
+```bash
+cd ios && pod install && cd ..
+```
+
+<LinkedHeader step={steps[1]} />
+
+Create a new file called `components/video-player.tsx` in your project and add the following code. You'll need a Mux **playback ID** to construct the video URL.
+
+If you don't have a video in Mux yet, you can use this demo playback ID for testing: `OfjbQ3esQifgboENTs4oDXslCP5sSnst`
+
+```tsx
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function VideoPlayer() {
+  // Replace with your own playback ID from https://dashboard.mux.com
+  const playbackId = 'OfjbQ3esQifgboENTs4oDXslCP5sSnst';
+  const videoSource = `https://stream.mux.com/${playbackId}.m3u8`;
+
+  const player = useVideoPlayer(videoSource, (player) => {
+    player.loop = false;
+    player.play();
+  });
+
+  return (
+    <View style={styles.container}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        allowsFullscreen
+        allowsPictureInPicture
+        nativeControls
+        contentFit="contain"
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+});
+```
+
+### Understanding the video URL
+
+Mux videos are streamed using the format:
+
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8
+```
+
+- `{PLAYBACK_ID}` is the unique identifier for your video
+- `.m3u8` is the HLS manifest file format
+
+<Callout type="info">
+  New to Mux? Learn about [playback IDs](/docs/guides/play-your-videos) and [creating video assets](/docs/core/stream-video-files) in the main Mux docs.
+</Callout>
+
+<LinkedHeader step={steps[2]} />
+
+Import and use the `VideoPlayer` component in your app. If you used `create-expo-app`, you'll likely find your main screen at `app/(tabs)/index.tsx` or `app/index.tsx`. Import and add the component:
+
+```tsx
+import VideoPlayer from '@/components/video-player';
+
+export default function HomeScreen() {
+  return <VideoPlayer />;
+}
+```
+
+Then run your app:
+
+```bash
+# Start Expo dev server
+npx expo start
+
+# Press 'i' for iOS or 'a' for Android
+# Or scan the QR code with Expo Go
+```
+
+You should see your video playing with native controls! The video will stream using HLS with adaptive bitrate, automatically adjusting quality based on the viewer's network conditions.
+
+## Common next steps
+
+Now that you have basic playback working, here are some common things you'll want to do:
+
+### Add a poster image (thumbnail)
+
+Mux provides thumbnails for your videos using the same playback ID. Display a poster image that the user taps to start playback:
+
+```tsx highlight=1-2 add=6,9,16-19,31-39,55-59 remove=13
+import React, { useState } from 'react';
+import { StyleSheet, View, Image, Pressable } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function VideoPlayer() {
+  const [showPoster, setShowPoster] = useState(true);
+  const playbackId = 'OfjbQ3esQifgboENTs4oDXslCP5sSnst';
+  const videoSource = `https://stream.mux.com/${playbackId}.m3u8`;
+  const posterSource = `https://image.mux.com/${playbackId}/thumbnail.png?time=0`;
+
+  const player = useVideoPlayer(videoSource, (player) => {
+    player.loop = false;
+    // Don't autoplay - wait for user to tap poster
+  });
+
+  const handlePosterPress = () => {
+    setShowPoster(false);
+    player.play();
+  };
+
+  return (
+    <View style={styles.container}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        allowsFullscreen
+        allowsPictureInPicture
+        nativeControls
+        contentFit="contain"
+      />
+      {showPoster && (
+        <Pressable onPress={handlePosterPress} style={styles.poster}>
+          <Image
+            source={{ uri: posterSource }}
+            style={styles.poster}
+            resizeMode="cover"
+          />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  poster: {
+    position: 'absolute',
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+});
+```
+
+The thumbnail URL format is:
+
+```
+https://image.mux.com/{PLAYBACK_ID}/thumbnail.png?time={SECONDS}
+```
+
+Set `time` to capture a frame at a specific timestamp (e.g., `time=5` for 5 seconds in).
+
+### Handle player events
+
+Track loading, playback progress, and errors using `expo-video`'s event system:
+
+```tsx highlight=2 add=3,13,16-40,44-46,55-63,79-94
+import React from 'react';
+import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
+
+export default function VideoPlayer() {
+  const playbackId = 'OfjbQ3esQifgboENTs4oDXslCP5sSnst';
+  const videoSource = `https://stream.mux.com/${playbackId}.m3u8`;
+
+  const player = useVideoPlayer(videoSource, (player) => {
+    player.loop = false;
+    player.play();
+    player.timeUpdateEventInterval = 0.5; // Update time every 0.5 seconds
+  });
+
+  // Listen to status changes (loading, readyToPlay, error)
+  const { status, error } = useEvent(player, 'statusChange', {
+    status: player.status,
+  });
+
+  // Listen to playback progress
+  const timeUpdate = useEvent(player, 'timeUpdate');
+  const currentTime = timeUpdate?.currentTime ?? 0;
+
+  // Listen to playing state changes
+  const { isPlaying } = useEvent(player, 'playingChange', {
+    isPlaying: player.playing,
+  });
+
+  if (status === 'error' && error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Failed to load video: {error.message}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {status === 'loading' && (
+        <ActivityIndicator size="large" color="#fff" style={styles.loader} />
+      )}
+      <VideoView
+        player={player}
+        style={styles.video}
+        allowsFullscreen
+        allowsPictureInPicture
+        nativeControls
+        contentFit="contain"
+      />
+      <View style={styles.info}>
+        <Text style={styles.infoText}>Status: {status}</Text>
+        <Text style={styles.infoText}>
+          Time: {Math.floor(currentTime)}s / {Math.floor(player.duration)}s
+        </Text>
+        <Text style={styles.infoText}>
+          {isPlaying ? 'Playing' : 'Paused'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  loader: {
+    position: 'absolute',
+  },
+  info: {
+    marginTop: 20,
+    padding: 10,
+  },
+  infoText: {
+    color: '#fff',
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+});
+```
+
+### Support different aspect ratios
+
+For portrait videos (like Stories or Reels), adjust the aspect ratio in your styles:
+
+```tsx highlight=4
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 9 / 16, // Portrait mode
+  },
+});
+```
+
+## Platform considerations
+
+### iOS vs Android
+
+Both iOS and Android have native HLS support, so `expo-video` works seamlessly on both platforms. However, there are a few differences to be aware of:
+
+- **iOS**: HLS playback is handled by AVPlayer
+- **Android**: HLS playback uses ExoPlayer (Media3)
+- **Web**: Uses HTML5 video with HLS.js for HLS support
+
+These differences are handled automatically by `expo-video`, but you may notice slight variations in buffering behavior or UI controls across platforms.
+
+### Expo Go limitations
+
+`expo-video` works with Expo Go for basic playback, but for advanced features like Picture-in-Picture or background playback, you'll need to create a [development build](https://docs.expo.dev/develop/development-builds/introduction/).
+
+<Callout type="warning">
+  Features like Picture-in-Picture (`allowsPictureInPicture`) and background playback require configuration through the [config plugin](#configuration) and a custom development build. These features will not work in Expo Go.
+</Callout>
+
+### Configuration
+
+To enable advanced features, add the `expo-video` config plugin to your `app.json`:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ]
+    ]
+  }
+}
+```
+
+After adding the config plugin, rebuild your app with `eas build` or `npx expo run:ios`/`npx expo run:android`.
+
+## What you've learned
+
+You now know how to:
+- Install and set up `expo-video`
+- Create a video player using the `useVideoPlayer` hook
+- Play Mux videos using playback IDs
+- Display poster images (thumbnails)
+- Handle player events with the `useEvent` hook (status, progress, playback state)
+- Adjust for different aspect ratios
+- Configure advanced features like Picture-in-Picture
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Video playback deep dive"
+    description="Learn about managing video state, custom controls, error handling, and optimizing playback in React Native"
+    links={[
+      {title: "Read the guide", href: "/docs/frameworks/react-native-video-playback"},
+    ]}
+  />
+  <GuideCard
+    title="Upload videos to Mux"
+    description="Learn how to upload videos from React Native or ingest videos from URLs for AI-generated content"
+    links={[
+      {title: "Read the guide", href: "/docs/frameworks/react-native-uploading-videos"},
+    ]}
+  />
+  <GuideCard
+    title="Build a Stories UI"
+    description="Create an Instagram Stories or TikTok-style vertical video feed with swipe navigation"
+    links={[
+      {title: "Read the guide", href: "/docs/frameworks/react-native-stories-reels-ui"},
+    ]}
+  />
+</GuideCards>

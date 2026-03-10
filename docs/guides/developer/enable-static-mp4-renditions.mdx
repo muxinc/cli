@@ -1,0 +1,353 @@
+---
+title: Use static MP4 and M4A renditions
+product: video
+description: Learn how to create downloadable MP4 and M4A files from your videos for offline playback, social media sharing, transcription services, and legacy device support.
+---
+
+<Callout type="info">
+This guide covers using `static_renditions` to create MP4 files, which replaces the deprecated `mp4_support` method. While `mp4_support` continues to function, we recommend using `static_renditions` for all new implementations.
+
+For details on the older method, see [enabling static mp4 renditions using mp4_support](/docs/guides/enable-static-mp4-renditions-using-mp4-support).
+</Callout>
+
+## What are static MP4 and M4A renditions?
+
+Static renditions are downloadable versions of your video assets in MPEG-4 video (`.mp4`) or audio (`.m4a`) format. These files are created alongside the default HLS streaming format and can be used for downloading or streaming the content.
+
+Static renditions allow you to create downloadable files that can be used for:
+
+* Supporting very old devices, like Android < v4.0 (Less than 1% of Android users)
+* Supporting assets that are very short in duration (e.g., < 10s) on certain platforms
+* Embedding a video in [Open Graph cards](/docs/guides/embed-videos-for-social-media) for sharing on sites like Facebook and Twitter
+* Downloading videos for offline viewing
+
+It also allows users to download M4A audio files, which may be useful for:
+* Feeding into transcription services
+* Delivering a streamable audio-only file to an audio element
+* Downloading an audio-only file, useful for things like podcasts
+
+In the majority of other cases, you'll want to use our default HLS (.m3u8) format, which provides a better viewing experience by dynamically adjusting the quality level to the viewer's connection speed.
+The HLS version of a video will also be ready sooner than the MP4 versions, if time-to-ready is important.
+
+## How video quality affects static renditions
+
+Static renditions are created at the same quality level (Basic, Plus, or Premium) as your original Mux video, and will be the highest quality video rendition possible, a specific desired resolution, or an audio-only version. For videos with multiple versions at the highest resolution (which can happen with Premium quality), we'll use the highest quality version available.
+
+## How to enable static renditions
+
+There are several points in an asset's lifecycle where you can enable static renditions. You can enable them when initially creating an asset, add them later to an existing asset, or configure them as part of a direct upload. The method you choose will depend on your workflow and when you determine you need the static renditions.
+
+### During asset creation
+
+You can add static renditions to an asset when <ApiRefLink href="/docs/api-reference/video/assets/create-asset">creating an asset</ApiRefLink> by including the `"static_renditions": []` array parameter and specifying a `{ "resolution": <option> }` object as an array element for each static rendition that should be created.
+
+There two types of static renditions: `standard` and `advanced`. Standard static rendition MP4s provide the most common options for needed for generating static renditions: either the highest video rendition possible, or an audio-only copy of the content. Advanced static rendition MP4s allow you to specify the specific resolution of the static renditions that are generated. Standard static renditions incur a cost for the number of minutes [stored](/docs/pricing/video#static-rendition-mp4s-storage) and [delivered](/docs/pricing/video#static-renditions-mp4s). Advanced static renditions also incur a [cost per minute of MP4s that are generated](/docs/pricing/video#advanced-static-rendition-mp4s-encoding). 
+
+#### Standard Static Rendition Options
+
+The standard static rendtions options are:
+* `highest`: Produces an MP4 file with the video resolution up to 4K (2160p).
+* `audio-only`: Produces an M4A (audio-only MP4) file for a video asset.
+
+One or both options can be specified.  
+
+* For an audio-only asset: The `audio-only` rendition option will produce an M4A file and `highest` is skipped.
+* For a video-only asset: The `highest` rendition option will produce an MP4 file and `audio-only` is skipped.
+
+Here's an example of creating an asset with `static_renditions` specified using the `highest` and `audio-only` options:
+
+```json
+// POST /video/v1/assets
+{
+  "inputs": [
+    {
+      "url": "https://storage.googleapis.com/muxdemofiles/mux.mp4"
+    }
+  ],
+  "playback_policies": [
+    "public"
+  ],
+  "static_renditions" : [ 
+    {
+      "resolution" : "highest"
+    },
+    {
+      "resolution" : "audio-only"
+    }
+  ]
+}
+```
+
+#### Advanced Static Rendition Options
+
+The advanced supported resolutions are:
+* 270p
+* 360p
+* 480p
+* 540p
+* 720p
+* 1080p
+* 1440p
+* 2160p
+
+Mux will not upscale to produce MP4 renditions - renditions that would cause upscaling are “skipped”.
+
+Note that advanced explicit resolution static renditions cannot be mixed with the `highest` standard static rendition. However, they can be generated on the same asset as the `audio-only` rendition. 
+
+Here's an example of creating an asset with `static_renditions` specified using the `720p`, `480p`, and `audio-only` options:
+
+```json
+// POST /video/v1/assets
+{
+  "inputs": [
+    {
+      "url": "https://storage.googleapis.com/muxdemofiles/mux.mp4"
+    }
+  ],
+  "playback_policies": [
+    "public"
+  ],
+  "static_renditions" : [ 
+    {
+      "resolution" : "720p"
+    },
+    {
+      "resolution" : "480p"
+    },
+    {
+      "resolution" : "audio-only"
+    }
+  ]
+}
+```
+
+### After asset creation
+
+You can add static renditions to existing assets retroactively by calling the <ApiRefLink href="/docs/api-reference/video/assets/create-asset-static-rendition">create static rendition API</ApiRefLink>, as shown below. The create static rendition API will need to be called for each static rendition you would like to add to the asset.  
+
+```json
+// POST /video/v1/assets/{ASSET_ID}/static-renditions
+{
+  "resolution" : "highest"
+}
+```
+
+### During direct upload
+
+To enable static renditions for direct upload, you need to specify the same `static_renditions` field within `new_asset_settings`, as shown below:
+
+```json
+// POST /video/v1/uploads
+{
+  "cors_origin": "https://example.com/",
+  "new_asset_settings": {
+    "playback_policies": [
+      "public"
+    ],
+    "static_renditions" : [ 
+      {
+        "resolution" : "highest"
+      }
+    ]
+  }
+}
+```
+
+### During live stream creation
+
+Static renditions can be created from the recorded version of a live stream. This is useful if you want to create downloadable files from a live stream soon after the live stream is finished.
+
+
+If you want to enable static renditions from the recorded version of a future live stream soon after the live stream is finished, use the `static_renditions` property in the `new_asset_settings` when <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">creating the live stream</ApiRefLink>.
+
+```json
+// POST /video/v1/live-streams
+{
+  "playback_policies": [
+    "public"
+  ],
+  "new_asset_settings": {
+    "playback_policies": [
+      "public"
+    ],
+    "static_renditions" : [
+      {
+        "resolution" : "highest"
+      }
+    ]
+  }
+}
+```
+
+### After live stream creation
+
+To update the static renditions that are configured to be created from the recorded version of a future live stream, use the <ApiRefLink href="/docs/api-reference/video/live-streams/update-live-stream-new-asset-settings-static-renditions">update live stream static renditions API</ApiRefLink>..
+
+```json
+// PUT /video/v1/live-streams/{LIVE_STREAM_ID}/new-asset-settings/static-renditions
+{
+  "static_renditions" : [
+    {
+      "resolution" : "highest"
+    },
+    {
+      "resolution" : "audio-only"
+    }
+  ]
+}
+```
+
+## Access static renditions
+
+After adding static renditions, you'll see an additional key on the asset object called `static_renditions`. This is the object that will contain the information about which static renditions are available.
+
+```json
+{
+  ...all asset details...
+  "static_renditions" : [
+    {
+      "id" : "ABC123",
+      "type" : "standard",
+      "status" : "preparing",
+      "resolution" : "highest",
+      "name" : "highest.mp4",
+      "ext":"mp4"
+    },
+    {
+      "id" : "GHI678",
+      "type" : "standard",
+      "status" : "preparing",
+      "resolution" : "audio-only",
+      "name" : "audio.m4a",
+      "ext":"m4a"
+    }
+  ]
+}
+```
+
+<Callout type="info" title="Static rendition status">
+Static renditions take longer to create than our default HLS version of the video, so they will not be ready immediately when the asset status is `ready`.
+
+The `static_renditions[].status` parameter refers to the current status of processing for each of the static renditions. Instead each static rendition will be ready when its `static_renditions[].status` is `ready`, and a `video.asset.static_rendition.ready` webhook is fired.
+</Callout>
+
+You can build the streaming URL by combining the playback ID with the name of the static rendition. The URL follows this pattern:
+
+```html
+https://stream.mux.com/{PLAYBACK_ID}/{STATIC_RENDITION_NAME}
+```
+
+The `name` field in each static rendition object (like `highest.mp4` or `audio.m4a`) is what you'll use as the `STATIC_RENDITION_NAME`.
+
+```
+ex. https://stream.mux.com/abcd1234/highest.mp4
+ex. https://stream.mux.com/abcd1234/audio.m4a
+```
+
+If you want a browser to download the MP4 or M4A file rather than attempt to stream it, you can provide a file name for the static rendition to save it via the `download` query parameter:
+
+```
+https://stream.mux.com/{PLAYBACK_ID}/{STATIC_RENDITION_NAME}?download={SAVED_FILE_NAME}
+```
+
+For example, if you want to save the `highest.mp4` file as `cats.mp4`, you can use the following URL:
+
+```
+ex. https://stream.mux.com/abcd1234/highest.mp4?download=cats
+```
+
+### Accessing static renditions of DRM enabled assets
+You can not access static renditions using the playback ID of a `drm` playback policy. If you want to use static renditions you must add a `public` or `signed` advanced playback policy alongside the `drm` policy.
+
+```json
+// POST /video/v1/assets
+{
+  "inputs": [
+    {
+      "url": "https://storage.googleapis.com/muxdemofiles/mux.mp4"
+    }
+  ],
+  "advanced_playback_policies": [
+    {
+      "policy": "drm",
+      "drm_configuration_id": "your-drm-configuration-id"
+    }, 
+    {
+      "policy": "signed",
+    }
+  ],
+  "static_renditions": [
+    {
+      "resolution": "highest"
+    }
+  ],
+  "video_quality": "plus"
+}
+```
+
+## Remove static renditions
+
+### From an asset
+
+To remove static renditions from an asset, you can use the <ApiRefLink href="/docs/api-reference/video/assets/delete-asset-static-rendition">delete static rendition API</ApiRefLink>. You call the delete static rendition API with the id for each rendition to remove from the asset. The static rendition files will be deleted when they are removed from an asset.
+
+```json
+// DELETE /video/v1/asset/{ASSET_ID}/static-renditions/{STATIC_RENDITION_ID}
+```
+
+To completely disable static renditions on an asset, delete all of the static renditions configured on the asset.
+
+### From future live streams
+
+To remove the static renditions that are configured to be created from the recorded version of a future live stream, use the <ApiRefLink href="/docs/api-reference/video/live-streams/delete-live-stream-new-asset-settings-static-renditions">delete live stream static renditions API</ApiRefLink>.
+
+```javascript
+// DELETE /video/v1/live-streams/{LIVE_STREAM_ID}/new-asset-settings/static-renditions
+```
+
+## Webhooks
+
+Your application can be automatically updated with the status of static renditions for an asset through [webhooks](/docs/core/listen-for-webhooks).
+
+There are five events you can receive, which can be fired for each individual static rendition.
+
+| Webhook       | Description   |
+| :------------ |:--------------|
+|`video.asset.static_rendition.created` |Emitted when a static rendition entry is created and the file is being prepared. |
+|`video.asset.static_rendition.ready` |Emitted when a static rendition is ready to be downloaded. |
+|`video.asset.static_rendition.errored` |Emitted when a static rendition fails to be generated. |
+|`video.asset.static_rendition.skipped` |Emitted when a static rendition is skipped because the requested resolution conflicts with the asset metadata. For example, specifying  `audio-only` for a video-only asset or  `highest` for an audio-only asset.
+|`video.asset.static_rendition.deleted` |Emitted when an individual static rendition is deleted. Note: This event is not emitted when the parent asset is deleted. |
+
+## Signed static rendition URLs
+
+Mux videos have two types of playback policy, `public` or `signed`. If your `playback_id` is `signed`, you will need to also sign requests made for MP4 URLs.
+
+You can check out how to do that in our [signed URLs guide](/docs/guides/secure-video-playback).
+
+If you run into any trouble signing requests, please reach out to [Mux Support](/support) and we'll be able to help.
+
+## Migrate from the deprecated `mp4_support` parameter
+
+Previously, MP4 support was specified using the `mp4_support` parameter on an asset. This method continues to work though it has been deprecated and new functionality will use the `static_renditions` array. 
+
+The `mp4_support` parameter and the `static_renditions` array cannot be used at the same time on an asset. 
+
+To use the `static_renditions` array with assets that have MP4 support enabled using `mp4_support`, you need to first use the <ApiRefLink href="/docs/api-reference/video/assets/update-asset-mp4-support">update asset MP4 support APIs</ApiRefLink>, setting `mp4_support` to `none` to remove the `mp4_support`. Then you can create the static renditions individually as described above.  
+
+```json
+// PUT /video/v1/assets/{ASSET_ID}/mp4-support
+{
+  "mp4_support": "none"
+}
+```
+
+Similarly, the `mp4_support` parameter cannot be used if an asset has existing `static_renditions` specified. Delete the static renditions and the legacy `mp4_support` parameter can be enabled.
+
+## Pricing
+
+Additional storage fees apply for assets that have static renditions enabled.
+
+Streaming of static renditions is charged at the same rate as HLS streaming.
+
+[See pricing documentation for full details](/docs/pricing/video#static-renditions-mp4s)

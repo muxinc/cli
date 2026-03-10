@@ -1,0 +1,858 @@
+---
+title: Complete Example App
+product: video
+description: Reference implementation of a full-featured React Native video app with Mux
+---
+
+# Complete Example App: Slop Social
+
+This guide walks through **Slop Social**, a complete reference implementation that demonstrates all the patterns covered in this documentation. Slop Social is an AI-generated video social media app with Instagram Stories-style video playback.
+
+## Overview
+
+**Slop Social** is a React Native app where users:
+1. Generate videos using AI prompts
+2. Videos are automatically uploaded to Mux
+3. Browse AI-generated videos in a Stories-style vertical feed
+4. See engagement metrics (views, likes)
+5. Interact with videos (like, comment, share)
+
+**GitHub Repository**: [github.com/mux/slop-social](https://github.com/mux/slop-social) _(example link)_
+
+## What's Demonstrated
+
+This example app showcases every pattern from the React Native + Mux documentation:
+
+### Video Playback
+- ✅ HLS streaming with react-native-video
+- ✅ Stories/Reels vertical swipe interface
+- ✅ Auto-play on scroll
+- ✅ Custom video controls
+- ✅ Fullscreen support
+- ✅ Loading and error states
+
+### Upload & Processing
+- ✅ Upload videos from URL (AI-generated)
+- ✅ Direct upload from device (camera/library)
+- ✅ Async processing with webhooks
+- ✅ Real-time status updates (Supabase Realtime)
+- ✅ Progress indicators
+
+### Analytics
+- ✅ Mux Data integration
+- ✅ View counts
+- ✅ Real-time viewer counts
+- ✅ Engagement metrics
+
+### Production Best Practices
+- ✅ Performance optimization
+- ✅ Error handling and retry logic
+- ✅ Memory management in lists
+- ✅ Network detection
+- ✅ Accessibility features
+
+## Architecture
+
+```
+┌─────────────────┐
+│  React Native   │
+│   (Expo App)    │
+└────────┬────────┘
+         │
+         ├─ Video Playback ──────► Mux Stream (stream.mux.com)
+         │
+         ├─ API Requests ─────────► Backend (Supabase Edge Functions)
+         │                              │
+         │                              ├─ Mux API (create assets, uploads)
+         │                              ├─ AI Service (Fal.ai)
+         │                              └─ Webhooks (video.asset.ready)
+         │
+         └─ Realtime Updates ──────► Supabase Realtime DB
+```
+
+### Tech Stack
+
+**Frontend:**
+- React Native (Expo)
+- TypeScript
+- react-native-video (playback)
+- @mux/mux-data-react-native-video (analytics)
+- react-native-gesture-handler (interactions)
+- react-native-reanimated (animations)
+
+**Backend:**
+- Supabase (database, auth, realtime, edge functions)
+- Node.js (edge functions runtime)
+
+**Video:**
+- Mux (video hosting, streaming, analytics)
+- Fal.ai (AI video generation)
+
+## Key Features
+
+### 1. Stories Feed (`screens/StoriesFeed.tsx`)
+
+The main feature - Instagram Stories-style vertical video feed:
+
+```tsx
+import { FlatList, Dimensions } from 'react-native';
+import { StoryItem } from '../components/StoryItem';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+export function StoriesFeed() {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Load videos from API
+  useEffect(() => {
+    loadVideos();
+  }, []);
+
+  // Track which video is visible
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      setCurrentIndex(viewableItems[0].index);
+    }
+  }).current;
+
+  return (
+    <FlatList
+      data={videos}
+      renderItem={({ item, index }) => (
+        <StoryItem
+          video={item}
+          isActive={index === currentIndex}
+        />
+      )}
+      pagingEnabled
+      snapToInterval={SCREEN_HEIGHT}
+      snapToAlignment="start"
+      decelerationRate="fast"
+      showsVerticalScrollIndicator={false}
+      windowSize={3}
+      removeClippedSubviews
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={{
+        itemVisiblePercentThreshold: 80,
+      }}
+      getItemLayout={(data, index) => ({
+        length: SCREEN_HEIGHT,
+        offset: SCREEN_HEIGHT * index,
+        index,
+      })}
+    />
+  );
+}
+```
+
+**Demonstrates:**
+- Full-screen vertical paging
+- Visibility tracking for auto-play
+- Memory optimization
+- Performance best practices
+
+---
+
+### 2. Story Item (`components/StoryItem.tsx`)
+
+Individual video with overlay UI:
+
+```tsx
+import Video from 'react-native-video';
+import { VideoOverlay } from './VideoOverlay';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import muxReactNativeVideo from '@mux/mux-data-react-native-video';
+
+const MuxVideo = muxReactNativeVideo(Video);
+
+export function StoryItem({ video, isActive }: Props) {
+  const [paused, setPaused] = useState(!isActive);
+  const [liked, setLiked] = useState(false);
+
+  // Auto-play when active
+  useEffect(() => {
+    setPaused(!isActive);
+  }, [isActive]);
+
+  // Gesture handlers
+  const singleTap = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => setPaused(prev => !prev));
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => handleLike());
+
+  const taps = Gesture.Exclusive(doubleTap, singleTap);
+
+  return (
+    <View style={styles.container}>
+      <GestureDetector gesture={taps}>
+        <MuxVideo
+          source={{ uri: video.playbackUrl }}
+          style={styles.video}
+          paused={paused}
+          resizeMode="cover"
+          repeat
+          muxOptions={{
+            application_name: 'Slop Social',
+            data: {
+              env_key: MUX_DATA_ENV_KEY,
+              video_id: video.id,
+              video_title: video.title,
+              viewer_user_id: currentUserId,
+            },
+          }}
+        />
+      </GestureDetector>
+
+      <VideoOverlay
+        video={video}
+        liked={liked}
+        onLike={handleLike}
+        onComment={handleComment}
+        onShare={handleShare}
+      />
+
+      {liked && <LikeAnimation />}
+    </View>
+  );
+}
+```
+
+**Demonstrates:**
+- Mux Data integration for analytics
+- Gesture detection (tap to pause, double-tap to like)
+- Auto-play based on visibility
+- Video overlays
+
+---
+
+### 3. AI Video Generation (`hooks/useAIVideoGeneration.ts`)
+
+Complete workflow for generating videos with AI:
+
+```tsx
+import { useState } from 'react';
+
+export function useAIVideoGeneration() {
+  const [status, setStatus] = useState<'idle' | 'generating' | 'uploading' | 'processing' | 'ready'>('idle');
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const generateVideo = async (prompt: string) => {
+    try {
+      // Step 1: Call AI service
+      setStatus('generating');
+      const response = await fetch(`${API_URL}/generate-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const { videoUrl, videoId } = await response.json();
+
+      // Step 2: Backend uploads to Mux
+      setStatus('uploading');
+      await fetch(`${API_URL}/ingest-video`, {
+        method: 'POST',
+        body: JSON.stringify({ videoUrl, videoId }),
+      });
+
+      // Step 3: Listen for processing completion
+      setStatus('processing');
+      await waitForVideoReady(videoId);
+
+      setStatus('ready');
+      return videoId;
+
+    } catch (err) {
+      setError(err.message);
+      setStatus('idle');
+      throw err;
+    }
+  };
+
+  return { generateVideo, status, progress, error };
+}
+```
+
+**Demonstrates:**
+- Complete AI video workflow
+- Upload from URL pattern
+- Status tracking through multiple stages
+- Error handling
+
+---
+
+### 4. Realtime Updates (`hooks/useVideoStatus.ts`)
+
+Listen for video processing updates via Supabase Realtime:
+
+```tsx
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+
+export function useVideoStatus(videoId: string) {
+  const [video, setVideo] = useState<Video | null>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Initial fetch
+    const fetchVideo = async () => {
+      const { data } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('id', videoId)
+        .single();
+
+      setVideo(data);
+      setIsReady(data.status === 'ready');
+    };
+
+    fetchVideo();
+
+    // Subscribe to changes
+    const subscription = supabase
+      .channel(`video-${videoId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'videos',
+        filter: `id=eq.${videoId}`,
+      }, (payload) => {
+        const updatedVideo = payload.new as Video;
+        setVideo(updatedVideo);
+        setIsReady(updatedVideo.status === 'ready');
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [videoId]);
+
+  return { video, isReady };
+}
+```
+
+**Demonstrates:**
+- Realtime database subscriptions
+- Async processing handling
+- Status updates from webhooks
+
+---
+
+### 5. Upload from Device (`screens/UploadScreen.tsx`)
+
+Allow users to upload videos from camera or library:
+
+```tsx
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+
+export function UploadScreen() {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const uploadVideo = async () => {
+    // Step 1: Pick video
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (result.canceled) return;
+
+    setUploading(true);
+
+    try {
+      // Step 2: Get upload URL from backend
+      const response = await fetch(`${API_URL}/generate-upload-url`, {
+        method: 'POST',
+      });
+      const { uploadUrl, uploadId } = await response.json();
+
+      // Step 3: Upload to Mux
+      const uploadResult = await FileSystem.uploadAsync(
+        uploadUrl,
+        result.assets[0].uri,
+        {
+          httpMethod: 'PUT',
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        }
+      );
+
+      if (uploadResult.status === 200) {
+        // Step 4: Wait for processing
+        await waitForUploadComplete(uploadId);
+        navigation.navigate('Home');
+      }
+
+    } catch (error) {
+      Alert.alert('Upload failed', error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Button title="Upload Video" onPress={uploadVideo} />
+      {uploading && (
+        <View style={styles.uploadProgress}>
+          <ActivityIndicator size="large" />
+          <Text>Uploading... {Math.round(progress * 100)}%</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+```
+
+**Demonstrates:**
+- Direct upload flow
+- File picker integration
+- Upload progress tracking
+- Error handling
+
+---
+
+### 6. View Analytics (`components/VideoStats.tsx`)
+
+Display engagement metrics:
+
+```tsx
+import { useVideoAnalytics } from '../hooks/useVideoAnalytics';
+
+export function VideoStats({ videoId }: Props) {
+  const { views, liveViewers } = useVideoAnalytics(videoId);
+
+  return (
+    <View style={styles.stats}>
+      <View style={styles.stat}>
+        <Text style={styles.statIcon}>👁</Text>
+        <Text style={styles.statValue}>
+          {views.toLocaleString()} views
+        </Text>
+      </View>
+
+      {liveViewers > 0 && (
+        <View style={styles.stat}>
+          <View style={styles.liveDot} />
+          <Text style={styles.statValue}>
+            {liveViewers} watching now
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// Custom hook
+function useVideoAnalytics(videoId: string) {
+  const [views, setViews] = useState(0);
+  const [liveViewers, setLiveViewers] = useState(0);
+
+  useEffect(() => {
+    // Fetch total views
+    fetch(`${API_URL}/video/${videoId}/views`)
+      .then(r => r.json())
+      .then(data => setViews(data.views));
+
+    // Poll for live viewers
+    const interval = setInterval(async () => {
+      const response = await fetch(`${API_URL}/video/${videoId}/live-viewers`);
+      const data = await response.json();
+      setLiveViewers(data.liveViewers);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [videoId]);
+
+  return { views, liveViewers };
+}
+```
+
+**Demonstrates:**
+- Mux Data API integration
+- View count display
+- Real-time viewer tracking
+- Polling pattern
+
+---
+
+## Backend Structure
+
+### Supabase Edge Functions
+
+**`generate-video`** - Trigger AI video generation
+```typescript
+// supabase/functions/generate-video/index.ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
+serve(async (req) => {
+  const { prompt, userId } = await req.json();
+
+  // Call AI service (Fal.ai)
+  const response = await fetch('https://fal.run/fal-ai/video-gen', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${Deno.env.get('FAL_KEY')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  const { video_url } = await response.json();
+
+  return new Response(
+    JSON.stringify({ videoUrl: video_url }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+});
+```
+
+**`ingest-video`** - Upload video URL to Mux
+```typescript
+// supabase/functions/ingest-video/index.ts
+import Mux from '@mux/mux-node';
+
+const mux = new Mux({
+  tokenId: Deno.env.get('MUX_TOKEN_ID')!,
+  tokenSecret: Deno.env.get('MUX_TOKEN_SECRET')!,
+});
+
+serve(async (req) => {
+  const { videoUrl, videoId } = await req.json();
+
+  const asset = await mux.video.assets.create({
+    input: [{ url: videoUrl }],
+    playback_policy: ['public'],
+  });
+
+  // Save to database
+  await supabase.from('videos').insert({
+    id: videoId,
+    mux_asset_id: asset.id,
+    status: 'preparing',
+  });
+
+  return new Response(JSON.stringify({ assetId: asset.id }));
+});
+```
+
+**`webhooks`** - Handle Mux webhooks
+```typescript
+// supabase/functions/webhooks/index.ts
+import Mux from '@mux/mux-node';
+
+serve(async (req) => {
+  const signature = req.headers.get('mux-signature');
+  const body = await req.text();
+
+  // Verify webhook
+  Mux.Webhooks.verifyHeader(
+    body,
+    signature,
+    Deno.env.get('MUX_WEBHOOK_SECRET')!
+  );
+
+  const event = JSON.parse(body);
+
+  if (event.type === 'video.asset.ready') {
+    const asset = event.data;
+
+    await supabase
+      .from('videos')
+      .update({
+        status: 'ready',
+        playback_id: asset.playback_ids[0].id,
+        duration: asset.duration,
+      })
+      .eq('mux_asset_id', asset.id);
+  }
+
+  return new Response('OK');
+});
+```
+
+**Demonstrates:**
+- Serverless functions (Deno Deploy)
+- Mux SDK usage
+- Webhook handling
+- Database updates
+
+---
+
+## Database Schema
+
+```sql
+-- Videos table
+create table videos (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id),
+  mux_asset_id text unique,
+  playback_id text,
+  status text check (status in ('preparing', 'ready', 'errored')),
+  title text,
+  prompt text, -- AI generation prompt
+  duration float,
+  aspect_ratio text,
+  thumbnail_url text,
+  view_count integer default 0,
+  like_count integer default 0,
+  created_at timestamp with time zone default now()
+);
+
+-- Likes table
+create table likes (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id),
+  video_id uuid references videos(id),
+  created_at timestamp with time zone default now(),
+  unique(user_id, video_id)
+);
+
+-- Realtime setup
+alter publication supabase_realtime add table videos;
+```
+
+---
+
+## How to Run Locally
+
+### Prerequisites
+
+- Node.js 18+
+- Expo CLI (`npm install -g expo-cli`)
+- Mux account ([mux.com](https://mux.com))
+- Supabase account ([supabase.com](https://supabase.com))
+- Fal.ai account ([fal.ai](https://fal.ai))
+
+### Step 1: Clone Repository
+
+```bash
+git clone https://github.com/mux/slop-social.git
+cd slop-social
+npm install
+```
+
+### Step 2: Environment Variables
+
+Create `.env` file:
+
+```bash
+# Mux (Dashboard → Settings → API Access Tokens)
+MUX_TOKEN_ID=your_mux_token_id
+MUX_TOKEN_SECRET=your_mux_token_secret
+MUX_SIGNING_KEY_ID=your_signing_key_id
+MUX_SIGNING_KEY_SECRET=your_signing_key_secret
+MUX_WEBHOOK_SECRET=your_webhook_secret
+
+# Mux Data (Dashboard → Settings → Data)
+EXPO_PUBLIC_MUX_DATA_ENV_KEY=your_mux_data_env_key
+
+# Supabase (Dashboard → Settings → API)
+EXPO_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Fal.ai
+FAL_API_KEY=your_fal_api_key
+
+# API URL (local or deployed)
+EXPO_PUBLIC_API_URL=http://localhost:54321/functions/v1
+```
+
+### Step 3: Set Up Supabase
+
+```bash
+# Install Supabase CLI
+npm install -g supabase
+
+# Login
+supabase login
+
+# Link project
+supabase link --project-ref your-project-ref
+
+# Push database schema
+supabase db push
+
+# Deploy edge functions
+supabase functions deploy generate-video
+supabase functions deploy ingest-video
+supabase functions deploy webhooks
+```
+
+### Step 4: Configure Mux Webhooks
+
+In [Mux Dashboard → Settings → Webhooks](https://dashboard.mux.com/settings/webhooks):
+
+**Webhook URL**: `https://your-project.supabase.co/functions/v1/webhooks`
+
+**Events**:
+- video.asset.ready
+- video.asset.errored
+- video.upload.asset_created
+
+Copy the webhook secret to your `.env` file.
+
+### Step 5: Run the App
+
+```bash
+# Start Expo dev server
+npm start
+
+# Run on iOS simulator
+npm run ios
+
+# Run on Android emulator
+npm run android
+
+# Or scan QR code in Expo Go app
+```
+
+### Step 6: Test the Flow
+
+1. Sign up / log in
+2. Tap "Generate Video"
+3. Enter a prompt (e.g., "A cat playing piano")
+4. Wait for AI generation and Mux processing
+5. Video appears in your Stories feed
+6. Swipe up/down to navigate
+7. Tap to pause, double-tap to like
+
+---
+
+## Project Structure
+
+```
+slop-social/
+├── src/
+│   ├── screens/
+│   │   ├── StoriesFeed.tsx          # Main feed (vertical swipe)
+│   │   ├── GenerateScreen.tsx       # AI video generation
+│   │   ├── UploadScreen.tsx         # Upload from device
+│   │   └── ProfileScreen.tsx        # User profile & videos
+│   ├── components/
+│   │   ├── StoryItem.tsx            # Individual video item
+│   │   ├── VideoOverlay.tsx         # UI overlay (likes, comments)
+│   │   ├── VideoPlayer.tsx          # Reusable video player
+│   │   ├── VideoStats.tsx           # View counts, analytics
+│   │   └── LikeAnimation.tsx        # Like animation effect
+│   ├── hooks/
+│   │   ├── useAIVideoGeneration.ts  # AI generation flow
+│   │   ├── useVideoStatus.ts        # Realtime status updates
+│   │   ├── useVideoAnalytics.ts     # Mux Data integration
+│   │   └── useVideoUpload.ts        # Direct upload flow
+│   └── lib/
+│       ├── supabase.ts              # Supabase client
+│       └── api.ts                   # API client
+├── supabase/
+│   ├── functions/
+│   │   ├── generate-video/          # AI video generation
+│   │   ├── ingest-video/            # Upload to Mux
+│   │   ├── webhooks/                # Mux webhook handler
+│   │   └── analytics/               # View counts API
+│   └── migrations/
+│       └── 001_initial_schema.sql   # Database schema
+├── App.tsx                          # Root component
+├── app.json                         # Expo config
+└── package.json
+```
+
+---
+
+## Key Learnings
+
+### What Works Well
+
+✅ **Stories UI is engaging** - Vertical swipe is intuitive and familiar
+✅ **Mux handles video complexity** - No need to worry about formats, codecs, or streaming
+✅ **Webhooks + Realtime = Great UX** - Users see updates immediately
+✅ **Mux Data provides insights** - View counts and analytics out of the box
+✅ **Upload from URL is perfect for AI** - Seamless integration with AI video services
+
+### Common Pitfalls Avoided
+
+❌ **Don't render all videos at once** - Use FlatList windowSize
+❌ **Don't forget React.memo** - Prevents expensive re-renders
+❌ **Don't expose API keys** - Always use backend proxy
+❌ **Don't skip error states** - Videos fail, networks drop - handle it
+❌ **Don't test only in simulator** - Real devices perform differently
+
+---
+
+## Next Steps
+
+### Extend the Example
+
+Ideas for additional features:
+
+- **Comments** - Add comment threads to videos
+- **User profiles** - Show all videos from a user
+- **Search** - Search videos by prompt/tags
+- **Notifications** - Push notifications for likes/comments
+- **Filters** - Apply filters to AI-generated videos
+- **Duets** - Side-by-side video responses
+- **Live streaming** - Go live with Mux Live Stream API
+
+### Deploy to Production
+
+1. **Build production app**
+   ```bash
+   eas build --platform ios
+   eas build --platform android
+   ```
+
+2. **Deploy backend**
+   - Supabase edge functions auto-deploy on push
+
+3. **Configure Mux for production**
+   - Set up proper webhook endpoints
+   - Use signed playback IDs for private content
+   - Review encoding tier (baseline vs standard)
+
+4. **Submit to app stores**
+   ```bash
+   eas submit --platform ios
+   eas submit --platform android
+   ```
+
+---
+
+## Additional Resources
+
+<GuideCards>
+  <GuideCard
+    title="Quickstart"
+    description="Start from the beginning with the 5-minute quickstart"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/quickstart"},
+    ]}
+  />
+  <GuideCard
+    title="Best Practices"
+    description="Optimize your production video app"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/best-practices"},
+    ]}
+  />
+  <GuideCard
+    title="Troubleshooting"
+    description="Common issues and how to solve them"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/troubleshooting"},
+    ]}
+  />
+  <GuideCard
+    title="GitHub Repository"
+    description="View the complete source code"
+    links={[
+      {title: "View on GitHub", href: "https://github.com/mux/slop-social"},
+    ]}
+  />
+</GuideCards>

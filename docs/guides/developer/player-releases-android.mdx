@@ -1,0 +1,98 @@
+---
+title: Mux Player for Android releases
+product: player
+description: Every new release of Mux Player for Android is posted here with release notes
+steps:
+---
+
+<Releases>
+# Current release
+## v1.5.3
+Improvements:
+
+* Update media3 to v1.9.2 and Mux Data to v1.11.1 (#87)
+
+# Previous releases
+
+## v1.5.2
+Fixes:
+* Swap MuxPlayer to implement ExoPlayer 
+
+## v1.5.1
+Fixes:
+* FileNotFoundException from the cache stalls playback
+
+## v1.5.0
+Improvements:
+* Update media3 version to 1.6.1
+* Update Mux Data to v1.8.0
+
+Fixes:
+* fix: DRM playback broken
+
+## v1.4.0
+Updates:
+* Add method for updating `CustomerData`
+
+Improvements:
+* Track player dimensions when using the default PlayerView (or SurfaceView or TextureView)
+
+Notes:
+* `MuxPlayer` now implements `Player` instead of `ExoPlayer`. Most people shouldn't have a problem, but if you referred to our player as an `ExoPlayer`, you'll need to change it to `Player` or `ExoPlayer`
+
+## v1.3.0
+Update:
+* update: Update Mux Data to v1.6.2 and Media3 to v1.5.0 
+
+## v1.2.2
+Fixes
+* fix: Rendering issues on Compose UI & API 34 (upstream from media3: [link](https://github.com/androidx/media/issues/1237))
+
+Improvements
+* Update media3 to 1.4.1 + mux data to 1.6.0 
+
+## v1.2.1
+Fixes
+* Fix cache errors when switching sources extremely quickly
+
+## v1.2.0
+Improvements
+* Add Instant Clipping asset relative time parameters to `MediaItems`
+
+## v1.1.3
+Improvements:
+* fix: playback fails sometimes when changing videos
+
+## v1.1.2
+Please prefer to use v1.1.3
+
+## v1.1.1
+Please prefer to use v1.1.3
+
+## v1.1.0
+Improvements
+- [Adds DRM support](/docs/guides/protect-videos-with-drm)
+
+## v1.0.0
+Updates:
+* Bump to version 1.0.0
+* Added a 'Default' rendition order
+
+Fixes:
+* Remove option for non-existent `Ascending` rendition order
+
+Improvements:
+* Misc API & code quality improvements
+* Complete public API docs
+
+## v0.3.1
+Improvements:
+* fix: Player should always request redundant_streams
+* feat: Set player software name as `mux-player-android`
+
+## v0.3.0
+New:
+* new: Add max and min playback resolution
+Updates:
+* update: Improve example app appearance + misc updates
+</Releases>

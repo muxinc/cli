@@ -1,0 +1,341 @@
+---
+title: Integrate with Contentful
+product: video
+description: >-
+  The Mux Contentful app connects Contentful with your Mux account so that Mux
+  can handle uploading and streaming of all videos.
+seoTitle: Integrate your Mux account with Contentful CMS
+seoDescription: >-
+  The Mux Contentful app connects Contentful with your Mux account so that Mux
+  can handle uploading and streaming of all videos.
+image:
+  src: /docs/images/Contentful-logo-dark.svg
+  alt: Contentful logo
+  width: 320
+  height: 66
+---
+
+This is a detailed guide for integrating the Contentful Mux app. To read more about the Mux app and why you may want to use it to power videos in your CMS, read [the announcement blog post on Contentful's blog](https://www.contentful.com/blog/improve-video-streaming-using-hls-with-mux-contentful/).
+
+## 1. Enter Mux credentials
+
+Create an access token in your Mux account - you will need both the access token ID and the access token secret in the Contentful application. The access token should have **Read** and **Write** permissions for Mux Video, and also **Read** for Mux Data.
+
+<Image src="/docs/images/new-cms-token.png" width={608} height={480} alt="Mux Video access token permissions" sm/>
+
+## 2. Install App
+
+In the Contentful dashboard click “Apps > Manage Apps” in the top navigation bar. Scroll down and find the Mux app, click it to start the installation flow.
+
+Next you will see the configuration screen. You can come back to this screen after the app is installed to update the app configuration. Enter your Mux access token and Mux token secret. These are the same credentials you would use to make API requests yourself.
+
+Assign Mux to JSON fields from your content model. In this example I am assigning Mux to take over the “Video Upload” field in my Blog post model. If you add new JSON fields later you can always come back to this configuration screen and assign Mux to the new fields.
+
+<Image src="/docs/images/contentful-v110-install.png" width={1506} height={953} alt="Add API keys to integration." />
+
+You can also assign Mux fields from the configuration of a particular Content model if you create a JSON Object type field and then edit its appearance as follows:
+
+<Image src="/docs/images/contentful-v200-install-2.png" width={1506} height={953} alt="Edit field appearance to add Mux." />
+
+### 2.1. Assign Mux Sidebar to a Content model
+
+Once the plugin is installed and your Content Models are configured, you can add the Mux sidebar by clicking the plus sign and placing it wherever you want. Then click save. This sidebar is used to visualize pending changes with the publication of the Entry in Contentful. This is explained in more detail in the [Features and Important Notes](#7-mux-sidebar) section.
+
+<Image src="/docs/images/contentful-v200-install-3.png" width={1506} height={953} alt="Add Mux sidebar to a Content model." />
+
+## 3. Upload video
+
+Create a new entry for your content model. You should see a drag and drop zone and file picker to select an audio or video file:
+
+<Image src="/docs/images/contentful-v200-upload-1.png" width={1256} height={834} alt="Empty Video field" />
+
+Select a video file and a modal will appear with expandable configuration options that you can click to expand and configure the video before it's uploaded. The configuration options available are:
+
+- **Video Quality Settings:** Allows you to define the video quality. More information: [Use different video quality levels](/docs/guides/use-video-quality-levels)
+
+- **Privacy Settings:** Allows you to define the video visibility between public or protected. More information: [Secure video playback](/docs/guides/secure-video-playback)
+
+- **Metadata:** Allows you to add the title in the video metadata. This is also useful for having the title defined in the Mux Dashboard. More information: [Add metadata to your videos](/docs/guides/add-metadata-to-your-videos)
+
+- **Captions:** Allows you to add captions to your videos, both custom and auto-generated captions.
+  - To generate auto-generated captions, you need to specify the video language and it will automatically generate captions.
+  - For custom captions, you need to specify the URL where the captions are located and the caption language.
+
+More information in [Captions and Subtitles](#5-captions-and-subtitles) section.
+
+- **MP4 Generation:** Allows you to generate static renditions for your videos, both audio-only and audio with video. More information: [Enable static MP4 renditions](/docs/guides/enable-static-mp4-renditions)
+
+After configuring these options, click on the upload button and wait for the file to upload to Mux. The amount of time this takes will depend on your network upload speed and the size of the file. **Don't close the tab until the upload is complete.**
+
+Additionally, entering a Mux Asset ID from an existing video in Mux, or a URL to an audio or video file will also work in the input field.
+
+<Image src="/docs/images/contentful-v200-upload-2.png" width={1256} height={834} alt="Empty Video field" />
+
+
+<Image src="/docs/images/contentful-v110-2.png" width={1256} height={833} alt="Uploading video." />
+
+After the upload is complete you will see a message that says "Waiting for asset to be playable" while Mux is processing your video. For normal video files it should only take a minute or so, however longer files, or files that need more processing, may take longer.
+
+<Image src="/docs/images/contentful-v110-3.png" width={1256} height={785} alt="Waiting for video to process." />
+
+Your video is now playable via Mux. You will see a player with your video in the Contentful UI.
+
+<Image src="/docs/images/contentful-v200-upload-3.png" width={1287} height={1295} alt="After a video is finished and ready to play." />
+
+## 4. Playback
+
+When you query your Mux video through the Contentful API you will get back a JSON object that looks something like this that is viewable in the Data tab:
+
+```json
+{
+  "version": 3,
+  "uploadId": "some-upload-id",
+  "assetId": "some-asset-id",
+  "playbackId": "YOUR_PLAYBACK_ID",
+  "ready": true,
+  "ratio": "16:9",
+  "max_stored_resolution": "HD",
+  "max_stored_frame_rate": 29.928,
+  "duration": 23.857167,
+  "audioOnly": false,
+  "created_at": 1664219467,
+  "audioTracks": [
+    {
+      "type": "audio",
+      "primary": true,
+      "max_channels": 2,
+      "max_channel_layout": "stereo",
+      "id": "some-audio-track-id",
+      "duration": 10.026667
+    }
+  ],
+  "meta": {
+    "title": "some-video-title",
+    "external_id": "some-external-id"
+  }
+}
+```
+
+You will need to pull out the `playbackId` property and construct a URL like this. You will use this URL with a player that supports HLS:
+
+```text
+https://stream.mux.com/{YOUR_PLAYBACK_ID}.m3u8
+```
+
+View Mux's [Playback docs](/docs/guides/play-your-videos) for more information about players.
+
+## Using Mux Player
+
+We made it easy to playback video using Mux Player by including the same code used to play the video in the Contentful dashboard. Simply head to the **Player Code** tab, click the copy button, and paste this into a website for quicker testing and development.
+You can also add optional parameters to the example code such as autoplay, mute, and loop by clicking the corresponding checkboxes. This will update the example code for you to use.
+
+Additionally, there's an option to get iframe example code for embedding the video, providing an alternative integration method.
+
+<Image src="/docs/images/contentful-v200-player-code-1.png" width={1249} height={934} alt="Get the Mux Player code." />
+
+
+## 5. Captions and Subtitles
+
+Captions can be added before uploading an asset (see the [Upload video](#3-upload-video) section) and after uploading in the Captions tab. There are two ways to add captions: auto-generated and custom captions, and they can be used together if desired.
+
+You must select the type of captions to upload from the dropdown menu.
+
+<Image src="/docs/images/contentful-v200-captions-dropdown.png" width={1256} height={585} alt="Select caption type from dropdown" />
+
+### Auto-Generated Captions
+
+For auto-generated captions, you need to select the Language Code. This is automatically populated based on the Audio Name you select. It's important to select the same language as the spoken audio in the video so that captions are generated correctly.
+
+The Audio Name is what will appear in the player when selecting the caption. You can use any name you want.
+
+<Image src="/docs/images/contentful-v200-captions-auto.png" width={1256} height={585} alt="Auto-generated captions configuration" />
+
+### Custom Captions
+
+Custom captions and subtitles can come from any publicly available URL. Add the URL to the `vtt` or `srt` caption file, selecting the caption name and to mark as closed captions.
+
+<Image src="/docs/images/contentful-v200-captions-custom.png" width={1256} height={585} alt="Adding custom captions/subtitles" />
+
+One way to upload captions is to use the Contentful Media Manager. After uploading the file to the Manager, right click on the download button and select `copy link` then paste this link into the URL field.
+
+<Image src="/docs/images/contentful-v110-cc-2.png" width={1447} height={1100} alt="Copying the file URL in Media Manager." />
+
+### Managing Captions
+
+Caption files can be added or deleted, and files can be downloaded for further editing. The stored JSON object will also reflect additional caption files. Existing captions will be displayed after clicking the `Resync` button under the Data tab or when entering to the entry. Deleting a caption will appear in the Mux sidebar and require publishing to take effect in Mux.
+
+<Image src="/docs/images/contentful-v200-captions-result.png" width={1256} height={1151} alt="Captions or subtitles are working on video." />
+
+## 6. Audio Tracks
+
+You can add new audio tracks to an existing asset in the Audio Tracks section. This is useful for providing multiple language audio tracks or alternative audio content for your videos.
+
+<Image src="/docs/images/contentful-v200-audio-tracks-tab.png" width={1256} height={585} alt="Audio Tracks tab" />
+
+### Adding Audio Tracks
+
+To upload a new audio track, you need to provide a public URL of an audio file. One way to obtain this is by using the Contentful Media Manager, in the same way as described in the [Captions section](#custom-captions).
+
+You need to specify the Language Code, which is automatically populated when you indicate the Audio Name. The Audio Name can contain any text and is what will be displayed in the player when users want to select from the available audio tracks.
+
+<Image src="/docs/images/contentful-v200-audio-tracks-upload.png" width={1256} height={585} alt="Adding new audio track" />
+
+### Managing Audio Tracks
+
+Audio tracks can be added or deleted, and the stored JSON object will reflect the additional audio tracks. Deleting an audio track will appear in the Mux sidebar and require publishing to take effect in Mux.
+
+<Image src="/docs/images/contentful-v200-audio-tracks-result.png" width={1256} height={585} alt="Audio tracks in player" />
+
+## 7. Mux Sidebar
+
+The Mux sidebar provides a visual interface to track the synchronization status between your Contentful entries and Mux assets. This sidebar displays:
+
+- Pending actions that need to be synchronized with Mux
+- Any changes that require publishing to take effect in Mux
+
+<Image src="/docs/images/contentful-v200-feature-sidebar-1.png" width={350} height={953} alt="Mux sidebar." sm/>
+
+<Image src="/docs/images/contentful-v200-feature-sidebar-2.png" width={350} height={953} alt="Mux sidebar." sm/>
+
+
+## 8. Publishing Requirements and Breaking Changes
+
+As part of the [version 2.0 plugin release](https://github.com/contentful/apps/pull/9826), changes were made to maintain data integrity and consistency between what is published in Contentful and what is stored in Mux. For example, to change a video from public to protected, its playback ID must be regenerated, and if that video is published in Contentful, the new playback ID couldn't be obtained previously.
+
+To solve this, some actions that we consider "breaking changes" will not be executed in Mux until the user clicks "Publish" on the pending changes.
+
+### Breaking Changes That Require Publishing
+
+The following changes will appear as pending in the Mux sidebar and will only be applied to Mux when you click "Publish changes" in Contentful:
+
+- **Delete Video** - Removing a video asset
+- **Delete Captions** - Removing caption/subtitle files  
+- **Delete Audio** - Removing audio tracks
+- **Change Metadata Title** - Modifying the title in the metadata section
+- **Delete MP4 Renditions** - Removing static MP4 files
+- **Change Video Visibility** - Switching between public/protected settings
+
+<Image src="/docs/images/contentful-v200-pending-changes-sidebar.png" width={1506} height={953} alt="Mux sidebar showing pending changes" />
+
+### Publishing Workflow
+
+For example, if you want to change the visibility of an existing video, this will be a pending change that appears in the sidebar and the change will be made in Mux when you click "Publish changes" in Contentful.
+
+<Image src="/docs/images/contentful-v200-publish-changes-process.png" width={1506} height={953} alt="Publishing changes process" />
+
+The same happens with actions like deletions - if you want to delete a caption, it will appear marked for deletion but will only be removed when you publish. You can also undo deletions to prevent them from being deleted when you publish.
+
+## Explore advanced options
+
+## Advanced: Signed URLs
+
+<Callout type="warning" title="Warning! Requires generating JWT on your server">
+
+Enabling signed URLs in Contentful will require you to generate your own signing tokens on your application **server**. This involves creating a signing key and using that to generate JSON web tokens when you want to access your videos and thumbnails outside of Contentful.
+
+</Callout>
+
+By default, all assets uploaded to Mux through Contentful will be created with a single playback policy of `"public"`. This means that your videos and thumbnails are accessible with `https://stream.mux.com/{PLAYBACK_ID}.m3u8` and `https://image.mux.com/{PLAYBACK_ID}/thumbnail.jpg`.
+
+If you want more control over controlling the playback and thumbnail access, you can enable this feature on the Contentful configuration page:
+
+<Image src="/docs/images/contentful-v110-config.png" width={1505} height={1158} alt="Additional global configuration options." />
+
+When you enable this feature, the following things will happen:
+
+1. The Mux App in Contentful will use the Mux API to create a URL signing key and save this with your Contentful configuration.
+2. When uploading an asset, you can select "Protected" in the Privacy Settings section of the configuration modal. If you select this option, the asset will be created with `playback_policy: "signed"` (instead of `"public"`).
+3. The signing key from Step 1 will be used by the Mux App to preview content inside the Contentful UI.
+4. When you access your content in your own application, outside of Contentful, the Mux asset will no longer have the key `playbackId`, it will now be called `signedPlaybackId`.
+
+```json
+{
+  "uploadId": "some-upload-id",
+  "assetId": "some-asset-id",
+  "signedPlaybackId": "YOUR_SIGNED_PLAYBACK_ID",
+  "ready": true,
+  "ratio": "16:9"
+}
+```
+
+5. You should use the value from `signedPlaybackId` to create URLs for playback and for thumbnail generation.
+
+- Playback `https://stream.mux.com/{SIGNED_PLAYBACK_ID}.m3u8?token={TOKEN}`
+- Thumbnails `https://image.mux.com/{SIGNED_PLAYBACK_ID}/thumbnail.jpg?token={TOKEN}`
+
+6. The `TOKEN` parameter for the above URLs is something you create on your server according to Step 2 in [Security: Signed URLs](/docs/guides/secure-video-playback).
+
+Note that in the Contentful UI when an asset is using a signed URL you will see this notice.
+
+<Image src="/docs/images/contentful-v110-notice.png" width={1444} height={573} alt="Signed Notice" />
+
+Public and signed playback IDs can be toggled per-entry under the Data tab. Each time the IDs are toggled, the old playback ID is deleted, and a new ID is created in its place.
+
+## Advanced: DRM
+
+DRM (Digital Rights Management) provides the highest level of content protection using industry-standard encryption. To use DRM, you must first [request access](https://www.mux.com/support/human). Once approved, you'll receive a DRM Configuration ID.
+
+[Learn more about DRM](/docs/guides/protect-videos-with-drm).
+
+### Enabling DRM in Contentful
+
+To enable DRM support, go to the Contentful Mux app configuration screen. You will see a new **"Advanced: DRM"** section where you can:
+
+1. Enable or disable DRM support by checking the **Enable DRM** checkbox
+2. Enter your **DRM Configuration ID** provided by Mux after your DRM access is approved
+
+<Image src="/docs/images/contentful-drm-1.png" width={1444} height={573} alt="Enable DRM in Contentful" />
+
+This configuration is stored alongside your other installation parameters and applies to all videos uploaded through this Contentful space.
+
+### Uploading DRM-protected videos
+
+Once DRM is enabled and configured, a new **"DRM Protected"** option will appear in the **Privacy Settings** section when uploading or editing a video asset.
+
+- The DRM option is only available when both DRM is enabled **and** a valid DRM Configuration ID is present
+- If DRM is enabled but no Configuration ID is set, the option will appear disabled with contextual help text
+- When DRM is enabled and configured, **DRM Protected** is selected by default (users can change it to Public or Protected if needed)
+
+<Image src="/docs/images/contentful-drm-2.png" width={1444} height={573} alt="DRM Protected option in Privacy Settings" />
+
+**Note:** DRM is only available for video assets. If you attempt to upload an audio-only file with DRM selected, the app will display a warning indicating that DRM is not supported for audio files. Use the **Protected** option for secure playback of audio content.
+
+### Viewing DRM-protected videos
+
+To view DRM-protected videos in Contentful, you must also have **Signed URLs enabled** in the app configuration. If Signed URLs are not enabled, you will see an error message when trying to view DRM content. See [Advanced: Signed URLs](#advanced-signed-urls) for setup instructions.
+
+Due to browser iframe security restrictions, **DRM-protected videos cannot be played directly within the Contentful preview**. When viewing a DRM-protected asset, you will see a notice explaining this limitation.
+
+The app provides an **"Open in external player"** link that opens the video in a standalone browser tab where DRM playback is permitted. This external player uses a Blob URL to load the player with the required DRM tokens.
+
+<Image src="/docs/images/contentful-drm-3.png" width={1444} height={573} alt="DRM warning in preview" />
+
+**Note:** DRM playback incurs additional costs. See the [DRM pricing](/docs/guides/protect-videos-with-drm#pricing) section for details.
+
+### Using DRM-protected videos in your application
+
+When you query a DRM-protected video through the Contentful API, the JSON object will include DRM-related information. The generated player code in the **Player Code** tab will automatically include the necessary DRM tokens (`playback`, `thumbnail`, `storyboard`, and `drm` tokens), so you can copy and paste it directly into your application.
+
+For more detailed information about implementing DRM playback, including token generation and player configuration, see the [DRM guide](/docs/guides/protect-videos-with-drm).
+
+## Note about version 2.0 release
+
+During the month of August 2025, [version 2.0 of the plugin was released](https://github.com/contentful/apps/pull/9826). No action is required as the plugin updates automatically.
+
+There are no changes to the previous data structure, but new fields have been added that are necessary to support new features such as audio tracks, MP4 renditions, and others.
+
+If you were already using the plugin previously, you may notice that when entering an entry that has a video, it changes to 'Changed' status. This occurs because the new video data is retrieved and stored in Contentful's data. It's like an automatic resync that runs.
+
+This is expected behavior and only occurs with videos uploaded before the new version or if changes are made to videos outside of Contentful, as it synchronizes automatically.
+
+## Note about migrating from the old Contentful extension
+
+Before releasing the Contentful App, Mux had an officially supported [Contentful extension](https://github.com/contentful/extensions/pull/316).
+
+The underlying data structure has not changed, so you can safely migrate to the app without losing data by following these steps:
+
+1. Uninstall the extension (now your video fields should look like raw JSON)
+2. Install the app
+3. On the configuration screen, apply the Mux App to the video fields that you had before
+
+<MdxImport snippet="cmsIntegrationGuideCards" />

@@ -1,0 +1,165 @@
+---
+title: AI Moderation
+product: video
+description: Use the @mux/ai library to automatically moderate video content and detect inappropriate material
+seoTitle: AI Video Moderation with Mux
+seoDescription: Automatically moderate video content using the @mux/ai library with OpenAI or Hive moderation APIs
+---
+
+<Callout type="info">This guide uses [@mux/ai](https://github.com/muxinc/ai), our open-source library that provides prebuilt workflows for common video AI tasks. It works with your favorite LLM provider (OpenAI, Anthropic, or Google). Check out the [GitHub repository](https://github.com/muxinc/ai) for more details!</Callout>
+
+## Overview
+
+This guide demonstrates how to automatically screen video content for inappropriate material using AI. The `@mux/ai` library handles all the complexity of extracting thumbnails, analyzing them with moderation APIs, and returning actionable results. If content exceeds your defined thresholds for sexual or violent content, you can automatically remove access to protect your platform.
+
+This approach provides an automated first line of defense against inappropriate content, helping you maintain content standards at scale without manual review of every upload.
+
+### Prerequisites
+
+Before starting this guide, make sure you have:
+- A Mux account with API credentials (token ID and token secret)
+- An API key for OpenAI or Hive (depending on your chosen provider)
+- Node.js installed
+- Basic familiarity with webhooks and async JavaScript
+
+## Installation
+
+```bash
+npm install @mux/ai
+```
+
+## Configuration
+
+Set your environment variables:
+
+```bash
+# Required
+MUX_TOKEN_ID=your_mux_token_id
+MUX_TOKEN_SECRET=your_mux_token_secret
+# You only need the API key for the provider you're using
+OPENAI_API_KEY=your_openai_api_key # OR
+HIVE_API_KEY=your_hive_api_key
+```
+
+## Basic usage
+
+```javascript
+import { getModerationScores } from "@mux/ai/workflows";
+
+const result = await getModerationScores("your-mux-asset-id", {
+  provider: "openai", // or "hive"
+  thresholds: {
+    sexual: 0.7,   // Flag content with 70%+ confidence
+    violence: 0.8  // Flag content with 80%+ confidence
+  }
+});
+
+console.log(result.exceedsThreshold); // true if content flagged
+console.log(result.maxScores.sexual);  // Highest sexual content score
+console.log(result.maxScores.violence); // Highest violence score
+```
+
+The function analyzes multiple thumbnails from your video and returns:
+
+```javascript
+{
+  "assetId": "your-asset-id",
+  "exceedsThreshold": false,
+  "maxScores": {
+    "sexual": 0.12,
+    "violence": 0.05
+  },
+  "thresholds": {
+    "sexual": 0.7,
+    "violence": 0.8
+  },
+  "thumbnailScores": [
+    { "sexual": 0.12, "violence": 0.05, "error": false },
+    { "sexual": 0.08, "violence": 0.03, "error": false }
+    // ... more thumbnails
+  ]
+}
+```
+
+## Provider options
+
+`@mux/ai` supports two moderation providers:
+
+- **OpenAI** (default): Uses `omni-moderation-latest` model - Multi-modal moderation with vision support
+- **Hive**: Visual moderation using Hive's specialized content safety models
+
+```javascript
+// Using OpenAI (default)
+const result = await getModerationScores("your-mux-asset-id", {
+  provider: "openai"
+});
+
+// Using Hive
+const result = await getModerationScores("your-mux-asset-id", {
+  provider: "hive"
+});
+```
+
+## Configuring thresholds
+
+Thresholds use a 0-1 scale where higher values mean stricter moderation:
+
+```javascript
+const result = await getModerationScores("your-mux-asset-id", {
+  thresholds: {
+    sexual: 0.7,   // Flag content with 70%+ confidence of sexual content
+    violence: 0.8  // Flag content with 80%+ confidence of violence
+  }
+});
+```
+
+Adjust these based on your content policies and user base. Lower thresholds catch more content but may increase false positives.
+
+## Webhook integration
+
+For automated moderation when videos are uploaded, you should trigger the call to get moderation scores from the [`video.asset.ready` webhook](/docs/core/listen-for-webhooks):
+
+```javascript
+export async function handleWebhook(req, res) {
+  const event = req.body;
+
+  if (event.type === 'video.asset.ready') {
+    const result = await getModerationScores(event.data.id, { thresholds: { sexual: 0.7, violence: 0.8 } });
+    if (result.exceedsThreshold) {
+      await mux.video.assets.deletePlaybackId(event.data.id, event.data.playback_ids[0].id);
+    }
+  }
+}
+```
+
+## How it works
+
+Under the hood, `@mux/ai` handles:
+1. **Thumbnail extraction**: Selects representative frames based on video duration
+   - Videos under 50 seconds: 5 evenly-spaced thumbnails
+   - Longer videos: One thumbnail every 10 seconds
+2. **Concurrent analysis**: Sends all thumbnails to the moderation API in parallel
+3. **Score aggregation**: Tracks the highest scores across all thumbnails
+4. **Threshold evaluation**: Compares max scores against your configured thresholds
+5. **Error handling**: Gracefully handles API failures and returns partial results
+
+## Mux features used
+
+- [Mux Thumbnail API](/docs/guides/get-images-from-a-video) - Extracts frames for moderation analysis
+- [Webhooks](/docs/core/listen-for-webhooks) - Trigger moderation automatically
+
+## Best practices
+
+- Maintain a database of automated moderation actions to fine-tune thresholds
+- Add notifications to users or moderators when content is flagged
+- Implement manual review queues for borderline content
+- Use transcriptions or captions for additional moderation
+- Be mindful of AI API rate limits and implement moderation queueing if needed
+
+## Resources
+
+- [@mux/ai GitHub Repository](https://github.com/muxinc/ai)
+- [@mux/ai Workflows Documentation](https://github.com/muxinc/ai/blob/main/docs/WORKFLOWS.md)
+- [Mux Webhooks](https://docs.mux.com/guides/video/listen-for-webhooks)
+- [OpenAI Moderation API](https://platform.openai.com/docs/guides/moderation)
+- [Mux Thumbnail API](https://docs.mux.com/guides/video/get-images-from-a-video)

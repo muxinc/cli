@@ -1,0 +1,196 @@
+---
+title: Reduce live stream latency
+product: video
+description: This guide covers types of latency, causes of latency, reconnect windows, and lower latency options.
+seoTitle: "Guide to live streaming with less delay: Reduce Live Steam Latency"
+seoDescription: Understand where live stream latency comes from, how to reduce live stream latency and how to broadcast live streams with less delay.
+---
+
+Mux Video live streaming is built with RTMP ingest and HLS delivery. HLS inherently introduces latency.
+To the broadcasting industry, this latency is called glass-to-glass latency. Standard glass-to-glass latency with HLS
+is greater than 20 seconds and typically about 25 to 30 seconds.
+
+To clarify some terminology and industry jargon:
+
+- **Glass-to-glass latency**: Also sometimes referred to as end-to-end latency. This latency is defined as the time lag between when a camera captures an action and when that action reaches a viewer’s device.
+- **Wall-clock time**: Also might be referred to as "realtime". If you have a clock on the wall where you are capturing video content, this would be the time on that clock.
+
+The nature of HLS delivery means that clients are not necessarily synchronized. Some clients might be 15 seconds behind wall-clock time and others might be 30 seconds behind.
+
+# Where does the latency come from?
+You don't have to worry about these gritty details when using Mux for live streams, but to give you an idea of how a live stream works:
+<Image src="/docs/images/live-stream-workflow.png" width={2250} height={1848} />
+
+1. **Captured by a camera**
+2. **Processed by an encoder** - If the computer running the encoder is running out of CPU this process can get behind and start lagging.
+3. **Send to an RTMP ingest server** - This server is ingesting the video content in real-time. This part is called the "first mile", it's happening over the internet, often times on consumer or cellular network connections so things like TCP packet-loss and random network disconnects are always happening.
+4. **Ingest server decodes and encodes** - Assuming all the content is traveling over the internet fast enough, the encoder on the other end needs to keep up and have enough CPU available to package up segments of video as they come in. The encoder has to ingest video, build up a buffer of content and then start decoding, processing and encoding for HLS delivery.
+5. **Manifest files and segments of video delivered** - After all of that, files are created and delivered over HTTP through multiple CDNs to reach end users. Each file becomes available after the entire segment's worth of data is ready. This part also happens over the internet where the same risks around packet-loss and network congestion are factors. Network issues are especially a factor for the last mile of delivery to the end user.
+6. **Decoded and played on the client** - When video makes it all the way to the client. The player has to decode and playback the video. Players do not play each segment on the screen as they receive it, they keep a buffer of playable video in-memory which also contributes to the glass-to-glass latency experienced by the end user.
+
+When you consider each of the steps above, any point of that pipeline has the potential to slow down or get backed up. The more latency you can tolerate,
+the safer the system is and the lower probability you have for an unhappy viewer. If any single step gets backed up momentarily, the whole system has a chance
+to catch up before an interruption in playback. And, when everything is running smoothly, the player has extra time to spend downloading the higher quality version of your content.
+
+<Callout type="info">
+As shown in the image above, there is latency added at every step. However, Mux does not control any latency added during video capture on the camera,
+encoder processing delays, and amount of video buffered & the decoding time of the video player.
+</Callout>
+
+# Reconnect Window
+When an end-user is streaming from their encoder to Mux, we need to know how to handle situations when the client disconnects unexpectedly.
+
+There are situations when a client disconnects on purpose: for example hitting "Stop streaming" on OBS.
+Those are intentional disconnects, we're talking about times when the client just stops sending video.
+In order to handle this, live streams have a `reconnect_window`. After an unexpected disconnect,
+Mux will keep the live stream "active" for the given period of time and wait for the client to reconnect and start streaming again.
+
+When the `reconnect_window` expires, the live stream transitions back into the `idle` state. In HLS terminology,
+Mux writes the `#EXT-X-ENDLIST` tag to the HLS manifest. At this point, your player can consider the live stream to have ended.
+By default, `reconnect_window` is `60` (seconds) - you can set this as high as `1800` (30 minutes).
+
+By adding the slate image, you can improve your viewer's video playback experience during the Reconnect window time interval.
+You can learn more on Reconnect Windows and Slates [here](/docs/guides/handle-live-stream-disconnects#reconnect-window-and-slates).
+
+# Lower latency Options
+Mux live streams have options for "reduced" and "low" latency. The `"latency_mode": "reduced"` option gets your latency down to a range of 12-20 seconds and
+the `"latency_mode": "low"` further reduces the latency to as low as 5 seconds. But your viewers might see some variance to the glass-to-glass latency because
+the latency depends on many factors, including player configurations, your viewer's geographic location, and their internet connectivity speed.
+
+## Input Requirements
+
+You should only set `latency_mode` to `reduced` or `low` if you have control over the following:
+- the encoder software
+- the hardware the encoder software is running on
+- the network the encoder software is connected to
+
+Typically, home networks in cities and mobile connections are not stable enough to reliably use `reduced` or `low` latency options.
+
+## Create a live stream with the "reduced" latency option
+
+Check out our <ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">Live Stream API reference</ApiRefLink> and find the `latency_mode` parameter and set the parameter to `"reduced"` in the request to create a live stream.
+
+Set the latency mode on a live stream to `reduced` by making this POST request:
+
+```json
+//POST https://api.mux.com/video/v1/live-streams
+
+{
+    "latency_mode": "reduced",
+    "reconnect_window": 60,
+    "playback_policies": ["public"],
+    "new_asset_settings": {
+        "playback_policies": ["public"]
+    }
+}
+```
+
+You can read more about the reduced latency feature in this [blog post about Reduced Latency](https://mux.com/blog/reduced-latency-for-mux-live-streaming-now-available/).
+
+## Create a live stream with the "low" latency option
+
+<ApiRefLink href="/docs/api-reference/video/live-streams/create-live-stream">Create Live Stream</ApiRefLink> is also used to set the `"latency_mode": "low"` flag.
+
+Set the latency mode on a live stream to `low` by making this POST request:
+
+```json
+//POST https://api.mux.com/video/v1/live-streams
+
+{
+    "latency_mode": "low",
+    "reconnect_window": 60,
+    "playback_policies": ["public"],
+    "new_asset_settings": {
+        "playback_policies": ["public"]
+    }
+}
+```
+
+<Callout type="warning">
+A live stream can only be configured as "reduced" or "low" or "standard" latency.
+</Callout>
+
+# Low-latency FAQs
+
+## Is low-latency HLS different from standard latency HLS?
+**Yes**. The `"latency_mode": "low"` mode uses [Apple's new low-latency HLS (LL-HLS) spec](https://developer.apple.com/documentation/http_live_streaming/enabling_low-latency_hls)
+that allows your viewers to play live streams with as low as 5 seconds glass-to-glass latency. In comparison, the other latency modes are based on the
+earlier version of the HLS spec which puts a cap on the lower limits of the glass-to-glass latency.
+
+Mux has closely followed the new low-latency HLS spec and published about the development of the new spec a few times on our blog
+[in June 2019](https://mux.com/blog/the-community-gave-us-low-latency-live-streaming-then-apple-took-it-away/)
+and again [in January 2020](https://mux.com/blog/low-latency-hls-part-2/).
+
+## Do video players support low-latency HLS?
+**Yes**. Because `"latency_mode": "low"` mode uses a recent version of Apple's LL-HLS spec, you may need to upgrade your video player. Below is the list of the
+most commonly used video players and the minimum version.
+
+<Callout type="info">
+The video player may have supported LL-HLS spec in earlier versions. However, the minimum video player version mentioned below represents
+the version we used for evaluating Mux's low-latency feature.
+<br/>
+<br/>
+Additionally, the video player companies are continuously improving video
+playback experience as the LL-HLS spec is more widely adopted and used in the real world.
+We recommend updating your video player versions frequently whenever possible to get the latest fixes and improvements.
+</Callout>
+
+| Player | Version | Additional details |
+| :-- | :-- | :-- |
+| HLS.js | >= 1.1.5 | Other potentially relevant issues to track - ([#3596](https://github.com/video-dev/hls.js/issues/3596)) |
+| JW Player | >= 8.20.5 | Setting the `liveSyncDuration` [configuration option](https://docs.jwplayer.com/players/reference/setup-options#behavior) can increase latency. So you should not set this option for low-latency playback. |
+| THEOplayer | >= 6.0.0 | LL-HLS playback is enabled by default. |
+| THEOplayer | >= 2.84.1 | Requires enabling `LL-HLS` add-on on your player instance and set `lowlatency` parameter to `true` in the player configuration. |
+| VideoJS | >= 8.0.0 | LL-HLS playback is enabled by default. |
+| VideoJS | >= 7.16.0 | Enabling low latency playback requires initializing `videojs-https-streaming` with the `experimentalLLHLS` flag. [See FAQs](/docs/guides/reduce-live-stream-latency#how-do-you-enable-ll-hls-playback-on-videojs-player-prior-to-800).|
+| [Mux Player](/docs/guides/mux-player-web) | >= 1.0 | |
+| [Mux Video.js Kit](/docs/guides/playback-videojs-with-mux) | >= 0.4 | Mux Video.js Kit uses HLS.js so the same issues apply. |
+| Apple iOS (AVPlayer) | 13.* | Requires `com.apple.developer.coremedia.hls.low-latency` app entitlement for your iOS apps. Also, there are known issues that occasionally cause playback failures. |
+| Apple iOS (AVPlayer) | 14.* | There are known issues that occasionally cause playback issues. |
+| Apple iOS (AVPlayer) | 15.* | |
+| Android ExoPlayer | >= 2.14 | |
+| Agnoplay | >= 1.0.33 | |
+
+
+## My video player does not support the LL-HLS spec. Can it still play a low-latency live stream?
+**Maybe**. Apple's LL-HLS specification is backward compatible. So your video player should fall back to playing standard HLS.
+Those viewers will have noticeably higher glass-to-glass latency. However, your video player does need support for demuxed audio & video tracks
+(each track requested separately) in MP4 format for being backward compatible. Most video players already support demuxed audio &
+video tracks in MP4 format.
+
+## My video player is running into issues when playing a low-latency live stream. Can I play the same live stream without the low-latency?
+**Yes**. You can add the `low_latency=false` parameter to the video playback URL. Mux can revert back to delivering the same live stream
+using standard HLS by adding this `low_latency=false` parameter. However, your video player does need support for demuxed audio & video tracks
+(each track requested separately) in MP4 format for the `low_latency=false` parameter to work.
+```
+https://stream.mux.com/{PLAYBACK_ID}.m3u8?low_latency=false
+```
+If your `playback_id` is `signed`, then all query parameters, including `low_latency` need to be added to the claims body. Take a look at
+the [signed URLs guide](/docs/guides/secure-video-playback) for details.
+
+## How do you enable LL-HLS playback on VideoJS player prior to 8.0.0?
+You can enable low latency playback using Apple's LL-HLS spec by initializing `videojs-http-streaming`
+module with the `experimentalLLHLS` flag along with any other options.
+```
+var player = videojs(video, {
+  html5: {
+    vhs: {
+      experimentalLLHLS: true
+    }
+  }
+});
+```
+
+## Can I change my existing live stream's latency to low latency?
+Yes. You can change your existing live stream's latency and set the latency to any of the available options -
+`standard` or `reduced` or `low` using the <ApiRefLink href="/docs/api-reference/video/live-streams/update-live-stream">Live Stream PATCH</ApiRefLink>.
+You can only execute this API when the live stream status is `idle` and helpful in migrating your live stream based on the streamer's
+requirements. After Mux successfully runs this API, your webhook endpoint also receives `video.live_stream.updated` event.
+
+```json
+//PATCH https://api.mux.com/video/v1/live-streams/{LIVE_STREAM_ID}
+
+{
+    "latency_mode": "low"
+}
+```

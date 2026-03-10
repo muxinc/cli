@@ -1,0 +1,237 @@
+---
+title: Monitor Kaltura Player (iOS and tvOS)
+product: data
+dataIntegration: true
+description: This guide walks through integration with iOS and TVOS Kaltura player to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Install the Mux Data SDK
+    description: Install `Mux-Stats-Kaltura` and import the framework into your application.
+  - title: 2. Initialize the monitor for your Kaltura player instance
+  - title: 3. Make your data actionable
+    description: Use metadata fields to make the data collected by Mux actionable and useful.
+  - title: 4. Set or update metadata after monitor
+    description: If you do not have all the metadata available at initialization time update metadata fields later.
+  - title: 5. Advanced
+    description: Depending on the details of your implementation, you may want to leverage some of the advanced options of Mux-Stats-Kaltura.
+  - title: Release notes
+    topic: notes
+---
+
+Mux Data `Mux-Stats-Kaltura` supports iOS 13.0 or newer and tvOS 13.0 or newer. The Mux integration with Kaltura is built on top of Mux's core Objective-C SDK, and the full code can be seen here: [muxinc/mux-stats-sdk-kaltura-ios](https://github.com/muxinc/mux-stats-sdk-kaltura-ios).
+
+This SDK is built with `XCFramework` bundle type and supports Mac Catalyst.
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+## Installing with SwiftPM
+
+1. In Xcode click "File" > "Swift Packages" > "Add Package Dependency..."
+1. The package repository URL is `https://github.com/muxinc/mux-stats-sdk-kaltura-ios.git`
+1. Click `next`.
+1. Select dependency resolution options. We recommend setting the "Rules" to install the latest version and choosing the option "Up to Next Major".
+
+Note that `MUXSDKStatsKaltura` has a dependency on `MuxCore`, so you will see that `MuxCore` gets installed as well.
+
+> As of Xcode 14.3.1 integrating the Mux SDKs as part of a shared framework using Swift Package Manager is now supported.
+
+## Installing with CocoaPods
+
+To install with CocoaPods, modify your Podfile to use frameworks by including `use_frameworks!` and then add the following pods to your Podfile:
+
+```
+pod 'Mux-Stats-Kaltura', '~>3.0'
+```
+
+This will install `Mux-Stats-Kaltura` and the latest current release of our [core Objective-C Library](https://github.com/muxinc/stats-sdk-objc). There will be no breaking updates in major versions, so you can safely run `pod update` for future versions.
+
+Next, add correct import statement into your application.
+
+```swift
+import MUXSDKKaltura
+```
+
+<LinkedHeader step={steps[2]} />
+
+<MdxImport snippet="envKeyCallout" />
+
+The example below uses `monitorPlayer:player:playerName:customerData:`.
+
+The `playerName` parameter is a string that identifies this instance of your player. When calling `destroyPlayer` later on, you will need this string. Each instance of a player that runs simultaneously in your application should have a different `playerName`.
+
+<CodeExamples product="data" example="initializeKalturaIOSMonitor" />
+
+For more complete examples check the [demo apps in the repo](https://github.com/muxinc/mux-stats-sdk-kaltura-ios/tree/main/apps/DemoApp).
+
+After you've integrated, start playing a video in your player. A few minutes after you stop watching, you'll see the results in your Mux data dashboard. Login to the dashboard and find the environment that corresponds to your `env_key` and look for video views.
+
+<LinkedHeader step={steps[3]} />
+
+The only required field is `env_key`. But without some more metadata the metrics in your dashboard will lack the necessary information to take meaningful actions. Metadata allows you to search and filter on important fields in order to diagnose issues and optimize the playback experience for your end users.
+
+Metadata fields are provided via the `MUXSDKCustomerPlayerData` and `MUXSDKCustomerVideoData` objects.
+
+For the full list of properties view the header files for this interfaces:
+
+- [MUXSDKCustomerPlayerData.h](https://github.com/muxinc/stats-sdk-objc/blob/master/XCFramework/MuxCore.xcframework/ios-arm64/MuxCore.framework/Headers/MUXSDKCustomerPlayerData.h)
+- [MUXSDKCustomerVideoData.h](https://github.com/muxinc/stats-sdk-objc/blob/master/XCFramework/MuxCore.xcframework/ios-arm64/MuxCore.framework/Headers/MUXSDKCustomerVideoData.h)
+
+For more details about each property, view the [Make your data actionable](/docs/guides/make-your-data-actionable-with-metadata) guide.
+
+<CodeExamples product="data" example="kalturaIOSMetadata" />
+
+<LinkedHeader step={steps[4]} />
+
+There are some cases where you may not have the full set of metadata until after the video playback has started. In this case, you should omit the values when you first call  `monitorPlayer`. Then, once you have the metadata, you can update the metadata with the  `setCustomerDataForPlayer`  method.
+<CodeExamples product="data" example="kalturaIOSUpdateCustomerData" />
+
+<LinkedHeader step={steps[5]} />
+
+## Changing the Video
+​
+There are two cases where the underlying tracking of the video view need to be reset. First, when you load a new source URL into an existing player, and second when the program within a singular stream changes (such as a program within a live stream).
+
+Note: You do not need to change the video info when changing to a different source of the same video content (e.g. different resolution or video format).
+​
+### New source
+​
+When you change to a new video (in the same player) you need to update the information that Mux knows about the current video. Examples of when this is needed are:
+​
+-   The player advances to the next video in a playlist
+-   The user selects a different video to play
+​
+This is done by calling  `videoChangeForPlayer`  which will remove all previous video data and reset all metrics for the video view. You can include any metadata when changing the video but you should only need to update the values that start with  `video_`.
+​
+It is required to call  `videoChangeForPlayer`  immediately before telling the player which new source to play.
+​
+<CodeExamples product="data" example="kalturaIOSChangeVideo" />
+​
+### New program (in single stream)
+​
+In some cases, you may have the program change within a stream, and you may want to track each program as a view on its own. An example of this is a live stream that streams multiple programs back to back, with no interruptions.
+​
+In this case, call  `programChangeForPlayer:name:customerData`. This will remove all previous video data and reset all metrics for the video view, creating a new video view. You can include any metadata when changing the video but you should only need to update the values that start with  `video`.
+
+## Usage with Google Interactive Media Ads (IMA)
+
+If you are using Google Interactive Media Ads and the `PlayKit_IMA` SDK, you can track ad playback events by installing the `mux-stats-google-ima-kaltura-ios` companion package.
+
+Please note: A fully functioning `PlayKit_IMA` integration is required for ad playback tracking in your iOS or tvOS application.
+
+Add the following to your Podfile and run `pod install`
+```
+'Mux-Stats-Google-IMA-Kaltura' ~> '2.0.0'
+```
+
+Initialize the Mux monitor with `MUXSDKStats.monitorPlayer`. Create an listener instance by calling `MUXSDKImaKalturaListener(playerBinding: playerBinding, player: player)`.
+Start dispatching the events by calling `start` on the listener instance.
+
+```swift
+import MUXSDKStatsKaltura
+
+// Follow the instructions from pod 'PlayKit_IMA' to set up
+// your IMA plugin configuration in the loadPlayer method
+//
+// When you call `monitorPlayer:withPlayer:playerName:customerData:`
+// from your ViewController, you will get back a MUXSDKPlayerBinding object
+let playerBinding = MUXSDKStats.monitorPlayer(
+  player: player,
+  playerName: self.playerName,
+  customerData: data
+)
+
+// Use the MUXSDKPlayerBinding object and the Player instance to initialize the MUXSDKImaKalturaListener class
+// and call start on the listener object
+let listener = MUXSDKImaKalturaListener(playerBinding: playerBinding, player: player)
+listener.start()
+```
+
+You can find a [complete example here](https://github.com/muxinc/mux-stats-sdk-kaltura-ios/tree/main/apps/DemoApp).
+
+## Track orientation change events
+
+You can optionally track  `orientationchange`  events. To use this functionality, call the  `orientationChangeForPlayer`  method.
+​
+These events will show up on the events log on the view views page.
+
+<CodeExamples product="data" example="kalturaIOSTrackOrientationChange" />
+
+## Handling errors manually
+
+By default,  `automaticErrorTracking`  is enabled which means the Mux SDK will catch errors that the player throws and track an  `error`  event. Error tracking is meant for fatal errors. When an error is thrown it will mark the view as having encountered an error in the Mux dashboard and the view will no longer be monitored.
+​
+If you want to disable automatic and track errors manually you can do by passing in  `automaticErrorTracking: false`  to the  `monitorPlayer`  method that you are using.
+​
+Whether automatic error tracking is enabled or disabled, you can dispatch errors manually with  `dispatchError`.
+
+<CodeExamples product="data" example="kalturaIOSHandleErrorManually" />
+
+<Releases>
+<LinkedHeader step={steps[6]} />
+
+### Current release
+
+#### v4.0.0
+
+Improvements:
+- Include privacy manifest file to satisfy [upcoming privacy requirements for App Store submissions](https://developer.apple.com/news/?id=3d8a9yyh)
+- Update Mux Core and Kaltura player dependencies
+
+### Previous releases
+
+#### v3.0.0
+
+Improvements:
+- Repackage SDK as source distribution
+- Add Swift Package Manager support
+- Raise minimum deployment targets to iOS 13 and tvOS 13
+
+Breaking:
+- Rename module name from `Mux_Stats_Google_IMA_Kaltura` to `MUXSDKStatsKaltura`
+
+Known Issues:
+- Cocoapod pod spec linting fails on Xcode 14.3 and above due to Cocoapods/Cocoapods issue #11839. As a workaround use xcode-select to switch to Xcode 14.2 before linting.
+
+#### v2.0.1
+Fixes:
+* Fix build issues in react-native projects
+
+#### v2.0.0
+Fixes:
+*Update MuxCore dependency and rebuild with recent tools. Some linkage changes have been necessary, but you shouldn't see any issues. You may require Xcode 14 to use this version of the Data SDK for Kaltura
+
+#### v1.1.1
+- Fix: Change minimum deployment target to iOS 9.0 and tvOS 9.0
+
+#### v1.1.0
+- Test: Unit test for destroy player
+- Feature: Support for Google IMA SDK Listener
+
+#### v1.0.0
+- Fix: Missing play event
+- Fix: Improve rendition change detection
+- Fix: Missing rebuffering metrics
+- Test: Unit test infrastructure
+- Test: Add test coverage
+
+#### v0.3.0
+- Third beta release of the Kaltura SDK for iOS
+- Adds tvOS support
+- Adds tvOS target to DemoApp and updates example project
+
+#### v0.2.0
+-   Second beta release of the Kaltura SDK for iOS
+-   Adds  `setCustomerDataForPlayer` to update metadata after monitor call
+-   Adds  `videoChangeForPlayer` to update metadata when a video change occurs
+-   Adds  `programChangeForPlayer:name:customerData:` to update metadata when a program change within a stream
+-   Adds  `orientationChangeForPlayer` to track orientation changes
+-   Adds  manual error tracking with `dispatchError`
+
+ #### v0.1.0
+ - First beta release of the Kaltura SDK for iOS
+</Releases>

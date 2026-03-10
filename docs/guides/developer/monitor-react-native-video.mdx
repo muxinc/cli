@@ -1,0 +1,521 @@
+---
+title: Monitor React native video
+product: data
+dataIntegration: true
+description: This guide walks through integration with react-native-video to collect video performance metrics with Mux Data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Install Mux Data SDK
+    description: Install `@mux/mux-data-react-native-video` either from the npm registry.
+  - title: 2. Initialize Mux Data
+    description: Wrap your `Video` component with the `muxReactNativeVideo` so that Mux can collect playback metrics.
+  - title: 3. Make your data actionable
+    description: Use metadata fields to make the data collected by Mux actionable and useful.
+  - title: 4. Set or update metadata after initialization
+    description: If you do not have all the metadata available at initialization time update metadata fields later.
+  - title: 5. Advanced options
+    description: Depending on the details of your implementation, you may want to leverage some of the advanced options of `@mux/mux-data-react-native-video`.
+  - title: Release notes
+    topic: notes
+---
+
+<Callout type="warning" title="Beta SDK">
+
+This SDK is currently beta.
+See the [Known Issues](https://github.com/muxinc/mux-stats-sdk-react-native-video#known-issues) and [Caveats](https://github.com/muxinc/mux-stats-sdk-react-native-video#caveats) in the README on GitHub.
+
+</Callout>
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+Include the Mux JavaScript SDK on every page of your web app that includes video.
+
+<CodeExamples
+  examples={{
+    npm: "npm install --save @mux/mux-data-react-native-video",
+    yarn: "yarn add @mux/mux-data-react-native-video",
+  }}
+  exampleOrder="npm,yarn,cdn"
+/>
+
+<LinkedHeader step={steps[2]} />
+
+<MdxImport snippet="envKeyCallout" />
+
+Wrap your `Video` component with the `muxReactNativeVideo` higher-order-component.
+
+```jsx
+import app from './package.json' // this is your application's package.json
+import Video from 'react-native-video'; // import Video from react-native-video like your normally would
+import muxReactNativeVideo from '@mux/mux-data-react-native-video';
+
+// wrap the `Video` component with Mux functionality
+const MuxVideo = muxReactNativeVideo(Video);
+
+// Pass the same props to `MuxVideo` that you would pass to the
+// `Video` element. All of these props will be passed through to your underlying react-native-video component
+// Include a new prop for `muxOptions`
+<MuxVideo
+  style={styles.video}
+  source={{
+    uri:
+      'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
+  }}
+  controls
+  muted
+  muxOptions={{
+    application_name: app.name,            // (required) the name of your application
+    application_version: app.version,      // the version of your application (optional, but encouraged)
+    data: {
+      env_key: 'YOUR_ENVIRONMENT_KEY',     // (required)
+      video_id: 'My Video Id',             // (required)
+      video_title: 'My awesome video',
+      player_software_version: '5.0.2',     // (optional, but encouraged) the version of react-native-video that you are using
+      player_name: 'React Native Player',  // See metadata docs for available metadata fields /docs/web-integration-guide#section-5-add-metadata
+    },
+  }}
+/>
+```
+
+<LinkedHeader step={steps[3]} />
+
+The required fields in the `muxOptions` that you pass into the `MuxVideo` component are `application_name`, `data.env_key` and `data.video_id`. However, without some metadata the metrics in your dashboard will lack the necessary information to take meaningful actions. Metadata allows you to search and filter on important fields in order to diagnose issues and optimize the playback experience for your end users.
+
+Pass in metadata under the `data` on initialization.
+
+```js
+  muxOptions={{
+    application_name: app.name,            // (required) the name of your application
+    application_version: app.version,      // the version of your application (optional, but encouraged)
+    data: {
+      env_key: 'ENV_KEY',
+      // Site Metadata
+      viewer_user_id: '', // ex: '12345'
+      experiment_name: '', // ex: 'player_test_A'
+      sub_property_id: '', // ex: 'cus-1'
+      // Player Metadata
+      player_name: '', // ex: 'My Main Player'
+      player_version: '', // ex: '1.0.0'
+      player_init_time: '', // ex: 1451606400000
+      // Video Metadata
+      video_id: '', // ex: 'abcd123'
+      video_title: '', // ex: 'My Great Video'
+      video_series: '', // ex: 'Weekly Great Videos'
+      video_duration: '', // in milliseconds, ex: 120000
+      video_stream_type: '', // 'live' or 'on-demand'
+      video_cdn: '' // ex: 'Fastly', 'Akamai'
+    },
+  }}
+});
+```
+
+For more information, view [Make your data actionable](/docs/guides/make-your-data-actionable-with-metadata).
+
+<LinkedHeader step={steps[4]} />
+
+There are some cases where you may not have the full set of metadata until after the video playback has started. In this case, you should omit the values when you first initialize the Mux SDK. Then, once you have the metadata, you can update the metadata with the `updateData` method.
+
+```js
+MuxVideo.updateData({ video_title: 'My Updated Great Video' });
+```
+
+<LinkedHeader step={steps[5]} />
+
+### Customize beacon collection domain
+
+<MdxImport snippet="sdkWebCustomizeBeaconCollection" />
+
+```js
+  muxOptions={{
+    application_name: app.name,              // (required) the name of your application
+    application_version: app.version,        // the version of your application (optional, but encouraged)
+    beaconCollectionDomain: 'CUSTOM_DOMAIN', // ex: 'foo.bar.com'
+    data: {
+      env_key: 'ENV_KEY',
+      // Site Metadata
+      viewer_user_id: '', // ex: '12345'
+      experiment_name: '', // ex: 'player_test_A'
+      sub_property_id: '', // ex: 'cus-1'
+      // Player Metadata
+      player_name: '', // ex: 'My Main Player'
+      player_version: '', // ex: '1.0.0'
+      player_init_time: '', // ex: 1451606400000
+      // Video Metadata
+      video_id: '', // ex: 'abcd123'
+      video_title: '', // ex: 'My Great Video'
+      video_series: '', // ex: 'Weekly Great Videos'
+      video_duration: '', // in milliseconds, ex: 120000
+      video_stream_type: '', // 'live' or 'on-demand'
+      video_cdn: '' // ex: 'Fastly', 'Akamai'
+    },
+  }}
+});
+```
+<Releases>
+<LinkedHeader step={steps[6]} />
+
+### Current release
+
+#### v0.19.10
+
+- fix issue where playing time might accumulate for paused players
+  - Updated dependency: `mux-embed` to v5.17.1
+
+### Previous releases
+
+#### v0.19.9
+
+- add compatibility for dash.js 5
+  - Updated dependency: `mux-embed` to v5.17.0
+
+#### v0.19.8
+
+- Update parsing of initial value for player_playback_mode
+  - Updated dependency: `mux-embed` to v5.16.1
+
+#### v0.19.7
+
+- Add Playback Range Tracker for new engagement metrics
+  - Updated dependency: `mux-embed` to v5.16.0
+
+#### v0.19.6
+
+- Automatically detect playback mode changes for HTML 5 Video
+  - Updated dependency: `mux-embed` to v5.15.0
+
+#### v0.19.5
+
+- Emit a renditionchange event at the start of views to eanble updated rendition tracking.
+  - Updated dependency: `mux-embed` to v5.14.0
+
+#### v0.19.4
+
+- Add ad type metadata to Ad Events
+- Add support for the upcoming Playback Mode changes:
+  - Updated dependency: `mux-embed` to v5.13.0
+
+#### v0.19.3
+
+- SDKs will no longer immediately send error events that are flagged as warnings. Fatal errors will still immediately be sent.
+  - Updated dependency: `mux-embed` to v5.12.0
+
+#### v0.19.2
+
+- Allow dev to specify page starting load and page finished loading times to calculate Page Load Time
+  - Updated dependency: `mux-embed` to v5.11.0
+
+#### v0.19.1
+
+- Adds support for cdnchange events
+  - Updated dependency: `mux-embed` to v5.10.0
+
+#### v0.19.0
+
+- React Native custom onProgress handling
+
+- Submit Aggregate Startup Time when autoplay is set
+  - Updated dependency: `mux-embed` to v5.9.1
+
+#### v0.18.3
+
+- Fix for race condition between rebuffering and pause events
+
+#### v0.18.2
+
+- Update `mux-embed` to v5.9.0
+
+#### v0.18.1
+
+- fix issue where updateData wasn't exposed, and issues with player_is_paused reporting
+
+#### v0.18.0
+
+- expose updateData method on MuxVideo element
+
+#### v0.17.6
+
+- Update `mux-embed` to v5.8.3
+
+#### v0.17.5
+
+- Update `mux-embed` to v5.8.2
+
+#### v0.17.4
+
+- Update `mux-embed` to v5.8.1
+
+#### v0.17.3
+
+- Update `react-native-video` version and Add the Mux, Inc Apple team to the demo app
+- Update `mux-embed` to v5.8.0
+
+#### v0.17.2
+
+- Update `mux-embed` to v5.7.0
+
+#### v0.17.1
+
+- Update `mux-embed` to v5.6.0
+
+#### v0.17.0
+
+- Update mechanism for generating unique IDs, used for `view_id` and others
+
+- Update `mux-embed` to v5.5.0
+
+#### v0.16.3
+
+- [chore] internal build process fix (no functional changes)
+- Update `mux-embed` to v5.4.3
+
+#### v0.16.2
+
+- Update `mux-embed` to v5.4.2
+
+#### v0.16.1
+
+- Update `mux-embed` to v5.4.1
+
+#### v0.16.0
+
+- Add updateData function that allows Mux Data metadata to be updated mid-view.
+
+- Update `mux-embed` to v5.4.0
+
+#### v0.15.6
+
+- Update `mux-embed` to v5.3.3
+
+#### v0.15.5
+
+- Update `mux-embed` to v5.3.2
+
+#### v0.15.4
+
+- Update `mux-embed` to v5.3.1
+
+#### v0.15.3
+
+- Update `mux-embed` to v5.3.0
+
+#### v0.15.2
+
+- Update `mux-embed` to v5.2.1
+
+#### v0.15.1
+
+- Update `mux-embed` to v5.2.0
+
+#### v0.15.0
+
+- Target ES5 for bundles and validate bundles are ES5
+
+- Update `mux-embed` to v5.1.0
+
+#### v0.14.4
+
+- Update `mux-embed` to v5.0.0
+
+#### v0.14.3
+
+- Update `mux-embed` to v4.30.0
+
+#### v0.14.2
+
+- Update `mux-embed` to v4.29.0
+
+#### v0.14.1
+
+- Update `mux-embed` to v4.28.1
+
+#### v0.14.0
+
+- Add renditionchange events for Android
+- Introduces error tracking
+
+- Bug fix for rebuffering metrics
+- Update `mux-embed` to v4.28.0
+
+#### v0.13.0
+
+- fix an issue where seek latency could be unexpectedly large
+- fix an issue where seek latency does not include time at end of a view
+
+- Update `mux-embed` to v4.27.0
+
+#### v0.12.3
+
+- Update `mux-embed` to v4.26.0
+
+#### v0.12.2
+
+- Update `mux-embed` to v4.25.1
+
+#### v0.12.1
+
+- Update `mux-embed` to v4.25.0
+
+#### v0.12.0
+
+- Fix an issue where beacons over a certain size could get hung and not be sent
+
+- Update `mux-embed` to v4.24.0
+
+#### v0.11.0
+
+- Fix an issue where tracking rebuffering can get into an infinite loop
+
+- Update `mux-embed` to v4.23.0
+
+#### v0.10.3
+
+- Update `mux-embed` to v4.22.0
+
+#### v0.10.2
+
+- Update `mux-embed` to v4.21.0
+
+#### v0.10.1
+
+- Update `mux-embed` to v4.20.0
+
+#### v0.10.0
+
+- Improve accuracy of react-native-video rebuffer tracking
+
+- Update `mux-embed` to v4.19.0
+
+#### v0.9.0
+
+- Allow for timeupdates less than 250ms
+
+#### v0.8.1
+
+- Update `mux-embed` to v4.18.0
+
+#### v0.8.0
+
+- Support `player_error_context` in `errorTranslator`
+
+- Update `mux-embed` to v4.17.0
+
+#### v0.7.0
+
+- Adds support for new and updated fields: `renditionchange`, error, DRM type, dropped frames, and new custom fields
+
+- Update `mux-embed` to v4.16.0
+
+#### v0.6.6
+
+- Update `mux-embed` to v4.15.0
+
+#### v0.6.5
+
+- Update `mux-embed` to v4.14.0
+
+#### v0.6.4
+
+- Update `mux-embed` to v4.13.4
+
+#### v0.6.3
+
+- Update `mux-embed` to v4.13.3
+
+#### v0.6.2
+
+- Update `mux-embed` to v4.13.2
+
+#### v0.6.1
+
+- Update `mux-embed` to v4.13.1
+
+#### v0.6.0
+
+- Upgraded internal webpack version
+
+- Update `mux-embed` to v4.13.0
+
+#### v0.5.8
+
+- Publish package to NPM
+
+#### v0.5.7
+
+- Update `mux-embed` to v4.12.1
+
+#### v0.5.6
+
+- Update `mux-embed` to v4.12.0
+
+#### v0.5.5
+
+- Update `mux-embed` to v4.11.0
+
+#### v0.5.4
+
+- Update `mux-embed` to v4.10.0
+
+#### v0.5.3
+
+- Update `mux-embed` to v4.9.4
+
+#### v0.5.2
+
+- Use common function for generating short IDs
+- Update `mux-embed` to v4.9.3
+
+#### v0.5.1
+
+- Update `mux-embed` to v4.9.2
+
+#### v0.5.0
+
+- We now expose the emit function the SDK uses which allows developers to manually invoke an event emission.
+
+#### v0.4.6
+
+- Update `mux-embed` to v4.9.1
+
+#### v0.4.5
+
+- Update `mux-embed` to v4.9.0
+
+#### v0.4.4
+
+- Update `mux-embed` to v4.8.0
+
+#### v0.4.3
+
+- Update `mux-embed` to v4.7.0
+
+#### v0.4.2
+
+- Update `mux-embed` to v4.6.2
+
+#### v0.4.1
+
+- Update `mux-embed` to v4.6.1
+
+#### v0.4.0
+
+- Bump mux-embed to 4.6.0
+
+#### v0.3.0
+
+- Fix an issue where `playerID` is `null` when wrapping the component with react-native-video-controls.
+
+#### v0.2.0
+
+- Update `mux-embed` to v4.2.0
+- Fix an issue where views that resulted from `programchange` may not have been tracked correctly
+- Fix an issue where if `destroy` was called multiple times, it would raise an exception
+
+#### v0.1.0
+
+- Initial release
+</Releases>

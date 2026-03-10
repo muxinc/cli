@@ -1,0 +1,130 @@
+---
+title: Add high-performance video to your Laravel application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video in your Laravel application
+---
+
+Laravel is one of the most popular PHP frameworks for building a website but doesn't have a built-in path for integrating video.
+
+Mux is a video API for developers that makes it easy to upload and manage your library of video and audio content. We'll handle the video end-to-end for you from upload, encoding, generating thumbnails and captions, right through to playback and customising the player experience.
+
+Here we've outlined some techniques and libraries you can use to make integrating with Mux as smooth as possible.
+
+## Listening for webhooks
+
+Everything that happens to your videos on Mux triggers a webhook that notifies you of the change. This can include an asset being ready for playback, a live streaming connecting, an asset being deleted, and [many others](/docs/webhook-reference).
+
+Read our [webhook guide](/docs/core/listen-for-webhooks) for learning about how to get setup for handling webhooks generally.
+
+In Laravel you would setup a route that looks like this:
+
+```php
+// routes/api.php
+use App\Http\Controllers\WebhookController;
+
+Route::post('webhook/endpoint', [WebhookController::class, 'handle']);
+```
+
+Which references this `WebhookController`:
+
+```php
+// app/Http/Controllers/WebhookController.php
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+
+class WebhookController extends Controller
+{
+    public function handle(Request $request)
+    {
+        // Process webhook payload here
+        // Save the asset ID and playback ID to your database
+        return response()->json(['success' => true]);
+    }
+}
+```
+
+This controller will be in charge of storing references to your videos that have successfully been uploaded and processed. It will also be notified if an upload fails for any reason, you might want to store this state too so it can be shown to users if needed.
+
+You should store at least the Asset ID and Playback ID in your database so that you can use them to embed the videos for playback in your page templates. You will use the Asset ID whenever you need to interact with the asset with the Mux API and you will need the Playback ID for playback on the front-end.
+
+## Uploading from the front-end with Direct Uploads
+
+[Direct Uploads](/docs/guides/upload-files-directly) allow you to upload a video from the browser to your Mux account. To start, call the Mux API to generate an upload URL that is provided to the front-end.
+
+
+We can use the [Mux PHP library](https://github.com/muxinc/mux-php) to make it easier to create these upload URLs:
+
+```php
+$createAssetRequest = new MuxPhp\Models\CreateAssetRequest(["playback_policy" => [MuxPhp\Models\PlaybackPolicy::_PUBLIC]]);
+$createUploadRequest = new MuxPhp\Models\CreateUploadRequest(["new_asset_settings" => $createAssetRequest]);
+$upload = $uploadsApi->createDirectUpload($createUploadRequest);
+
+print "Upload URL:" $upload->getData()->getUrl();
+```
+
+You'll want to add this script to one of your API routes, and return the upload URL instead of printing it.
+On the front-end, you can use [Mux Uploader](/docs/guides/mux-uploader), a web component that gives you a simple UI to make uploading a video easier.
+On the front-end using Mux Uploader, you would use the Upload URL for the `endpoint` attribute:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mux/mux-uploader"></script>
+
+<mux-uploader endpoint="{direct_upload_url}"></mux-uploader>
+```
+
+## Video playback
+
+If your webhook is already storing Playback IDs in your database, you can play back videos on the front-end using [Mux Player](/docs/guides/mux-player-web). Your blade template for this might look like:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mux/mux-player" defer></script>
+
+<!-- The `metadata-` attributes are optional  -->
+<mux-player
+  playback-id="{{ $playbackId }}"
+  metadata-video-title="{{ $title }}" 
+  metadata-viewer-user-id="{{ $userId }}"
+></mux-player>
+```
+
+Mux Player comes with lots of [features](/docs/guides/player-core-functionality) and [customisability](/docs/guides/player-customize-look-and-feel) out of the box.
+
+The controller for this page might look something like this:
+
+```php
+<?php
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+
+class PlaybackController extends Controller
+{
+    public function show($videoId)
+    {
+        // Fetch the video from the database and set
+        // $playbackId
+        // $title
+        
+        // Get user (replace with your actual authentication logic)
+        $userId = auth()->id();
+
+        return view('playback', [
+            'playbackId' => $playbackId,
+            'title' => $title,
+            'userId' => $userId,
+        ]);
+    }
+}
+```
+
+## Community contributions and libraries
+
+### `mux-php-laravel`
+
+`mux-php-laravel` is a [library](https://github.com/martinbean/mux-php-laravel) that will help you setup defaults for working with Mux easier in your Laravel project.
+
+### Statamic Mux
+ 
+[Statamic](https://statamic.com/) is a popular CMS built on top of Laravel. There is a community [Mux integration](https://statamic-mux.daun.ltd/) for making it easier to get your videos into Mux using the CMS.

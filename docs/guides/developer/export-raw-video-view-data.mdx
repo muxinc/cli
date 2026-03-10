@@ -1,0 +1,322 @@
+---
+title: Export raw video view data
+product: data
+description: Understand how to export your video views data into your own data warehouse for processing and analysis.
+steps:
+  - title: Call the Export API to get daily aggregated data
+    description: The Export API will return a list of CSV files (one per day) that contain each video view.
+    topic: API
+  - title: Stream views as they complete
+    description: Export video view data as the views complete.
+    topic: view
+  - title: Understand the data fields
+    description: Understand the data fields that Mux attaches to each view.
+  - title: CSV file formats
+    description: Samples of the CSV file formats
+    topic: formats
+  - title: Streaming Export message format
+    description: 
+    topic: code
+  - title: Streaming Export versioning
+    description: Understand how to manage the schema versioning in Streaming Export
+---
+
+View data can be exported from Mux Data for aggregation and reporting in your data infrastructure. Views are available individually using the <ApiRefLink href="/docs/api-reference/data/video-views/get-video-view">Views API</ApiRefLink> or in bulk with the export methods: daily CSV exports or streaming exports.
+
+<LinkedHeader step={steps[0]} />
+
+Full data exports are available via the <ApiRefLink href="/docs/api-reference/data/exports/list-exports-views">Exports API</ApiRefLink>. This API is available for Mux Data customers on Media plans.
+
+Use this API to get a list of CSV files available for download. Files are available to download for seven days after they are generated. Each CSV file is a single day of data and includes every single dimension collected by Mux, for each single video view. The table below details each of these data fields.
+
+The Versions column indicates what fields are included in each version. Newer export versions will include the latest columns available. Some columns may be empty based on the features enabled. From version 2 onward, fields are sorted in alphabetical order. Older versions of the export may have fields in a different order, please refer to the export file for the most accurate ordering. Please contact support to change the export version that is generated.
+
+**We strongly suggest you build the file import to use the field names rather than ordinal order so additional fields can be added to the file without causing an error.**
+
+<LinkedHeader step={steps[1]} />
+
+<Callout type="info">
+
+Streaming Exports are available on **Mux Data Media** plans. Learn more about [Mux Data Plans](https://data.mux.com/pricing) or [contact support](https://mux.com/support).
+</Callout>
+
+Mux Data supports streaming exports of video views to an Amazon Kinesis Data Stream or Google Cloud Pub/Sub topic in your cloud account. Views are sent to Kinesis or Pub/Sub as they complete and are made available to retrieve from the stream within about one minute after the view ends.
+
+Each message is a single view, with all of the metadata and metrics, and the event timeline for the view. The view data can be stored in your long-term storage for aggregation and reporting.
+
+This method of access is most useful for customers who want to update metrics on a rolling basis throughout the day or are embedding metrics in a user-facing application feature and need faster updates than once per day.
+
+## Setting up a streaming export
+Streaming exports can be configured in the **Streaming Exports** settings in your Mux dashboard. See the setup guide for your platform for more information on setting up an export:
+-  [Amazon Kinesis Data Streams](/docs/guides/export-amazon-kinesis-data-streams)
+-  [Google Cloud Pub/Sub](/docs/guides/export-google-cloud-pubsub)
+
+## Message format
+Messages are in either JSON format or Protobuf (proto2) encoding. You can choose between the two formats when setting up the streaming export in the Mux Dashboard -> Settings -> Streaming Export -> New streaming export page.
+
+For Protobuf encoding, every message uses the `VideoView` message type defined in the export Protobuf spec, which is available in the [mux-protobuf repository](https://github.com/muxinc/mux-protobuf/tree/main/video_view). Use the latest Protobuf spec when creating schemas or generating code.
+
+The fields in the Protobuf definition match those used in the latest version of the Exports API. The available fields are noted in the table below.
+
+## View handling
+A view can be updated after it has been exported. This will be expressed with a record of the latest version of the view being emitted to the stream. When processing views, make sure you're able to handle multiple or duplicate records for each view ID (`view_id`). The `view_id` can be used as a unique primary key for each view record.
+
+<LinkedHeader step={steps[2]} />
+
+**Mux API Value**: field name in the CSV file or streaming export
+
+**Unit**: unit of the field, such as text, percentage, or bits per second. Note that all units of type `Time` are represented as timestamps in UTC.
+
+**Type**: 
+- Dimension: metadata about the view
+- Metric: metrics calculated by Mux
+- Score: score calculated by Mux
+
+**Versions**: export version in which the fields are included 
+
+| Mux API Value | Unit | Type | Definition | Versions |
+|---------------|------|------|------------|----------|
+|`asn` |Integer |Dim. | Autonomous System Number uniquely identifying each network| v1+ |
+|`asset_id` |Text |Dim. | If Mux Video is used, the Asset Id of the video.| v4+ |
+|`audio_codec` |Text |Dim. | The codec of the audio that played during the view. | v13+ |
+|`browser` |Text |Dim.| Browser used for the video view (`Safari`, `Chrome`, etc.).| v2+ |
+|`browser (viewer_application_name)` |Text |Dim.| Deprecated - see `browser`| v1 |
+|`browser_version` |Version |Dim. | Browser version (e.g. `66.0.3359.158`).| v2+ |
+|`browser_version (viewer_application_version)` |Version |Dim. | Deprecated - see `browser_version (viewer_application_version)`| v1 |
+|`cdn` |Text |Dim. | CDN delivering the video view, either determined by response header auto-detection or provided as video_cdn.| v1+ |
+|`city` |Text |Dim. | City of the viewer.| v1+ |
+|`client_application_name` |Text |Dim. | Name of the customer application that the viewer is using to watch the content. e.g 'OurBrand iOS App'. | v13+ |
+|`client_application_version` |Text |Dim. | Version of the customer application that the viewer is using to view the content. | v13+ |
+|`continent_code` |ISO Code |Dim. | 2-letter ISO code identifying the Continent of the viewer (e.g. `NA`, `EU`).| v1+ |
+|`country` |ISO Code |Dim. | 2-letter Country Code.| v2+ |
+|`country (country_code)` |ISO Code |Dim. | Deprecated - see `country`| v1 |
+|`country_name` |Text |Dim. | Country of the viewer.| v1+ |
+|`custom_1` |Text |Dim. | Customer-defined metadata.| v2+ |
+|`custom_2` |Text |Dim. | Customer-defined metadata.| v2+ |
+|`custom_3` |Text |Dim. | Customer-defined metadata.| v2+ |
+|`custom_4` |Text |Dim. | Customer-defined metadata.| v2+ |
+|`custom_5` |Text |Dim. | Customer-defined metadata.| v2+ |
+|`custom_6` |Text |Dim. | Customer-defined metadata.| v5+ |
+|`custom_7` |Text |Dim. | Customer-defined metadata.| v5+ |
+|`custom_8` |Text |Dim. | Customer-defined metadata.| v5+ |
+|`custom_9` |Text |Dim. | Customer-defined metadata.| v5+ |
+|`custom_10` |Text |Dim. | Customer-defined metadata.| v5+ |
+|`environment_id`|Unique ID |Dim. | Mux Environment ID, linked with a specific environment| v4+ |
+|`error_type` |Unique ID |Dim. | Mux-internal ID used to categorize errors.| v2+ |
+|`error_type (error_type_id)` |Unique ID |Dim. | Deprecated - see `error_type`| v1 |
+|`exit_before_video_start` |Boolean |Metric | Identifies when a viewer abandons the video because it is taking too long to load.| v1+ |
+|`experiment_name` |Text |Dim. | A/B Testing:  use this field to separate views into different experiments.| v1+ |
+|`isp` |Text |Dim. | Unused| v1+ |
+|`latitude` |Degrees |Dim. | Latitude of the viewer, truncated to 1 decimal place.| v1+ |
+|`live_stream_id` |Text |Dim. | If Mux Video is used, the Live Stream Id of the video.| v4+ |
+|`live_stream_latency` |Integer |Metric | Live Stream Latency measuring the average time from ingest to display for the view.| v4+ |
+|`longitude` |Degrees |Dim. | Longitude of the viewer, truncated to one decimal place.| v1+ |
+|`max_downscale_percentage` | Percentage | Metric | Maximum Downscale Percentage at any point in time during a video view.| v2+ |
+|`max_downscale_percentage (view_max_downscale_percentage)` | Percentage | Metric | Deprecated - see `max_downscale_percentage`| v1 |
+|`max_upscale_percentage` | Percentage | Metric |  Maximum Upscale Percentage at any point in time during a video view.| v2+ |
+|`max_upscale_percentage (view_max_upscale_percentage)` | Percentage | Metric | Deprecated - see `max_upscale_percentage`| v1 |
+|`metro` |Text |Dim. | Unused| v1+ |
+|`mux_api_version` | Text|Dim. | Ignore | v1+ |
+|`mux_embed_version` |Dim. |Dim. | Internal version of Mux Core SDK. Ignore| v1+ |
+|`mux_viewer_id` |Unique ID |Dim. | A Mux Internal ID representing the viewer who is watching the stream.| v1+ |
+|`operating_system` |Text |Dim. | Operating System (`iOS`, `Windows`, etc.).| v2+ |
+|`operating_system (viewer_os_family)` |Text |Dim. | Deprecated - see `operating_system`| v1 |
+|`operating_system_version` |Version |Dim. | Operating System version (e.g. `10.15`).| v2 |
+|`operating_system_version (viewer_os_version)` |Version |Dim. | Deprecated - see `operating_system_version`| v1 |
+|`page_load_time` |Milliseconds |Metric | Measures the time from the initial user request for a page to the time when the video player is first initialized| v1+ |
+|`page_type` |Text |Dim. | Provides the context of the page for more specific analysis. Values include `watchpage` or `iframe`.| v1+ |
+|`page_url` |URL |Dim. | Page URL| v1+ |
+|`platform_description` |Text |Dim. | Unused| v1+ |
+|`playback_id` |Text |Dim. | If Mux Video is used, the Playback Id of the video.| v4+ |
+|`playback_business_exception_error_type_id` |Unique ID |Dim. | An ID value that is present when a playback business exception occurs | v9+ |
+|`playback_failure_error_type_id` |Unique ID |Dim. | An ID value that is present when a playback failure occurs | v9+ |
+|`playback_success_score` |Decimal |Dim. | Playback Success Score| v2+ |
+|`player_autoplay` |Boolean |Dim. | Indicates whether the player autoplayed the video or not| v1+ |
+|`player_captions_enabled` |Boolean |Dim. | Boolean indicating if the player used captions at any time during the view. | v13+ |
+|`player_error_code` |String |Dim. | An error code that represents a fatal error (one resulting in playback failure). Often an integer, but implementation-dependent.| v1+ |
+|`player_error_context` |Text |Dim. | Error instance-specific information such as stack trace or segment number.| v5+ |
+|`player_error_message` |Text |Dim. | Message sent by the player when an error has been fired up (associated with an error code)| v1+ |
+|`player_height` |Integer |Dim. | Height of the player as displayed in page, in pixels| v1+ |
+|`player_instance_id` |Unique ID |Dim. | Identifies the instance of the Player class that is created when a video is initialized| v1+ |
+|`player_language` |Text |Dim. | Player's text language| v1+ |
+|`player_load_time` |Milliseconds |Metric | Deprecated - see `player_startup_time`)| v1+ |
+|`player_mux_plugin_name` |Text |Dim. | Mux Integration Plugin name (e.g. `mux-player`)| v1+ |
+|`player_mux_plugin_version` |Version |Dim. | Mux Integration Plugin version (e.g. `2.2.0`)| v2+ |
+|`player_name` |Text |Dim. | Identifies different configurations or types of players around your site or application (e.g. `My Player`)| v1+ |
+|`player_pip_enabled` |Boolean |Dim. | Boolean indicating if the player used Picture in Picture at any time during the view. | v13+ |
+|`player_poster`|URL| Dim. | The image shown as the pre-visualization before play | v1+ |
+|`player_preload` |Boolean |Dim. | Specifies if the player was configured to load the video when the page loads.| v1+ |
+|`player_remote_played` |Boolean |Dim. | Specify from the SDK if the video is remote played to AirPlay or Chromecast.| v2+ |
+|`player_software` |Text |Dim. | Player Software being used to play the Video (e.g. `Video.js`, `JW Player`, etc.)| v1+ |
+|`player_software_version` |Text |Dim. | Player Software Version (e.g. `2.45.5`)| v1+ |
+|`player_source_domain` |Text |Dim. | Video Source Domain (e.g. `myvideostreams.com`)| v1+ |
+|`player_source_duration` |Milliseconds |Dim. | Video Source Duration| v1+ |
+|`player_source_height` |Integer |Dim. | Height of the source video being sent to the player, in pixels| v1+ |
+|`player_source_stream_type` |Text |Dim. | Unused| v1+ |
+|`player_source_url` |URL |Dim. | Video Source URL| v1+ |
+|`player_source_width` | Integer | Dim. | Width of the source video being as seen by the player | v1+ |
+|`player_startup_time` |Milliseconds |Metric | Measures the time from when the player is first initialized in the page to when it is ready to receive further instructions.| v1+ |
+|`player_version` |Text |Dim. | As you make changes to your player you can compare how new versions of your player perform. Set in combination with `player_name` (e.g. `1.2.0`) | v1+ |
+|`player_view_count` |Integer |Dim. | View Count - equal to 1 in Full Exports (1 line = 1 video view)| v1+ |
+|`player_width` |Integer |Dim. | Width of the player as displayed in page, in pixels| v1+ |
+|`property_id` |Unique ID |Dim. | Mux Property ID, linked with a specific environment. Deprecated, please use `environment_id`. | v1+ |
+|`rebuffer_count` |Integer |Metric | Number of rebuffering events that happen during the video view. | v2+ |
+|`rebuffer_count (buffering_count)` |Integer |Metric | Deprecated - see `rebuffer_count` | v1 |
+|`rebuffer_duration` |Milliseconds |Metric | Amount of time in milliseconds that viewers wait for rebuffering per video view. | v2+ |
+|`rebuffer_duration (buffering_duration)` |Milliseconds |Metric | Deprecated - see `rebuffer_duration` | v1 |
+|`rebuffer_frequency` |Events per millisecond |Metric | Measures how often rebuffering events happen. | v2+ |
+|`rebuffer_frequency (buffering_rate)` |Events per millisecond |Metric | Deprecated - see `rebuffer_frequency` | v1 |
+|`rebuffer_percentage` |Percentage |Metric | Volume of rebuffering that is occurring across the view| v1+ |
+|`region` |Text |Dim. | Region of the viewer| v1+ |
+|`session_id` |Unique ID |Dim. | Mux Session ID tracking a viewer's session| v1+ |
+|`smoothness_score` |Decimal |Score | Smoothness Score| v2+ |
+|`source_hostname` |Text |Dim. | Video Hostname (e.g. `media.myvideos.com`).| v2+ |
+|`source_hostname (player_source_host_name)` |Text |Dim. | Deprecated - see `source_hostname`| v1 |
+|`source_type` |Text |Dim. | Format of the source, as determined by the player. E.g. `application/dash+xml`, `x-application/mpegUrl`, `mp4`, etc.| v2+ |
+|`source_type (player_source_type)` |Text |Dim. | Deprecated - see `source_type`| v1 |
+|`startup_time_score` |Decimal |Score | Startup Time Score| v2+ |
+|`stream_type` |Text |Dim. | Type of stream (e.g. `live` or `on-demand`).| v2+ |
+|`stream_type (video_stream_type)` |Text |Dim. | Deprecated - see `stream_type`| v1 |
+|`sub_property_id` |Text |Dim. | Sub Property Id| v2+ |
+|`time_to_first_frame` |Milliseconds | Metric | Deprecated - see `video_startup_time`| v1 |
+|`used_fullscreen` |Boolean |Dim. | Indicates whether the viewer used full screen to watch the video.| v1+ |
+|`video_affiliate` |Text |Dim. | Affiliate station that the viewer is watching or associated with the viewer. | v13+ |
+|`video_brand` |Text |Dim. | Brand associated with the video or the brand of the streaming platform the viewer is using to watch the video. | v13+ |
+|`video_cdn_trace` |Array |Dim. | Sequential values of the video delivery CDN over the course of the view | v14+ |
+|`video_codec` |Text |Dim. | The codec of the video that played during the view. | v13+ |
+|`video_content_type` |Text |Dim. | Content Type (e.g. `short`, `movie`, `episode`, `clip`, `trailer`, or `event`).| v1+ |
+|`video_creator_id` |Text |Dim. | A unique identifier for the creator of the video. Defaults to the Mux Creator ID if enabled for Assets and Livestreams hosted by Mux.| v13+ |
+|`video_duration` |Milliseconds |Dim. | The length of the video supplied to Mux via custom metadata| v1+ |
+|`video_dynamic_range_type` |Text |Dim. | The format or type of dynamic range available on the video during the view. | v13+ |
+|`video_encoding_variant` |Text |Dim. | An optional detail that allows you to compare different encoding settings.| v1+ |
+|`video_id` |Unique ID |Dim. | Your internal ID for the video| v1+ |
+|`video_language` |Text|Dim. | The audio language of the video, assuming it's unchangeable after playing.| v1+ |
+|`video_producer` |Text |Dim. | The producer of the video title| v1+ |
+|`video_quality_score` |Decimal |Score | Video Quality Score| v2+ |
+|`video_startup_business_exception_error_type_id` |Unique ID |Dim. | An ID value that is present when a video startup business exception occurs | v9+ |
+|`video_series` |Text |Dim. | Series name (e.g. `The Girls`)| v1+ |
+|`video_startup_time` |Milliseconds | Metric | (Video Startup Time on Mux Dashboards) Measures from when the player has been instructed to play the video, to when the first frame of video (either content or preroll ad) is showing and the playhead is progressing.| v2+ |
+|`video_startup_failure` |Boolean | Metric | Identifies when a viewer encounters an error before the first frame of the video begins playback.| v7+ |
+|`video_title` |Text |Dim. | Video Title| v1+ |
+|`video_variant_id` |Unique ID |Dim. | Your internal ID for a video variant| v1+ |
+|`video_variant_name` | Text |Dim. | An optional detail that allows you to monitor issues with the files of specific versions of the content, for example different audio translations or versions with hard-coded/burned-in subtitles.| v1+ |
+|`view_cdn_edge_pop` |Text |Dim. | Region where the CDN edge point of presence server is located or other origin server identification. | v13+ |
+|`view_cdn_origin` |Text |Dim. | Identifying name of the Content Origin or Region where the Origin server is located. | v13+ |
+|`view_content_startup_time` |Milliseconds |Metric | Measures from when the player has been instructed to play the video, to when the first frame of video content is showing and the playhead is progressing.| v10+ |
+|`view_content_watch_time` |Milliseconds |Metric | Total Content Watch Time across the view (includes Startup Time, Playing time, potential rebuffering).| v10+ |
+|`view_downscaling_percentage` |Percentage |Metric | Downscale Percentage| v2+ |
+|`view_drm_level` |Text |Dim. | Security level of the specific DRM type. Some DRM types do not have levels.  v13+ |
+|`view_drm_type` |Text |Dim. | The type of DRM used during playback (e.g. `widevine` or `playready`).| v5+ |
+|`view_dropped` |Boolean |Dim. | Boolean indicating whether the view was finalized without an explicit viewend event. | v11+ |
+|`view_dropped_frame_count` |Integer |Metric | The number of frames that were dropped by the player during playback| v5+ |
+|`view_end` |Time |Dim. | Date and Time at which the view ended, in UTC.| v1+ |
+|`view_has_ad` |Boolean |Metric | Identifies if an advertisement played or attempted to play during the video view.| v6+ |
+|`view_id` |Unique ID |Dim. | Unique View Identifier| v1+ |
+|`view_max_playhead_position` |Milliseconds |Dim. | The furthest the video was played, indicated by the maximum time value of the playhead during the view.| v3+ |
+|`view_playing_time` |Milliseconds |Metric | The amount of time the video spent playing during the view; this value does not include time spent joining, rebuffering, or seeking.| v3+ |
+|`view_seek_count` |Integer |Dim. | The number of times that the viewer attempted to seek to a new location within the view.| v1+ |
+|`view_seek_duration` |Milliseconds |Dim. | Total amount of time spent waiting for playback to resume after the viewer seeks to a new location. Seek Latency metric in the Dashboard is this value divided by `view_seek_count`.| v1+ |
+|`view_session_id` |Unique ID |Dim. | An id that can be used to correlate the view with platform services upstream such as CDN or origin logs.| v2+ |
+|`view_start` |Time |Dim. | Date and Time at which the view started, in UTC.| v1+ |
+|`view_time_shift_enabled` |Boolean |Dim. | Boolean indicating if this view had time_shift enabled. | v13+ |
+|`view_total_content_playback_time` |Milliseconds |Dim. | Internal metric used in calculating upscale and downscale percentages.| v1+ |
+|`view_total_downscaling` |Milliseconds |Dim. | Internal number used to calculate Downscale Percentage Metric. Downscale Percentage = `view_total_downscaling / view_total_content_playback_time` | v1+ |
+|`view_total_upscaling` |Milliseconds |Dim. | Internal number used to calculate Upscale Percentage Metric. Upscale Percentage = `view_total_upscaling / view_total_content_playback_time`| v1+ |
+|`view_upscaling_percentage` |Percentage |Metric | Upscale Percentage| v2+ |
+|`viewer_application_engine` |Text |Dim. | Web Browser Engine (`Gecko`, `WebKit`, etc.)| v1+ |
+|`viewer_connection_type` |Text |Dim. | The type of connection used by the player, as reported by the client when available: `cellular`, `other`, `wifi`, `wired`| v2+ |
+|`viewer_device_category` |Text |Dim. | The form factor of the device: `camera`, `car browser`, `console`, `desktop`, `feature phone`, `peripheral`, `phone`, `portable media player`, `smart display`, `smart speaker`, `tablet`, `tv`, `wearable`| v1+ |
+|`viewer_device_manufacturer` |Text |Dim. | Device Brand (e.g. `Apple`, `Microsoft`, etc.)| v1+ |
+|`viewer_device_model` |Text |Dim. | Device Model (e.g. `iPhone11,2`)| v4+ |
+|`viewer_device_name` |Text |Dim. | Device Name (e.g. `iPhone 12`)| v1+ |
+|`viewer_experience_score` |Decimal |Score | Overall Viewer Experience Score| v2+ |
+|`viewer_os_architecture` |Text |Dim. | No longer used. Ignore.| v1+ |
+|`viewer_plan` |Text |Dim. | Name of the viewer's customer-specific plan, product, or subscription. | v13+ |
+|`viewer_plan_category` |Text |Dim. | Category of the viewer's customer-specific subscription plan (e.g. bundle-type, subscription-campaign-id). | v13+ |
+|`viewer_plan_status` |Text |Dim. | Status pertaining to that viewer's subscription plan (e.g. subscriber, non-subscriber, SVOD, AVOD, free, standard, premium). | v13+ |
+|`viewer_user_agent` |Text |Dim. | User Agent (e.g. `Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0)`)| v1+ |
+|`viewer_user_id` |Unique ID |Dim. | A Customer-defined ID representing the viewer who is watching the stream. Note: You should not use any value that is personally identifiable such as email address, username, etc. Instead, you should supply an anonymized viewer ID which you have stored within your own system.| v1+ |
+|`watch_time` |Milliseconds |Dim. | Total Watch Time across the view (includes Startup Time, Playing time, potential rebuffering).| v1+ |
+|`watched` |Boolean |Dim. | Ignore| v1+ |
+|`weighted_average_bitrate` |bits/sec |Metric | Weighted Average Bitrate, expressed in bps.| v2+ |
+
+## Ad Metrics and Dimensions
+
+| Mux API Value | Unit | Type | Definition | Versions |
+|---------------|------|------|------------|----------|
+|`ad_attempt_count` |Integer |Metric | The number of times that the player attempted to play an ad | v8+ |
+|`ad_break_count` |Integer |Metric | The number of times that the player entered an ad break| v8+ |
+|`ad_break_error_count` |Integer |Metric | The number of times that the viewer encountered an ad error during an ad break| v8+ |
+|`ad_break_error_percentage` |Percentage |Metric | Percentage of views that contain ads that encountered an ad break error| v8+ |
+|`ad_error_count` |Integer |Metric | The number of times that the player encountered an ad error| v8+ |
+|`ad_error_percentage` |Percentage |Metric | Percentage of views that contain ads that encountered an ad error| v8+ |
+|`ad_impression_count` |Integer |Metric | The number of times that the player began ad playback| v8+ |
+|`ad_startup_error_count` |Integer |Metric | The number of times that the player errored on ad startup| v8+ |
+|`ad_startup_error_percentage` |Percentage |Metric | Percentage of views that contain ads that encountered an ad startup error| v8+ |
+|`ad_exit_before_start_count` |Integer |Metric | The number of times that the viewer exited before the ad started playback| v8+ |
+|`ad_exit_before_start_percentage` |Percentage |Metric | Percentage of views that contain ads that encountered an ad exit before start| v8+ |
+|`ad_playback_failure_error_type_id` |Unique ID |Dim. | An ID value that is present when an ad playback failure occurs | v10+ |
+|`ad_preroll_startup_time` |Milliseconds |Metric | Measures from when the player has been instructed to play a preroll ad to when the first frame of the ad is showing and the playhead is progressing.| v10+ |
+|`ad_watch_time` |Milliseconds |Metric | Total Watch Time for ad playback across the view (includes Ad Preroll Startup Time, ad playing time, potential rebuffering). | v10+ |
+|`preroll_ad_asset_hostname` |Hostname |Dim. | Hostname of the Preroll Ad Asset.| v1+ |
+|`preroll_ad_tag_hostname` |Hostname |Dim. | Hostname of a Preroll Ad Tag.| v1+ |
+|`preroll_played` |Boolean |Dim. | Flag to identify video views for which a Preroll Ad has been successfully played.| v1+ |
+|`preroll_requested` |Boolean |Dim. | Flag to identify video views for which a Preroll Ad has been requested.| v1+ |
+|`requests_for_first_preroll` |Integer |Metric | Measures the number of ad requests that are made up to the point of preroll ad playback beginning.| v1+ |
+|`video_startup_preroll_load_time` |Milliseconds |Metric | Total amount of Video Startup Time that is spent loading the first preroll ad asset.| v1+ |
+|`video_startup_preroll_request_time` |Milliseconds |Metric | Total amount of Video Startup Time that is spent making preroll ad requests.| v1+ |
+
+## Request-level Metrics
+
+| Mux API Value | Unit | Type | Definition | Versions |
+|---------------|------|------|------------|----------|
+|`max_request_latency` |Milliseconds |Metric | Maximum time to first byte for a media request.| v2+ |
+|`max_request_latency (view_max_request_latency)` |Milliseconds |Metric | Deprecated - see `max_request_latency`| v1 |
+|`request_latency` |Milliseconds |Metric | Measures the average time to first byte for media requests.| v2+ |
+|`request_latency (view_average_request_latency)` |Milliseconds |Metric | Deprecated - see `request_latency`| v1 |
+|`request_throughput` |bits/sec |Metric | Measures the average throughput, in bits per second, for all media requests that were completed.| v2+ |
+|`request_throughput (view_average_request_throughput)` |bits/sec |Metric | Deprecated - see `request_throughput`| v1 |
+
+<LinkedHeader step={steps[3]} />
+
+The daily CSV export files are generated based on the specific version that is configured and include the fields specified in the section above.
+
+Sample CSV export files are available to download, for reference:
+* [Version 2](/exports/export_v2_sample.csv)
+* [Version 3](/exports/export_v3_sample.csv)
+* [Version 4](/exports/export_v4_sample.csv)
+
+<LinkedHeader step={steps[4]} />
+
+The protobuf definition for Streaming Exports of video views is available in the [mux-protobuf repository](https://github.com/muxinc/mux-protobuf/tree/main/video_view). Please subscribe to this repository for updates to the protobuf definition.
+
+The JSON format streaming export contains identical fields as the protobuf-encoded format.
+
+<LinkedHeader step={steps[5]} />
+
+## Backward compatibility
+
+The Streaming Export schema provided by Mux Data is backward compatible, meaning that each schema version guarantees that it will still work upon future upgrades. Customers do not need to worry about breaking changes. 
+
+## When to upgrade the schema?
+
+When Mux adds new fields into the Streaming Export, we will upgrade the schema version. Without taking any actions you will not be impacted by it: the fields that you used to get will keep working as normal, and the new fields introduced since your last upgrade will not be sent to you either. The benefit of designing it this way is that you will not be getting new fields without knowing. 
+
+For customers who want to get the new fields, read below to see the how-tos.
+
+## How to upgrade the schema?
+
+### If integrated with Google Pub/Sub
+
+If your Google Pub/Sub topic is **schematized**, once a schema is associated with a topic, you can no longer change that schema. This means that customers using Google Pub/Sub for Streaming Export must take a couple of steps to move to a new topic that is associated with a new schema.
+
+* Create a new topic in Google Pub/Sub with upgraded schema
+* Point the Mux Data Streaming Export to that new topic
+* Go to Mux Dashboard → Settings → Streaming Export → Click Upgrade.
+
+If your Google Pub/Sub topic is **schemaless**, which it must be if you want to use JSON, you do not need to create new topics or reconfigure your streaming export, but to get the new fields released from Mux, customer needs to do the 3rd step as mentioned above.
+
+### If integrated with Amazon Kinesis
+
+* If using protobuf message format, make sure you get the latest protobuf definition from Mux public repo. Subscribe to the [mux-protobuf repository](https://github.com/muxinc/mux-protobuf/tree/main/video_view) to receive updates.
+* Go to Mux Dashboard → Settings → Streaming Export → Click Upgrade button.

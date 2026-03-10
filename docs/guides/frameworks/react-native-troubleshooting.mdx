@@ -1,0 +1,762 @@
+---
+title: Troubleshooting & FAQ
+product: video
+description: Solutions to common issues and frequently asked questions for React Native + Mux
+---
+
+# Troubleshooting & FAQ
+
+This guide covers common issues you might encounter when integrating Mux with React Native, along with frequently asked questions.
+
+## Common Issues
+
+### Video Won't Play
+
+**Symptom**: Video component renders but nothing plays, or you see a black screen.
+
+**Solutions**:
+
+1. **Check if asset is ready**
+   ```tsx
+   // Verify asset status before displaying
+   if (video.status !== 'ready') {
+     return <LoadingView />;
+   }
+   ```
+
+2. **Verify playback ID is correct**
+   ```tsx
+   // Check the URL format
+   const playbackUrl = `https://stream.mux.com/${playbackId}.m3u8`;
+   console.log('Playing:', playbackUrl);
+   ```
+
+3. **Check network connectivity**
+   ```tsx
+   import NetInfo from '@react-native-community/netinfo';
+
+   NetInfo.fetch().then(state => {
+     console.log('Connection type:', state.type);
+     console.log('Is connected?', state.isConnected);
+   });
+   ```
+
+4. **Test on real device**
+   - iOS Simulator may have codec limitations
+   - Android Emulator often has video decoding issues
+   - Always test on actual hardware for video playback
+
+<Callout type="warning">
+The Android Emulator frequently has issues with HLS video playback. If videos won't play in the emulator but work in your code, test on a real Android device before debugging further.
+</Callout>
+
+### Playback Errors
+
+**Symptom**: Video fails to load with error codes or messages.
+
+**Solutions**:
+
+1. **Invalid playback ID error**
+   ```tsx
+   // Error: "Cannot load m3u8"
+   // Check if playback ID exists and is correct
+   const handleError = (error: any) => {
+     console.error('Playback error:', error);
+     // Check Mux Dashboard to verify asset exists
+   };
+   ```
+
+2. **Asset not ready yet**
+   ```tsx
+   // Asset is still processing
+   if (video.status === 'preparing') {
+     return (
+       <View>
+         <ActivityIndicator />
+         <Text>Video is processing...</Text>
+       </View>
+     );
+   }
+   ```
+
+3. **Signed URL expired**
+   ```tsx
+   // If using signed playback IDs, tokens expire
+   const isTokenExpired = (url: string) => {
+     const params = new URLSearchParams(url.split('?')[1]);
+     const exp = params.get('exp');
+     if (exp) {
+       return Date.now() / 1000 > parseInt(exp);
+     }
+     return false;
+   };
+
+   // Regenerate token if expired
+   if (isTokenExpired(signedUrl)) {
+     const newUrl = await fetchNewSignedUrl(playbackId);
+     setVideoUrl(newUrl);
+   }
+   ```
+
+4. **CORS issues with signed playback**
+   ```tsx
+   // Signed URLs must include correct audience (aud)
+   // Backend code:
+   const token = Mux.JWT.signPlaybackId(playbackId, {
+     keyId: signingKeyId,
+     keySecret: signingKeySecret,
+     expiration: '7d',
+     params: {
+       // Ensure audience matches your domain/app
+     },
+   });
+   ```
+
+### Upload Failures
+
+**Symptom**: Video uploads fail or hang indefinitely.
+
+**Solutions**:
+
+1. **File size too large**
+   ```tsx
+   const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB recommended for mobile
+
+   const validateFileSize = async (uri: string) => {
+     const fileInfo = await FileSystem.getInfoAsync(uri);
+     if (fileInfo.size > MAX_FILE_SIZE) {
+       throw new Error('File size exceeds 500MB limit');
+     }
+   };
+   ```
+
+2. **Network interruption**
+   ```tsx
+   // Implement retry logic for uploads
+   const uploadWithRetry = async (uploadUrl: string, fileUri: string, maxRetries = 3) => {
+     for (let i = 0; i < maxRetries; i++) {
+       try {
+         const result = await FileSystem.uploadAsync(uploadUrl, fileUri, {
+           httpMethod: 'PUT',
+           uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+         });
+
+         if (result.status === 200) {
+           return result;
+         }
+       } catch (error) {
+         if (i === maxRetries - 1) throw error;
+         // Wait before retrying (exponential backoff)
+         await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+       }
+     }
+   };
+   ```
+
+3. **Upload URL expired**
+   ```tsx
+   // Direct upload URLs expire after 48 hours
+   // Always generate fresh URLs right before uploading
+   const { uploadUrl } = await fetch('/api/generate-upload-url').then(r => r.json());
+   // Use immediately
+   await uploadVideo(uploadUrl, videoUri);
+   ```
+
+4. **Invalid file format**
+   ```tsx
+   const SUPPORTED_FORMATS = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+
+   const validateFileFormat = (uri: string) => {
+     const extension = uri.split('.').pop()?.toLowerCase();
+     if (!extension || !SUPPORTED_FORMATS.includes(extension)) {
+       throw new Error(`Unsupported format: ${extension}`);
+     }
+   };
+   ```
+
+### Performance Issues
+
+**Symptom**: App is slow, videos lag, or device gets hot.
+
+**Solutions**:
+
+1. **Memory leaks in FlatList**
+   ```tsx
+   // Problem: Rendering too many videos at once
+   <FlatList
+     data={videos}
+     windowSize={3} // Only render 3 screens worth (1 above, current, 1 below)
+     maxToRenderPerBatch={2}
+     removeClippedSubviews={true}
+   />
+   ```
+
+2. **Too many videos rendering simultaneously**
+   ```tsx
+   // Problem: Multiple videos playing at once
+   const [currentIndex, setCurrentIndex] = useState(0);
+
+   <FlatList
+     data={videos}
+     renderItem={({ item, index }) => (
+       <VideoItem
+         video={item}
+         // Only play the visible video
+         paused={index !== currentIndex}
+       />
+     )}
+   />
+   ```
+
+3. **Not cleaning up video refs**
+   ```tsx
+   // Always cleanup in useEffect
+   useEffect(() => {
+     return () => {
+       if (videoRef.current) {
+         videoRef.current.dismissFullscreenPlayer?.();
+         videoRef.current = null;
+       }
+     };
+   }, []);
+   ```
+
+4. **Unnecessary re-renders**
+   ```tsx
+   // Use React.memo to prevent re-renders
+   const VideoItem = React.memo(({ video, isActive }) => {
+     return <Video source={{ uri: video.url }} paused={!isActive} />;
+   }, (prev, next) => {
+     // Only re-render if these props change
+     return prev.video.id === next.video.id && prev.isActive === next.isActive;
+   });
+   ```
+
+### Platform-Specific Issues
+
+#### iOS Simulator vs Device
+
+**Issue**: Videos play on device but not in simulator (or vice versa).
+
+**Solution**:
+- iOS Simulator uses macOS codecs, which may differ from device
+- Always test on real iOS devices for accurate results
+- Simulator performance is not representative of device performance
+
+```tsx
+import { Platform } from 'react-native';
+
+if (__DEV__ && Platform.OS === 'ios') {
+  console.warn('Testing on iOS simulator. Video performance may differ on device.');
+}
+```
+
+#### Android Codec Support
+
+**Issue**: Videos work on some Android devices but not others.
+
+**Solution**:
+- Different Android manufacturers have different codec support
+- HLS (.m3u8) is widely supported, but specific codecs vary
+- Mux automatically encodes videos in multiple formats for compatibility
+
+```tsx
+// Check codec support (if needed)
+import { Platform } from 'react-native';
+
+if (Platform.OS === 'android') {
+  console.log('Android version:', Platform.Version);
+  // Android 4.1+ supports HLS natively
+}
+```
+
+<Callout type="info">
+Mux automatically creates multiple renditions of your videos with different codecs to ensure maximum compatibility across devices. You don't need to worry about codec support - just use the `.m3u8` URL.
+</Callout>
+
+#### Expo Go Limitations
+
+**Issue**: Some features don't work in Expo Go app.
+
+**Solution**:
+- Expo Go has limitations with custom native modules
+- Basic video playback works fine
+- For advanced features (background video, picture-in-picture), use Expo dev client
+
+```bash
+# Create Expo development build
+npx expo install expo-dev-client
+npx expo run:ios
+npx expo run:android
+```
+
+Learn more: [Expo Development Builds](https://docs.expo.dev/development/introduction/)
+
+## Frequently Asked Questions
+
+### Does Mux work with Expo?
+
+**Yes!** Mux works great with both Expo and bare React Native apps.
+
+For video playback, you can use:
+- `react-native-video` (works in Expo)
+- `expo-av` (native Expo video package)
+
+```tsx
+// With react-native-video (recommended)
+import Video from 'react-native-video';
+
+<Video source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }} />
+
+// Or with expo-av
+import { Video } from 'expo-av';
+
+<Video source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }} />
+```
+
+<Callout type="info">
+Mux Data (analytics) officially supports `react-native-video`. If using `expo-av`, you may need custom integration for analytics.
+</Callout>
+
+### Can I use Expo Go?
+
+**Yes** for basic video playback. **No** for some advanced features.
+
+**Works in Expo Go:**
+- Video playback with `react-native-video`
+- HLS streaming
+- Basic controls
+- Thumbnails
+
+**Requires Expo dev client:**
+- Background video playback
+- Picture-in-picture
+- Some native features
+- Full Mux Data integration
+
+**Recommendation**: Start with Expo Go for development, switch to dev client when needed.
+
+### Does react-native-video support HLS?
+
+**Yes!** `react-native-video` has native HLS support on both iOS and Android.
+
+```tsx
+import Video from 'react-native-video';
+
+// HLS works natively - no special configuration needed
+<Video
+  source={{ uri: 'https://stream.mux.com/PLAYBACK_ID.m3u8' }}
+  controls={true}
+/>
+```
+
+HLS features that work automatically:
+- Adaptive bitrate streaming (ABR)
+- Multiple quality levels
+- Automatic quality switching based on network
+- Seeking and scrubbing
+
+### How do I handle offline playback?
+
+Mux streams are **online-only by default**. For offline playback:
+
+**Option 1: Download MP4 renditions (static files)**
+- Enable MP4 support in Mux (check [MP4 renditions guide](/docs/guides/enable-static-mp4-renditions))
+- Download MP4 to device using `react-native-fs` or `expo-file-system`
+- Play local file
+
+```tsx
+import * as FileSystem from 'expo-file-system';
+
+// Download video
+const downloadVideo = async (mp4Url: string, videoId: string) => {
+  const fileUri = `${FileSystem.documentDirectory}${videoId}.mp4`;
+  const download = await FileSystem.downloadAsync(mp4Url, fileUri);
+  return download.uri;
+};
+
+// Play offline video
+<Video source={{ uri: localFileUri }} />
+```
+
+**Option 2: Consider DRM requirements**
+- If you need DRM-protected offline playback, see the DRM section below
+- React Native DRM support is limited
+
+<Callout type="warning">
+Downloading videos for offline playback requires careful consideration of:
+- Storage space on user's device
+- Copyright and DRM requirements
+- File size and download time on mobile networks
+</Callout>
+
+### What about DRM (Digital Rights Management)?
+
+React Native DRM support is **limited**. Options:
+
+**1. Use Mux Player Web in WebView** (Recommended for DRM)
+```tsx
+import { WebView } from 'react-native-webview';
+
+<WebView
+  source={{
+    html: `
+      <script src="https://cdn.jsdelivr.net/npm/@mux/mux-player"></script>
+      <mux-player
+        playback-id="${playbackId}"
+        drm-token="${drmToken}"
+      />
+    `
+  }}
+/>
+```
+
+**2. Native SDKs with bridge** (Advanced)
+- Use native Mux Player iOS/Android SDKs
+- Create React Native bridge
+- More complex but full DRM support
+
+**3. react-native-video with DRM** (Limited)
+- Some DRM support exists but varies by platform
+- Requires significant native configuration
+- Not officially supported by Mux
+
+**Recommendation**: For most apps, don't use DRM. If you must have DRM, use option 1 (WebView) or hire a mobile DRM specialist.
+
+Learn more: [Mux DRM guide](/docs/guides/protect-videos-with-drm)
+
+### How much does Mux cost?
+
+Mux pricing is based on:
+- **Video storage** (per GB stored)
+- **Encoding** (per minute of video encoded)
+- **Streaming delivery** (per GB delivered)
+- **Mux Data** (per view tracked)
+
+**Estimate for a typical social video app:**
+- 1000 videos × 1 minute average = ~10GB storage
+- 1000 video encodes = encoding cost
+- 10,000 views × 10MB average = 100GB delivery
+- 10,000 views tracked = analytics cost
+
+Check current pricing: [Mux Pricing](https://www.mux.com/pricing)
+
+<Callout type="info">
+Mux has a **free tier** that includes encoding and streaming credits. Great for testing and small apps!
+</Callout>
+
+### How do I debug playback issues?
+
+**Step 1: Enable Mux Data**
+```tsx
+import muxReactNativeVideo from '@mux/mux-data-react-native-video';
+const MuxVideo = muxReactNativeVideo(Video);
+
+<MuxVideo
+  source={{ uri: videoUrl }}
+  muxOptions={{
+    data: {
+      env_key: MUX_DATA_ENV_KEY,
+      video_id: videoId,
+    },
+  }}
+/>
+```
+
+**Step 2: Check Mux Dashboard**
+- Go to [Mux Dashboard → Data](https://dashboard.mux.com/data)
+- Look for errors, buffering events, startup time
+- Filter by video_id or user_id
+
+**Step 3: Add logging**
+```tsx
+<Video
+  source={{ uri: videoUrl }}
+  onLoad={(data) => console.log('Video loaded:', data)}
+  onBuffer={(data) => console.log('Buffering:', data.isBuffering)}
+  onError={(error) => console.error('Error:', error)}
+  onProgress={(data) => console.log('Progress:', data.currentTime)}
+/>
+```
+
+**Step 4: Test on real device with network inspector**
+- Use Flipper or React Native Debugger
+- Check network requests to `stream.mux.com`
+- Verify HLS manifest loads correctly
+
+**Common findings:**
+- Asset not in `ready` state → wait for processing
+- Network timeout → check user's internet connection
+- 403 error → signed URL expired or invalid
+- 404 error → playback ID doesn't exist
+
+### Can I use Expo Video instead of react-native-video?
+
+**Yes**, but with limitations.
+
+```tsx
+// With expo-av
+import { Video } from 'expo-av';
+
+<Video
+  source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+  useNativeControls
+  resizeMode="contain"
+  style={{ width: 300, height: 200 }}
+/>
+```
+
+**Pros:**
+- Native to Expo (no extra package)
+- Good for simple use cases
+- Works in Expo Go
+
+**Cons:**
+- Mux Data integration not officially supported
+- Fewer customization options
+- Different API than react-native-video
+
+**Recommendation**: Use `react-native-video` for Mux integration. It has better community support and official Mux Data integration.
+
+### How do I handle video rotation and aspect ratios?
+
+```tsx
+import { Dimensions } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+
+// Landscape videos (16:9)
+<Video
+  source={{ uri: videoUrl }}
+  style={{ width: '100%', aspectRatio: 16 / 9 }}
+  resizeMode="contain"
+/>
+
+// Portrait videos (9:16) - Stories/Reels
+<Video
+  source={{ uri: videoUrl }}
+  style={{ width: '100%', aspectRatio: 9 / 16 }}
+  resizeMode="cover"
+/>
+
+// Square videos (1:1)
+<Video
+  source={{ uri: videoUrl }}
+  style={{ width: width, aspectRatio: 1 }}
+  resizeMode="cover"
+/>
+
+// Dynamic aspect ratio from API
+<Video
+  source={{ uri: videoUrl }}
+  style={{ width: '100%', aspectRatio: video.aspectRatio || 16/9 }}
+  resizeMode="contain"
+/>
+```
+
+**Get aspect ratio from Mux:**
+```tsx
+// Backend: Get asset details
+const asset = await mux.video.assets.retrieve(assetId);
+const aspectRatio = asset.aspect_ratio; // e.g., "16:9"
+
+// Parse to number
+const [w, h] = aspectRatio.split(':').map(Number);
+const ratio = w / h; // 1.777...
+
+// Send to React Native
+return { aspectRatio: ratio };
+```
+
+### How do I show view counts in real-time?
+
+Use Mux Data API with real-time viewer counts:
+
+```tsx
+// Backend endpoint
+import Mux from '@mux/mux-node';
+
+async function getRealtimeViewers(playbackId: string) {
+  const token = Mux.JWT.signViewerCounts(playbackId, {
+    keyId: signingKeyId,
+    keySecret: signingKeySecret,
+    type: 'video',
+  });
+
+  const response = await fetch(`https://stats.mux.com/counts?token=${token}`);
+  const data = await response.json();
+
+  return data.current_viewers || 0;
+}
+
+// React Native: Poll for updates
+function useRealtimeViewers(videoId: string) {
+  const [viewers, setViewers] = useState(0);
+
+  useEffect(() => {
+    const fetchViewers = async () => {
+      const count = await fetch(`/api/viewers/${videoId}`).then(r => r.json());
+      setViewers(count);
+    };
+
+    fetchViewers();
+    const interval = setInterval(fetchViewers, 10000); // Every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [videoId]);
+
+  return viewers;
+}
+
+// Display
+function VideoPlayer({ videoId }: Props) {
+  const viewers = useRealtimeViewers(videoId);
+
+  return (
+    <>
+      <Video source={{ uri: videoUrl }} />
+      <View style={styles.viewersOverlay}>
+        <Text>👁 {viewers} watching</Text>
+      </View>
+    </>
+  );
+}
+```
+
+Learn more in the [Mux Data Analytics guide](/docs/guides/react-native/mux-data-analytics).
+
+### Can I customize the video player UI?
+
+**Yes!** Build custom controls on top of `react-native-video`:
+
+```tsx
+function CustomVideoPlayer({ videoUrl }: Props) {
+  const [paused, setPaused] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  return (
+    <View style={styles.container}>
+      <Video
+        source={{ uri: videoUrl }}
+        paused={paused}
+        onLoad={(data) => setDuration(data.duration)}
+        onProgress={(data) => setProgress(data.currentTime)}
+        style={styles.video}
+        controls={false} // Hide default controls
+      />
+
+      {/* Custom controls */}
+      <View style={styles.controls}>
+        <TouchableOpacity onPress={() => setPaused(!paused)}>
+          <Text style={styles.button}>{paused ? '▶️' : '⏸'}</Text>
+        </TouchableOpacity>
+
+        <Slider
+          value={progress}
+          maximumValue={duration}
+          onSlidingComplete={(value) => videoRef.current?.seek(value)}
+          style={styles.slider}
+        />
+
+        <Text style={styles.time}>
+          {formatTime(progress)} / {formatTime(duration)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+```
+
+See complete example in the [Video Playback guide](/docs/guides/react-native/video-playback#custom-controls).
+
+## Getting Help
+
+### Documentation Resources
+
+- [Mux Video API reference](/docs/api-reference/video)
+- [Mux Data API reference](/docs/api-reference/data)
+- [react-native-video Documentation](https://github.com/TheWidlarzGroup/react-native-video)
+- [Expo Video Documentation](https://docs.expo.dev/versions/latest/sdk/video/)
+
+### Community Support
+
+**Mux Discord**
+Join the Mux community for quick help and discussions:
+[discord.gg/mux](https://discord.gg/mux)
+
+**Stack Overflow**
+Search or ask questions with these tags:
+- `[mux]` + `[react-native]`
+- `[video-streaming]` + `[react-native]`
+
+**GitHub Issues**
+- [react-native-video issues](https://github.com/TheWidlarzGroup/react-native-video/issues)
+- [Mux Node SDK issues](https://github.com/muxinc/mux-node-sdk/issues)
+
+### Mux Support
+
+**For Mux customers:**
+Contact support through the [Mux Dashboard](https://dashboard.mux.com) or email support@mux.com
+
+**Include in your support request:**
+- Playback ID or Asset ID
+- Platform (iOS/Android)
+- Device model and OS version
+- Error messages or logs
+- Steps to reproduce
+- Screenshots or screen recordings
+
+### Debugging Checklist
+
+Before reaching out for help, check:
+
+1. **Asset Status**
+   - [ ] Asset is in `ready` state (not `preparing` or `errored`)
+   - [ ] Playback ID exists and is correct
+
+2. **Network**
+   - [ ] Device has internet connectivity
+   - [ ] HLS URL is accessible (test in browser)
+   - [ ] No CORS issues (check network inspector)
+
+3. **Code**
+   - [ ] Video component props are correct
+   - [ ] Error handlers are in place
+   - [ ] Console logs show useful info
+
+4. **Testing**
+   - [ ] Tested on real device (not just simulator/emulator)
+   - [ ] Tested on both iOS and Android
+   - [ ] Tested with different videos
+
+5. **Documentation**
+   - [ ] Reviewed relevant guides
+   - [ ] Checked FAQ section
+   - [ ] Searched Discord/Stack Overflow
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Best Practices"
+    description="Optimize your React Native + Mux integration for production"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/best-practices"},
+    ]}
+  />
+  <GuideCard
+    title="Example App"
+    description="See a complete working implementation with all features"
+    links={[
+      {title: "View the example", href: "/docs/guides/react-native/example-app"},
+    ]}
+  />
+  <GuideCard
+    title="Mux Support"
+    description="Get help from the Mux team"
+    links={[
+      {title: "Contact support", href: "https://mux.com/support"},
+    ]}
+  />
+</GuideCards>

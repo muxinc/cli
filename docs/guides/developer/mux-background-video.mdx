@@ -1,0 +1,188 @@
+---
+title: Mux Background Video
+product: player
+description: Mux Background Video is a lightweight component for adding background videos to your web application
+steps:
+  - title: Quick start
+    topic: start
+    description: Start using Mux Background Video for background video assets.
+  - title: Analytics
+    topic: analytics
+    description: Understand how to add Mux Data analytics tracking.
+  - title: API Reference
+    topic: API
+    description: Reference for the Mux Background Video API.
+---
+
+**Mux Background Video** is a lightweight component and HLS engine for creating background videos using Mux HLS streams.
+
+- **React**: React component for easy integration
+- **Web Component**: Custom element for easy integration
+- **Lightweight**: Minimal bundle size with no dependencies
+- **Preload Control**: Control video preloading behavior
+- **Audio Control**: Optionally enable audio tracks for background videos
+- **Resolution Control**: Set maximum resolution for optimal performance
+
+<LinkedHeader step={steps[0]} />
+
+## Installation
+
+```bash
+npm install @mux/mux-background-video
+```
+
+## Usage
+
+<Callout type="info">
+Requires Mux [Basic](https://www.mux.com/docs/guides/use-video-quality-levels#basic) or [Premium](https://www.mux.com/docs/guides/use-video-quality-levels#premium) video quality currently because transmuxing of `.ts` segments is not supported.
+</Callout>
+
+### HTML Custom Element
+
+The easiest way to use Mux Background Video is with the custom element:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Background Video</title>
+  <style>
+    html, 
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    
+    mux-background-video,
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+  <script type="module" src="http://cdn.jsdelivr.net/npm/@mux/mux-background-video/html/+esm"></script>
+</head>
+<body>
+  <mux-background-video src="https://stream.mux.com/YOUR_PLAYBACK_ID.m3u8">
+    <img src="https://image.mux.com/YOUR_PLAYBACK_ID/thumbnail.webp?time=0" alt="Mux Background Video" />
+  </mux-background-video>
+</body>
+</html>
+```
+
+### JavaScript Import
+
+You can also import the custom element directly:
+
+```ts
+import '@mux/mux-background-video/html';
+
+// The custom element is automatically registered
+// You can now use <mux-background-video> in your HTML
+```
+
+### React Component
+
+For React applications, use the React component:
+
+```tsx
+import { MuxBackgroundVideo } from '@mux/mux-background-video/react';
+
+function HeroSection() {
+  return (
+    <MuxBackgroundVideo src="https://stream.mux.com/YOUR_PLAYBACK_ID.m3u8">
+      <img src="https://image.mux.com/YOUR_PLAYBACK_ID/thumbnail.webp?time=0" alt="Mux Background Video" />
+    </MuxBackgroundVideo>
+  );
+}
+```
+
+<LinkedHeader step={steps[1]} />
+
+To enable [Mux data](https://www.mux.com/data) collection for your background videos, include the Mux embed script in your HTML page before the Mux Background Video script:
+
+```html
+<script defer src="https://cdn.jsdelivr.net/npm/mux-embed"></script>
+```
+
+Once this script is included, Mux data will automatically be enabled for all background videos on the page, providing you with detailed analytics and insights about video performance.
+
+<LinkedHeader step={steps[2]} />
+
+### HTML Custom Element: `<mux-background-video>`
+
+The `<mux-background-video>` element automatically handles HLS streaming.
+
+#### Attributes
+
+- **`src`**: The Mux HLS stream URL (required)
+- **`max-resolution`**: Maximum resolution for the video (e.g., "720p", "1080p")
+- **`audio`**: Enable audio track (default: false)
+- **`preload`**: Controls video preloading behavior (default: auto)
+  - `"none"`: No preloading
+  - `"metadata"`: Preload only metadata
+  - `"auto"`: Preload video data
+
+#### HTML Structure
+
+```html
+<mux-background-video audio max-resolution="720p" src="YOUR_STREAM_URL">
+  <img src="https://image.mux.com/YOUR_PLAYBACK_ID/thumbnail.webp?time=0" alt="Mux Background Video" />
+</mux-background-video>
+```
+
+#### JavaScript Attributes
+
+You can also set attributes programmatically:
+
+```typescript
+const element = document.querySelector('mux-background-video');
+
+// Set maximum resolution
+element.setAttribute('max-resolution', '1080p');
+
+// Enable audio track
+element.toggleAttribute('audio', true);
+
+// Set preload behavior
+element.setAttribute('preload', 'metadata');
+
+// Set the stream URL
+element.setAttribute('src', 'https://stream.mux.com/NEW_PLAYBACK_ID.m3u8');
+
+// Get current values
+console.log(element.getAttribute('src'));
+console.log(element.getAttribute('max-resolution'));
+console.log(element.hasAttribute('audio'));
+console.log(element.getAttribute('preload'));
+```
+
+### React Component: `<MuxBackgroundVideo />`
+
+#### Props
+
+- **`src`**: The Mux HLS stream URL (required)
+- **`maxResolution`**: Maximum resolution for the video (e.g., "720p", "1080p")
+- **`audio`**: Enable audio track (default: false)
+- **`preload`**: Controls video preloading behavior (default: auto)
+  - `"none"`: No preloading
+  - `"metadata"`: Preload only metadata
+  - `"auto"`: Preload video data
+
+
+#### Example
+
+```tsx
+<MuxBackgroundVideo
+  src="https://stream.mux.com/YOUR_PLAYBACK_ID.m3u8"
+  maxResolution="720p"
+  audio={true}
+>
+  <img src="https://image.mux.com/YOUR_PLAYBACK_ID/thumbnail.webp?time=0" alt="Mux Background Video" />
+</MuxBackgroundVideo>
+```

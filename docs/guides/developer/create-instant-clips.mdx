@@ -1,0 +1,274 @@
+---
+title: Create instant clips
+product: video
+description: >-
+  Learn how to create instant clips at no extra cost.
+videoWalkthrough:
+  src: LOMMdhiOET521ZEsVVyM01blbZXEgfgxj
+  thumbnailTime: 6
+  created: '2024-05-07T16:00:00Z'
+---
+
+## Use cases for instant clipping
+
+Instant clipping allows you to set the start and end times of the streaming URL to make clips that are instantly available without the wait time or expense of a new asset being created. This feature can be used to build a variety of viewer facing workflows.
+
+<Callout type="info">
+  If you require frame accurate clips, clipped masters, or clipped MP4s, you should use the [asset-based clipping feature](/docs/guides/create-clips-from-your-videos).
+</Callout>
+
+Here are examples of workflows that can be built with instant clipping:
+
+### Pre-live workflows
+
+Sometimes you need to connect your contribution encoder to a live stream and test that the video is working end-to-end before exposing the live stream to your audience. But when you have [DVR mode](/docs/guides/stream-recordings-of-live-streams) turned on for your stream, it's often necessary to prevent viewers being able to seek back into the parts of the live stream where your announcers are saying "testing, testing, 1… 2… 3…".
+
+Instant clipping can be used to specify a start time to allow playback of a live stream, stopping users from seeking back into the stream beyond where you want. You can also specify an end time if you're worried about extra content at the end of your live events.
+
+### Post-live trimming without re-encoding
+
+With our [asset-based clipping feature](/docs/guides/create-clips-from-your-videos) you're able to create clipped on-demand assets, which are shortened versions of a given asset - this is commonly called "top and tail editing". These assets always incur an encoding cost to process the clipped version, and can take some time to process.
+
+With instant clipping, for any asset generated from a live stream, you can simply specify the start and end times of the content you want clipped directly during playback without the need for time-consuming and costly re-processing.
+
+For example, if you broadcast multiple sports events back-to-back on a single live stream, you can use instant clipping to generate instant on-demand streams of each match as it ends for no extra cost.
+
+### Highlight clips
+
+Sometimes a really exciting moment happens on a live stream, and you want to clip out a short highlight for others to enjoy. You can use instant clipping to pull out short clips from a currently active asset for promoting on your homepage or embedding into news articles. 
+
+This can be used for example to instantly show just the 90th-minute equalizer goal on your home page while having extra time and penalties to watch live on your pay-to-view platform.
+
+## How instant clipping works
+
+### From a live stream
+
+Every live stream or asset generated from a live stream contains a timestamp that is close (usually within a second) to the time that Mux received the source video from the contribution encoder. This timestamp is known as ["Program Date Time"](https://www.mux.com/video-glossary/pdt-program-date-and-time) or "PDT" for short.
+
+<Callout type="info">
+  "PDT" has nothing to do with the Pacific Daylight time zone; all times are represented in UTC or with unix timestamps.
+</Callout>
+
+Instant clipping works by trimming the HLS manifests from live streams and VOD assets originating from live streams using these PDT timestamps, without re-encoding any segments. This means that instant clipping operates at the segment level of accuracy, so you should expect that the content that you clip out may be several seconds longer than you've requested. We always make sure to include the timestamps that you request, but your content may start a few seconds earlier, and end a few seconds later. The exact accuracy depends on the latency settings of the live stream that you're clipping from.
+
+### From a VOD asset
+
+Regardless if an asset has originated from a live stream or was uploaded, you can create instant clips using relative time markers for the start and end to generate the trimmed HLS manifest.  The relative time markers are based on the beginning of the asset and so specifying a range of `10` - `20` would result in a 10 second clip between `0:00:10` and `0:00:20`.
+
+## Creating an instant clip URL
+
+Instant clipping is controlled by passing [playback modifiers](/docs/guides/modify-playback-behavior) (query string arguments or JWT claims) to the playback URL of your live stream or VOD assets. If you're using signed URLs, these playback modifiers need to be embedded into your JWT.
+
+### Live stream instant clips
+
+While Mux timestamps video frames when they are received, there is a delay while enough frames are processed to form sufficient segments for a live stream to be started.
+
+This means that you should expect some delay from wall-clock time to when you can use a given timestamp as a `program_start_time`.
+
+For example, if a commentator presses a “Go Live” button at 13:00 UTC, which sets the `program_start_time` of a Live Stream to that timestamp, you should expect request for the live stream's manifest to respond with a HTTP 412 error for up to 15 seconds after (this will depend on the `latency_mode` of your live stream).
+
+The start and end time of your trimmed live stream or on-demand asset are specified by using the following two parameters:
+
+#### Using `program_start_time`
+
+This parameter accepts an epoch time and can be set on a playback URL, and sets the start time of the content within the live stream or asset, for example:
+
+```
+# Format
+https://stream.mux.com/${PLAYBACK_ID}.m3u8?program_start_time=${EPOCH_TIME}
+
+# Example
+https://stream.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq.m3u8?program_start_time=1707740400
+```
+
+When used on a live stream, this will cause the live stream to behave as if it is idle prior to this time.
+
+When used on an asset, this will trim the start of the streamed media to this timestamp if needed.
+
+#### Using `program_end_time`
+
+This parameter accepts an epoch time and can be set on a playback URL, and sets the end time of the content within the live stream or asset, for example:
+
+```
+# Format
+https://stream.mux.com/${PLAYBACK_ID}.m3u8?program_end_time=${EPOCH_TIME}
+
+# Example
+https://stream.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq.m3u8?program_end_time=1707740460
+```
+
+When used on a live stream, this will cause the live stream to behave as if it is idle after this time.
+
+When used on an asset, this will trim the end of the streamed media to this timestamp.
+
+#### Combining `program_start_time` and `program_end_time`
+
+These parameters can be used together to extract a specific clip of a live stream or asset, for example:
+
+```
+# Format
+https://stream.mux.com/${PLAYBACK_ID}.m3u8?program_start_time=${EPOCH_TIME}&program_end_time=${EPOCH_TIME}
+
+# Example
+https://stream.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq.m3u8?program_start_time=1707740400&program_end_time=1707740460
+```
+
+### VOD instant clips
+
+The start and end time of your trimmed on-demand asset are specified by using the following two parameters:
+
+#### Using `asset_start_time`
+
+This parameter accepts relative time and can be set on a Playback URL, and sets the start time of the content within the asset, for example:
+
+```
+# Format
+https://stream.mux.com/${PLAYBACK_ID}.m3u8?asset_start_time=${RELATIVE_TIME}
+
+# Example
+https://stream.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq.m3u8?asset_start_time=10
+```
+
+#### Using `asset_end_time`
+
+This parameter accepts relative time and can be set on a Playback URL, and sets the end time of the content within the asset, for example:
+
+```
+# Format
+https://stream.mux.com/${PLAYBACK_ID}.m3u8?asset_end_time=${RELATIVE_TIME}
+
+# Example
+https://stream.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq.m3u8?asset_end_time=20
+```
+
+#### Combining `asset_start_time` and `asset_end_time`
+
+You can also use both of these parameters to create an instant clip of specific portion of your asset, for example:
+
+```
+# Format
+https://stream.mux.com/${PLAYBACK_ID}.m3u8?asset_start_time=${RELATIVE_TIME}&asset_end_time=${RELATIVE_TIME}
+
+# Example
+https://stream.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq.m3u8?asset_start_time=10&asset_end_time=20
+```
+
+## Thumbnail & Storyboard support
+
+### Images for VOD assets
+
+To generate images for VOD assets, the `time` [query string parameter](/docs/guides/get-images-from-a-video#thumbnail-query-string-parameters) can be used to retrieve an image from the video, for example:
+
+```
+# Format
+https://image.mux.com/${PLAYBACK_ID}/thumbnail.png?time=${RELATIVE_TIME}
+
+# Example
+https://image.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq/thumbnail.png?time=15
+```
+
+Storyboard generation for VOD assets support these parameters as a way to generate storyboard tiles for frames between the `asset_start_time` and `asset_end_time` values, for example:
+
+```
+#Format
+https://image.mux.com/${PLAYBACK_ID}/storyboard.png?asset_start_time=${RELATIVE_TIME}&asset_end_time=${RELATIVE_TIME}
+
+# Example
+https://image.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq/storyboard.png?asset_start_time=10&asset_end_time=20
+```
+
+### Images for live streams
+
+For thumbnails, you can now pass an absolute time using the `program_time` parameter, for example:
+
+```
+# Format
+https://image.mux.com/${PLAYBACK_ID}/thumbnail.png?program_time=${EPOCH_TIME}
+
+# Example
+https://image.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq/thumbnail.png?program_time=1707740460
+```
+
+You can pass the same set of [playback modifiers](/docs/guides/modify-playback-behavior) (`program_start_time` and `program_end_time`) on a request for a storyboard and the storyboard will be trimmed appropriately, for example:
+
+```
+#Format
+https://image.mux.com/${PLAYBACK_ID}/storyboard.png?program_start_time=${RELATIVE_TIME}&program_end_time=${RELATIVE_TIME}
+
+# Example
+https://image.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq/storyboard.png?program_start_time=1707740400&program_end_time=1707740460
+
+```
+
+## Using instant clipping in Mux Player
+
+We've also made sure it's easy to pass these parameters to Mux Player when you're using it for playback.
+
+Instant clipping is supported in Mux Player through two paths:
+
+### Using Public Playback IDs: Via extra source params
+
+<Callout type="info">
+  This feature was added in mux-player 2.3.0, but we recommend using the latest version at all times.
+</Callout>
+
+Here's an example of using the extra source params for using the `asset_start_time` and `asset_end_time` parameters with mux-player for both video delivery and storyboards:
+
+```html
+<mux-player
+  playback-id="sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq"
+  extra-source-params="asset_start_time=10&asset_end_time=20"
+  metadata-video-title="Instant clipping demo (Public)"
+  storyboard-src="https://image.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq/storyboard.vtt?format=webp&asset_start_time=10&asset_end_time=20"
+></mux-player>
+```
+
+Using the extra source params can also be used for instant clipping for live streams for video and storyboards as well: 
+
+```html
+<mux-player
+  playback-id="sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq"
+  extra-source-params="program_start_time=1707740400&program_end_time=1707740460"
+  metadata-video-title="Instant clipping demo (Public)"
+  storyboard-src="https://image.mux.com/sp9WNcgcktsmlvFLKgNm3jjSGRD00RPlq/storyboard.vtt?format=webp&program_start_time=1707740400&program_end_time=1707740460"
+></mux-player>
+```
+
+### Via signed URLs
+
+When using signed URLs, it's required to include the clipping parameters as [claims inside the respective JWTs](/docs/guides/modify-playback-behavior#jwt-claim-with-signed-playback-url) passed to Mux Player.
+
+For the playback token and the storyboard token, the following parameters should be injected into the JWT claims: 
+* `asset_start_time` and/or `asset_end_time`
+* `program_start_time` and/or `program_end_time`
+
+For the thumbnail token, the `program_time` parameter should be injected into the JWT claim.
+
+Then Mux Player can be loaded in the usual way, passing in the signed tokens:
+
+```html
+<mux-player
+  playback-id="s6oiUXJ6W1JH02D9ThJZQtyg74ubYTiT7"
+  playback-token="${PLAYBACK_TOKEN}"
+  storyboard-token="${STORYBOARD_TOKEN}"
+  thumbnail-token="${THUMBNAIL_TOKEN}"
+  metadata-video-title="Instant clipping demo (Signed)"
+></mux-player>
+```
+
+## Stream security considerations
+
+We strongly recommend using this feature alongside [signed URLs](/docs/guides/secure-video-playback). When using this feature without signed URLs, it is possible for users to manipulate the manifest playback URL to expose parts of the media that you want to keep hidden.
+
+## Choosing between asset clipping and instant clipping
+
+Not sure if you should be [generating a new asset](/docs/guides/create-clips-from-your-videos) when clipping, or using instant clipping for your workflow? Here are some tips that can help you choose the right approach for your product.
+
+Instant clipping is a great choice when:
+* You require a clip to be instantly available
+* You need the clips to not incur additional encoding fees
+* You need to pre-emptively limit the availability of content to build pre-live workflows for live streaming
+
+You should use our [asset-based clipping](/docs/guides/create-clips-from-your-videos) when:
+* You require frame accuracy in your clips
+* You require trimmed [MP4s](/docs/guides/enable-static-mp4-renditions) or [masters](/docs/guides/download-for-offline-editing)

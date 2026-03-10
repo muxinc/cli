@@ -1,0 +1,168 @@
+---
+title: Focus your operational response with error categorization
+product: data
+description: Configure error categorization through the Mux Data Dashboard or your SDKs to track and report on custom error metadata for views in Mux Data.
+steps:
+  - title: 1. What is Error Categorization?
+    description: Error Categorization allows you to specify metadata on an error-level basis
+  - title: 2. Configuring Error Categorization
+    description: Set error severity and type
+  - title: 3. Submitting Error metadata from Mux Data SDKs
+    description: Attach severity and type to errors with Mux Data SDKs
+---
+
+<LinkedHeader step={steps[0]} />
+
+Error Categorization allows you to set custom error metadata to provide more actionable data. By using error categorization, you can distinguish between fatal errors or warnings and classify errors as playback failures or business exceptions. Errors categorized as warnings or as business exceptions are not considered playback failures, meaning these errors are excluded from alerting, giving a more accurate picture of the health of your system with less noise from alerts.
+
+Playback Failure metrics (`Playback Failure Percentage` and `Video Startup Playback Failure Percentage`) only include fatal operational failures, while errors categorized as business exceptions and warnings are excluded. Errors that are categorized as a business exception will be included in the `Playback Business Exception Percentage` and `Video Startup Business Exception Percentage` metrics. 
+
+There are two dimensions, `Playback Business Exception` and `Video Startup Business Exception`, that are available as filters. Like the Playback Failure metrics, the `Playback Failure` and `Video Startup Failure` dimensions are not set for business exceptions and warnings.
+
+The category information for errors can be set from the Mux Dashboard or from the individual player SDKs. You only need to set the categorization on an error in one place and information about the categories that are set in the Dashboard overrides the information set in the SDKs.
+
+<LinkedHeader step={steps[1]} />
+
+Categorizing Errors is available from the Settings page and selecting the "Categorize Errors" tab. You must be an admin user to add a new error code categorization.
+
+<Image sm src="/docs/images/categorize-errors-tab.png" width={1254} height={436} />
+
+In the configuration page, you can categorize errors by code. Click the "Add an error code" button. In the dropdown, you will see the error codes your environment has encountered. Select from this dropdown and press "Add" to create a new categorization. By default, errors will have fatal error severity and will be tagged as playback failures.
+
+Type into the filter box to search for specific error codes. If you are configuring an error code not previously seen in this environment, you can press "Enter" to create a new categorization.
+
+<Image sm src="/docs/images/categorize-errors-add.png" width={1254} height={477} />
+
+<LinkedHeader step={steps[2]} />
+
+### Attach severity and type to errors with Mux Data SDKs
+
+Error Categorization can also be configured in the Mux Data SDKs in a similar method to other error metadata. If an error code is already configured in the data dashboard, the settings from the dashboard will take precedence.
+
+### HTML5 Video Element and other web SDKs
+
+In web-based SDKs, Error Categorizations can be set by passing through a function to the player. This function will set the relevant error metadata.
+
+```js
+function errorTranslator (error) {
+  return {
+    player_error_code: translateCode(error.player_error_code),
+    player_error_message: translateMessage(error.player_error_message),
+    player_error_context: translateContext(error.player_error_context),
+    player_error_severity: translateSeverity(error.player_error_severity),
+    player_error_business_exception: translateBusinessException(error.player_error_business_exception)
+  };
+}
+
+mux.monitor('#my-player', {
+  debug: false,
+  errorTranslator: errorTranslator,
+  data: {
+    env_key: 'ENV_KEY', // required
+    // ... additional metadata
+  }
+});
+```
+
+For more guidance on using and configuring the error translator in web-based SDKs, please refer to the guide on [monitoring the HTML5 video element](/docs/guides/monitor-html5-video-element#error-translator).
+
+Version 5.2.0 or later of the HTML5 Video Element monitor is necessary to support Error Categorization.
+
+### Android
+
+Error Categorization is supported for custom integrations that use the Core Java-based SDK `v8.0.0` or later.
+
+This is an example of how to categorize an error event to be a warning.
+
+```java
+    import com.mux.stats.sdk.core.events.EventBus;
+    import com.mux.stats.sdk.core.model.CustomerPlayerData;
+    import com.mux.stats.sdk.muxstats.IPlayerListener;
+    import com.mux.stats.sdk.events.playback.ErrorEvent;
+
+    public class PlayerListener extends EventBus implements IPlayerListener {
+    MuxStats muxStats;
+
+    // Call from the source of warning or player callback meant to trigger warning with parameters appropriate to your integration. Dispatches an error event that Mux will categorize as a warning by default
+    public void onPlaybackWarning(String errorCode, String errorMessage, String errorContext) {
+        PlayerData playerData = new PlayerData();
+        playerData.setErrorCode(errorCode);
+        playerData.setErrorMessage(errorMessage);
+        
+        ErrorEvent errorEvent = new ErrorEvent(playerData, errorContext, ErrorSeverity.ErrorSeverityWarning);
+
+        dispatch(errorEvent);
+    }
+```
+
+For more guidance and additional examples please refer to the guide on [custom integrations in Java](/docs/guides/data-custom-java-integration).
+
+### Objective-C (iOS, tvOS, visionOS)
+
+Error Categorization is supported when using the Mux `AVPlayer` integration `v4.0.0` or later and with custom integrations that use the Core Objective-C-based SDK `v5.0.0` or later.
+
+
+#### AVPlayer Integration
+
+This is an example of how to categorize an error event to be a warning.
+
+```objc
+- (void)dispatchPlaybackWarningWithPlayerName:(NSString *)playerName
+                              playerErrorCode:(NSString *)playerErrorCode
+                           playerErrorMessage:(NSString *)playerErrorMessage
+                           playerErrorContext:(NSString *)playerErrorContext {
+  [MUXSDKStats dispatchError: playerErrorCode,
+                 withMessage: playerErrorMessage,
+                    severity: MUXSDKErrorSeverityWarning,
+                errorContext: playerErrorContext,
+                   forPlayer: playerName];
+}
+```
+
+For more guidance and additional examples please refer to the [AVPlayer monitoring guide](/docs/guides/monitor-avplayer).
+
+#### Custom Integrations
+
+This is an example of how to categorize an error event to be a warning.
+
+```objc
+// Call this method from the source of the playback warning (such as an `AVPlayer` key-value property observer, for example) with parameters appropriate to your integration.
+- (void)dispatchPlaybackWarningWithPlayerName:(NSString *)playerName
+                              playerErrorCode:(NSString *)playerErrorCode
+                           playerErrorMessage:(NSString *)playerErrorMessage
+                           playerErrorContext:(NSString *)playerErrorContext
+                           playerPlayheadTime:(NSNumber *)playerPlayheadTime {
+  MUXSDKErrorEvent *errorEvent = [[MUXSDKErrorEvent alloc] initWithSeverity:MUXSDKErrorSeverityWarning
+                                                                    context:playerErrorContext];
+
+  // Configure any custom video or view data if necessary
+  MUXSDKPlayerData *playerData = [[MUXSDKPlayerData alloc] init];
+  [playerData setPlayerErrorCode:playerErrorCode];
+  [playerData setPlayerErrorMessagae:playerErrorMessage];
+  [playerData setPlayerPlayheadTime: playerPlayheadTime];
+  // ... repeat for any other `MUXSDKPlayerData` properties if they've changed
+
+  [MUXSDKCore dispatchEvent:errorEvent 
+                  forPlayer:playerName];
+}
+```
+
+For more guidance and additional examples please refer to the guide on [custom integrations in Objective-C](/docs/guides/data-custom-objectivec-integration).
+
+### Roku
+
+Error categorization is supported when using an SDK v2.0.0 or later.
+
+```js
+mux.setField("error", {
+  player_error_code: errorCode,
+  player_error_message: errorMessage,
+  player_error_context: errorContext,
+  player_error_severity: errorSeverity,
+  player_error_business_exception: isBusinessException
+})
+```
+
+The possible values or `errorSeverity` are `"warning"` or `"fatal"`.
+
+For more guidance on using and configuring the Roku SDK, please refer to the guide on [monitoring Roku](/docs/guides/monitor-roku).

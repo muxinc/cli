@@ -1,0 +1,62 @@
+---
+title: Mux Player FAQs
+product: player
+description: Get answers to common questions about Mux Player
+steps:
+---
+
+# Do you support non-Mux HLS streams?
+
+Mux Player is designed with the Mux Platform in mind. Being tightly coupled with Mux Video is what enables features like timeline hover previews, and those sweet, descriptive errors in Mux Data.
+
+# How can I access the underlying video element using Mux Player?
+
+The `media.nativeEl` property is a reference to the underlying video element. You can use this to access the video element's properties and methods.
+
+```jsx
+  <MuxPlayer
+    playbackId="EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs"
+    ref={(muxPlayerEl) => console.log(muxPlayerEl.media.nativeEl)}
+    metadata={{
+      video_id: "video-id-54321",
+      video_title: "Test video title",
+      viewer_user_id: "user-id-007",
+    }}
+  />
+```
+
+This isn't possible when using the iframe-embedded version of Mux Player through player.mux.com. You can control the embedded version of Mux Player through the [Player.js spec](https://github.com/embedly/player.js#playerjs). 
+
+# Do you have a Mux Player for native mobile?
+
+Yes, we have public beta SDKs for [iOS](/docs/guides/mux-player-ios) and [Android](/docs/guides/mux-player-android). If you're building directly in Swift/Objective-C or Kotlin/Java then you can use these SDKs directly. If you're building with Flutter or React Native you will need to bridge these native SDKs into your framework.
+
+# I would love to speak to someone on the team about a feature idea or a problem I'm running into with the player, how can I do that?
+
+Please [leave us some feedback](/support) and we'll be in touch!
+
+# How is Mux Player built?
+
+Mux Player is built with [Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components). Web Components is a native browserAPI for defining custom HTML tags that can be used in the DOM.
+Mux Player is built on top of [Media Chrome](https://github.com/muxinc/media-chrome) and the [Mux Video HTML element](https://github.com/muxinc/elements/tree/main/packages/mux-video). You can think of it like this:
+
+- [Mux Video HTML element](https://github.com/muxinc/elements/tree/main/packages/mux-video) handles the HLS playback tech behind the scenes and integration with Mux Data.
+- [Media Chrome](https://github.com/muxinc/media-chrome) is the UI layer.
+  Both the Mux Video HTML element and Media Chrome are maintained and under active development by Mux.
+
+# What are the developer system requirements?
+
+Mux Player package targets ES2019, if you're targeting an older JavaScript runtime Mux Player might not be compatible with your build setup.
+
+# Evergreen browser support
+
+Mux Player supports the most recent versions of evergreen browsers on desktop and mobile. Evergreen browsers are the modern browsers that are automatically updated:
+
+- Chrome (Mac, Windows, Linux, iOS, iPadOS, Android)
+- Safari (Mac, iOS, iPadOS)
+- Firefox (Mac, Windows, Linux, Android)
+- Edge (Mac, Windows, Linux)
+
+# TypeScript support
+
+Mux Player is fully written in TypeScript version 4.5. If you are on an older version of TypeScript (pre-4.0), you will likely have to upgrade your TypeScript package in order to get the TypeScript benefits.

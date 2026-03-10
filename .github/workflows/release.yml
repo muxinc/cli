@@ -38,9 +38,21 @@ jobs:
           name: mux-${{ matrix.target }}
           path: ./dist/mux-${{ matrix.target }}
 
+  docs:
+    name: Package Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create docs tarball
+        run: tar -czf mux-docs.tar.gz docs/ AGENTS.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mux-docs
+          path: mux-docs.tar.gz
+
   release:
     name: Create Release
-    needs: build
+    needs: [build, docs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -88,6 +100,7 @@ jobs:
           echo "darwin_x64=$(sha256sum artifacts/mux-darwin-x64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "linux_arm64=$(sha256sum artifacts/mux-linux-arm64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "linux_x64=$(sha256sum artifacts/mux-linux-x64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "docs=$(sha256sum artifacts/mux-docs.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Generate GitHub App token
         id: app-token
@@ -136,9 +149,19 @@ jobs:
               end
             end
 
+            resource "docs" do
+              url "${BASE_URL}/mux-docs.tar.gz"
+              sha256 "${{ steps.checksums.outputs.docs }}"
+            end
+
             def install
               binary = Dir.glob("mux-*").first || "mux"
               bin.install binary => "mux"
+
+              resource("docs").stage do
+                (share/"mux").install "docs"
+                (share/"mux").install "AGENTS.md"
+              end
             end
 
             test do

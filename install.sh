@@ -18,15 +18,25 @@ esac
 # Get latest version
 VERSION="${MUX_VERSION:-$(curl -fsSL https://api.github.com/repos/muxinc/cli/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": *"//;s/".*//')}"
 
-# Download
+# Download binary
 INSTALL_DIR="${MUX_INSTALL_DIR:-$HOME/.mux/bin}"
-mkdir -p "$INSTALL_DIR"
+SHARE_DIR="${MUX_SHARE_DIR:-$HOME/.mux/share}"
+mkdir -p "$INSTALL_DIR" "$SHARE_DIR"
+
 DOWNLOAD_URL="https://github.com/muxinc/cli/releases/download/${VERSION}/mux-${OS}-${ARCH}"
 echo "Downloading mux ${VERSION} for ${OS}-${ARCH}..."
 curl -fsSL "$DOWNLOAD_URL" -o "$INSTALL_DIR/mux"
 chmod +x "$INSTALL_DIR/mux"
 
+# Download docs
+DOCS_URL="https://github.com/muxinc/cli/releases/download/${VERSION}/mux-docs.tar.gz"
+echo "Downloading docs..."
+curl -fsSL "$DOCS_URL" -o "$SHARE_DIR/mux-docs.tar.gz"
+tar -xzf "$SHARE_DIR/mux-docs.tar.gz" -C "$SHARE_DIR"
+rm "$SHARE_DIR/mux-docs.tar.gz"
+
 echo "Installed mux to $INSTALL_DIR/mux"
+echo "Installed docs to $SHARE_DIR/docs/"
 
 # PATH hint
 case ":$PATH:" in

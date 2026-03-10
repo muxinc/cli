@@ -1,0 +1,210 @@
+---
+title: Integrate with Strapi
+product: video
+description: >-
+  Strapi is an open source content management system that allows you to define
+  your own schemas for your content.
+image:
+  src: /docs/images/strapi-logo-light.svg
+  alt: Strapi logo
+  width: 569
+  height: 151
+---
+
+The [Mux Video Uploader](https://www.npmjs.com/package/strapi-plugin-mux-video-uploader) plugin allows editors to upload content directly to Mux from within the Strapi interface, then associate those videos with their custom collection types.
+
+## Requirements
+
+- A working installation of Strapi that is publicly accessible through a hostname
+- An [Access Token and Secret Key](/docs/integrations/strapi#2-create-access-in-mux) which is provisioned within Mux Dashboard
+- Configure a [Webhooks listener](/docs/integrations/strapi#3-configure-webhook-listener) within Mux Dashboard so that Strapi can be informed of upload progress.
+
+## 1. Install the Mux Video Uploader plugin
+
+With your existing Strapi installation, run the following command in the root of your Strapi project to install the plugin. Be sure to restart Strapi for the plugin to take effect.
+
+<Callout type="info" title="Version notice">
+As of the 2.1.0 version of this player, only Strapi v4 will be supported. To use with Strapi v3, please use version 2.0.0 of this plugin.
+
+</Callout>
+
+## Install instructions for Strapi v5
+
+Run this command in your project folder if you are using NPM:
+
+```sh
+npm i strapi-plugin-mux-video-uploader@latest
+```
+
+Or this command if you are using yarn with your project:
+
+```sh
+yarn add strapi-plugin-mux-video-uploader@latest
+```
+
+## Install instructions for Strapi v4
+
+Run this command in your project folder if you are using NPM:
+
+```sh
+npm i strapi-plugin-mux-video-uploader@2.8.4
+```
+
+Or this command if you are using yarn with your project:
+
+```sh
+yarn add strapi-plugin-mux-video-uploader@2.8.4
+```
+
+## Install instructions for Strapi v3
+
+Run this command in your project folder if you are using NPM:
+
+```sh
+npm i strapi-plugin-mux-video-uploader@2.0.0
+```
+
+Or this command if you are using yarn with your project:
+
+```sh
+yarn add strapi-plugin-mux-video-uploader@2.0.0
+```
+
+## 2. Create access token in Mux
+
+Generate a new Access Token by going to the Access Token settings of your Mux account dashboard.
+
+<Image
+  src="/docs/images/settings-api-access-tokens.png"
+  width={500} height={500}
+  alt="Mux access token settings"
+/>
+
+The access token should have Mux Video **Read** and **Write** permissions.
+
+<Image
+  src="/docs/images/new-access-token.png"
+  width={760}
+  height={376}
+  alt="Mux Video access token permissions"
+  sm
+/>
+
+After clicking the "Generate Token" button, save the "Access Token ID" and "Secret Key" to be used later.
+
+## 3. Configure Webhook listener
+
+Part of the upload process includes Mux updating Strapi with the completion of the upload and processing. In order for Mux to make this communication, a Webhook needs to be established so that events are sent to your Strapi installation.
+
+Create a new Webhook configuration in Mux Dashboard. There will be a space to add a "URL to notify". This value should be formatted based on your Strapi's hostname
+
+```txt
+{YOUR_STRAPI_DOMAIN_HERE}/mux-video-uploader/webhook-handler
+```
+
+After saving, copy the "Signing Secret" which will be used later.
+
+## 4. Setup configuration in Strapi
+
+In Strapi, visit the Settings page and navigate to the `MUX VIDEO UPLOADER` section.
+
+Using the details saved in the previous step, fill in the fields with the appropriate values.
+
+<Image src="/docs/images/strapi-config.png" width={1600} height={819} />
+
+Click the "Save" button to persist the changes.
+
+## 5. Upload video
+
+Use the Mux Video Uploader page that is now available in Strapi's menu to upload either with a remote URL or directly using a local video file.
+
+<Image src="/docs/images/strapi-upload.png" width={1600} height={819} />
+
+From here, relationships of Mux assets can be modeled to custom collection types within Strapi to tie metadata with playable content.
+
+<Player playbackId="kBwjf6dl6028FjELH4p0297dLcPM6AvQ1D" thumbnailTime="0" title="Strapi - Mux Video Uploader - Upload" />
+
+<Callout type="success" title="Congratulations!">
+
+You now have the ability to upload content to Mux through Strapi CMS!
+
+</Callout>
+
+At this point, querying Strapi using REST or GraphQL will give you access to the `playback_id` information. This `playback_id` can be used by your client applications to stream content or retrieve thumbnails.
+
+## 6. Explore advanced options
+
+## Signed tokens
+
+<Callout type="warning" title="Warning! Requires generating JWT on your server">
+
+Enabling signed URLs in Strapi will require you to generate your own signing tokens on your application **server**. This involves creating a signing key and using that to generate JSON web tokens when you want to access your videos and thumbnails outside of Strapi.
+
+</Callout>
+
+By default, all assets uploaded to Mux through Strapi will be created with a playback policy of `"public"`. This means that your videos and thumbnails are accessible with `https://stream.mux.com/{PLAYBACK_ID}.m3u8` and `https://image.mux.com/{PLAYBACK_ID}/thumbnail.jpg`.
+
+If you want more control over delivery of the playback and thumbnail access, you can enable this feature in the Strapi settings for the Mux Video Uploader.
+
+When you enable this feature, the following things will happen:
+
+1. The Mux Plugin in Strapi will save the signing keys that you've generated and be available immediately.
+2. Any Assets that get created with the Signed Playback URL setting enabled will be created with `playback_policy: "signed"` (instead of `"public"`).
+3. The signing key from Step 1 will be used by the Mux Plugin to preview content inside the Strapi UI.
+4. When you access your content in your own application, use the `MuxAsset.signed` property to determine if the asset is signed by either a `true` or `false` value.
+
+```json
+{
+  "id": 9,
+  "upload_id": null,
+  "asset_id": "H9H01yni83yRLuu6cKaf8jQI8XW01SPp5XI7WrGsD37n00",
+  "playback_id": "aAqXNee00zlfzR2Rsw01NmGBvxSg1Ocs3g008YChvtG6aM",
+  "signed": true,
+  "isReady": true,
+  "duration": 25.492133,
+  "aspect_ratio": "16:9",
+  "createdAt": "2024-04-01T23:48:19.760Z",
+  "updatedAt": "2024-04-01T23:48:21.605Z"
+}
+```
+
+5. You should use the signed `playback_id` to create URLs for playback and for thumbnail generation.
+
+- Playback `https://stream.mux.com/{SIGNED_PLAYBACK_ID}.m3u8?token={TOKEN}`
+- Thumbnails `https://image.mux.com/{SIGNED_PLAYBACK_ID}/thumbnail.jpg?token={TOKEN}`
+
+6. The `TOKEN` parameter for the above URLs is something you create on your server according to Step 2 in [Secure video playback](/docs/guides/secure-video-playback)
+
+Note that in the Strapi UI when an asset is using a signed URL you will see a lock icon on the Asset list.
+
+## Encoding Tiers
+
+When uploading a new video, you can select what Encoding Tier used when preparing the Asset.  Possible selections are `Smart` and `Baseline`.  When choosing `Smart` additional options are made available for maximum stream resolutions (1080p, 2K or 4K).
+
+More details can be found in our [Use Encoding Tiers](/docs/guides/use-video-quality-levels) section.
+
+## Static Renditions
+
+When using the `Smart` Encoding Tier, an option to enable downloadable MP4s will be available.  This option will create [Static Renditions](/docs/guides/enable-static-mp4-renditions) for the Asset and will make MP4 files available for download to client devices using a formatted URL.
+
+## Captions/Subtitles
+
+With Mux&apos;s auto-generated captions, editors can easily add captions to videos being uploaded from Strapi.  When using the "Auto-generated" option, Mux will generate captions automatically while it prepares the Asset.  More details can be found in the [Add auto-generated captions to your videos and use transcripts](/docs/guides/add-autogenerated-captions-and-use-transcripts) section of our documentation.
+
+If you choose to upload a "Custom" captions file (supported formats are `.vtt` and `.srt`), your file will be uploaded to your instance of Strapi and Mux will pull it via a public URL from your Strapi instance.  Take a look at our [Add subtitles/captions to videos](/docs/guides/add-subtitles-to-your-videos) for more details.
+
+<MdxImport snippet="cmsIntegrationGuideCards" />
+
+<Releases>
+## Release notes
+
+### Current release
+
+#### v3.0.1
+
+- Upgrade to Strapi v5
+- **Breaking change**— Plugin configuration is now done using Strapi's file based config.  Details on how to do this can be found in the `README.md`.
+- Refreshed library versions to latest
+- Both auto-generated and custom captions can be added on upload
+- Previous issue with preview player is resolved, plugin now uses Mux Player again
+</Releases>

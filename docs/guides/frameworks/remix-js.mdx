@@ -1,0 +1,97 @@
+---
+title: Add high-performance video to your Remix.js application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video
+  in your Remix.js application
+---
+
+## When should you use Mux with Remix.js?
+When adding video to your Remix.js app, you'll encounter some common hurdles. First, videos are large. Storing them in your public directory can lead to excessive bandwidth consumption and poor Git repository performance. Next, it's important to compress and optimize your videos for the web. Then, as network conditions change, you might want to adapt the quality of your video to ensure a smooth playback experience for your users. Finally, you may want to integrate additional features like captions, thumbnails, and analytics.
+
+You might consider using Mux's APIs and components to handle these challenges, [and more](https://www.mux.com/features).
+
+## Quickly drop in a video with Mux Player
+
+The quickest way to add a video to your site is with [Mux Player](/docs/guides/mux-player-web). Here's what Mux Player looks like in action:
+
+```jsx
+import MuxPlayer from "@mux/mux-player-react";
+
+export default function Page() {
+  return (
+    <MuxPlayer
+      playbackId="jwmIE4m9De02B8TLpBHxOHX7ywGnjWxYQxork1Jn5ffE"
+      metadata={{
+        video_title: "Test video title",
+        viewer_user_id: "user-id-007",
+      }}
+    />
+  );
+}
+```
+
+If your site has just a few videos, you might upload them to Mux directly through the dashboard. In the [Mux Dashboard](https://dashboard.mux.com/), on your video assets page, select "Create New Asset". On the next screen, you can upload a video directly to Mux.
+
+<Image src="/docs/images/dashboard-create-new-asset.png" width={2404} height={350} alt='In the upper-right corner of the Mux Dashboard is a button labeled "Create New Asset"' />
+
+You'll then be able to see your new asset on your video assets page. When you click on the asset, you can find the asset's playback ID in the "Playback and Thumbnails" tab. This playback ID can be used in the `playbackId` prop of the Mux Player component.
+
+<Image src="/docs/images/dashboard-playback-id.png" width={2404} height={350} alt="In the playback and thumbnails tab of an asset you can find the playback ID, as well as more information on how to play the video." />
+
+You can read more about Mux Player, including how to customize its look and feel, over in the [Mux Player guides](/docs/guides/mux-player-web).
+
+If you're managing more videos, you might take a look at our [CMS integrations](/docs/integrations/cms).
+
+Finally, if you need more control over your video workflow, read on.
+
+## Use the API to build your video workflow
+
+If you're looking to build your own video workflow that enables uploading, playback, and more in your application, you can use the Mux API and components like [Mux Player](/docs/guides/mux-player-web) and [Mux Uploader](/docs/guides/mux-uploader).
+
+### Example: allowing users to upload video to your app
+One reason you might want to build your own video workflow is when you want to allow users to upload video to your app.
+
+Let's start by adding a new page where users can upload videos. This will involve using the [Mux Uploader](/docs/guides/mux-uploader) component, which will upload videos to a Mux <ApiRefLink href="/docs/api-reference/video/direct-uploads/create-direct-upload">Direct Uploads URL</ApiRefLink>.
+
+In the code sample below, we'll create an upload URL using the [Mux Node SDK](https://github.com/muxinc/mux-node-sdk) and the Direct Uploads URL API. We'll pass that URL to the Mux Uploader component, which will handle uploading for us.
+
+<CodeExamples product="video" example="remixJsMuxUploader" />
+
+<Callout type="warning">
+In production, you'll want to apply additional security measures to your upload URL. Consider protecting the route with authentication to prevent unauthorized users from uploading videos. Also, use `cors_origin` and consider [`playback_policy`](/docs/guides/secure-video-playback) to further restrict where uploads can be performed and who can view uploaded videos.
+</Callout>
+
+Next, we'll create an API endpoint that will [listen for Mux webhooks](/docs/core/listen-for-webhooks). When we receive the notification that the video has finished uploading and is ready for playback, we'll add the video's metadata to our database.
+
+<CodeExamples product="video" example="remixJsWebhook" exampleOrder="App Directory (.js),Pages Directory (.js),App Directory (.ts),Pages Directory (.ts)" />
+
+Finally, let's make a playback page. We retrieve the video metadata from our database, and play it by passing its `playbackId` to [Mux Player](/docs/guides/mux-player-web):
+
+<CodeExamples product="video" example="remixJsMuxPlayer" exampleOrder="App Directory (.js),Pages Directory (.js),App Directory (.ts),Pages Directory (.ts)" />
+
+And we've got upload and playback. Nice!
+
+What's next? You can [integrate with your CMS](/docs/integrations/cms). You can [optimize your loading experience](/docs/guides/player-lazy-loading). Or get started with the example project below:
+
+## Example projects
+
+<GuideCards>
+  <GuideCard
+    title="remix-examples/mux-video"
+    description={<>
+      <p>This is a bare-bones starter application with Remix.js that uses:</p>
+      <ul>
+        <li>Mux <ApiRefLink href="/docs/api-reference/video/direct-uploads">Direct Uploads</ApiRefLink> and <a href="/docs/guides/mux-uploader">Mux Uploader</a></li>
+        <li>Mux <a href="/docs/guides/video" title="Mux Video">Video</a> + Mux <a href="/docs/guides/data" title="Mux Data">Data</a></li>
+        <li>Mux <a href="/docs/guides/mux-player-web" title="Mux Player">Player</a></li>
+      </ul>
+    </>}
+    links={[
+      {
+        title: "View project →",
+        href: "https://github.com/remix-run/examples/tree/main/mux-video",
+      },
+    ]}
+  />
+</GuideCards>

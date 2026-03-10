@@ -33,6 +33,8 @@
   },
   "files": [
     "bin",
+    "docs",
+    "AGENTS.md",
     "README.md",
     "LICENSE"
   ],

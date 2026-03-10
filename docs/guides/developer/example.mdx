@@ -1,0 +1,477 @@
+---
+title: Guide to writing guides
+product: video
+description: "Learn how to [do a thing] to [accomplish your goal] (this should be ~2 sentences. Avoid mux-specific terms and industry jargon. Answer the question: What will I accomplish by the end of this?)."
+# you can add images to the /public/images folder and reference them like this
+# image:
+#   src: /docs/images/Contentful-logo-dark.svg
+#   alt: Strapi logo
+#   width: 569
+#   height: 151
+# or you can use "ogImage" to absolutely reference an image. https://... required
+# ogImage: https://www.mux.com/docs/images/introducing-mux-player.png
+steps:
+  - title: 1. Add a guide to /docs/_guides
+  - title: 2. Write a guide
+  - title: Decide whether to use `steps`
+    description: You should use good headers in your guide. In some situations, you may want to define those headers with the `<LinkedHeader />` component instead of markdown.
+  - title: Add a video walkthrough
+    description: We're a video company, so let's also describe our concepts in video! Use the `videoWalkthrough` frontmatter to add a video walkthrough to your guide.
+    topic: camera
+  - title: Create code examples
+    topic: code
+  - title: Add images and videos to your guide
+    topic: image
+  - title: Use callouts
+    description: Callouts are used to highlight key pieces of information
+  - title: Link to other related guides
+    description: See how to link to other guides that are related to this one or that serve as good next steps.
+    topic: notes
+  - title: Other commonly-used components
+videoWalkthrough:
+  src: 8n96HyBfkuWYVvKtZpYZhvHS00krCRPey
+  thumbnailTime: 25
+  created: "2021-06-09T20:36:00Z"
+---
+
+<LinkedHeader step={steps[0]} />
+
+Clone the repo [muxinc/docs.mux.com](https://github.com/muxinc/docs.mux.com). Follow instructions in the README to get the project runnig locally. After you have it running, you're ready to create a new guide.
+
+To add a new guide, add an `.mdx` file `/docs/_guides` folder. You might find it handy to copy this file (`docs/_guides/example.mdx`) to the file you want to create.
+
+Next, add the guide to the sidebar. The sidebar sections are defined in the `docs/_config` folder. 
+
+<Callout type="warning">
+Any guide that is not in the sidebar will not display (unless it has its own file in the `/app` directory -- see `spaces-to-livekit` for example)
+</Callout>
+
+Create all your changes on a branch and submit a pull request. Vercel will build a deploy preview for your branch for easy sharing.
+
+<LinkedHeader step={steps[1]} />
+
+### Wait, what's an `.mdx` file?
+Guides are written in [MDX](https://mdxjs.com/), meaning you can write in [Markdown](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax), and you can include shiny components.
+
+We'll talk more about the shiny components in the rest of the guide. But first, some quick markdown pointers. 
+
+_text written like this:_
+```md
+Paragraphs are written in normal text like this.
+Use two line breaks to start a new paragraph.
+
+Use [markdown link syntax](https://www.mux.com).
+Normal markdown syntax like **bold** and _italic_, ordered lists and unordered lists should all work as expected.
+```
+
+_Will render like this:_
+
+Paragraphs are written in normal text like this.
+Use two line breaks to start a new paragraph.
+
+Use [markdown link syntax](https://www.mux.com).
+Normal markdown syntax like **bold** and _italic_, ordered lists and unordered lists should all work as expected.
+
+### Writing well
+
+Guides should be a holistic story around a problem a customer is trying to solve instead of just our features.
+
+Use the instructions in the image below, coupled with [The Writing/voice guideline in notion](https://www.notion.so/mux/Writing-voice-guideline-d5af229ae61e49f9b5ae50c122aa9ff0) so that our guides have a consistent tone.
+
+<Image
+  src="/docs/images/guide-for-guides.png"
+  width={2254}
+  height={3016}
+  alt="Guide for writing guides"
+/>
+
+<LinkedHeader step={steps[2]} />
+
+You should write good, descriptive headers. They're useful for users who are navigating your guide using the table of contents, and it's useful for search engines.
+
+In some cases, though, the table of contents might not be enough. For example, if you have a guide that has a few, clear, discrete steps that are worth highlighting up front. In these cases, we use the `steps` frontmatter and the `<LinkedHeader />` component. 
+
+> This example guide uses `steps` and `<LinkedHeader />`, if you're curious for an example
+
+To use `steps` and `<LinkedHeader />`, begin by defining `steps` in the frontmatter. For example: 
+```yaml
+steps:
+  - title: 1. Add a guide to /docs/_guides
+  - title: 2. Write a guide
+  - title: Decide whether to use `steps`
+    description: You should use good headers in your guide. In some situations, you may want to define those headers with the `<LinkedHeader />` component instead of markdown.
+  - title: Create code examples
+    topic: code
+```
+Notice three things about these steps:
+1. if you begin a step with a number, that number will be used in the steps' icon
+2. your step may optionally have a description
+3. your step my optionally have a custom icon. These icons are defined in `docs/_components/guide-icons`
+
+Once your steps are defined in your frontmatter, you're ready to add them as a header. Add a `<LinkedHeader />` component in your document where you want the header to appear. Reference the step like this: `<LinkedHeader step={steps[0]} />` or `<LinkedHeader step={steps[1]} />`.
+
+Linked headers will render as an `<h2 />`.
+
+If your header has a specific API reference associated with it you can pass in a prop for `apiRef` like this:
+
+```jsx
+<LinkedHeader
+  step={steps[2]}
+  apiRef={{ product: "video", slug: "create-an-asset" }}
+/>
+```
+
+<LinkedHeader step={steps[3]} />
+
+All embedded Video Walkthroughs will reference videos with subtitles that exist in the `docs` environment under the organization named "Mux Marketing Videos". You can add Video walkthrough videos to the `docs` environment by using the script `create-video-walkthrough.js`. To add new video walkthroughs to any .mdx file you first must add videos to this Mux environment, then add a reference to their playback ID to the guide header inside `GuideVideoWalkthrough` element.
+
+If the video file does not have captions/text track already in it, that here are the steps you'll want to take to generate the video with captions (for accessibility):
+
+1. Get the public video file url for the raw video in [Dropbox > Mux > DevEx > Video Production > Renders (Release)](<https://www.dropbox.com/home/DevEx/Video%20Production/Renders%20(Release)>).
+
+<Callout type="info">
+This process is moving away from Dropbox into Google Drive soon.
+</Callout>
+
+2. Log in to the Mux Marketing Videos organization with an admin account and navigate to dashboard.mux.com to view all assets in the `docs` environment. If you don't have access to this organization, please request access by posting in the #devex-dev channel in Slack.
+
+3. Upload your new video, but modify the API request so that it includes `autogenerated_subtitles` like so:
+
+```
+{
+  "inputs": [{
+    "url": "https://your_public_url",
+    "generated_subtitles": [{
+      "language_code": "en",
+      "name": "default"
+    }]
+  }],
+  "playback_policies": [
+    "public"
+  ],
+  "max_resolution_tier": "2160p"
+}
+```
+
+4. Get the PlaybackId from your new asset. In the Title / header section between "---" lines, of any .mdx guide, add the asset's Playback Id to `src` and thumbnailTime: 25:
+
+```
+videoWalkthrough:
+  src: 01b2r4H6Pg8Q01NJZGppCu6X6tmfP6f6Jtp5oFZaETUwU
+  thumbnailTime: 25
+```
+
+6. Test video for usability
+
+<LinkedHeader step={steps[4]} />
+
+### Inline
+
+For inline code use backticks `like this`.
+
+### Code Blocks
+
+#### Language
+
+For blocks of code you can use triple backticks like this and specify the language.
+
+Here is a block of JSON code:
+
+```json
+{
+  "id": "123456"
+}
+```
+
+Here is a block of JavaScript code:
+
+```js
+import Mux from "@mux/mux-node";
+```
+
+#### Code block props
+You can also pass the following props to code blocks:
+- `filename=file.js`
+- `withLineNumbers=true/false`
+- `highlight=1,3-5`: blue highlight
+- `add=1,3-5`: green highlight (will replace line number with `+`)
+- `remove=1,3-5`: red highlight (will replace line number with `-`)
+- `warning=1,3-5`: yellow highlight
+- `error=1,3-5`: red highlight
+
+For example...
+```
+```js filename=file.js withLineNumbers=false highlight=1,3-5
+```
+will render...
+```js filename=file.js withLineNumbers=false highlight=1,3-5
+<Image
+  src="/docs/images/settings-access-token-env.png"
+  width={1140}
+  height={374}
+  alt="Mux access token env"
+/>
+```
+
+#### Transformer comments
+You can also achieve some of the code block arguments with inline transformer comments. Whether you use code block arguments or transformer comments is up to you! Place the following in an inline comment to transform the line:
+- `[!code highlight]`: blue highlight
+- `[!code ++]`: green highlight (will replace line number with `+`)
+- `[!code --]`: red highlight (will replace line number with `-`)
+- `[!code error]`: yellow highlight
+- `[!code warning]`: red highlight
+
+For example...
+
+```text withLineNumbers=false
+```js
+// next.config.js
+const { withNextVideo } = require('next-video/process') // [!code ++]
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+module.exports = withNextVideo(nextConfig, { // [!code ++]
+  provider: 'vercel-blob', // [!code ++]
+}) // [!code ++]
+```
+
+...will render...
+
+```js
+// next.config.js
+const { withNextVideo } = require('next-video/process') // [!code ++]
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+module.exports = withNextVideo(nextConfig, { // [!code ++]
+  provider: 'vercel-blob', // [!code ++]
+}) // [!code ++]
+```
+
+This works in any language that supports inline comments. For example...
+```html
+<p>highlight</p> <!-- [!code highlight] -->
+```
+```elixir
+IO.puts("highlight") # [!code highlight]
+```
+
+### Multiple Languages
+
+This is an example of a complex code example that shows code from multiple languages.
+
+Take a look at the `code_examples/video/example.js` file to see all the code snippets in there.
+
+After creating that file and adding the code snippets in various languages, that file is imported into `code_examples/index.ts`. Once it is imported to there it can be used with the `<CodeExamples />` component. You can re-order the languages in the example by using the `exampleOrder` attribute as a comma-separated list of languages. Finally,  by exporting a `args` object from the example file, you can use code block arguments like `filename` and `highlight`. You can also use the `displayName` argument to override what the example is named in the tabs, and `lang` to override what language is used to highlight the example.
+
+```jsx
+<CodeExamples product="video" example="example" exampleOrder="go,php,python" />
+```
+
+<CodeExamples product="video" example="example" exampleOrder="go,php,python" />
+
+### Interactive Code Examples
+
+Similar to multi-language code examples, interactive code examples are defined in the `code_examples` directory and imported in `code_examples/index.ts`. Interactive code examples can have the following exports:
+
+- [options](https://sandpack.codesandbox.io/docs/api/react/interfaces/SandpackOptions) (default: `{}`)
+- [template](https://sandpack.codesandbox.io/docs/api/react/#sandpackpredefinedtemplate) (default: `vanilla`)
+- [files](https://sandpack.codesandbox.io/docs/api/react/interfaces/SandpackFile) (default: `{}`)
+- [customSetup](https://sandpack.codesandbox.io/docs/api/react/interfaces/SandpackSetup) (default `{}`)
+
+> See `code_examples/video-interactive/example.ts` for an example
+
+Once imported, interactive examples can be used with the `<InteractiveCodeExample />` component.
+
+```jsx
+<InteractiveCodeExample product="video" example="example" />
+```
+
+<InteractiveCodeExample product="video" example="example" />
+
+<LinkedHeader step={steps[5]} />
+
+First, add an image into the `public/images` directory. And then use the `<Image />` component. Be sure to pass in the `width`, `height` and `alt` properties.
+
+The `width` and `height` should be the natural dimensions of the source image. You can find this by the dimensions of the image on the filesystem. Our `<Image />` component (`next/image`) will detect the aspect ratio and the container that the image is being rendered into and optimize the size automatically so you don't need to worry about optimizing the image ahead of time. Our `<Image />` component will also make sure there is no layout shift when the page loads so you don't see any kind of awkward content shift on the initial load.
+
+You can also include a `caption` prop. If you provide a `caption` it will be rendered below the image in italics and if the `alt` prop is omitted then the caption will be used as the `alt`.
+
+For example, this code produces the image below
+
+```jsx
+<Image
+  src="/docs/images/settings-access-token-env.png"
+  width={1140}
+  height={374}
+  alt="Mux access token env"
+/>
+```
+
+<Image
+  src="/docs/images/settings-access-token-env.png"
+  width={1140}
+  height={374}
+  alt="Mux access token env"
+/>
+
+By default images will stretch the full width, but sometimes that's too big, so you can constrain them to be small with the `sm` property with code like this. This works well for vertical images.
+
+```jsx
+<Image
+  sm
+  src="/docs/images/iOS-quality-options.png"
+  width={750}
+  height={1334}
+  caption="iOS video app with video quality options"
+/>
+```
+
+<Image
+  sm
+  src="/docs/images/iOS-quality-options.png"
+  width={750}
+  height={1334}
+  caption="iOS video app with video quality options"
+/>
+
+<LinkedHeader step={steps[6]} />
+
+The `<Callout />` component is used to highlight key pieces of information. It comes in 4 flavors:
+
+- `info` is used for informational kind of things. When something is "good to know" but no necessarily critical or dangerous.
+- `warning` is used for things that area "gotcha". Or something that might non-obvious or easy to overlook.
+- `error` is one level up from warning. This is something mission-critical that would result in an error or a potential security issue if it is overlooked.
+- `success` is a happy callout. A common case for this is when we want to lead the developer down a default path if they are unsure of something. For example "Most applications use X. If you're unsure if you should use option A or option B, you probably want option A."
+
+```jsx
+<Callout type="info">This is an example of an info callout</Callout>
+```
+
+<Callout type="info">This is an example of an info callout</Callout>
+
+Using `type="warning"` looks like this:
+
+<Callout type="warning">This is an example of warning callout</Callout>
+
+Using `type="error"` looks like this:
+
+<Callout type="error">
+
+The error callout looks a little more scary.
+
+You can have multiple paragraphs
+
+And things like lists:
+
+- one
+- two
+- three
+
+</Callout>
+
+
+### Markdown
+You can optionally write markdown inside the callout. This is an example of adding a header to a `type="success"` callout.
+
+```jsx
+<Callout type="success">
+  **Hi, I'm bold!**
+</Callout>
+```
+
+And that will render the following:
+
+<Callout type="success">
+  **Hi, I'm bold!**
+</Callout>
+
+### Titles
+
+You can optionally give a callout a title. That looks like this.
+
+```jsx
+<Callout type="success" title="What a `title`">
+  A callout with a title
+</Callout>
+```
+
+And that will render the following:
+
+<Callout type="success" title="What a `title`">
+  A callout with a title
+</Callout>
+
+<LinkedHeader step={steps[7]} />
+
+Use the `<GuideCards />` component as a wrapper and add up to 3 `<GuideCard />` components as children.
+
+<GuideCards>
+  <GuideCard
+    title="Configure Playback"
+    description="Set up your iOS application, Android application or web application to start playing your Mux assets"
+    links={[
+      { title: "Web", href: "/docs/guides/play-your-videos" },
+      { title: "iOS", href: "/docs/guides/play-your-videos" },
+      { title: "Android", href: "/docs/guides/play-your-videos" },
+    ]}
+  />
+  <GuideCard
+    title="Preview your video"
+    description="Now that you have Mux assets, build rich experiences into your application by previewing your videos with Thumbnails and Storyboards"
+  />
+  <GuideCard
+    title="Integrate Mux Data"
+    description="Add the Mux Data SDK to your player and start collecting playback performance metrics."
+  />
+</GuideCards>
+
+<LinkedHeader step={steps[8]} />
+
+### `<MultiImage />`
+Add multiple images in one place with `<MultiImage />`. Define your images by passing them to the images prop: 
+
+```mdx
+<MultiImage
+  images={[
+    { src: "/docs/images/blurup-loading.png", width: 409, height: 230 },
+    { src: "/docs/images/blurup-loaded.png", width: 409, height: 227 },
+  ]}
+/>
+```
+
+### `<Player />`
+
+We are a video company, are we not? If your video describes your whole guide, use `videoWalkthrough` in your frontmatter. If you just need something inline? `<Player />` is your guy. 
+
+It takes all the normal Mux Player React props, as well as `caption` and `sm` (as described above for `<Image />`).
+
+### Link to API references with `<ApiRefLink />`
+If you have an inline-link to an API reference use `<ApiRefLink/>` component like <ApiRefLink href="/docs/api-reference/video/assets">this link to assets</ApiRefLink>.
+
+### Reuse snippets with `<MdxImport />`
+Got some text you're using over and over across multiple guides you maintain? Use `<MdxImport />` instead!
+
+Start by adding a snippet to `guides/snippets`. Then, import it in `config/snippets`. Finally:
+```mdx
+<MdxImport snippet="yourSnippetName" />
+```
+
+<Callout type="warning">
+Currently, our table of contents can't "see" into snippets. This is something I wanna fix but it's a hairy problem, so... um... sorry about that.
+</Callout>
+
+### Declutter search and the TOC with `<Releases />`
+
+We often have these loooooooong changelogs at the ends of some of our guides. (Idk why we're not just using the docs changelog for those, but, I'm sure someone has a good explanation.)
+
+We wrap these long changelogs in a `<Releases />` tag. That tag tells
+1. search to deprioritize these sections
+2. the table of contents to not include these sections
+
+
+### And more
+
+Let's be honest. I probably forgot to update these docs with the latest component. See other guides for examples of components in action. And take a look at `components/mdx` for a full list of components supported in our guiesguides.

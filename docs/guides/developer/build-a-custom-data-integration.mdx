@@ -1,0 +1,61 @@
+---
+title: Build a Custom Integration
+product: data
+description: If Mux does not have an SDK specific to your player, you may want to build a custom integration.
+seoTitle: Build a custom data integration for your player
+seoDescription: If your player doesn’t have a Mux integration, this article will show you how you can integrate Mux data into your playback environment with a custom integration.
+---
+
+Mux provides pre-built SDKs and integrations for most major platforms, but there are some platforms for which there is no pre-built integration. In this case, Mux provides core SDKs for multiple languages, including JavaScript, Java, and Objective-C. These core libraries encapsulate the majority of the business and metric calculation logic, while exposing a common API for plugging in individual player integrations.
+
+# Integration Overview
+Mux Data SDKs operate by tracking the playback events that occur through the idea of a `Player`. To Mux, a `Player` is an object that encapsulates the playback of videos, exposing APIs for playback events and retrieving playback state information.
+
+In most cases, the `Player` is a single object exposed by the player technology. For instance, for our Video.js integration (`videojs-mux`), the `Player` is just the Video.js [Player object](https://docs.videojs.com/player). However, in some scenarios, there may be one or more underlying player instances that are unified through a single composite API/object. In these cases, the `Player` would be that higher-level object.
+
+There are three major steps for building an integration for a `Player`:
+1. Initialize a monitor for the `Player` that is being tracked.
+2. Provide a set of callbacks for the core SDK to retrieve player/device information
+3. Emit events for each of the important playback events.
+
+The core SDKs share the above common architecture, but there are differences driven primarily by each programming language. The individual documentation for each will describe the exact steps for integration:
+- [JavaScript - Building a custom Integration](/docs/guides/data-custom-javascript-integration)
+- [Java - Building a custom Integration](/docs/guides/data-custom-java-integration)
+- [Objective-C - Building a custom Integration](/docs/guides/data-custom-objectivec-integration)
+
+Read on for an overview of each of these steps.
+
+# Initialize a Player monitor
+Because each core SDK supports the idea of tracking multiple `Player`s (for instance, if more than one video is being played in the same view/web page), each `Player` must be identifiable with a unique ID. This ID is used when initializing the monitor, as well as when emitting events to the core SDK.
+
+The first step that a custom integration must do is initialize a monitor for the `Player`. This is done differently for each core SDK, but the goal is just to allow the core library to prepare the state necessary for tracking a `Player`.
+
+In this step, some information must be provided:
+ - the `Player` ID
+ - some integration-specific metadata
+ - methods to retrieve information from the `Player` (more on this in a later section)
+
+## Integration-level Metadata
+When initializing a monitor for a `Player`, metadata about the integration itself should be passed. The possible fields that should be passed are the following (all are strings):
+
+ - `player_software_name`: the name of the underlying player software (i.e. 'Video.js')
+ - `player_software_version`: the version of this player software
+ - `player_mux_plugin_name`: the name of the plugin
+ - `player_mux_plugin_version`: the version of the plugin
+
+# Provide Callbacks
+
+To ease the burden of sending a lot of data with each event that is emitted, the Mux core SDKs accept callbacks that allow the core to retrieve information from the player when necessary. The callbacks required differ by core SDK, so read the appropriate section for the core SDK that you are developing with:
+
+- [JavaScript SDK Callbacks](/docs/guides/data-custom-javascript-integration#provide-callbacks)
+- [Java SDK Callbacks](/docs/guides/data-custom-java-integration#provide-callbacks)
+- [Objective-C SDK Callbacks](/docs/guides/data-custom-objectivec-integration#provide-callbacks)
+
+# Emit events
+
+The majority of the work in an integration is creating and emitting the specific playback events as playback occurs. Most players have a concept of `events` such as `play`, `pause`, `error`, and others, but these events are often named differently depending on the player in use. The Mux core SDKs expect events named in a consistent manner, as defined in [Mux Playback Events](/docs/guides/mux-data-playback-events).
+
+Each core SDK has a different mechanism for emitting these events, so read the appropriate section for the core SDK that you are developing with:
+- [JavaScript SDK Emit Events](/docs/guides/data-custom-javascript-integration#emit-events)
+- [Java SDK Emit Events](/docs/guides/data-custom-java-integration#emit-events)
+- [Objective-C SDK Emit Events](/docs/guides/data-custom-objectivec-integration#emit-events)

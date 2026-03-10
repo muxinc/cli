@@ -1,0 +1,308 @@
+---
+title: Upload video directly from an Android app
+product: video
+description: Allow your users to upload content directly to Mux from a native Android app.
+---
+
+Direct Uploads allow you to provide an authenticated upload URL to your client applications so content can be uploaded directly to Mux without needing any intermediate steps. You still get to control who gets an authenticated URL, how long it's viable, and, of course, the Asset settings used when the upload is complete.
+
+The Android Upload SDK allows a client application to upload video files from an Android device to Mux Video. The upload can be paused before completion and resume where it left off, even after process death.
+
+Let's start by uploading a video directly into Mux from an Android application. The code from these examples can be found in our [upload example app](https://github.com/muxinc/android-upload-sdk/tree/main/app)
+
+## Gradle setup
+
+To integrate the Mux Upload SDK into your Android app, you first have to add it to your project, then create a `MuxUpload` object using an upload URL your app can fetch from a trusted server. Once you create the `MuxUpload`, you can start it with `start()`.
+
+A working example can be found alongside our source code [here](https://github.com/muxinc/android-upload-sdk/tree/main/app).
+
+## Add Mux's maven repository to your project
+
+Add our maven repository to your project's `repositories` block. Depending on your setup, you may need to do this either the `settings.gradle` under `dependencyResolutionManagement` or your project's `build.gradle`.
+
+<CodeExamples
+  examples={{
+    gradle_kts: `
+// In your repositories block
+maven {
+  url = uri("https://muxinc.jfrog.io/artifactory/default-maven-release-local")
+}
+    `,
+    gradle_groovy: `
+// In your repositories block
+maven {
+  url "https://muxinc.jfrog.io/artifactory/default-maven-release-local"
+}
+    `,
+  }}
+  exampleOrder="gradle_kts,gradle_groovy"
+/>
+
+## Add the Upload SDK to your app's dependencies
+
+Add the upload SDK to your app's `dependencies` block in its `build.gradle` file.
+
+<CodeExamples
+  examples={{
+    gradle_kts: `
+// in your app's dependencies
+implementation("com.mux.video:upload:0.4.1")
+    `,
+    gradle_groovy: `
+// in your app's dependencies
+implementation "com.mux.video:upload:0.4.1"
+    `,
+  }}
+  exampleOrder="gradle_kts,gradle_groovy"
+/>
+
+## Upload a video
+
+In order to securely upload a video, you will need to create a PUT URL for your video. Once you have created the upload URL, return it to the Android client then use the `MuxUpload` class to upload the file to Mux.
+
+## Getting an Upload URL to Mux Video
+
+In order to upload a new video to Mux, you must first create a new <ApiRefLink href="/docs/api-reference/video/direct-uploads/create-direct-upload">Direct Upload</ApiRefLink> to receive the file. The Direct Upload will contain a resumable PUT url for your Android client to use while uploading the video file.
+
+You should not create your Direct Uploads directly from your app. Instead, refer to the [Direct Upload Guide](/docs/guides/upload-files-directly) to create them securely on your server backend.
+
+## Creating and starting your `MuxUpload`
+
+To perform the upload from your Android app, you can use the `MuxUpload` class. At the simplest, you need to build your `MuxUpload` via its `Builder`, then add your listeners and `start()` the upload.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+/**
+ * @param myUploadUri PUT URL fetched from a trusted environment
+ * @param myVideoFile File where the local video is stored. The app must have permission to read this file
+*/
+fun beginUpload(myUploadUrl: Uri, myVideoFile: File) {
+  val upl = MuxUpload.Builder(myUploadUrl, myVideoFile).build()
+  upl.addProgressListener { innerUploads.postValue(uploadList) }
+  upl.addResultListener {
+    if (it.isSuccess) {
+      notifyUploadSuccess()
+    } else {
+      notifyUploadFail()
+    }
+  }
+  upl.start()
+}
+    `,
+    java: `
+/**
+ * @param myUploadUri PUT URL fetched from a trusted environment
+ * @param myVideoFile File where the local video is stored. The app must have permission to read this file
+*/
+public void beginUpload(Uri uploadUrl, File videoFile) {
+  MuxUpload upload = new MuxUpload.Builder(uploadUri, videoFile).build();
+  upload.setProgressListener(progress -> {
+    handleProgress(progress);
+  });
+  upload.setResultListener(result -> {
+    if (UploadResult.isSuccessful(progressResult)) {
+      handleSuccess(UploadResult.getFinalProgress(progressResult));
+    } else {
+      handleFailure(UploadResult.getError(progressResult));
+    }
+  });
+  upload.start();
+}
+    `,
+  }}
+  exampleOrder="kotlin,java"
+/>
+
+### Resume uploads after network loss or process death
+
+The upload SDK will keep track of uploads that are in progress. When your app starts, you can restart them using `MuxUploadManager`. For more information on managing, pausing, and resuming uploads, see the next section of this guide.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+// You can do this anywhere, but it's really effective to do early in app startup
+MuxUploadManager.resumeAllCachedJobs()
+    `,
+    java: `
+// You can do this anywhere, but it's really effective to do early in app startup
+MuxUploadManager.INSTANCE.resumeAllCachedJobs()
+    `,
+  }}
+  exampleOrder="kotlin,java"
+/>
+
+### Upload from a coroutine
+
+If you're using Kotlin coroutines, you don't have to rely on the listener API to receive notifications when an upload succeeds or fails. If you prefer, you can use `awaitSuccess` in your coroutine.
+
+```kotlin
+suspend fun uploadFromCoroutine(videoFile: File): Result<UploadStatus> {
+  val uploadUrl = withContext(Dispatchers.IO) {
+    getUploadUrl()  // via call to your backend server, see the guide above
+  }
+  val upload = MuxUpload.Builder(uploadUrl, videoFile).build()
+  // Set up your listener here too
+  return upload.awaitSuccess()
+}
+```
+
+## Resuming and managing Uploads
+
+`MuxUpload`s are managed globally while they are in-progress. Your upload can safely continue while your user does other things in your app. Optionally, you can listen for progress updates for these uploads in, eg, a foreground `Service` with a system notification, or a progress view in another `Fragment`.
+
+### Find Uploads already in progress
+
+`MuxUpload`s are managed internally by the SDK, and you don't have to hold onto a reference to your `MuxUpload` in order for the upload to complete. You can get a `MuxUpload` object for any file currently uploading using `MuxUploadManager`
+
+This example listens for progress updates. You can also `pause()` or `cancel()` your uploads this way if desired.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+fun listenToUploadInProgress(videoFile: File) {
+  val upload = MuxUploadManager.findUploadByFile(videoFile)
+  upload?.setProgressListener { handleProgress(it) }
+}
+    `,
+    java: `
+public void listenToUploadInProgress(File videoFile) {
+  MuxUpload uploadInProgress = MuxUploadManager.INSTANCE.findUploadByFile(videoFile);
+  if (uploadInProgress != null) {
+    uploadInProgress.setProgressListener(progress -> handleProgress(progress));
+  }
+}
+    `,
+  }}
+  exampleOrder="kotlin,java"
+/>
+
+## Advanced
+
+### Setting a Maximum resolution
+
+If desired, you may choose a maximum resolution for the content being uploaded. You may wish to scale down the video files that are too large for your asset tier, for instance. This can save data costs for your users and it ensures that your assets are available to play as soon as possible.
+
+The Mux Upload SDK scales down any input video larger than 4k (3840x2160 or 2160x3840) by default. You can choose to scale them down further to save on user data, or if you're targeting a basic video quality asset.
+
+### Disable Input Standardization
+
+<Callout type="warning">
+
+  The setting described here will only affect *local* changes to your input. Mux Video will still convert any non-standard inputs to a standard format during ingestion.
+
+</Callout>
+
+The Upload SDK is capable of processing input videos in order to optimize them for use with Mux Video. This behavior can be disabled if it isn't desired, although this may result in extra processing on Mux's servers. We don't recommend disabling standardization unless you are experiencing issues.
+
+<CodeExamples
+  examples={{
+    kotlin: `
+fun beginUpload(myUploadUrl: Uri, myVideoFile: File) {
+  val upl = MuxUpload.Builder(myUploadUrl, myVideoFile)
+    .standarizationRequested(false) // disable input processing
+    .build()
+  // add listeners etc
+  upl.start()
+}
+    `,
+    java: `
+public void beginUpload(Uri uploadUrl, File videoFile) {
+  MuxUpload upload = new MuxUpload.Builder(uploadUri, videoFile)
+      .standarizationRequested(false) // disable input processing
+      .build();
+  // add listeners etc
+  upload.start();
+}
+    `,
+  }}
+  exampleOrder="kotlin,java"
+/>
+
+<Releases>
+## Release notes
+
+### Current release
+
+### 1.0.0
+New:
+* 4k and 720p input standardization
+* Background-Uploading example in sample app
+
+Fixes:
+* fix: currentStatus always reports READY
+* fix: upload success reported as failure in some cases
+
+### Previous releases
+
+### 0.5.0
+New:
+* Audio transcoding
+
+Improvements:
+* Improved performance reporting
+
+### 0.4.2
+New
+* feat: Add `UploadResult` class for java users to interpret Result
+
+Fixes
+* Fix: Some methods on MuxUpload.Builder don't return Builder
+* Fix: the application context shouldn't be visible
+* Fix: Transcoding errors handled incorrectly
+
+### 0.4.1
+
+New
+* feat: Add API for listening to and retrieving the status of an upload
+* feat: Add Input Standardization, to process videos device-side
+
+Fixes
+* fix: Metrics events not properly redirected
+
+Known Issues
+* There's no notification/callback for the result of input standardization
+
+### 0.4.0
+
+Improvements
+
+* doc: Finish out the public KDoc
+* doc: Improve KDocs and add logo
+* nfc: Hide some internal classes from java. This should not affect anyone using the SDK
+
+Fixes
+* fix: pausing uploads shouldn't create errors
+
+### 0.3.1
+
+Improvements
+* fix: Restarts broken due to invalid progress data
+
+### 0.3.0
+
+Breaking
+* breaking: Remove extraneous MIME type and Retry Time Builder fields. Configuring these did nothing
+
+Updates
+* update: Add the ability to resume all failed or paused uploads
+
+Improvements
+* Greatly improved the example app
+
+### 0.2.0
+
+Improvements
+* fix: Hide some constructors to prevent unintended use by java callers
+* feat: Add Performance Metrics Tracking
+
+### 0.1.0
+
+🥳 First beta release of the Mux Android SDK
+
+Features
+* Upload multiple files at once
+* Pause and resume uploads, even after process death
+* Observe upload progress from anywhere in your app without extra code
+
+</Releases>

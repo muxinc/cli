@@ -1,0 +1,90 @@
+---
+title: Live Streaming FAQs
+product: video
+description: Answers to common questions relating to Live Streaming.
+---
+
+## What is Mux’s latency for live streams?
+For a standard live stream, latency is expected to be greater than 20 seconds and typically about 25 - 30 seconds. We offer a
+[reduced latency](https://mux.com/blog/reduced-latency-for-mux-live-streaming-now-available/) mode which will reduce latency to about 12 - 20 seconds.
+A low-latency live stream can go as low as 5 seconds of glass-to-glass latency but the latency can vary depending on your viewer's geographical
+location and internet connectivity.
+
+## Does Mux support WebRTC for live streaming ingest?
+We currently do not support direct WebRTC ingest to a Live Stream. 
+
+We have focused on RTMP and RTMPS for live streams from an encoder as they are the most universal ingest protocols.
+
+## How can I go live from a browser?
+To [go live directly from a browser](https://mux.com/blog/the-state-of-going-live-from-a-browser/), you need to convert the browser stream into a format that can be consumed by RTMP on our end.
+
+For example, we’ve had customers use Zoom to provide the video from a browser, and use its RTMP-out feature to broadcast a stream with Mux for streaming to a larger [conference-like audience](https://mux.com/blog/how-to-host-your-own-online-conference/).
+
+## Is Mux Live Streaming API suitable for 2-way video communication applications?
+
+Mux's Live Streaming API is not intended to provide 2-way video communication. For use cases that require 2-way video communication, we'd suggest looking at one of our partners, [LiveKit](https://livekit.io/).
+
+## Is it possible to rewind live content while the live stream continues?
+
+**DVR (Digital Video Recorder) mode** is a live stream feature that lets it rewind. Mux supports DVR and non-DVR modes for live streams.
+
+**non-DVR mode** is enabled by default for live streams and only has access to the most recent 30 seconds of the live stream.
+
+**DVR mode** is possible by utilizing the live stream's `active_asset_id`. When constructing the playback URL, the `playback_id` for the associated `active_asset_id` is used. When the live video ends, the <ApiRefLink href="/docs/api-reference/video/playback-id">Playback ID</ApiRefLink> associated with the `active_asset_id` will automatically transition to an on-demand asset for playback instead.
+
+For more information and caveats behind these two modes, refer to our [Stream recordings of live streams](/docs/guides/stream-recordings-of-live-streams) guide.
+
+## What is the maximum live stream duration?
+Currently, we have a 12 hour limit for continuous streaming to our live endpoints. The live stream is disconnected after 12 hours.
+
+If the encoder reconnects, Mux will transition to a new asset with its own playback ID.
+
+## Do I need to create stream keys for every live event?
+No, stream keys can be re-used as many time as you want. It's common for applications to assign one stream key to each user (broadcaster) in their system and allow that user to re-use the same stream key over time.
+
+## Is there a limit to creating stream keys and live steams?
+There is no limit on how many stream keys and live streams you can create.
+
+Once created, stream keys are persistent and can be used for any number of live events.
+
+## Do you charge for creating stream keys?
+We don’t charge for creating stream keys, only when sending us an active RTMP feed.
+
+## Can I live stream a pre-recorded video?
+Mux does not support generating simulated live from on-demand assets. Such a service is also called a "Playout service".
+
+However, you can run a simulated live stream using a tool like [OBS](https://obsproject.com/) and Wirecast to send your on-demand asset to us as an RTMP stream. See how to configure your RTMP encoder on our [Configuring Broadcast Software docs page](/docs/guides/configure-broadcast-software).
+
+For a more comprehensive guide and common options we recommend for work-arounds, see this guide of how to [Stream simulated live](/docs/guides/stream-simulated-live).
+
+## Can I restream/simulcast my live stream to social platforms like Facebook?
+Yes. Mux Video live service supports up to six simultaneous restreams to third party platforms that support RTMP feed.
+
+Read more in this blog post: [Help Your Users be in 5 Places at Once: Your Guide to Simulcasting](https://mux.com/blog/help-your-users-be-in-5-places-at-once-your-guide-to-simulcasting/).
+
+## Is my content saved after the live broadcast is over?
+Yes. Mux will automatically create an <ApiRefLink href="/docs/api-reference/video/assets">on-demand (VOD) asset</ApiRefLink> after your live stream ends, which can be streamed again instantly after the live stream ends.
+
+## Can I get access to my live event's recording?
+Yes, you can enable downloading of the entire event recording using [Master access](/docs/guides/download-for-offline-editing) feature.
+
+With Master access enabled, you will receive a Webhook notification after the live stream ends, indicating that the master copy of the video asset is available to download.
+
+## Can I generate thumbnails/GIFs while the live stream is active?
+Yes. You can use our [thumbnail and animated GIF API](/docs/guides/get-images-from-a-video) while the live event is active.
+
+Many customers use thumbnails or GIFs to show what content is currently playing or to as a way to promote the live stream.
+
+## Can I test Mux live streaming for free?
+On any paid plan, you can create [free test live streams](https://mux.com/blog/new-test-mux-video-features-for-free/) to help evaluate the Mux Video APIs without incurring any cost.
+
+We give you access to create an unlimited number of test live streams. Test live streams are watermarked with the Mux logo, limited to 5 minutes, and disabled after 24 hours.
+
+## Can I add multiple audio channels or tracks to my live stream?
+
+No, we currently support only one audio track for live streams. On-demand video assets do support [multiple alternative audio tracks](/docs/guides/add-alternate-audio-tracks-to-your-videos)
+
+You may want your users to be able to select a language on the player and view a stream showing the same video content but play different audio. One workaround would be first, ingest multiple streams with one in each language. Then add logic to the player to switch between different playback URLs and the complete stream when the user changes the language.
+
+## What happens if I live stream variable frame rate (VFR) content?
+While Mux does not output variable frame rate (VFR) content for live streams, we will accept variable frame rate (VFR) content for ingest. Having said that, we recommend using constant frame rate (CFR) content for live streams to ensure the best playback experience.

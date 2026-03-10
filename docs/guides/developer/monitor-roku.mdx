@@ -1,0 +1,628 @@
+---
+title: Monitor Roku
+product: data
+dataIntegration: true
+description: This guide walks through integration with Roku to collect video performance metrics with Mux data.
+steps:
+  - title: Features
+    description: The features supported by Mux Data for this player.
+  - title: 1. Include the Mux Data SDK
+    description: Install mux-analytics into your Roku application.
+  - title: 2. Setup a new Mux Task
+    description: Define an interface that links your Roku player instance with mux-analytics.
+  - title: 3. Setup the task to respond to video events
+    description: Create the Mux Task node and pass in your Video node.
+  - title: 4. Debugging
+    description: Use the debugging attributes in your manifest to see logging output.
+  - title: 5. Make your data actionable
+    description: Use metadata fields to make the data collected by Mux actionable and useful.
+  - title: 6. Advertising configuration
+    description: If your player users advertising, add the necessary callbacks.
+  - title: 7. Additional configuration
+  - title: Release notes
+    topic: notes
+---
+
+Mux's Roku integration supports Roku SceneGraph applications, in conjunction with standard `Video` nodes. Mux runs as a `Task` alongside the `Video` node, and supports instances where the `Video` nodes are reused with additional content as well as when the `Video` nodes are reset between content.
+
+<LinkedHeader step={steps[0]} />
+
+<SDKFeatures featureDef={featureDef} />
+
+<LinkedHeader step={steps[1]} />
+
+Place the SDK file in your `libs` folder. The latest version of the SDK can be found here:
+
+```sh
+https://src.litix.io/roku/2/mux-analytics.brs
+```
+
+<LinkedHeader step={steps[2]} />
+
+Create a new `Task` XML named `MuxTask.xml` inside your `components` folder and give it the following interface. This is used to link the `mux-analytics.brs` file into your application.
+
+```html
+<component name="MuxTask" extends="Task">
+  <interface>
+    <field id="video" type="node" alwaysNotify="true"/>
+    <field id="config" type="assocarray" alwaysNotify="true"/>
+    <field id="rafEvent" type="assocarray" alwaysNotify="true"/>
+    <field id="error" type="assocarray" alwaysNotify="true"/>
+    <field id="view" type="String" alwaysNotify="true"/>
+    <field id="exit" type="Boolean" alwaysNotify="true"/>
+    <field id="exitType" type="String" alwaysNotify="true" value="hard"/>
+    <field id="useRenderStitchedStream" type="Boolean" alwaysNotify="true" value="false"/>
+    <field id="useSSAI" type="Boolean" alwaysNotify="true" value="false"/>
+    <field id="disableAutomaticErrorTracking" type="Boolean" alwaysNotify="true" value="false"/>
+    <field id="randomMuxViewerId" type="Boolean" value="false"/>
+    <field id="cdn" type="String" alwaysNotify="true" />
+    <field id="disablePlayheadRebufferTracking" type="Boolean" alwaysNotify="true" value="false" />
+    <field id="disableDecoderStats" type="Boolean" alwaysNotify="true" value="false" />
+    <field id="rebufferstart" type="Boolean" alwaysNotify="true" />
+    <field id="rebufferend" type="Boolean" alwaysNotify="true" />
+    <field id="playback_mode" type="assocarray" alwaysNotify="true" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/libs/mux-analytics.brs"/>
+</component>
+```
+
+<LinkedHeader step={steps[3]} />
+
+Within your main application, create the Mux Task node, and pass the `Video` node that you are tracking to it. This should be done before the content is set into the `Video` node so that Mux can track the load process.
+
+<MdxImport snippet="envKeyCallout" />
+
+```js
+m.mux = m.top.CreateNode("mux")
+m.mux.setField("video", m.video)
+
+muxConfig = {
+  env_key: "ENV_KEY",
+}
+
+m.mux.setField("config", muxConfig)
+m.mux.control = "RUN"
+
+' Load the video into the Video node
+```
+
+After you've integrated, start playing a video in the player you've integrated with. A few minutes after you stop watching, you'll see the results in your Mux account. We'll also email you when your first video view has been recorded.
+
+You can also test that Mux is receiving data in the Mux Data dashboard. Login to the dashboard and find the environment that corresponds to your `ENV_KEY` and look for video views.
+
+Note that it may take a few minutes for views to show up in the Mux Data dashboard.
+
+<LinkedHeader step={steps[4]} />
+
+To help you with the integration process and ensure you have successfully incorporated the SDK within your player, we have provided a number of optional manifest attributes. These attributes can help you better understand how the MUX SDK event tracking works as well as show you the actual data being collected. Some of the benefits of using some of the debugging attributes (mentioned below) are that you will be able to see the SDK events and data collected as it occurs.
+
+**NOTE:** The outputs illustrated below are printed on a single line within the terminal to reduce clutter.
+
+<Callout type="info">
+  Note that the following settings are configured in your application's `manifest` file, rather than passed into the config object.
+</Callout>
+
+### mux_debug_events
+
+#### Values
+`full`, `partial` or `none`
+
+#### Description
+Outputs the event at the time it occurs. Default value is `none`
+
+#### Example output
+
+Property set to `partial`:
+
+```sh
+[mux-analytics] EVENT playerready
+```
+
+Property set to `full`:
+
+```sh
+[mux-analytics] EVENT playing
+{
+  viewer_application_name:Roku,
+  mux_api_version:2.1,
+  view_seek_duration:0,
+  viewer_application_version:9.20,
+  player_name:Reset Player,
+  viewer_time:1582317809984,
+  view_start:1582317808627,
+  player_model_number:4660X,
+  video_source_mime_type:mp4,
+  event:playing,
+  ...
+```
+
+---
+
+### mux_debug_beacons
+
+#### Values
+`full`, `partial` or `none`
+
+#### Description
+Outputs the data (full) or event(s) (partial) that is being sent (at the time of sending). Default value is `none`.
+
+#### Example output
+
+Property set to `partial`:
+
+```sh
+[mux-analytics] BEACON (2) [  playerready viewstart ]
+```
+
+Property set to `full`:
+
+```sh
+[mux-analytics] BEACON (2)
+[
+  {
+    viewer_application_name:Roku,
+    mux_api_version:2.1,
+    view_seek_duration:0,
+    viewer_application_version:9.20,
+    player_name:Reset Player,
+    viewer_time:1582317809984,
+    view_start:1582317808627,
+    player_model_number:4660X,
+    video_source_mime_type:mp4,
+    event:playerready,
+    ...
+  }, {
+    viewer_application_name:Roku,
+    mux_api_version:2.1,
+    view_seek_duration:0,
+    viewer_application_version:9.20,
+    player_name:Reset Player,
+    viewer_time:1582317809984,
+    view_start:1582317808627,
+    player_model_number:4660X,
+    video_source_mime_type:mp4,
+    event:viewstart,
+    ...
+  }
+]
+```
+
+----
+### `mux_base_url`
+
+#### Values
+Protocol + domain name. Eg. `https://img.litix.io`
+
+#### Description
+Controls to which domain the data should be sent. Useful for environmental builds of your project
+
+<LinkedHeader step={steps[5]} />
+
+The Roku SDK supports adding metadata via two different mechanisms.
+
+The majority of the metadata should be passed inside the `muxConfig` object that is passed to the Mux Task. You can read detailed information about the fields that are supported in [Metadata](/docs/guides/make-your-data-actionable-with-metadata). To update any field, update this within `muxConfig` and then call `m.mux.setField("config", muxConfig)`.
+
+Some other underlying information is mapped from standard [Roku content metadata](https://developer.roku.com/docs/developer-program/getting-started/architecture/content-metadata.md), most of which you probably already set when creating your video. In particular, the metadata fields that you should set (if you do not already) are:
+ - *ContentType*
+ - *URL*
+ - *Live*
+ - *StreamFormat*
+ - *Length*
+
+<LinkedHeader step={steps[6]} />
+
+If advertising is to be used, you must send the appropriate events to the Mux Task, as shown below.
+
+```js
+function setUpRokuAdFramework
+  adIface.SetTrackingCallback(adTrackingCallback, adIface)
+end function
+
+function adTrackingCallback(obj = Invalid as Dynamic, eventType = Invalid as Dynamic, ctx = Invalid as Dynamic)
+  m.mux = GetGlobalAA().global.findNode("mux")
+  adUrl = Invalid
+  if obj <> Invalid
+    adUrl = obj.getAdUrl()
+  end if
+  m.mux.setField("rafEvent", {obj: { adurl: adUrl }, eventType:eventType, ctx:ctx})
+end function
+```
+
+If you would like to pass your own ad parameters, you can do so by setting `ctx.mux` to an associative array with the values you desire. Currently the only value supported is `ad_type`.
+
+```js
+function adTrackingCallback(obj = Invalid as Dynamic, eventType = Invalid as Dynamic, ctx = Invalid as Dynamic)
+  m.mux = GetGlobalAA().global.findNode("mux")
+  adUrl = Invalid
+  if obj <> Invalid
+    adUrl = obj.getAdUrl()
+  end if
+  # Add your ad_type if you desire
+  ctx.mux = {}
+  ctx.mux.ad_type = "preroll"
+  m.mux.setField("rafEvent", {obj: { adurl: adUrl }, eventType:eventType, ctx:ctx})
+end function
+```
+
+If you are utilizing RAF's `renderStitchedStream` method to stitch ads and content together client-side, then you must tell the Mux SDK that this is in use. This is set via `useRenderStitchedStream` on the Mux Task, set to `true`, such as:
+
+```js
+mux.setField("useRenderStitchedStream", true)
+```
+
+If you are _not_ utilizing `renderStitchedStream` but instead controlling ad and content playback directly, then you need to set `useRenderStitchedStream` to `false`.
+
+If you are utilizing server-side ad insertion (SSAI), you should signal that to the SDK by setting `useSSAI` to `true`:
+
+```js
+mux.setField("useSSAI", true)
+```
+
+<LinkedHeader step={steps[7]} />
+
+There are a number of options you can configure on MuxTask, which can be used to customize the SDK:
+
+<IndexedTable>
+| Field Name | Type | Description |
+|:-|:-|:-|
+| `video` | `Node` | The `Video` node that is being tracked. |
+| `config` | `assocarray` | Configuration for the Mux task, including env key and additional metadata. |
+| `rafEvent` | `assocarray` | Used to forward RAF events from your application into the Mux SDK. See [Advertising Configuration](#6-advertising-configuration) for more information. |
+| `view` | `String` | Used to control when views start and end directly. See [Controlling View Start and End Directly](#controlling-view-start-and-end-directly) for more information. |
+| `disableAutomaticErrorTracking` | `Boolean` | Used to signal errors manually. See [Manually Tracking Errors](#manually-tracking-errors) for more information. |
+| `error` | `assocarray` | Used to signal errors manually. See [Manually Tracking Errors](#manually-tracking-errors) for more information. |
+| `exit` | `Boolean` | Used to exit tracking directly. See [Controlling View Start and End Directly](#controlling-view-start-and-end-directly) for more information. |
+| `exitType` | `String` | Used to control the mechanism used while exiting tracking. See [Controlling View Start and End Directly](#controlling-view-start-and-end-directly) for more information. |
+| `useRenderStitchedStream` | `Boolean` | Used to set whether `renderStitchedStream` is used for advertising in your application. See [Advertising Configuration](#6-advertising-configuration) for more information. |
+| `useSSAI` | `Boolean` | Used to set whether Roku's built-in server-side-ad-insertion is used for advertising in your application. See [Advertising Configuration](#6-advertising-configuration) for more information. |
+| `randomMuxViewerId` | `Boolean` | Used to instruct Mux to use a random viewer ID instead of an ID based on the device. By default, Mux utilizes the [device RIDA](https://developer.roku.com/docs/references/brightscript/interfaces/ifdeviceinfo.md#getrida-as-string) as the viewer ID. If this flag is enabled, unique viewer counts may be inflated.  |
+| `cdn` | `String` | Used to manually signal when the CDN changes. See [CDN Tracking](#cdn-tracking) for more information. |
+| `disablePlayheadRebufferTracking` | `Boolean` | Used to control rebuffering directly. See [Rebuffer Controls](#rebuffer-controls) for more information. |
+| `rebufferstart` | `Boolean` | Used to control rebuffering directly. See [Rebuffer Controls](#rebuffer-controls) for more information. |
+| `rebufferend` | `Boolean` | Used to control rebuffering directly. See [Rebuffer Controls](#rebuffer-controls) for more information. |
+| `disableDecoderStats` | `Boolean` | By default, Mux sets `enableDecoderStats` to true on the `Video` node. Set this to `true` not enable decoder stats; dropped frames will no longer be tracked. |
+| `playback_mode` | `assocarray` | Used to set and update [Playback Mode](#playback-mode). |
+| `request` | `assocarray` | Used to trigger [custom network request events](#network-custom-request-event). |
+</IndexedTable>
+
+### Controlling View Start and End Directly
+
+In some situations, it is necessary to directly signal the beginning or ending of a `view` to Mux. This is necessary when the `Video` Node is recycled (i.e. more pieces of content are loaded into the same Node), or when using advertising, as the ads run outside of the lifecycle of the Video.
+
+Note: A `view` is defined as the user watching a single piece of _content_, which includes any advertising.
+
+```js
+mux = GetGlobalAA().global.findNode("mux")
+
+' To signal the start of a view:
+mux.setField("view", "start")
+
+' To signal the end of a view:
+mux.setField("view", "end")
+```
+
+The `exitType` setting controls the behavior of the task when a request to exit/terminate the thread is invoked (via `mux.exit=true`). The default value of `exitType` is `hard`.
+
+If the value is set to `hard` then the thread terminates immediately and any data that has not propagated already to the MUX servers is lost.
+
+If the value is set to `soft` then the thread sends all the remaining data to the MUX servers and terminates afterward.
+
+To change value to `soft` call `m.mux.setField("exitType", "soft")`
+
+NOTE: This means that there might be a time difference between you calling `mux.exit=true` and the task thread actually terminating. Please ensure you have a single `MUX Task` running at any given time.
+
+### Manually Tracking Errors
+
+The Mux SDK for Roku tracks error events from the Video node automatically, and reports them as fatal playback errors. If you would like to disable this automatic error tracking, you can set the following in your MuxTask.xml:
+
+```js
+<field id="disableAutomaticErrorTracking" type="Boolean" alwaysNotify="true" value="true"/>
+```
+
+While it is not advised to control this at runtime, you can also set this by calling
+
+```js
+mux.setField("disableAutomaticErrorTracking", true)
+```
+
+In order to emit events, you will need to trigger any errors directly, by calling
+
+```js
+mux.setField("error", {
+  player_error_code: errorCode,
+  player_error_message: errorMessage,
+  player_error_context: errorContext,
+  player_error_severity: errorSeverity,
+  player_error_business_exception: isBusinessException
+})
+```
+
+The error code and message should always be provided, and you can set the other fields if desired. The possible values or `errorSeverity` are `"warning"` or `"fatal"`. Read more about [Error Classification](/docs/guides/error-categorization) for more details.
+
+### CDN Tracking
+
+The Mux SDK for Roku can listen to CDN change events. In order to emit events, you will need to trigger any CDN changes directly, by calling
+
+```js
+' The "new_cdn" string should be the new CDN name
+mux.setField("cdn", "new_cdn")
+```
+
+### Rebuffer Controls
+
+<Callout type="warning">
+Mux does not suggest disabling the automatic rebuffer tracking. The following is for advanced usage only.
+</Callout>
+
+The Mux SDK for Roku tracks error events from the Video node automatically. If you would like to disable this automatic rebuffer tracking, you can set the following in your MuxTask.xml:
+
+```js
+<field id="disablePlayheadRebufferTracking" type="Boolean" alwaysNotify="true" value="true"/>
+```
+
+While it is not advised to control this at runtime, you can also set this by calling
+
+```js
+mux.setField("disablePlayheadRebufferTracking", true)
+```
+
+Rebuffer start and end events can be emitted by calling the following
+
+```js
+mux.setField("rebufferstart", true)
+```
+
+```js
+mux.setField("rebufferend", true)
+```
+
+### Playback Mode
+
+A playback mode event can be emitted by calling the following
+
+```js
+mux.setField("playback_mode", {
+  player_playback_mode: mode,
+  player_playback_mode_data: data
+})
+```
+
+The `mode` should always be provided, suggested values are: `inline`, `fullscreen`, `mini` and `pip`.
+The `data` is optional, if provided it should be a parse-able JSON string.
+
+A `playbackmodechange` event will be emitted containing the following fields:
+
+- `player_playback_mode` (containing the mode set)
+- `player_playback_mode_data` (containing the data set)
+- `ad_playing_time_ms_cumulative` (containing ad watch time)
+- `view_playing_time_ms_cumulative` (containing the total content watch time plus ad watch time)
+
+### Network custom request event
+
+Custom request events can be emitted with custom data for network requests by calling the following
+
+```js
+mux.setField("request", manifestRequest)
+```
+
+The `manifestRequest` must be a parse-able JSON string.
+
+The following fields can be included in `manifestRequest`. All fields should be numeric values, not strings, except where noted:
+
+- `type` (required, string) - The status of the request: `completed`, `failed`, or `canceled`
+- `request_start` (numeric) - Timestamp in milliseconds since the Unix epoch when the request was initiated
+- `request_response_start` (numeric) - Timestamp in milliseconds since the Unix epoch when the first byte of the response was received
+- `request_response_end` (numeric) - Timestamp in milliseconds since the Unix epoch when the last byte of the response was received
+- `request_bytes_loaded` (numeric) - The total number of bytes loaded as part of this request
+- `request_hostname` (string) - The hostname portion of the URL that was requested
+- `request_type` (string) - The type of content being requested. One of: `manifest`, `video`, `audio`, `video_init`, `audio_init`, `media`, `subtitle`, or `encryption`
+- `request_id` (string) - A unique identifier for the request
+- `request_url` (string) - The URL that was requested
+- `request_labeled_bitrate` (numeric) - Labeled bitrate in bps of the video, audio, or media segment that was downloaded
+- `request_response_headers` (object) - A map of response headers and their values
+- `request_media_duration` (numeric) - The duration of the media loaded, in seconds. Should not be included for manifest requests
+- `request_video_width` (numeric) - For events with `media` or `video` `request_type`, the width of the video included in the segment/fragment
+- `request_video_height` (numeric) - For events with `media` or `video` `request_type`, the height of the video included in the segment/fragment
+- `request_error` (string) - The name of the error event that occurred (e.g., `FragLoadError`)
+- `request_error_code` (numeric) - The response code of the request that spawned the error (e.g., 401, 400, 500)
+- `request_error_text` (string) - The message returned with the failed status code
+
+Depending on the `type` value, a corresponding event will be emitted: `requestcompleted` (for `type: "completed"`), `requestfailed` (for `type: "failed"`), or `requestcanceled` (for `type: "canceled"`).
+
+For more information about these fields, see [Network Request Data](/docs/guides/mux-data-playback-events#network-request-data).
+
+#### Latency and Throughput Calculation
+
+If you set `request_start`, `request_response_start`, `request_response_end`, and `request_bytes_loaded`, latency and throughput will be automatically calculated and sent in each event.
+
+- Latency is calculated as the time between `request_start` and `request_response_start`.
+- Throughput is calculated as `request_bytes_loaded` divided by the time between `request_response_start` and `request_response_end`.
+
+#### Request Duration Calculation
+
+If the request is completed (`type` is `"completed"`), the `request_type` is `"api"` or `"encryption"`, and both `request_start` and `request_response_end` are present as valid numeric values, the total request duration (`request_duration`) will be calculated as `request_response_end - request_start` and included in the event. Requests of type `"api"` or `"encryption"` are limited to a maximum of 5 per view; if this limit is exceeded, the event is discarded and not sent to Mux.
+
+<Releases>
+<LinkedHeader step={steps[8]} />
+
+### Current release
+
+#### v2.6.2 
+- fix crash due to Invalid starting playhead 
+
+### Previous releases
+
+#### v2.6.1
+- Fix crash when `debug_beacons` or `debug_events` are set to `full`
+
+#### v2.6.0
+- Fix inconsistent heartbeat management. may prevent excessive beacons or view state issues
+- Track playhead ranges for engagement tracking
+
+#### v2.5.3
+- fix crash due to ad watch time metrics being Invalid during ad breaks
+
+#### v2.5.2
+- fix an issue where playback_mode may not have updated correctly on changes if set in initial config
+
+#### v2.5.1
+- fix an issue where request_url was not included in certain request events
+- expose mechanism to report `ad_type` within ads
+
+#### v2.5.0
+- fix issue where subsequent views could end up with metadata from previous views
+- expose option for disabling tracking decoder stats
+- fix typo in player_error_message
+- remove warning when env_key is not set
+
+#### v2.4.1
+- fix: max function doesn't exist
+
+#### v2.4.0
+- add network `request` field
+- add network change events: Network change events are now sent when a network transition is detected (for example, from Wi-Fi to Ethernet).
+
+#### v2.3.2
+- fix issue where invalid playhead time would crash 
+
+#### v2.3.1
+- Improve performance by reducing thread rendevous 
+- fix: player_playback_mode not appearing in Dashboard 
+- fix: send codec in `video_source_codec` to have it show up in `renditionchange` events 
+
+#### v2.3.0
+
+- add calculations for ad watch time, now sending analytics properties `ad_playing_time_ms_cumulative` as total ad watch time and `view_playing_time_ms_cumulative` as content watch time plus ad watch time
+- add support for `playback_mode` user event, which triggers a `playbackmodechange` event, containing the playback mode and data
+- `playbackmodechange` event sent before every `viewstart` event, containing `standard` playback mode
+
+#### v2.2.2
+
+- fix issue where watch time was calculated incorrectly, a guard was added for big jumps on content playback time calculations
+
+#### v2.2.1
+
+- fix for `MAX_VIDEO_POSITION_JUMP` not being properly declared, which could cause app crashes
+
+#### v2.2.0
+- fix viewing data irregularities where watch time values could be near maxint values
+- add support for disabling automatic rebuffer tracking and allow for rebuffer events to be emitted directly
+- `video_codec` and `video_audio_codec` fields are now sent in `renditionchange` events
+
+#### v2.1.0
+- fix error code inconsistencies on `error` event handling
+- `viewer_connection_type` is set to invalid if unable to be determined, set to `other` if connection not Wired or Wireless
+- `viewer_connection_type` is now rechecked and updated every 10 seconds
+- add support for `cdn` user event, which triggers a `cdnchange` analytics event, containing the current and previous CDN 
+
+#### v2.0.1
+- fix an issue where `client_application_name` and other newer metadata fields could not be set
+- fix an issue where `disableAutomaticErrorTracking` was not settable at runtime
+
+#### v2.0.0
+- BREAKING: `disableAutomaticErrorTracking`, `useRenderStitchedStream`, and `useSSAI` have had their types changed to `Boolean`, so you will need to make sure to update your `MuxTask.xml` files to the right types, and anywhere you might set those values dynamically.
+- add support for `disableAutomaticErrorTracking`
+- add support for `useRandomMuxViewerId`
+- fix issue where `ended` event was sent when it should not have been
+- support severity and business exception in manual error handler
+
+#### v1.8.0
+- Fix an issue where beacon requests were not delayed upon retry
+- Fix a couple if internal typos
+- Various performance improvements to reduce the number of rendezvous
+
+#### v1.7.1
+- Fix issue where a crash may occur due to the Content node having an invalid URL
+
+#### v1.7.0
+- Fix issue where renditionchange was triggered too often when demuxed audio/video are used
+- Fix issue where a memory leak was possible with some configurations with ads involved
+- Add support for useSSAI to track ad breaks correctly when SSAI integrations are used
+
+#### v1.6.0
+- Add support for automatically detecting video changes and metadata when using a playlist within a single Content Node
+- Add support for 8k devices
+- Add support for Video Quality Metrics
+- Add support for tracking individual network requests, throughput, and network errors
+
+#### v1.5.1
+- Remove unintended logging
+
+#### v1.5.0
+- Fix an issue where views were not tracked correctly when playing with advertisements via `renderStitchedStream`
+- Fix an issue where `player_init_time` was expected as a string but would not work correctly
+- Performance improvements
+- Update sample app to have option for `renderStitchedStream`
+
+#### v1.4.3
+- Add support for collecting dropped frame counts automatically where possible
+
+#### v1.4.2
+- Add support for `beaconCollectionDomain`
+- Add support for setting `env_key` instead of `property_key`
+
+#### v1.4.1
+- Fix a syntax issue causing compilation problems
+
+#### v1.4.0
+- Fix a misnamed ad event (`adpause` was incorrectly sent as `adpaused`)
+- Add support for a few more ad events
+- Fix an issue where ad play count was attributed at ad completion, rather than ads beginning to play
+
+#### v1.3.3
+- Fix an issue where certain env keys were not handled correctly
+
+#### v1.3.2
+- Fix an issue where hostname extraction did not work correctly for hostnames with `-`s
+
+#### v1.3.1
+- Fixes an issue where certain Roku devices would not correctly expose the model number
+
+#### v1.3.0
+Updates:
+- Add `drmType` property to the Mux node. This value is automatically reported from the player if available (#44)
+- Add `droppedFrames` property to the Mux node. This value is must be reported from your player. (#44)
+- Add `errorContext` field to Error Events. This value is automatically reported from the player if available (#44)
+
+#### v1.2.1
+ - Fixes an issue that could cause incorrect playback reporting when seeking occurs during a view and updated the SDK testing infrastructure.
+
+#### v1.2.0
+ - Remove auto-generated `video_id` value; applications should pass their own `video_id` in the metadata.
+
+#### v1.1.1
+ - Fix an issue where an invalid value provided for `player_init_time` could cause the application to crash.
+
+#### v1.1.0
+ - Add support for custom dimensions
+
+#### v1.0.3
+ - Fix an issue where properties from the Roku application (such as Director) that are not string types crash the application
+ - Fix an issue with the sample application running ads
+
+#### v1.0.2
+ - Fix an issue where `viewer_device_model` was not populated correctly.
+
+#### v1.0.1
+ - Fix an issue where the player playhead position was not reported. This has no impact on collected metrics, but fixes a display issue within the dashboard when viewing individual views.
+
+#### v1.0.0
+ - Fix an issue where `viewer_user_id` was overwritten unintentionally.
+ - Fix an issue where `player_mux_plugin_name` and device type were set incorrectly.
+ - Fix an issue where the `seeked` event was incorrectly named.
+ - Provide updated device information to match the intended uses for each field.
+ - Fix an issue where certain metrics (large numbers) were sent in scientific notation, causing incorrect values to be stored.
+ - Fix an issue where error code and message were incorrectly sent with `aderror` events.
+
+#### v0.2.0
+ - Remove the debug option of `mux_minification`. If you set this, it will have no action. Instead, all events and beacons will be logged in an un-minified version, while everything will be sent to the Mux backend minified.
+ - Update such that `player_instance_id` (controlled by the Mux SDK) is sent as a GUID rather than a different format of ID.
+
+#### v0.1.0
+ - Add `exitType` configuration option
+ - Fix an issue where source duration is reported incorrectly
+ - Fix an issue where, on certain devices, the rebuffer percentage could be reported incorrectly (e.g. extremely high)
+ - Fix an issue where `watch_time` may have been calculated incorrectly in certain situations
+ - Fix an issue to allow correctly tracking exits before video start
+</Releases>

@@ -1,0 +1,45 @@
+---
+title: Add high-performance video to your Ruby application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video
+  in your Ruby application
+---
+
+## Installation
+
+Add `mux_ruby` to your project's `Gemfile`.
+
+```ruby
+gem 'mux_ruby'
+```
+
+## Quickstart
+
+To start, you'll need a Mux access token. Once you've got that, you're off to the races!
+
+```ruby
+require 'mux_ruby'
+
+# Auth Setup
+openapi = MuxRuby.configure do |config|
+  config.username = ENV['MUX_TOKEN_ID']
+  config.password = ENV['MUX_TOKEN_SECRET']
+end
+
+# API Client Init
+assets_api = MuxRuby::AssetsApi.new
+
+# List Assets
+puts "Listing Assets in account:\n\n"
+
+assets = assets_api.list_assets()
+assets.data.each do | asset |
+  puts "Asset ID: #{asset.id}"
+  puts "Status: #{asset.status}"
+  puts "Duration: #{asset.duration.to_s}\n\n"
+end
+```
+
+## Full documentation
+Check out the [Mux Ruby SDK docs](https://github.com/muxinc/mux-ruby) for more information.

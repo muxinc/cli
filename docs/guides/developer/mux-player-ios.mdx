@@ -1,0 +1,384 @@
+---
+title: Mux Player for iOS
+product: video
+description: Learn how to use Mux Player SDK to play video delivered by Mux in your iOS or iPadOS application
+steps:
+  - title: Install the SDK
+    description: Set up your application with Xcode and `MuxPlayerSwift` with Swift Package Manager.
+    topic: info
+  - title: Stream video from a Mux asset
+    description: Use `MuxPlayerSwift` to stream video to an `AVPlayerViewController` or `AVPlayerLayer`
+    topic: code
+  - title: Monitor media playback
+    description: Customize Mux Data monitoring and provide your own parameters
+    topic: code
+  - title: Secure your playback experience
+    description: Setup `AVPlayerViewController` or `AVPlayerLayer` to play video securely
+    topic: lock
+  - title: Customize playback
+    description: Adjust the types and order of resolution levels provided to `AVPlayer`
+    topic: code
+  - title: Improve playback performance
+    description: Reduce latency and save on video delivery costs with built-in smart caching for HLS
+    topic: info
+---
+
+This guide will help you install the Mux Player SDK in your native iOS or iPadOS application. If you encounter any issues please let us know by filing [an issue on Github](https://github.com/muxinc/mux-player-swift).
+
+<LinkedHeader step={steps[0]} />
+
+Let's start by installing the SDK. We'll use the Swift Package Manager. [Step-by-step guide on using Swift Package Manager in Xcode](https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app).
+
+Open your applications project in Xcode. In the Xcode menu bar select File > Add Packages. In the top-right corner of the modal window that opens enter the SDK repository URL which is `https://github.com/muxinc/mux-player-swift`.
+
+By default Xcode will fetch the latest version of the SDK available on the `main` branch. If you need a specific package version or to restrict the range of package versions used in your application, select a different Dependency Rule. [Here's an overview of the different SPM Dependency Rules and their semantics](https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app#Decide-on-package-requirements).
+
+Click on Add Package to begin resolving and downloading the SDK package. When completed, select your application target as the destination for the `MuxPlayerSwift` package product. To use the SDK in your application, import it's module.
+
+```swift
+import MuxPlayerSwift
+```
+
+<LinkedHeader step={steps[1]} />
+
+Use `MuxPlayerSwift` to setup an `AVPlayerViewController` or `AVPlayerLayer` that can download and stream a Mux asset with only a playback ID. The SDK will also enable Mux Data monitoring to help you measure the performance and quality of your application's video experiences.
+
+```swift
+/// After you're done testing, you can check this video out to learn more about video and players (as well as some philosophy)
+let playbackID = "qxb01i6T202018GFS02vp9RIe01icTcDCjVzQpmaB00CUisJ4"
+
+/// Prepare an AVPlayerViewController to stream and monitor a Mux asset, configured with the playback ID.
+let playerViewController = AVPlayerViewController(playbackID: playbackID)
+
+/// Prepare an AVPlayerLayer to stream and monitor a Mux asset, configured with the playback ID.
+let playerLayer = AVPlayerLayer(playbackID: playbackID)
+```
+
+Your application can customize how Mux Video delivers video to the player using playback URL modifiers. A playback URL modifier is appended as a query parameter to a public playback URL. The `MuxPlayerSwift` exposes a type-safe Swift API that constructs these URLs.
+
+```swift
+/// After you're done testing, you can check out this video out to learn more about video and players (as well as some philosophy)
+let playbackID = "qxb01i6T202018GFS02vp9RIe01icTcDCjVzQpmaB00CUisJ4"
+
+/// Create playback options to limit resolution up to 720p.
+let playbackOptions = PlaybackOptions(maximumResolutionTier: .upTo720p)
+
+/// Prepare an AVPlayerViewController to stream and monitor a Mux asset with playback options.
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+The example above delegated constructing the playback URL and appending playback modifiers to the SDK.
+
+When using the [`AVPlayerViewController`](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/avkit/avplayerviewcontroller/#initializers) or [`AVPlayerLayer`](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/avfoundation/avplayerlayer#initializers) convenience initializers provided by the `MuxPlayerSwift` there are no required steps to enable Mux Data monitoring for video streamed from a Mux playback URL.
+
+[See the below section](/docs/guides/mux-player-ios#monitor-media-playback) for more details and how to customize Mux Data monitoring.
+
+### AVPlayerLayer-backed views
+
+If you're using `UIView` that is backed by an `AVPlayerLayer` to display video, `MuxPlayerSwift` [exposes APIs](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/avfoundation/avplayerlayer#instance-methods) to setup an existing `AVPlayerLayer` for playback.
+
+
+```swift
+/// Prepare an already initialized AVPlayerLayer to stream and monitor a Mux asset
+func preparePlayerLayer(playbackID: String, in playerView: UIView) {
+  // Check to make sure the player view backing layer is of the correct type and get a reference if it is.
+  guard let playerLayer = playerView.layer as? AVPlayerLayer else {
+    return
+  }
+
+  // Prepares the player layer to stream media and monitor playback with Mux Data.
+  playerLayer.prepare(playbackID: playbackID)
+}
+```
+
+Your application can also customize playback or monitoring with Mux Data by using the same parameters as shown for the `AVPlayerLayer` initializers above.
+
+<LinkedHeader step={steps[2]} />
+
+By default Mux Data metrics will be populated in the same environment as your playback ID.  [Learn more about Mux Data metric definitions here](/docs/guides/understand-metric-definitions).
+
+Read on for additional (and optional) setup steps to modify or extend the information Mux Data tracks.
+
+Use [`MonitoringOptions`](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/monitoringoptions) to set custom monitoring-related parameters.
+
+If you're already using the Mux Data SDK for AVPlayer [this initializer](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/monitoringoptions/init(customerdata:playername:)) allows you to any of your existing logic for constructing `MUXSDKCustomerData`.
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+let customEnvironmentKey = "ENV_KEY"
+
+// Configure custom Mux Data player metadata.
+let playerData = MUXSDKCustomerPlayerData()
+playerData.environmentKey = customEnvironmentKey
+
+// Configure custom Mux Data video metadata.
+let videoData = MUXSDKCustomerVideoData()
+videoData.videoTitle = "Video Behind the Scenes"
+videoData.videoSeries = "Video101"
+
+// Combine metadata into customer data for monitoring.
+let customerData = MUXSDKCustomerData()
+customerData.customerPlayerData = playerData
+customerData.customerVideoData = videoData
+
+// Build monitoring options and create the player.
+let monitoringOptions = MonitoringOptions(customerData: customerData, playerName: "MyPlayer1")
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  monitoringOptions: monitoringOptions
+)
+```
+
+<LinkedHeader step={steps[3]} />
+
+Mux Video offers several levels of playback access control. [See here for more](/docs/guides/secure-video-playback).
+
+### Signed Playback URLs
+
+`MuxPlayerSwift` supports playback of assets enabled for access with signed playback URLs. Playing back assets with a signed playback policy requires the player to include a valid and unexpired JSON Web Token (JWT) when requesting media from Mux.
+
+Your application should generate and sign the JWT in a trusted environment that you control like a server-side application. As a security measure any playback modifiers must be passed through the JWT as additional claims.
+
+Once your application is in possession of the JWT, it can begin streaming.
+
+To start playback, use the JWT to initialize `PlaybackOptions`. Then, initialize `AVPlayerViewController` or `AVPlayerLayer` with your playback ID, as in prior examples.
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+let playbackToken = "YOUR_PLAYBACK_TOKEN"
+
+/// Prepare an AVPlayerViewController to stream and monitor a Mux asset
+/// with a playback ID that has a signed playback policy.
+let playbackOptions = PlaybackOptions(playbackToken: playbackToken)
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+let playbackToken = "YOUR_PLAYBACK_TOKEN"
+
+/// Prepare an AVPlayerLayer to stream and monitor a Mux asset
+/// with a playback ID that has a signed playback policy.
+let playbackOptions = PlaybackOptions(playbackToken: playbackToken)
+let playerLayer = AVPlayerLayer(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+```swift
+/// Prepare an already initialized AVPlayerLayer to stream and monitor a Mux asset
+/// with a playback ID that has a signed playback policy.
+func preparePlayerLayer(playbackID: String, playbackToken: String, in playerView: UIView) {
+  let playbackOptions = PlaybackOptions(playbackToken: playbackToken)
+
+  // Check to make sure the player view backing layer is of the correct type and get a reference if it is.
+  guard let playerLayer = playerView.layer as? AVPlayerLayer else {
+    return
+  }
+
+  // Prepares the player layer to stream media and monitor playback with Mux Data.
+  playerLayer.prepare(playbackID: playbackID, playbackOptions: playbackOptions)
+}
+```
+
+<Callout type="info">
+
+If your JWT includes a playback restriction, Mux will not be able perform domain validation when the playback URL is loaded by `AVPlayer` because no referrer information is supplied. 
+
+To allow `AVPlayer` playback of referrer restricted assets set the `allow_no_referrer` boolean parameter to `true` when creating a playback restriction. Conversely, a playback restriction with `allow_no_referrer` to `false` will disallow `AVPlayer` playback. [See here for more](/docs/guides/secure-video-playback#using-referer-http-header-for-validation).
+
+</Callout>
+
+### Digital Rights Management
+
+DRM (Digital Rights Management) provides an extra layer of content security for video content streamed from Mux.
+For more details see the [Protect Your Videos with DRM guide](/docs/guides/protect-videos-with-drm).
+
+<Callout type="warning">
+
+Mux uses the industry standard FairPlay protocol for delivering DRM'd video content to native iOS and iPadOS applications. To play back DRM'd content on these platforms, you'll need to obtain a FairPlay deployment package (also called a “Fairplay certificate”), [see more details from Apple here](/docs/guides/protect-videos-with-drm#prerequisites-for-fairplay-drm-on-apple-devices). _Without this, DRM’d content will not be playable in your application on these platforms._
+
+</Callout>
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+let playbackToken = "YOUR_PLAYBACK_TOKEN"
+let drmToken = "YOUR_DRM_TOKEN"
+
+/// Configure playback options for a playback ID configured for DRM.
+let playbackOptions = PlaybackOptions(
+  playbackToken: playbackToken,
+  drmToken: drmToken
+)
+
+/// Prepare an AVPlayerViewController to stream and monitor a Mux asset.
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+<LinkedHeader step={steps[4]} />
+
+## More tools to control playback behavior
+
+### Restrict Resolution Range
+
+Mux Video gives you extra control over the available resolutions of your video.
+
+`MuxPlayerSwift` exposes convenience APIs to adjust the [maximum](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/maxresolutiontier) and [minimum](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/minresolutiontier) resolutions if they are available.
+
+Setting a maximum resolution helps reduce delivery costs while setting a minimum resolution helps ensure visual quality of your video. Maximum and minimum resolutions can be set independently or composed together.
+
+<Callout type="info">
+
+If you're using signed URLs, you'll need to embed `min_resolution` and `max_resolution` into the JWT claims. [Full documentation available here](/docs/guides/modify-playback-behavior#jwt-claim-with-signed-playback-url).
+
+</Callout>
+
+This example restricts the resolution range `AVPlayer` requests to be between 720p and 1080p.
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+
+// Configure playback options to request renditions between 720p and 1080p.
+let playbackOptions = PlaybackOptions(
+  maximumResolutionTier: .upTo1080p,
+  minimumResolutionTier: .atLeast720p
+)
+
+// Prepare an AVPlayerViewController to stream a Mux asset with this range.
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+This example restricts the resolution `AVPlayer` requests to a single fixed resolution of 720p.
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+
+// Configure playback options to request only the 720p rendition.
+let playbackOptions = PlaybackOptions(singleRenditionResolutionTier: .only720p)
+
+// Prepare an AVPlayerViewController to stream a Mux asset at a fixed 720p resolution.
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+### Adjust Resolution Selection
+
+When `AVPlayer` requests delivery of HLS content, it first downloads a series of text files, commonly called manifests or playlists, to describe the available qualities of a video and the location of all the segments that comprise the video.
+
+The order of renditions in the initial manifest or playlist can influence the resolution level a player selects. When using the Mux Player Swift SDK your application can manipulate that order in the [`PlaybackOptions`](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/playbackoptions) provided to `AVPlayerViewController` or `AVPlayerLayer`.
+
+If your Mux asset is publicly playable, specify a [`RenditionOrder`](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/renditionorder).
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+
+// Configure playback options to prioritize higher renditions first.
+let playbackOptions = PlaybackOptions(renditionOrder: .descending)
+
+// Prepare an AVPlayerViewController to stream a Mux asset with descending rendition order.
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+The available values for rendition order are [listed here](https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/renditionorder#enumeration-cases).
+
+<Callout type="info">
+
+If using signed playback URLs in your application, you'll need "rendition_order" : "desc" for descending rendition order into your JWT claims. [Full documentation available here](/docs/guides/modify-playback-behavior#jwt-claim-with-signed-playback-url).
+
+</Callout>
+ 
+See [the Mux blog](https://www.mux.com/blog/more-tools-to-control-playback-behavior-min-resolution-and-rendition-order) and [this guide](/docs/guides/control-playback-resolution#using-playback-modifiers-to-manipulate-playback-resolution) for more on these options.
+
+### Instant Clips
+
+Instant clips are an alternative to our [long-standing asset-based clipping feature](/docs/guides/create-clips-from-your-videos). Requesting instant clips using relative time is now [available for use with all video on-demand (VOD) assets](https://www.mux.com/blog/instant-clipping-update).
+
+Instant clipping allows you to request a stream whose start time is at some later point in the video, relative to the start time of the asset. Likewise you're able to request a stream that ends sooner than when the underlying asset completes. Instant clips do not incur the wait time or expense of a creating a new asset.
+
+Unlike asset-based clipping, instant clipping is done by trimming your VOD assets HLS manifest. This means that instant clipping operates at the segment level of accuracy. You should expect that the content that you clip out may be several seconds longer than you’ve requested. We always make sure to include the timestamps that you request, but your content may start a few seconds earlier, and end a few seconds later.
+
+Assets that originate from a livestream can also be converted into instant clips using program date time epochs. Support for these clips will be available in a future Mux Player Swift release.
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+
+// Configure instant clipping for a highlight clip of your publicly viewable asset.
+// The clip starts about 10 seconds after your asset starts and finishes approximately 10 more seconds after that.
+// A few extra seconds of video may be included in the clip.
+let clipping = InstantClipping(assetStartTimeInSeconds: 10, assetEndTimeInSeconds: 20)
+let playbackOptions = PlaybackOptions(clipping: clipping)
+
+// Create an AVPlayerViewController to stream the instant clip.
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+<Callout type="info">
+
+If using signed playback URLs in your application, you'll need to include `asset_start_time` and `asset_end_time` keys in your JWT claims to enable instant clipping. [Full documentation available here](/docs/guides/modify-playback-behavior#jwt-claim-with-signed-playback-url).
+
+</Callout>
+
+<LinkedHeader step={steps[5]} />
+
+`AVPlayer` supports playing back HTTP live streams without pre-loading. When playing the same video more than once in this case, `AVPlayer` does not provide a means for making sure cached video files are used for subsequent playback. This may result in higher network throughput and additional video delivery cost when the same video is played more than once.
+
+One alternative is to [enable static renditions for your Mux asset](/docs/guides/enable-static-mp4-renditions) that your application can download and persist using `URLSession` and `FileManager` APIs.
+
+Another is to first preload streams. As with static renditions, it requires your application to manage downloads and handling storage. (See the [Apple offline playback and storage documentation](https://developer.apple.com/documentation/avfoundation/offline_playback_and_storage?language=objc) for more details on pre-loading).
+
+Mux Player Swift offers a caching mechanism for streams that only provide a single rendition to the player. This cache is primarily tested against and provides the most cost-savings benefit when constraining playback to a single rendition. Your application is required to select a resolution tier to which playback will be constrained when using the smart cache.
+
+This avoids manual intervention required by the previous two options.
+
+Like a browser’s cache, cached segments can be used by all players in your application, as long as they’re configured to use the smart cache.  If your application uses multiple player instances, you can enable smart cache for them by using the convenience initializers provided by the SDK. 
+
+The example below enables the smart cache with playback at single fixed resolution.
+
+```swift
+let playbackID = "YOUR_PLAYBACK_ID"
+
+// Select a single rendition tier for smart caching (for example, only 720p).
+// Available values: https://devdocs.mux.dev/mux-player-swift/documentation/muxplayerswift/singlerenditionresolutiontier
+let singleRenditionResolutionTier: SingleRenditionResolutionTier = .only720p
+
+// Enable smart cache and constrain playback to the selected single rendition tier.
+let playbackOptions = PlaybackOptions(
+  enableSmartCache: true,
+  singleRenditionResolutionTier: singleRenditionResolutionTier
+)
+
+// Prepare an AVPlayerViewController to stream a Mux asset with smart caching enabled.
+let playerViewController = AVPlayerViewController(
+  playbackID: playbackID,
+  playbackOptions: playbackOptions
+)
+```
+
+<Callout type="info">
+
+The smart cache will be automatically purged after your application is terminated. It may be purged by the operating system at any time when your application is suspended in the background.
+
+</Callout>
+
+Mux supports HLS video delivery with Transport Stream segments or Common Media Application Format (CMAF) chunks. Both are supported by the smart cache. [See this explainer for a general introduction to video delivery](https://howvideo.works/#delivery).

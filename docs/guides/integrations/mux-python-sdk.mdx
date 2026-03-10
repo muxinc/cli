@@ -1,0 +1,54 @@
+---
+title: Add high-performance video to your Python application
+product: video
+description: >-
+  Use our API and components to handle embedding, storing, and streaming video
+  in your Python application
+---
+
+## Installation
+
+Install this module using either `pip` or by installing from source.
+
+
+```curl
+# Via pip
+pip install git+https://github.com/muxinc/mux-python.git
+
+# Via source
+git checkout https://github.com/muxinc/mux-python.git
+cd mux-python
+python setup.py install --user
+```
+
+## Quickstart
+
+To start, you'll need a Mux access token. Once you've got that, you're off to the races!
+
+```python
+import os
+import mux_python
+from mux_python.rest import ApiException
+
+# Authentication Setup
+configuration = mux_python.Configuration()
+configuration.username = os.environ['MUX_TOKEN_ID']
+configuration.password = os.environ['MUX_TOKEN_SECRET']
+
+# API Client Initialization
+assets_api = mux_python.AssetsApi(mux_python.ApiClient(configuration))
+
+# List Assets
+print("Listing Assets: \n")
+try:
+    list_assets_response = assets_api.list_assets()
+    for asset in list_assets_response.data:
+        print('Asset ID: ' + asset.id)
+        print('Status: ' + asset.status)
+        print('Duration: ' + str(asset.duration) + "\n")
+except ApiException as e:
+    print("Exception when calling AssetsApi->list_assets: %s\n" % e)
+```
+
+## Full documentation
+Check out the [Mux Python SDK docs](https://github.com/muxinc/mux-python) for more information.

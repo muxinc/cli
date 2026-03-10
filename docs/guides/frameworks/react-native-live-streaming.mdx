@@ -1,0 +1,737 @@
+---
+title: Live Streaming
+product: video
+description: Play and broadcast live streams in React Native with Mux
+---
+
+# Live Streaming
+
+This guide covers how to integrate Mux live streaming into your React Native app. You'll learn how to play live streams (simple!) and explore options for broadcasting live video from mobile devices.
+
+<Callout type="info">
+**Good news**: Playing live streams in React Native is exactly the same as playing on-demand videos. If you can play a video, you can play a live stream!
+</Callout>
+
+For complete live streaming concepts and backend setup, see the [Live Streaming Guide](/docs/guides/live-streaming).
+
+## Overview
+
+Mux Live Stream allows you to broadcast live video to viewers in real-time. Common use cases:
+- Live events and conferences
+- Live Q&A sessions
+- Live shopping streams
+- Gaming streams
+- Real-time video interactions
+
+**Architecture**:
+```
+Broadcaster (RTMP) → Mux Live Stream → HLS Playback → React Native App
+```
+
+## Creating Live Streams
+
+Live streams are created on your backend using the Mux API. React Native apps consume the playback URL.
+
+```javascript
+// Backend code (Node.js)
+import Mux from '@mux/mux-node';
+
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID,
+  tokenSecret: process.env.MUX_TOKEN_SECRET,
+});
+
+// Create live stream
+app.post('/api/live-stream/create', async (req, res) => {
+  const { userId, title } = req.body;
+
+  const liveStream = await mux.video.liveStreams.create({
+    playback_policy: ['public'], // or ['signed'] for private
+    new_asset_settings: {
+      playback_policy: ['public'], // Record stream as VOD
+    },
+    reconnect_window: 60, // Allow reconnection within 60 seconds
+    reduced_latency: false, // Set true for low-latency streaming
+  });
+
+  // Save to database
+  await db.liveStreams.create({
+    id: liveStream.id,
+    userId,
+    title,
+    streamKey: liveStream.stream_key,
+    playbackId: liveStream.playback_ids[0].id,
+    status: 'idle',
+  });
+
+  res.json({
+    streamId: liveStream.id,
+    streamKey: liveStream.stream_key, // Keep secret! Only share with broadcaster
+    playbackId: liveStream.playback_ids[0].id,
+    rtmpUrl: `rtmps://global-live.mux.com:443/app/${liveStream.stream_key}`,
+  });
+});
+```
+
+<Callout type="warning">
+**Keep stream keys secret!** Only share them with the broadcaster. Anyone with the stream key can broadcast to your live stream.
+</Callout>
+
+**API reference**: <ApiRefLink product="video" slug="operation/create-live-stream">Create Live Stream</ApiRefLink>
+
+---
+
+## Playing Live Streams
+
+Playing a live stream in React Native is identical to playing a VOD video:
+
+```tsx
+import Video from 'react-native-video';
+
+function LiveStreamPlayer({ playbackId }: Props) {
+  const playbackUrl = `https://stream.mux.com/${playbackId}.m3u8`;
+
+  return (
+    <Video
+      source={{ uri: playbackUrl }}
+      style={styles.video}
+      controls={true}
+      resizeMode="contain"
+      // Tell react-native-video this is a live stream
+      streamType="live"
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+});
+```
+
+That's it! HLS handles all the complexity of live streaming automatically.
+
+---
+
+## Live Stream States
+
+Live streams have different states that affect playback:
+
+```tsx
+import { useState, useEffect } from 'react';
+
+type LiveStreamStatus = 'idle' | 'active' | 'disconnected';
+
+function useLiveStreamStatus(streamId: string) {
+  const [status, setStatus] = useState<LiveStreamStatus>('idle');
+
+  useEffect(() => {
+    // Poll backend for stream status
+    const checkStatus = async () => {
+      const response = await fetch(`${API_URL}/live-stream/${streamId}/status`);
+      const { status } = await response.json();
+      setStatus(status);
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [streamId]);
+
+  return status;
+}
+
+function LiveStreamPlayer({ streamId, playbackId }: Props) {
+  const status = useLiveStreamStatus(streamId);
+
+  if (status === 'idle') {
+    return (
+      <View style={styles.waitingContainer}>
+        <Text style={styles.waitingText}>Stream will start soon...</Text>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (status === 'disconnected') {
+    return (
+      <View style={styles.disconnectedContainer}>
+        <Text style={styles.disconnectedText}>
+          Stream temporarily disconnected. Reconnecting...
+        </Text>
+      </View>
+    );
+  }
+
+  // Status is 'active'
+  return (
+    <View style={styles.container}>
+      <Video
+        source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+        style={styles.video}
+        streamType="live"
+      />
+      <View style={styles.liveBadge}>
+        <View style={styles.liveDot} />
+        <Text style={styles.liveText}>LIVE</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  liveBadge: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'white',
+    marginRight: 6,
+  },
+  liveText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+});
+```
+
+**Backend endpoint** to check live stream status:
+
+```javascript
+// Backend code
+app.get('/api/live-stream/:streamId/status', async (req, res) => {
+  const { streamId } = req.params;
+
+  const liveStream = await mux.video.liveStreams.retrieve(streamId);
+
+  res.json({
+    status: liveStream.status, // 'idle', 'active', 'disconnected'
+    isActive: liveStream.status === 'active',
+  });
+});
+```
+
+---
+
+## Live Stream with Viewer Count
+
+Show real-time viewer counts:
+
+```tsx
+import { useLiveViewers } from '../hooks/useVideoAnalytics';
+
+function LiveStreamPlayer({ streamId, playbackId }: Props) {
+  const liveViewers = useLiveViewers(playbackId);
+
+  return (
+    <View style={styles.container}>
+      <Video
+        source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+        style={styles.video}
+        streamType="live"
+      />
+
+      <View style={styles.topOverlay}>
+        <View style={styles.liveBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>LIVE</Text>
+        </View>
+
+        <View style={styles.viewerCount}>
+          <Text style={styles.viewerIcon}>👁</Text>
+          <Text style={styles.viewerText}>
+            {liveViewers.toLocaleString()} watching
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+```
+
+Learn more: [Real-time Viewer Counts](/docs/guides/get-real-time-viewer-count)
+
+---
+
+## Low-Latency Streaming
+
+For interactive use cases (live Q&A, auctions), enable low-latency mode:
+
+```javascript
+// Backend code - Create low-latency stream
+const liveStream = await mux.video.liveStreams.create({
+  playback_policy: ['public'],
+  reduced_latency: true, // Enable low-latency mode (3-5s vs 10-15s)
+});
+```
+
+```tsx
+// React Native - Same playback code, lower latency automatically
+<Video
+  source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+  streamType="live"
+/>
+```
+
+<Callout type="info">
+Low-latency streaming reduces latency from ~10-15 seconds to ~3-5 seconds. However, it may increase buffering on poor networks. Choose based on your use case.
+</Callout>
+
+---
+
+## DVR Mode (Seeking in Live Streams)
+
+Allow viewers to scrub backwards in live streams:
+
+```tsx
+function LiveStreamPlayer({ playbackId }: Props) {
+  const videoRef = useRef<Video>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [seekableDuration, setSeekableDuration] = useState(0);
+
+  return (
+    <View>
+      <Video
+        ref={videoRef}
+        source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+        streamType="live"
+        onProgress={(data) => {
+          setCurrentTime(data.currentTime);
+          setSeekableDuration(data.seekableDuration);
+        }}
+      />
+
+      {/* DVR controls */}
+      <View style={styles.controls}>
+        <Slider
+          value={currentTime}
+          maximumValue={seekableDuration}
+          onSlidingComplete={(value) => {
+            videoRef.current?.seek(value);
+          }}
+        />
+
+        <TouchableOpacity
+          onPress={() => {
+            // Jump to live edge
+            videoRef.current?.seek(seekableDuration);
+          }}
+        >
+          <Text style={styles.liveButton}>Go to LIVE</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+```
+
+---
+
+## Broadcasting from React Native
+
+Broadcasting live video from React Native is **more complex** than playback. Options:
+
+### Option 1: Use External RTMP Apps (Recommended)
+
+The simplest approach is to direct users to dedicated RTMP streaming apps:
+
+```tsx
+import { Linking, Alert } from 'react-native';
+
+function StartBroadcastButton({ rtmpUrl, streamKey }: Props) {
+  const startBroadcast = () => {
+    Alert.alert(
+      'Start Broadcasting',
+      'To broadcast, you need an RTMP streaming app.',
+      [
+        {
+          text: 'Download Larix',
+          onPress: () => {
+            // Larix Broadcaster (iOS/Android)
+            Linking.openURL('https://softvelum.com/larix/');
+          },
+        },
+        {
+          text: 'Copy Stream Info',
+          onPress: () => {
+            // Copy RTMP details to clipboard
+            Clipboard.setString(`RTMP URL: ${rtmpUrl}\nStream Key: ${streamKey}`);
+          },
+        },
+        { text: 'Cancel' },
+      ]
+    );
+  };
+
+  return (
+    <Button title="Start Broadcasting" onPress={startBroadcast} />
+  );
+}
+```
+
+**Recommended RTMP apps**:
+- **Larix Broadcaster** (iOS/Android) - Free, professional features
+- **Streamlabs** (iOS/Android) - Gaming-focused, with overlays
+- **OBS Mobile** (iOS) - Open source streaming
+
+### Option 2: WebRTC Broadcasting (Advanced)
+
+For in-app broadcasting without external apps, use WebRTC:
+
+```tsx
+import { RTCView, mediaDevices } from 'react-native-webrtc';
+import { MuxWebRTCClient } from '@mux/webrtc-client'; // Hypothetical package
+
+function InAppBroadcaster({ streamId }: Props) {
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+
+  const startBroadcast = async () => {
+    // Get camera and mic access
+    const stream = await mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'user',
+        width: 1280,
+        height: 720,
+      },
+      audio: true,
+    });
+
+    setLocalStream(stream);
+
+    // Connect to Mux via WebRTC (requires custom implementation)
+    // Note: Mux doesn't have official WebRTC ingest yet
+    // This would require a media server bridge (Janus, Jitsi, etc.)
+  };
+
+  return (
+    <View style={styles.container}>
+      {localStream && (
+        <RTCView
+          streamURL={localStream.toURL()}
+          style={styles.preview}
+        />
+      )}
+      <Button title="Start Broadcast" onPress={startBroadcast} />
+    </View>
+  );
+}
+```
+
+<Callout type="warning">
+**WebRTC broadcasting to Mux requires a media server bridge.** Mux accepts RTMP/RTMPS input. To broadcast via WebRTC, you need a media server (like Janus or Jitsi) that converts WebRTC to RTMP. This is an advanced setup.
+</Callout>
+
+### Option 3: Native Modules (Most Advanced)
+
+Bridge native RTMP broadcasting libraries:
+
+**iOS**: Use libraries like `HaishinKit` or `LFLiveKit`
+**Android**: Use `rtmp-rtsp-stream-client-java`
+
+This requires building React Native native modules, which is beyond the scope of this guide. See the [Native SDKs guide](/docs/guides/react-native/native-sdks) for bridging patterns.
+
+---
+
+## Live to VOD (Recording)
+
+Mux automatically records live streams as VOD assets:
+
+```javascript
+// Backend - Create stream with recording enabled
+const liveStream = await mux.video.liveStreams.create({
+  playback_policy: ['public'],
+  new_asset_settings: {
+    playback_policy: ['public'], // VOD will be public
+  },
+});
+
+// After stream ends, check for created asset
+app.post('/webhooks/mux', async (req, res) => {
+  const event = req.body;
+
+  if (event.type === 'video.live_stream.recording') {
+    const assetId = event.data.asset_id;
+
+    // Save the VOD asset
+    await db.videos.create({
+      liveStreamId: event.data.id,
+      muxAssetId: assetId,
+      status: 'ready',
+      type: 'vod',
+    });
+  }
+
+  res.sendStatus(200);
+});
+```
+
+```tsx
+// React Native - Play recorded stream
+function RecordedStream({ assetId }: Props) {
+  const [playbackId, setPlaybackId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch playback ID from backend
+    fetch(`${API_URL}/asset/${assetId}`)
+      .then(r => r.json())
+      .then(data => setPlaybackId(data.playbackId));
+  }, [assetId]);
+
+  if (!playbackId) {
+    return <LoadingView />;
+  }
+
+  return (
+    <Video
+      source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+      controls
+    />
+  );
+}
+```
+
+---
+
+## Complete Live Stream Example
+
+Here's a full example showing live stream playback with status handling:
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import Video from 'react-native-video';
+
+interface LiveStreamProps {
+  streamId: string;
+  playbackId: string;
+}
+
+type StreamStatus = 'idle' | 'active' | 'disconnected';
+
+export function LiveStreamPlayer({ streamId, playbackId }: LiveStreamProps) {
+  const [status, setStatus] = useState<StreamStatus>('idle');
+  const [viewers, setViewers] = useState(0);
+
+  // Poll for stream status
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`${API_URL}/live-stream/${streamId}/status`);
+        const data = await response.json();
+        setStatus(data.status);
+      } catch (error) {
+        console.error('Failed to fetch stream status:', error);
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 5000);
+
+    return () => clearInterval(interval);
+  }, [streamId]);
+
+  // Poll for live viewers
+  useEffect(() => {
+    if (status !== 'active') return;
+
+    const fetchViewers = async () => {
+      try {
+        const response = await fetch(`${API_URL}/live-stream/${streamId}/viewers`);
+        const data = await response.json();
+        setViewers(data.viewers);
+      } catch (error) {
+        console.error('Failed to fetch viewers:', error);
+      }
+    };
+
+    fetchViewers();
+    const interval = setInterval(fetchViewers, 10000);
+
+    return () => clearInterval(interval);
+  }, [streamId, status]);
+
+  // Render waiting state
+  if (status === 'idle') {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.statusText}>Stream will start soon...</Text>
+      </View>
+    );
+  }
+
+  // Render disconnected state
+  if (status === 'disconnected') {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.statusText}>Stream temporarily disconnected</Text>
+        <Text style={styles.subText}>Reconnecting...</Text>
+      </View>
+    );
+  }
+
+  // Render active stream
+  return (
+    <View style={styles.container}>
+      <Video
+        source={{ uri: `https://stream.mux.com/${playbackId}.m3u8` }}
+        style={styles.video}
+        streamType="live"
+        resizeMode="contain"
+      />
+
+      {/* Live badge */}
+      <View style={styles.liveBadge}>
+        <View style={styles.liveDot} />
+        <Text style={styles.liveText}>LIVE</Text>
+      </View>
+
+      {/* Viewer count */}
+      {viewers > 0 && (
+        <View style={styles.viewerCount}>
+          <Text style={styles.viewerIcon}>👁</Text>
+          <Text style={styles.viewerText}>
+            {viewers.toLocaleString()}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#000',
+  },
+  centerContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  subText: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  liveBadge: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 0, 0, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    marginRight: 6,
+  },
+  liveText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  viewerCount: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  viewerIcon: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  viewerText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+```
+
+---
+
+## Best Practices
+
+### For Playback
+
+✅ **Handle all stream states** - idle, active, disconnected
+✅ **Show "LIVE" badge** - Make it clear this is live content
+✅ **Display viewer count** - Creates social proof
+✅ **Test on real devices** - Live streams require good network
+✅ **Add buffering indicators** - Live streams may buffer more than VOD
+
+### For Broadcasting
+
+✅ **Recommend dedicated apps** - Better UX than in-app solutions
+✅ **Keep stream keys secure** - Never expose in client code
+✅ **Test network requirements** - Live upload needs stable upload bandwidth
+✅ **Provide clear instructions** - Broadcasting is complex for users
+✅ **Monitor stream health** - Alert broadcaster if connection is poor
+
+---
+
+## Next Steps
+
+<GuideCards>
+  <GuideCard
+    title="Live Streaming Guide"
+    description="Complete guide to Mux Live Stream features and concepts"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/live-streaming"},
+    ]}
+  />
+  <GuideCard
+    title="Real-time Viewer Counts"
+    description="Display live viewer counts for your streams"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/get-real-time-viewer-count"},
+    ]}
+  />
+  <GuideCard
+    title="Native SDKs"
+    description="Bridge native broadcasting libraries for advanced use cases"
+    links={[
+      {title: "Read the guide", href: "/docs/guides/react-native/native-sdks"},
+    ]}
+  />
+</GuideCards>
