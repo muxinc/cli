@@ -1,5 +1,6 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { getDataDir } from './xdg.ts';
 
 export interface EmbeddedDocsPaths {
   rootPath: string;
@@ -40,6 +41,7 @@ function getCandidateRoots(execPath: string, cwd: string): string[] {
   const execDir = dirname(execPath);
   const realExecDir = dirname(tryRealpath(execPath));
   const anchors = uniquePaths([
+    getDataDir(),
     cwd,
     execDir,
     realExecDir,

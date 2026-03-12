@@ -7,7 +7,10 @@ import { resolveEmbeddedDocsPaths } from './embedded-docs.ts';
 async function writeFixture(root: string, withAgents = true): Promise<void> {
   await mkdir(join(root, 'skill'), { recursive: true });
   await mkdir(join(root, 'docs', 'guides'), { recursive: true });
-  await Bun.write(join(root, 'skill', 'SKILL.md'), '---\nname: mux-cli\ndescription: test\n---\n');
+  await Bun.write(
+    join(root, 'skill', 'SKILL.md'),
+    '---\nname: mux-cli\ndescription: test\n---\n',
+  );
   await Bun.write(join(root, 'docs', 'guides', 'sample.mdx'), '# test\n');
 
   if (withAgents) {
@@ -38,7 +41,10 @@ describe('resolveEmbeddedDocsPaths', () => {
   it('resolves a repo-style layout from cwd', async () => {
     await writeFixture(tempDir);
 
-    const result = resolveEmbeddedDocsPaths(join(tempDir, 'bin', 'mux'), tempDir);
+    const result = resolveEmbeddedDocsPaths(
+      join(tempDir, 'bin', 'mux'),
+      tempDir,
+    );
 
     expect(result).not.toBeNull();
     expect(result?.rootPath).toBe(tempDir);
@@ -86,7 +92,10 @@ describe('resolveEmbeddedDocsPaths', () => {
       'mux',
     );
 
-    const result = resolveEmbeddedDocsPaths(execPath, join(tempDir, 'workspace'));
+    const result = resolveEmbeddedDocsPaths(
+      execPath,
+      join(tempDir, 'workspace'),
+    );
 
     expect(result?.rootPath).toBe(npmRoot);
   });
@@ -98,5 +107,31 @@ describe('resolveEmbeddedDocsPaths', () => {
     );
 
     expect(result).toBeNull();
+  });
+
+  it('prioritizes XDG data dir over other locations', async () => {
+    const xdgDataDir = join(tempDir, 'xdg-data', 'mux');
+    const cwdDir = join(tempDir, 'workspace');
+    await writeFixture(xdgDataDir);
+    await writeFixture(cwdDir);
+
+    const originalXdgDataHome = process.env.XDG_DATA_HOME;
+    process.env.XDG_DATA_HOME = join(tempDir, 'xdg-data');
+
+    try {
+      const result = resolveEmbeddedDocsPaths(
+        join(tempDir, 'bin', 'mux'),
+        cwdDir,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.rootPath).toBe(xdgDataDir);
+    } finally {
+      if (originalXdgDataHome === undefined) {
+        delete process.env.XDG_DATA_HOME;
+      } else {
+        process.env.XDG_DATA_HOME = originalXdgDataHome;
+      }
+    }
   });
 });

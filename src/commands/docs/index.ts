@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import { pathCommand } from './path.ts';
+import { updateCommand } from './update.ts';
 
 export const docsCommand = new Command()
   .description(
@@ -12,4 +13,5 @@ export const docsCommand = new Command()
   .action(function () {
     this.showHelp();
   })
-  .command('path', pathCommand);
+  .command('path', pathCommand)
+  .command('update', updateCommand);

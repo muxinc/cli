@@ -45,6 +45,11 @@ export function getDataDir(): string {
   return join(baseDir, 'mux');
 }
 
+
+export function getDocsUpdateCachePath(): string {
+  return join(getCacheDir(), 'docs-update-check.json');
+}
+
 /**
  * Get the full path to the stored webhook events file
  */

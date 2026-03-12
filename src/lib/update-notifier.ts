@@ -2,7 +2,14 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { colors } from '@cliffy/ansi/colors';
-import { getUpdateCachePath } from './xdg.ts';
+import {
+  type DocsVersionInfo,
+  fetchRemoteDocsVersion,
+  isDocsUpdateAvailable,
+  readLocalDocsVersion,
+} from './docs-update.ts';
+import { resolveEmbeddedDocsPaths } from './embedded-docs.ts';
+import { getDocsUpdateCachePath, getUpdateCachePath } from './xdg.ts';
 
 export interface UpdateCache {
   latestVersion: string;
@@ -178,4 +185,72 @@ export async function checkForUpdate(
 
   const command = getUpgradeCommand(method);
   return formatUpdateNotice(currentVersion, latestVersion, command);
+}
+
+export interface DocsUpdateCache {
+  remoteVersion: DocsVersionInfo;
+  lastChecked: number;
+}
+
+
+export async function readDocsUpdateCache(): Promise<DocsUpdateCache | null> {
+  const cachePath = getDocsUpdateCachePath();
+  if (!existsSync(cachePath)) return null;
+
+  try {
+    const content = await readFile(cachePath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+export async function writeDocsUpdateCache(
+  cache: DocsUpdateCache,
+): Promise<void> {
+  const cachePath = getDocsUpdateCachePath();
+  const cacheDir = dirname(cachePath);
+  await mkdir(cacheDir, { recursive: true });
+  await writeFile(cachePath, JSON.stringify(cache, null, 2));
+}
+
+export interface CheckForDocsUpdateOptions {
+  isTTY?: boolean;
+}
+
+export async function checkForDocsUpdate(
+  options?: CheckForDocsUpdateOptions,
+): Promise<string | null> {
+  if (process.env.CI) return null;
+  if (process.env.MUX_NO_UPDATE_CHECK) return null;
+
+  const isTTY = options?.isTTY ?? process.stderr.isTTY;
+  if (!isTTY) return null;
+
+  // Resolve local docs
+  const paths = resolveEmbeddedDocsPaths();
+  const localVersion = paths?.rootPath
+    ? await readLocalDocsVersion(paths.rootPath)
+    : null;
+
+
+  const cache = await readDocsUpdateCache();
+  let remoteVersion: DocsVersionInfo | null = null;
+
+  if (cache && Date.now() - cache.lastChecked < CACHE_TTL_MS) {
+    remoteVersion = cache.remoteVersion;
+  } else {
+    remoteVersion = await fetchRemoteDocsVersion();
+    if (remoteVersion) {
+      await writeDocsUpdateCache({
+        remoteVersion,
+        lastChecked: Date.now(),
+      }).catch(() => {});
+    }
+  }
+
+  if (!remoteVersion) return null;
+  if (!isDocsUpdateAvailable(localVersion, remoteVersion)) return null;
+
+  return `\n${colors.yellow('Newer docs available.')} Run \`${colors.cyan('mux docs update')}\` to download.\n`;
 }

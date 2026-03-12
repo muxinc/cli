@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  checkForDocsUpdate,
   checkForUpdate,
   compareSemver,
   detectInstallMethod,
@@ -11,6 +12,7 @@ import {
   getUpgradeCommand,
   readUpdateCache,
   type UpdateCache,
+  writeDocsUpdateCache,
   writeUpdateCache,
 } from './update-notifier.ts';
 
@@ -409,6 +411,132 @@ describe('update-notifier', () => {
       // npm install — no delay, should show notice immediately
       expect(result).not.toBeNull();
       expect(result).toContain('2.0.0');
+    });
+  });
+
+  describe('checkForDocsUpdate', () => {
+    let testCacheDir: string;
+    let originalXdgCacheHome: string | undefined;
+    let originalFetch: typeof globalThis.fetch;
+    let originalCI: string | undefined;
+    let originalNoUpdateCheck: string | undefined;
+
+    beforeEach(async () => {
+      testCacheDir = join(tmpdir(), `mux-cli-test-docs-cache-${Date.now()}`);
+      originalXdgCacheHome = process.env.XDG_CACHE_HOME;
+      process.env.XDG_CACHE_HOME = testCacheDir;
+
+      originalFetch = globalThis.fetch;
+      originalCI = process.env.CI;
+      originalNoUpdateCheck = process.env.MUX_NO_UPDATE_CHECK;
+
+      delete process.env.CI;
+      delete process.env.MUX_NO_UPDATE_CHECK;
+    });
+
+    afterEach(async () => {
+      if (originalXdgCacheHome === undefined) {
+        delete process.env.XDG_CACHE_HOME;
+      } else {
+        process.env.XDG_CACHE_HOME = originalXdgCacheHome;
+      }
+
+      globalThis.fetch = originalFetch;
+
+      if (originalCI === undefined) {
+        delete process.env.CI;
+      } else {
+        process.env.CI = originalCI;
+      }
+
+      if (originalNoUpdateCheck === undefined) {
+        delete process.env.MUX_NO_UPDATE_CHECK;
+      } else {
+        process.env.MUX_NO_UPDATE_CHECK = originalNoUpdateCheck;
+      }
+
+      await rm(testCacheDir, { recursive: true, force: true });
+    });
+
+    it('should return null when CI env var is set', async () => {
+      process.env.CI = 'true';
+      const result = await checkForDocsUpdate();
+      expect(result).toBeNull();
+    });
+
+    it('should return null when MUX_NO_UPDATE_CHECK is set', async () => {
+      process.env.MUX_NO_UPDATE_CHECK = '1';
+      const result = await checkForDocsUpdate();
+      expect(result).toBeNull();
+    });
+
+    it('should return null when not a TTY', async () => {
+      globalThis.fetch = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              date: '2099-01-01T00:00:00Z',
+              commit: 'abc',
+            }),
+            { status: 200 },
+          ),
+        ),
+      ) as unknown as typeof fetch;
+      const result = await checkForDocsUpdate({ isTTY: false });
+      expect(result).toBeNull();
+    });
+
+    it('should return notice when newer docs are available', async () => {
+      globalThis.fetch = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              date: '2099-01-01T00:00:00Z',
+              commit: 'abc1234',
+            }),
+            { status: 200 },
+          ),
+        ),
+      ) as unknown as typeof fetch;
+      const result = await checkForDocsUpdate({ isTTY: true });
+      expect(result).not.toBeNull();
+      expect(result).toContain('mux docs update');
+    });
+
+    it('should return null when fetch fails', async () => {
+      globalThis.fetch = mock(() =>
+        Promise.reject(new Error('network error')),
+      ) as unknown as typeof fetch;
+      const result = await checkForDocsUpdate({ isTTY: true });
+      expect(result).toBeNull();
+    });
+
+    it('should use cached result when cache is fresh', async () => {
+      const remoteVersion = {
+        date: '2099-01-01T00:00:00Z',
+        commit: 'cached123',
+      };
+      await writeDocsUpdateCache({
+        remoteVersion,
+        lastChecked: Date.now(),
+      });
+
+      const fetchMock = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              date: '2099-06-01T00:00:00Z',
+              commit: 'newer456',
+            }),
+            { status: 200 },
+          ),
+        ),
+      ) as unknown as typeof fetch;
+      globalThis.fetch = fetchMock;
+
+      const result = await checkForDocsUpdate({ isTTY: true });
+      expect(result).not.toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

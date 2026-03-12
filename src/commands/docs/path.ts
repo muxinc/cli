@@ -6,7 +6,9 @@ interface DocsPathOptions {
 }
 
 export const pathCommand = new Command()
-  .description('Print the installed paths to the embedded skill and bundled docs')
+  .description(
+    'Print the installed paths to the embedded skill and bundled docs',
+  )
   .option('--json', 'Output JSON instead of pretty format')
   .action((options: DocsPathOptions) => {
     const paths = resolveEmbeddedDocsPaths();

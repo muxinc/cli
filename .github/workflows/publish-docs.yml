@@ -1,0 +1,48 @@
+name: Publish Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "skill/**"
+      - "AGENTS.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish Docs Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate docs-version.json
+        run: |
+          cat > docs-version.json << EOF
+          {
+            "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+
+      - name: Create docs tarball
+        run: tar -czf mux-docs.tar.gz docs/ skill/ AGENTS.md docs-version.json
+
+      - name: Delete existing docs-latest release
+        run: gh release delete docs-latest --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create docs-latest release
+        run: |
+          gh release create docs-latest \
+            --title "Latest Documentation" \
+            --notes "Automatically updated documentation bundle. Last updated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --prerelease \
+            mux-docs.tar.gz \
+            docs-version.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

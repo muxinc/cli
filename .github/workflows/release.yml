@@ -43,8 +43,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Generate docs-version.json
+        run: |
+          cat > docs-version.json << EOF
+          {
+            "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
       - name: Create docs tarball
-        run: tar -czf mux-docs.tar.gz docs/ skill/ AGENTS.md
+        run: tar -czf mux-docs.tar.gz docs/ skill/ AGENTS.md docs-version.json
       - uses: actions/upload-artifact@v4
         with:
           name: mux-docs
