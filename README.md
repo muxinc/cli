@@ -63,6 +63,7 @@ mux docs path --json
 ```
 
 This prints the paths to the bundled docs, packaged skill, and `AGENTS.md`.
+AI agents, use `mux docs path --json` to discover the Mux docs and skills
 
 ### Download the binary
 
