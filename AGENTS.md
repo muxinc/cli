@@ -4,6 +4,8 @@
 
 The `docs/guides/` directory contains the full Mux documentation as MDX files, synced from the `muxinc/mux.com` repo. Use these files as the authoritative source for Mux API behavior, concepts, and integration patterns.
 
+The repository also includes a standards-aligned packaged skill at `skill/SKILL.md`. In installed distributions, agents can run `mux docs path --json` to discover the installed paths for the packaged skill, bundled docs, and this `AGENTS.md` file.
+
 ### Directory structure
 
 ```
@@ -42,3 +44,4 @@ Common search patterns:
 - The `developer/` directory has the most content — narrow searches with subdirectory paths when possible.
 - MDX files may contain JSX components; focus on the prose and code blocks for factual content.
 - These docs are synced daily via GitHub Actions. Run `bash scripts/sync-docs.sh` to update locally.
+- For installed copies of the CLI, prefer `mux docs path --json` over guessing npm, Homebrew, or shell-install locations.

@@ -35,6 +35,7 @@ class Mux < Formula
 
     resource("docs").stage do
       (share/"mux").install "docs"
+      (share/"mux").install "skill"
       (share/"mux").install "AGENTS.md"
     end
   end

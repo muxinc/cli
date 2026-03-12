@@ -117,6 +117,7 @@ node -e "
 "
 cp -r bin "$STAGING/bin"
 cp -r docs "$STAGING/docs"
+cp -r skill "$STAGING/skill"
 cp AGENTS.md README.md LICENSE "$STAGING/"
 
 echo "Publishing @mux/cli@${VERSION}..."

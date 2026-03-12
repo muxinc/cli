@@ -34,6 +34,7 @@
   "files": [
     "bin",
     "docs",
+    "skill",
     "AGENTS.md",
     "README.md",
     "LICENSE"

@@ -52,6 +52,18 @@ npx @mux/cli
 curl -fsSL https://raw.githubusercontent.com/muxinc/cli/main/install.sh | bash
 ```
 
+### Agent skill and bundled docs
+
+The CLI ships with bundled Mux docs plus a standards-aligned `SKILL.md` so agents can use the CLI consistently across npm, Homebrew, and shell installs.
+
+To discover the installed paths:
+
+```bash
+mux docs path --json
+```
+
+This prints the paths to the bundled docs, packaged skill, and `AGENTS.md`.
+
 ### Download the binary
 
 Download the latest binary for your platform from [GitHub Releases](https://github.com/muxinc/cli/releases):

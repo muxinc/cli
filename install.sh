@@ -37,6 +37,7 @@ rm "$SHARE_DIR/mux-docs.tar.gz"
 
 echo "Installed mux to $INSTALL_DIR/mux"
 echo "Installed docs to $SHARE_DIR/docs/"
+echo "Installed skill to $SHARE_DIR/skill/SKILL.md"
 
 # PATH hint
 case ":$PATH:" in
