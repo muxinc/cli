@@ -37,6 +37,7 @@ class Mux < Formula
       (share/"mux").install "docs"
       (share/"mux").install "skill"
       (share/"mux").install "AGENTS.md"
+      (share/"mux").install "docs-version.json"
     end
   end
 
