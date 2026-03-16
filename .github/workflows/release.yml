@@ -140,20 +140,20 @@ jobs:
 
           if [ "${{ steps.checksums.outputs.has_docs }}" = "true" ]; then
             DOCS_RESOURCE=$(cat <<EOF
-  resource "docs" do
-    url "${BASE_URL}/mux-docs.tar.gz"
-    sha256 "${{ steps.checksums.outputs.docs }}"
-  end
-          EOF
+            resource "docs" do
+              url "${BASE_URL}/mux-docs.tar.gz"
+              sha256 "${{ steps.checksums.outputs.docs }}"
+            end
+            EOF
             )
 
             DOCS_INSTALL=$(cat <<'EOF'
-    resource("docs").stage do
-      (share/"mux").install "docs"
-      (share/"mux").install "skill"
-      (share/"mux").install "AGENTS.md"
-    end
-          EOF
+              resource("docs").stage do
+                (share/"mux").install "docs"
+                (share/"mux").install "skill"
+                (share/"mux").install "AGENTS.md"
+              end
+            EOF
             )
           fi
 
