@@ -109,7 +109,12 @@ jobs:
           echo "darwin_x64=$(sha256sum artifacts/mux-darwin-x64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "linux_arm64=$(sha256sum artifacts/mux-linux-arm64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "linux_x64=$(sha256sum artifacts/mux-linux-x64 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "docs=$(sha256sum artifacts/mux-docs.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          if [ -f artifacts/mux-docs.tar.gz ]; then
+            echo "has_docs=true" >> "$GITHUB_OUTPUT"
+            echo "docs=$(sha256sum artifacts/mux-docs.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_docs=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate GitHub App token
         id: app-token
@@ -129,6 +134,28 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           BASE_URL="https://github.com/muxinc/cli/releases/download/${GITHUB_REF_NAME}"
+
+          DOCS_RESOURCE=""
+          DOCS_INSTALL=""
+
+          if [ "${{ steps.checksums.outputs.has_docs }}" = "true" ]; then
+            DOCS_RESOURCE=$(cat <<EOF
+  resource "docs" do
+    url "${BASE_URL}/mux-docs.tar.gz"
+    sha256 "${{ steps.checksums.outputs.docs }}"
+  end
+          EOF
+            )
+
+            DOCS_INSTALL=$(cat <<'EOF'
+    resource("docs").stage do
+      (share/"mux").install "docs"
+      (share/"mux").install "skill"
+      (share/"mux").install "AGENTS.md"
+    end
+          EOF
+            )
+          fi
 
           mkdir -p Formula
           cat > Formula/mux.rb << RUBY
@@ -158,20 +185,13 @@ jobs:
               end
             end
 
-            resource "docs" do
-              url "${BASE_URL}/mux-docs.tar.gz"
-              sha256 "${{ steps.checksums.outputs.docs }}"
-            end
+          ${DOCS_RESOURCE}
 
             def install
               binary = Dir.glob("mux-*").first || "mux"
               bin.install binary => "mux"
 
-              resource("docs").stage do
-                (share/"mux").install "docs"
-                (share/"mux").install "skill"
-                (share/"mux").install "AGENTS.md"
-              end
+          ${DOCS_INSTALL}
             end
 
             test do
