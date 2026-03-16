@@ -61,6 +61,7 @@ jobs:
   release:
     name: Create Release
     needs: [build, docs]
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
