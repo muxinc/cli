@@ -19,7 +19,7 @@ import {
   getSigningSecretForCurrentEnv,
 } from '@/lib/webhook-signing.ts';
 
-type View = 'list' | 'detail' | 'filter-type' | 'payload' | 'message';
+type View = 'list' | 'detail' | 'filter-type' | 'message';
 
 interface EventsBrowserAppProps {
   environmentId: string;
@@ -90,9 +90,11 @@ export function EventsBrowserApp({
             'error',
           );
         }
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        showMessage(`Failed to forward event: ${msg}`, 'error');
+      } catch {
+        showMessage(
+          `Failed to forward event to ${forwardTo}\nIs a webserver running at that URL?`,
+          'error',
+        );
       }
     },
     [forwardTo, showMessage],
@@ -110,7 +112,7 @@ export function EventsBrowserApp({
       }
     }
 
-    if (view === 'message' || view === 'payload') {
+    if (view === 'message') {
       if (key.name === 'return' || key.name === 'escape') {
         if (selectedEvent) {
           setView('detail');
@@ -191,11 +193,10 @@ export function EventsBrowserApp({
     );
   }
 
-  // Event detail / actions
+  // Event detail: actions on the left, payload on the right
   if (view === 'detail' && selectedEvent) {
-    type EventAction = 'view-payload' | 'copy-payload' | 'copy-id' | 'replay';
+    type EventAction = 'copy-payload' | 'copy-id' | 'replay';
     const actions: Action<EventAction>[] = [
-      { id: 'view-payload', label: 'View payload' },
       { id: 'copy-payload', label: 'Copy payload to clipboard' },
       { id: 'copy-id', label: 'Copy event ID to clipboard' },
     ];
@@ -207,6 +208,7 @@ export function EventsBrowserApp({
     }
 
     const time = new Date(selectedEvent.timestamp).toLocaleString();
+    const payloadStr = JSON.stringify(selectedEvent.payload, null, 2);
 
     return (
       <box style={{ flexDirection: 'column', flexGrow: 1 }}>
@@ -218,62 +220,42 @@ export function EventsBrowserApp({
             {selectedEvent.id} • {time}
           </text>
         </box>
-        <ActionMenu
-          actions={actions}
-          onAction={async (actionId) => {
-            switch (actionId) {
-              case 'view-payload':
-                setView('payload');
-                break;
-              case 'copy-payload':
-                try {
-                  await copyToClipboard(
-                    JSON.stringify(selectedEvent.payload, null, 2),
-                  );
-                  showMessage('Payload copied to clipboard');
-                } catch {
-                  showMessage('Failed to copy to clipboard', 'error');
+        <box style={{ flexDirection: 'row', flexGrow: 1, gap: 1 }}>
+          <box style={{ width: '40%' }}>
+            <ActionMenu
+              actions={actions}
+              onAction={async (actionId) => {
+                switch (actionId) {
+                  case 'copy-payload':
+                    try {
+                      await copyToClipboard(payloadStr);
+                      showMessage('Payload copied to clipboard');
+                    } catch {
+                      showMessage('Failed to copy to clipboard', 'error');
+                    }
+                    break;
+                  case 'copy-id':
+                    try {
+                      await copyToClipboard(selectedEvent.id);
+                      showMessage('Event ID copied to clipboard');
+                    } catch {
+                      showMessage('Failed to copy to clipboard', 'error');
+                    }
+                    break;
+                  case 'replay':
+                    await handleReplay(selectedEvent);
+                    break;
                 }
-                break;
-              case 'copy-id':
-                try {
-                  await copyToClipboard(selectedEvent.id);
-                  showMessage('Event ID copied to clipboard');
-                } catch {
-                  showMessage('Failed to copy to clipboard', 'error');
-                }
-                break;
-              case 'replay':
-                await handleReplay(selectedEvent);
-                break;
-            }
-          }}
-          onCancel={() => {
-            setSelectedEvent(null);
-            setView('list');
-          }}
-        />
-      </box>
-    );
-  }
-
-  // Payload view
-  if (view === 'payload' && selectedEvent) {
-    const payloadStr = JSON.stringify(selectedEvent.payload, null, 2);
-    const lines = payloadStr.split('\n');
-
-    return (
-      <box style={{ flexDirection: 'column', flexGrow: 1 }}>
-        <box style={{ marginBottom: 1 }}>
-          <text style={{ fg: '#FFFF00' }}>{selectedEvent.type} — Payload</text>
-        </box>
-        <box style={{ marginBottom: 1 }}>
-          <text style={{ fg: '#888888' }}>Press Enter or Esc to go back</text>
-        </box>
-        <box style={{ border: true, flexGrow: 1, padding: 1 }}>
-          {lines.map((line, i) => (
-            <text key={i}>{line}</text>
-          ))}
+              }}
+              onCancel={() => {
+                setSelectedEvent(null);
+                setView('list');
+              }}
+            />
+          </box>
+          <box style={{ width: '60%', border: true, padding: 1 }}>
+            <text>{payloadStr}</text>
+          </box>
         </box>
       </box>
     );
@@ -282,10 +264,15 @@ export function EventsBrowserApp({
   // Message view
   if (view === 'message') {
     const color = messageType === 'success' ? '#66FF66' : '#FF6666';
+    const messageLines = message.split('\n');
     return (
       <box style={{ flexDirection: 'column', padding: 1 }}>
-        <box style={{ marginBottom: 1 }}>
-          <text style={{ fg: color }}>{message}</text>
+        <box style={{ flexDirection: 'column', marginBottom: 1 }}>
+          {messageLines.map((line) => (
+            <text key={line} style={{ fg: color }}>
+              {line}
+            </text>
+          ))}
         </box>
         <text style={{ fg: '#888888' }}>Press Enter to continue</text>
       </box>
