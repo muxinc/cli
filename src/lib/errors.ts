@@ -144,6 +144,11 @@ export async function checkFetchPermissionError(
     if (tokenInfo) {
       return formatPermissionError(tokenInfo.permissions, tokenInfo.tokenName);
     }
+    // Even if /whoami fails, 403 is never transient — don't return null
+    // and let it enter a retry loop.
+    if (response.status === 403) {
+      return "Permission denied. Please check your token's permissions at:\nhttps://dashboard.mux.com/settings/access-tokens";
+    }
   }
 
   return null;

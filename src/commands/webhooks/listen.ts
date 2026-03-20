@@ -106,7 +106,7 @@ export const listenCommand = new Command()
             } else {
               console.error(`Error: ${permError}`);
             }
-            return;
+            process.exit(1);
           }
           throw new Error(
             `Server returned ${response.status} ${response.statusText}`,
