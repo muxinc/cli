@@ -99,11 +99,7 @@ export const listenCommand = new Command()
         if (!response.ok) {
           // Check for permission issues before entering the reconnection loop.
           // Permission errors are not transient and should not be retried.
-          const permError = await checkFetchPermissionError(
-            response,
-            'webhooks',
-            'listen',
-          );
+          const permError = await checkFetchPermissionError(response);
           if (permError) {
             if (options.json) {
               console.error(JSON.stringify({ error: permError }));
