@@ -7,8 +7,13 @@ import { getAuthHeaders, getMuxBaseUrl } from './mux.ts';
 export function formatPermissionError(
   tokenPermissions: string[],
   tokenName?: string,
+  apiResponseBody?: unknown,
 ): string {
-  const lines = ['Permission denied or this route does not exist.', ''];
+  const lines = ['Permission denied or this route does not exist.'];
+  if (apiResponseBody) {
+    lines.push(JSON.stringify(apiResponseBody));
+  }
+  lines.push('');
 
   if (tokenName) {
     lines.push(
@@ -90,12 +95,14 @@ export async function handleCommandError(
       const message = formatPermissionError(
         tokenInfo.permissions,
         tokenInfo.tokenName,
+        error.error,
       );
       if (options.json) {
         console.error(
           JSON.stringify(
             {
               error: 'not_found_or_permission_denied',
+              api_response: error.error,
               token_permissions: tokenInfo.permissions,
               docs: 'https://dashboard.mux.com/settings/access-tokens',
             },
