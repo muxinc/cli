@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import { buildDataFilterParams } from '@/lib/data-filters.ts';
+import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface InsightsOptions {
@@ -85,14 +86,6 @@ export const insightsCommand = new Command()
         console.log('');
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      if (options.json) {
-        console.error(JSON.stringify({ error: errorMessage }, null, 2));
-      } else {
-        console.error(`Error: ${errorMessage}`);
-      }
-      process.exit(1);
+      await handleCommandError(error, 'metrics', 'insights', options);
     }
   });

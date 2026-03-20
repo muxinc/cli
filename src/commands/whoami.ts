@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { handleCommandError } from '@/lib/errors.ts';
 import { getAuthHeaders, getMuxBaseUrl } from '../lib/mux.ts';
 
 interface WhoAmIOptions {
@@ -38,13 +39,6 @@ export const whoamiCommand = new Command()
         `Permissions:   ${(data.permissions as string[]).join(', ')}`,
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      if (options.json) {
-        console.error(JSON.stringify({ error: errorMessage }, null, 2));
-      } else {
-        console.error(`Error: ${errorMessage}`);
-      }
-      process.exit(1);
+      await handleCommandError(error, 'whoami', 'get', options);
     }
   });

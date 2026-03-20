@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { confirmPrompt } from '@/lib/prompt.ts';
 
@@ -47,15 +48,7 @@ export const deleteCommand = new Command()
           console.log(`Simulcast target ${targetId} deleted successfully`);
         }
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-
-        if (options.json) {
-          console.error(JSON.stringify({ error: errorMessage }, null, 2));
-        } else {
-          console.error(`Error: ${errorMessage}`);
-        }
-        process.exit(1);
+        await handleCommandError(error, 'live', 'delete', options);
       }
     },
   );
