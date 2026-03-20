@@ -10,6 +10,7 @@ import {
   formatUpdateNotice,
   getUpgradeCommand,
   readUpdateCache,
+  refreshUpdateCache,
   type UpdateCache,
   writeUpdateCache,
 } from './update-notifier.ts';
@@ -223,10 +224,9 @@ describe('update-notifier', () => {
     });
   });
 
-  describe('checkForUpdate', () => {
+  describe('checkForUpdate (cache-only)', () => {
     let testCacheDir: string;
     let originalXdgCacheHome: string | undefined;
-    let originalFetch: typeof globalThis.fetch;
     let originalCI: string | undefined;
     let originalNoUpdateCheck: string | undefined;
 
@@ -235,7 +235,6 @@ describe('update-notifier', () => {
       originalXdgCacheHome = process.env.XDG_CACHE_HOME;
       process.env.XDG_CACHE_HOME = testCacheDir;
 
-      originalFetch = globalThis.fetch;
       originalCI = process.env.CI;
       originalNoUpdateCheck = process.env.MUX_NO_UPDATE_CHECK;
 
@@ -249,8 +248,6 @@ describe('update-notifier', () => {
       } else {
         process.env.XDG_CACHE_HOME = originalXdgCacheHome;
       }
-
-      globalThis.fetch = originalFetch;
 
       if (originalCI === undefined) {
         delete process.env.CI;
@@ -280,114 +277,55 @@ describe('update-notifier', () => {
     });
 
     it('should return null when not a TTY', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ version: '2.0.0' }), { status: 200 }),
-        ),
-      ) as unknown as typeof fetch;
       const result = await checkForUpdate('1.0.0', { isTTY: false });
       expect(result).toBeNull();
     });
 
-    it('should return notice when newer version is available', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ version: '2.0.0' }), { status: 200 }),
-        ),
-      ) as unknown as typeof fetch;
+    it('should return null when no cache exists', async () => {
+      const result = await checkForUpdate('1.0.0', { isTTY: true });
+      expect(result).toBeNull();
+    });
+
+    it('should return notice when cache has newer version', async () => {
+      await writeUpdateCache({
+        latestVersion: '2.0.0',
+        lastChecked: Date.now(),
+        firstSeenAt: Date.now() - 49 * 60 * 60 * 1000,
+      });
       const result = await checkForUpdate('1.0.0', { isTTY: true });
       expect(result).not.toBeNull();
       expect(result).toContain('2.0.0');
     });
 
-    it('should return null when already on latest version', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ version: '1.0.0' }), { status: 200 }),
-        ),
-      ) as unknown as typeof fetch;
-      const result = await checkForUpdate('1.0.0', { isTTY: true });
-      expect(result).toBeNull();
-    });
-
-    it('should use cached version when cache is fresh', async () => {
-      const now = Date.now();
-      const cache: UpdateCache = {
-        latestVersion: '3.0.0',
-        lastChecked: now,
-        firstSeenAt: now - 49 * 60 * 60 * 1000, // 49 hours ago (past Homebrew delay)
-      };
-      await writeUpdateCache(cache);
-
-      // fetch should NOT be called
-      const fetchMock = mock(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ version: '4.0.0' }), { status: 200 }),
-        ),
-      ) as unknown as typeof fetch;
-      globalThis.fetch = fetchMock;
-
-      const result = await checkForUpdate('1.0.0', { isTTY: true });
-      expect(result).toContain('3.0.0'); // cached version, not 4.0.0
-      expect(fetchMock).not.toHaveBeenCalled();
-    });
-
-    it('should fetch when cache is stale', async () => {
-      const staleTime = Date.now() - 25 * 60 * 60 * 1000; // 25 hours ago
-      const cache: UpdateCache = {
-        latestVersion: '2.0.0',
-        lastChecked: staleTime,
-        firstSeenAt: staleTime,
-      };
-      await writeUpdateCache(cache);
-
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ version: '3.0.0' }), { status: 200 }),
-        ),
-      ) as unknown as typeof fetch;
-
-      const result = await checkForUpdate('1.0.0', { isTTY: true });
-      expect(result).toContain('3.0.0'); // fetched version
-    });
-
-    it('should return null when fetch fails and no cache exists', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.reject(new Error('network error')),
-      ) as unknown as typeof fetch;
+    it('should return null when cache version equals current', async () => {
+      await writeUpdateCache({
+        latestVersion: '1.0.0',
+        lastChecked: Date.now(),
+        firstSeenAt: Date.now(),
+      });
       const result = await checkForUpdate('1.0.0', { isTTY: true });
       expect(result).toBeNull();
     });
 
     it('should suppress notification for Homebrew when version is recent', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ version: '2.0.0' }), { status: 200 }),
-        ),
-      ) as unknown as typeof fetch;
+      await writeUpdateCache({
+        latestVersion: '2.0.0',
+        lastChecked: Date.now(),
+        firstSeenAt: Date.now(), // just discovered
+      });
       const result = await checkForUpdate('1.0.0', {
         isTTY: true,
         execPath: '/opt/homebrew/bin/mux',
       });
-      // Version was just discovered (firstSeenAt = now), so Homebrew delay kicks in
       expect(result).toBeNull();
     });
 
     it('should show notification for Homebrew when version is old enough', async () => {
-      const oldTime = Date.now() - 49 * 60 * 60 * 1000; // 49 hours ago
-      const cache: UpdateCache = {
+      await writeUpdateCache({
         latestVersion: '2.0.0',
         lastChecked: Date.now(),
-        firstSeenAt: oldTime,
-      };
-      await writeUpdateCache(cache);
-
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ version: '2.0.0' }), { status: 200 }),
-        ),
-      ) as unknown as typeof fetch;
-
+        firstSeenAt: Date.now() - 49 * 60 * 60 * 1000, // 49 hours ago
+      });
       const result = await checkForUpdate('1.0.0', {
         isTTY: true,
         execPath: '/opt/homebrew/bin/mux',
@@ -397,18 +335,148 @@ describe('update-notifier', () => {
     });
 
     it('should not apply Homebrew delay for npm installs', async () => {
+      await writeUpdateCache({
+        latestVersion: '2.0.0',
+        lastChecked: Date.now(),
+        firstSeenAt: Date.now(), // just discovered, but npm — no delay
+      });
+      const result = await checkForUpdate('1.0.0', {
+        isTTY: true,
+        execPath: '/usr/local/lib/node_modules/@mux/cli/bin/mux',
+      });
+      expect(result).not.toBeNull();
+      expect(result).toContain('2.0.0');
+    });
+  });
+
+  describe('refreshUpdateCache', () => {
+    let testCacheDir: string;
+    let originalXdgCacheHome: string | undefined;
+    let originalFetch: typeof globalThis.fetch;
+
+    beforeEach(async () => {
+      testCacheDir = join(tmpdir(), `mux-cli-test-cache-${Date.now()}`);
+      originalXdgCacheHome = process.env.XDG_CACHE_HOME;
+      process.env.XDG_CACHE_HOME = testCacheDir;
+      originalFetch = globalThis.fetch;
+    });
+
+    afterEach(async () => {
+      if (originalXdgCacheHome === undefined) {
+        delete process.env.XDG_CACHE_HOME;
+      } else {
+        process.env.XDG_CACHE_HOME = originalXdgCacheHome;
+      }
+      globalThis.fetch = originalFetch;
+      await rm(testCacheDir, { recursive: true, force: true });
+    });
+
+    it('should fetch and write cache when no cache exists', async () => {
       globalThis.fetch = mock(() =>
         Promise.resolve(
           new Response(JSON.stringify({ version: '2.0.0' }), { status: 200 }),
         ),
       ) as unknown as typeof fetch;
-      const result = await checkForUpdate('1.0.0', {
-        isTTY: true,
-        execPath: '/usr/local/lib/node_modules/@mux/cli/bin/mux',
+
+      await refreshUpdateCache();
+
+      const cache = await readUpdateCache();
+      expect(cache).not.toBeNull();
+      expect(cache?.latestVersion).toBe('2.0.0');
+    });
+
+    it('should skip fetch when cache is fresh', async () => {
+      await writeUpdateCache({
+        latestVersion: '2.0.0',
+        lastChecked: Date.now(),
+        firstSeenAt: Date.now(),
       });
-      // npm install — no delay, should show notice immediately
-      expect(result).not.toBeNull();
-      expect(result).toContain('2.0.0');
+
+      const fetchMock = mock(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ version: '3.0.0' }), { status: 200 }),
+        ),
+      ) as unknown as typeof fetch;
+      globalThis.fetch = fetchMock;
+
+      await refreshUpdateCache();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      const cache = await readUpdateCache();
+      expect(cache?.latestVersion).toBe('2.0.0');
+    });
+
+    it('should fetch when cache is stale', async () => {
+      const staleTime = Date.now() - 25 * 60 * 60 * 1000;
+      await writeUpdateCache({
+        latestVersion: '2.0.0',
+        lastChecked: staleTime,
+        firstSeenAt: staleTime,
+      });
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ version: '3.0.0' }), { status: 200 }),
+        ),
+      ) as unknown as typeof fetch;
+
+      await refreshUpdateCache();
+
+      const cache = await readUpdateCache();
+      expect(cache?.latestVersion).toBe('3.0.0');
+    });
+
+    it('should preserve firstSeenAt when version is unchanged', async () => {
+      const originalFirstSeen = Date.now() - 10 * 60 * 60 * 1000;
+      const staleTime = Date.now() - 25 * 60 * 60 * 1000;
+      await writeUpdateCache({
+        latestVersion: '2.0.0',
+        lastChecked: staleTime,
+        firstSeenAt: originalFirstSeen,
+      });
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ version: '2.0.0' }), { status: 200 }),
+        ),
+      ) as unknown as typeof fetch;
+
+      await refreshUpdateCache();
+
+      const cache = await readUpdateCache();
+      expect(cache?.firstSeenAt).toBe(originalFirstSeen);
+    });
+
+    it('should reset firstSeenAt when version changes', async () => {
+      const staleTime = Date.now() - 25 * 60 * 60 * 1000;
+      await writeUpdateCache({
+        latestVersion: '2.0.0',
+        lastChecked: staleTime,
+        firstSeenAt: staleTime,
+      });
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ version: '3.0.0' }), { status: 200 }),
+        ),
+      ) as unknown as typeof fetch;
+
+      const before = Date.now();
+      await refreshUpdateCache();
+
+      const cache = await readUpdateCache();
+      expect(cache?.firstSeenAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it('should not write cache when fetch fails', async () => {
+      globalThis.fetch = mock(() =>
+        Promise.reject(new Error('network error')),
+      ) as unknown as typeof fetch;
+
+      await refreshUpdateCache();
+
+      const cache = await readUpdateCache();
+      expect(cache).toBeNull();
     });
   });
 });

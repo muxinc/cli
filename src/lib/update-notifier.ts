@@ -123,10 +123,11 @@ export interface CheckForUpdateOptions {
 }
 
 /**
- * Check for an available update. Returns a formatted notice string
- * if an update is available, or null otherwise.
+ * Check for an available update using only the local cache (no network).
+ * Returns a formatted notice string if an update is available, or null otherwise.
  *
  * Skipped when:
+ * - version is 0.0.0 (local dev)
  * - stderr is not a TTY (piped output)
  * - CI env var is set
  * - MUX_NO_UPDATE_CHECK env var is set
@@ -135,40 +136,18 @@ export async function checkForUpdate(
   currentVersion: string,
   options?: CheckForUpdateOptions,
 ): Promise<string | null> {
-  // Skip for local development builds (version is 0.0.0 until publish)
   if (currentVersion === '0.0.0') return null;
-  // Skip in non-interactive environments
   if (process.env.CI) return null;
   if (process.env.MUX_NO_UPDATE_CHECK) return null;
 
   const isTTY = options?.isTTY ?? process.stderr.isTTY;
   if (!isTTY) return null;
 
-  // Check cache first
   const cache = await readUpdateCache();
-  let latestVersion: string | null = null;
-  let firstSeenAt: number = Date.now();
+  if (!cache) return null;
 
-  if (cache && Date.now() - cache.lastChecked < CACHE_TTL_MS) {
-    // Cache is fresh
-    latestVersion = cache.latestVersion;
-    firstSeenAt = cache.firstSeenAt;
-  } else {
-    // Cache is stale or missing — fetch from registry
-    latestVersion = await fetchLatestVersion();
-    if (latestVersion) {
-      // Preserve firstSeenAt if same version, otherwise record new discovery time
-      firstSeenAt =
-        cache?.latestVersion === latestVersion ? cache.firstSeenAt : Date.now();
-      await writeUpdateCache({
-        latestVersion,
-        lastChecked: Date.now(),
-        firstSeenAt,
-      }).catch(() => {}); // best-effort cache write
-    }
-  }
+  const { latestVersion, firstSeenAt } = cache;
 
-  if (!latestVersion) return null;
   if (compareSemver(latestVersion, currentVersion) <= 0) return null;
 
   const method = detectInstallMethod(options?.execPath);
@@ -180,4 +159,28 @@ export async function checkForUpdate(
 
   const command = getUpgradeCommand(method);
   return formatUpdateNotice(currentVersion, latestVersion, command);
+}
+
+/**
+ * Refresh the update cache in the background. Fetches the latest version
+ * from npm and writes it to the cache file. Skips the fetch if the cache
+ * is still fresh.
+ */
+export async function refreshUpdateCache(): Promise<void> {
+  const cache = await readUpdateCache();
+
+  // Cache is still fresh — nothing to do
+  if (cache && Date.now() - cache.lastChecked < CACHE_TTL_MS) return;
+
+  const latestVersion = await fetchLatestVersion();
+  if (!latestVersion) return;
+
+  const firstSeenAt =
+    cache?.latestVersion === latestVersion ? cache.firstSeenAt : Date.now();
+
+  await writeUpdateCache({
+    latestVersion,
+    lastChecked: Date.now(),
+    firstSeenAt,
+  }).catch(() => {}); // best-effort
 }

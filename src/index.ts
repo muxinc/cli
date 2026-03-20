@@ -26,7 +26,7 @@ import { videoViewsCommand } from './commands/video-views/index.ts';
 import { webhooksCommand } from './commands/webhooks/index.ts';
 import { whoamiCommand } from './commands/whoami.ts';
 import { setAgentMode } from './lib/context.ts';
-import { checkForUpdate } from './lib/update-notifier.ts';
+import { checkForUpdate, refreshUpdateCache } from './lib/update-notifier.ts';
 
 const VERSION = pkg.version;
 
@@ -90,9 +90,10 @@ const cli = new Command()
 
 // Run the CLI
 if (import.meta.main) {
-  // Resolve the update check early so the notice is available on exit.
-  // This reads from a local cache (fast) or fetches with a 3s timeout.
+  // Read cached update info (no network, instant) for the exit notice.
+  // Refresh the cache in the background so the next run has fresh data.
   const updateNotice = await checkForUpdate(VERSION).catch(() => null);
+  refreshUpdateCache().catch(() => {});
 
   process.on('exit', () => {
     if (updateNotice) console.error(updateNotice);
