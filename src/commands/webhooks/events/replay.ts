@@ -1,5 +1,6 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
+import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
 import { getAllEvents, getEventById } from '@/lib/events-store.ts';
 import {
   buildSignedHeaders,
@@ -46,8 +47,30 @@ export const replayCommand = new Command()
         process.exit(1);
       }
 
+      const env = await getCurrentEnvironment();
+      if (!env) {
+        console.error("Not logged in. Please run 'mux login' to authenticate.");
+        process.exit(1);
+      }
+      const environmentId = env.environment.environmentId ?? env.name;
+
+      // Use provided --forward-to, or fall back to the saved URL
+      if (!options.forwardTo && env.environment.forwardUrl) {
+        options.forwardTo = env.environment.forwardUrl;
+      }
+
+      // Save the forward URL if a new one was provided
+      if (
+        options.forwardTo &&
+        options.forwardTo !== env.environment.forwardUrl
+      ) {
+        await updateEnvironment(env.name, {
+          forwardUrl: options.forwardTo,
+        });
+      }
+
       if (options.all) {
-        const events = await getAllEvents();
+        const events = getAllEvents(environmentId);
         if (events.length === 0) {
           console.log('No stored events to replay.');
           return;
@@ -111,7 +134,7 @@ export const replayCommand = new Command()
       }
 
       // Single event replay
-      const event = await getEventById(eventId as string);
+      const event = getEventById(eventId as string, environmentId);
       if (!event) {
         console.error(`Event not found: ${eventId}`);
         process.exit(1);

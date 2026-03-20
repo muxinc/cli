@@ -1,62 +1,144 @@
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { Database } from 'bun:sqlite';
+import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { getEventsPath } from './xdg.ts';
-
-const MAX_EVENTS = 100;
+import { getEventsDatabasePath } from './xdg.ts';
 
 export interface StoredEvent {
   id: string;
   type: string;
   timestamp: string;
-  environmentName: string;
+  environmentId: string;
   payload: Record<string, unknown>;
 }
 
-async function readEvents(path: string): Promise<StoredEvent[]> {
-  if (!existsSync(path)) return [];
-  try {
-    const content = await readFile(path, 'utf-8');
-    return JSON.parse(content);
-  } catch {
-    return [];
-  }
+let db: Database | null = null;
+
+function getDb(): Database {
+  if (db) return db;
+
+  const dbPath = getEventsDatabasePath();
+  mkdirSync(dirname(dbPath), { recursive: true });
+
+  db = new Database(dbPath);
+  db.run('PRAGMA journal_mode = WAL');
+  db.run(`
+    CREATE TABLE IF NOT EXISTS events (
+      id          TEXT PRIMARY KEY,
+      type        TEXT NOT NULL,
+      timestamp   TEXT NOT NULL,
+      environment_id TEXT NOT NULL,
+      payload     TEXT NOT NULL
+    )
+  `);
+  db.run(
+    'CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events (timestamp)',
+  );
+  db.run('CREATE INDEX IF NOT EXISTS idx_events_type ON events (type)');
+  db.run(
+    'CREATE INDEX IF NOT EXISTS idx_events_environment_id ON events (environment_id)',
+  );
+
+  return db;
 }
 
-async function writeEvents(path: string, events: StoredEvent[]): Promise<void> {
-  const dir = dirname(path);
-  await mkdir(dir, { recursive: true });
-  await writeFile(path, JSON.stringify(events, null, 2));
+export function appendEvent(event: StoredEvent): void {
+  const database = getDb();
+  database
+    .query(
+      'INSERT OR IGNORE INTO events (id, type, timestamp, environment_id, payload) VALUES (?, ?, ?, ?, ?)',
+    )
+    .run(
+      event.id,
+      event.type,
+      event.timestamp,
+      event.environmentId,
+      JSON.stringify(event.payload),
+    );
 }
 
-export async function appendEvent(event: StoredEvent): Promise<void> {
-  const path = getEventsPath();
-  const events = await readEvents(path);
-  // Deduplicate by event ID
-  if (events.some((e) => e.id === event.id)) return;
-  events.push(event);
-  // FIFO: keep only the most recent MAX_EVENTS
-  const trimmed = events.slice(-MAX_EVENTS);
-  await writeEvents(path, trimmed);
+interface EventRow {
+  id: string;
+  type: string;
+  timestamp: string;
+  environment_id: string;
+  payload: string;
 }
 
-export async function listEvents(limit = 25): Promise<StoredEvent[]> {
-  const path = getEventsPath();
-  const events = await readEvents(path);
-  // Return most recent events first
+function rowToEvent(row: EventRow): StoredEvent {
+  return {
+    id: row.id,
+    type: row.type,
+    timestamp: row.timestamp,
+    environmentId: row.environment_id,
+    payload: JSON.parse(row.payload),
+  };
+}
+
+export function listEvents(environmentId: string, limit = 25): StoredEvent[] {
   if (limit <= 0) return [];
-  return events.slice(-limit).reverse();
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE environment_id = ? ORDER BY timestamp DESC LIMIT ?',
+    )
+    .all(environmentId, limit) as EventRow[];
+  return rows.map(rowToEvent);
 }
 
-export async function getEventById(
+export function getEventById(
   id: string,
-): Promise<StoredEvent | undefined> {
-  const path = getEventsPath();
-  const events = await readEvents(path);
-  return events.find((e) => e.id === id);
+  environmentId: string,
+): StoredEvent | undefined {
+  const database = getDb();
+  const row = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE id = ? AND environment_id = ?',
+    )
+    .get(id, environmentId) as EventRow | null;
+  return row ? rowToEvent(row) : undefined;
 }
 
-export async function getAllEvents(): Promise<StoredEvent[]> {
-  const path = getEventsPath();
-  return readEvents(path);
+export function getAllEvents(environmentId: string): StoredEvent[] {
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE environment_id = ? ORDER BY timestamp ASC',
+    )
+    .all(environmentId) as EventRow[];
+  return rows.map(rowToEvent);
+}
+
+export function getEventTypes(environmentId: string): string[] {
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT DISTINCT type FROM events WHERE environment_id = ? ORDER BY type ASC',
+    )
+    .all(environmentId) as Array<{ type: string }>;
+  return rows.map((row) => row.type);
+}
+
+export function listEventsByType(
+  environmentId: string,
+  type: string,
+  limit = 25,
+): StoredEvent[] {
+  if (limit <= 0) return [];
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE environment_id = ? AND type = ? ORDER BY timestamp DESC LIMIT ?',
+    )
+    .all(environmentId, type, limit) as EventRow[];
+  return rows.map(rowToEvent);
+}
+
+/**
+ * Close the database connection. Primarily for testing cleanup.
+ */
+export function closeDb(): void {
+  if (db) {
+    db.close();
+    db = null;
+  }
 }
