@@ -108,6 +108,20 @@ export function getAllEvents(environmentId: string): StoredEvent[] {
   return rows.map(rowToEvent);
 }
 
+export function getRecentEvents(
+  environmentId: string,
+  count: number,
+): StoredEvent[] {
+  const database = getDb();
+  const rows = database
+    .query(
+      'SELECT id, type, timestamp, environment_id, payload FROM events WHERE environment_id = ? ORDER BY timestamp DESC LIMIT ?',
+    )
+    .all(environmentId, count) as EventRow[];
+  // Reverse to return in chronological order
+  return rows.reverse().map(rowToEvent);
+}
+
 export function getEventTypes(environmentId: string): string[] {
   const database = getDb();
   const rows = database

@@ -1,7 +1,7 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
 import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
-import { getAllEvents, getEventById } from '@/lib/events-store.ts';
+import { getEventById, getRecentEvents } from '@/lib/events-store.ts';
 import {
   buildSignedHeaders,
   getSigningSecretForCurrentEnv,
@@ -9,7 +9,7 @@ import {
 
 interface ReplayOptions {
   forwardTo?: string;
-  all?: boolean;
+  count?: number;
   json?: boolean;
 }
 
@@ -31,19 +31,19 @@ export const replayCommand = new Command()
   .description('Replay stored webhook events')
   .arguments('[event-id:string]')
   .option('--forward-to <url:string>', 'POST event(s) to a local URL')
-  .option('--all', 'Replay all stored events')
+  .option('--count <n:integer>', 'Replay the last N events')
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: ReplayOptions, eventId?: string) => {
     try {
-      if (!eventId && !options.all) {
+      if (!eventId && !options.count) {
         console.error(
-          'Provide an event ID or use --all to replay all stored events.',
+          'Provide an event ID or use --count <n> to replay the last N events.',
         );
         process.exit(1);
       }
 
-      if (eventId && options.all) {
-        console.error('Cannot use both an event ID and --all.');
+      if (eventId && options.count) {
+        console.error('Cannot use both an event ID and --count.');
         process.exit(1);
       }
 
@@ -69,97 +69,99 @@ export const replayCommand = new Command()
         });
       }
 
-      if (options.all) {
-        const events = getAllEvents(environmentId);
-        if (events.length === 0) {
-          console.log('No stored events to replay.');
-          return;
+      // Single event replay by ID
+      if (eventId) {
+        const event = getEventById(eventId, environmentId);
+        if (!event) {
+          console.error(`Event not found: ${eventId}`);
+          process.exit(1);
         }
 
         if (!options.forwardTo) {
-          if (options.json) {
-            console.log(JSON.stringify(events, null, 2));
-          } else {
-            for (const event of events) {
-              console.log(JSON.stringify(event.payload, null, 2));
-            }
-          }
+          console.log(JSON.stringify(event.payload, null, 2));
           return;
         }
 
         const signingSecret = await getSigningSecretForCurrentEnv();
-
-        let forwarded = 0;
-        let failed = 0;
-        for (const event of events) {
-          try {
-            const { status } = await forwardEvent(
-              options.forwardTo,
-              event.payload,
-              signingSecret,
-            );
-            if (status >= 200 && status < 300) {
-              forwarded++;
-              if (!options.json) {
-                console.log(
-                  `${colors.green(`[${status}]`)}  ${event.type.padEnd(30)}  ${event.id}`,
-                );
-              }
-            } else {
-              failed++;
-              if (!options.json) {
-                console.log(
-                  `${colors.red(`[${status}]`)}  ${event.type.padEnd(30)}  ${event.id}`,
-                );
-              }
-            }
-          } catch {
-            failed++;
-            if (!options.json) {
-              console.log(
-                `${colors.red('[ERR]')}  ${event.type.padEnd(30)}  ${event.id}`,
-              );
-            }
-          }
-        }
-
+        const { status } = await forwardEvent(
+          options.forwardTo,
+          event.payload,
+          signingSecret,
+        );
         if (options.json) {
-          console.log(JSON.stringify({ forwarded, failed }, null, 2));
+          console.log(JSON.stringify({ status, eventId: event.id }, null, 2));
+        } else if (status >= 200 && status < 300) {
+          console.log(
+            `${colors.green(`[${status}]`)} Forwarded ${event.type} (${event.id}) to ${options.forwardTo}`,
+          );
         } else {
           console.log(
-            `\nReplayed ${forwarded + failed} events: ${forwarded} forwarded, ${failed} failed.`,
+            `${colors.red(`[${status}]`)} Failed to forward ${event.type} (${event.id}) to ${options.forwardTo}`,
           );
         }
         return;
       }
 
-      // Single event replay
-      const event = getEventById(eventId as string, environmentId);
-      if (!event) {
-        console.error(`Event not found: ${eventId}`);
-        process.exit(1);
+      // Replay last N events
+      const count = options.count as number;
+      const events = getRecentEvents(environmentId, count);
+      if (events.length === 0) {
+        console.log('No stored events to replay.');
+        return;
       }
 
       if (!options.forwardTo) {
-        console.log(JSON.stringify(event.payload, null, 2));
+        if (options.json) {
+          console.log(JSON.stringify(events, null, 2));
+        } else {
+          for (const event of events) {
+            console.log(JSON.stringify(event.payload, null, 2));
+          }
+        }
         return;
       }
 
       const signingSecret = await getSigningSecretForCurrentEnv();
-      const { status } = await forwardEvent(
-        options.forwardTo,
-        event.payload,
-        signingSecret,
-      );
+
+      let forwarded = 0;
+      let failed = 0;
+      for (const event of events) {
+        try {
+          const { status } = await forwardEvent(
+            options.forwardTo,
+            event.payload,
+            signingSecret,
+          );
+          if (status >= 200 && status < 300) {
+            forwarded++;
+            if (!options.json) {
+              console.log(
+                `${colors.green(`[${status}]`)}  ${event.type.padEnd(30)}  ${event.id}`,
+              );
+            }
+          } else {
+            failed++;
+            if (!options.json) {
+              console.log(
+                `${colors.red(`[${status}]`)}  ${event.type.padEnd(30)}  ${event.id}`,
+              );
+            }
+          }
+        } catch {
+          failed++;
+          if (!options.json) {
+            console.log(
+              `${colors.red('[ERR]')}  ${event.type.padEnd(30)}  ${event.id}`,
+            );
+          }
+        }
+      }
+
       if (options.json) {
-        console.log(JSON.stringify({ status, eventId: event.id }, null, 2));
-      } else if (status >= 200 && status < 300) {
-        console.log(
-          `${colors.green(`[${status}]`)} Forwarded ${event.type} (${event.id}) to ${options.forwardTo}`,
-        );
+        console.log(JSON.stringify({ forwarded, failed }, null, 2));
       } else {
         console.log(
-          `${colors.red(`[${status}]`)} Failed to forward ${event.type} (${event.id}) to ${options.forwardTo}`,
+          `\nReplayed ${forwarded + failed} events: ${forwarded} forwarded, ${failed} failed.`,
         );
       }
     } catch (error) {
