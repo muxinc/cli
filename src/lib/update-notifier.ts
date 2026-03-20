@@ -80,13 +80,11 @@ export async function fetchLatestVersion(): Promise<string | null> {
  */
 export function detectInstallMethod(
   execPath?: string,
-): 'homebrew' | 'npm' | 'shell' | 'dev' | 'unknown' {
+): 'homebrew' | 'npm' | 'shell' | 'unknown' {
   const p = execPath ?? process.argv[0];
   if (p.includes('/Cellar/') || p.includes('/homebrew/')) return 'homebrew';
   if (p.includes('node_modules')) return 'npm';
   if (p.includes('.mux/bin')) return 'shell';
-  // Local development builds (e.g., ./dist/mux, bun run src/index.ts)
-  if (p.includes('/dist/') || p.includes('/src/')) return 'dev';
   return 'unknown';
 }
 
@@ -94,7 +92,7 @@ export function detectInstallMethod(
  * Get the appropriate upgrade command for the install method.
  */
 export function getUpgradeCommand(
-  method: 'homebrew' | 'npm' | 'shell' | 'dev' | 'unknown',
+  method: 'homebrew' | 'npm' | 'shell' | 'unknown',
 ): string {
   switch (method) {
     case 'homebrew':
@@ -137,6 +135,8 @@ export async function checkForUpdate(
   currentVersion: string,
   options?: CheckForUpdateOptions,
 ): Promise<string | null> {
+  // Skip for local development builds (version is 0.0.0 until publish)
+  if (currentVersion === '0.0.0') return null;
   // Skip in non-interactive environments
   if (process.env.CI) return null;
   if (process.env.MUX_NO_UPDATE_CHECK) return null;
@@ -172,9 +172,6 @@ export async function checkForUpdate(
   if (compareSemver(latestVersion, currentVersion) <= 0) return null;
 
   const method = detectInstallMethod(options?.execPath);
-
-  // Skip update notices for local development builds
-  if (method === 'dev') return null;
 
   // Give Homebrew formulae time to update before notifying
   if (method === 'homebrew' && Date.now() - firstSeenAt < HOMEBREW_DELAY_MS) {

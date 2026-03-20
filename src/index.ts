@@ -90,7 +90,13 @@ const cli = new Command()
 
 // Run the CLI
 if (import.meta.main) {
-  const updateCheck = checkForUpdate(VERSION).catch(() => null);
+  // Resolve the update check early so the notice is available on exit.
+  // This reads from a local cache (fast) or fetches with a 3s timeout.
+  const updateNotice = await checkForUpdate(VERSION).catch(() => null);
+
+  process.on('exit', () => {
+    if (updateNotice) console.error(updateNotice);
+  });
 
   try {
     await cli.parse(preprocessArgs(Bun.argv.slice(2)));
@@ -102,9 +108,6 @@ if (import.meta.main) {
     }
     process.exit(1);
   }
-
-  const notice = await updateCheck;
-  if (notice) console.error(notice);
 }
 
 export { cli };

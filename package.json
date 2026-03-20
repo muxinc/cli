@@ -1,6 +1,6 @@
 {
   "name": "@mux/cli",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Official Mux CLI for interacting with Mux APIs",
   "author": "Mux",
   "license": "Apache-2.0",
