@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import { getCurrentEnvironment, setEnvironment } from '@/lib/config.ts';
+import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { confirmPrompt } from '@/lib/prompt.ts';
 
@@ -79,14 +80,6 @@ export const createCommand = new Command()
         console.log(`Key ID: ${keyId}`);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      if (options.json) {
-        console.error(JSON.stringify({ error: errorMessage }, null, 2));
-      } else {
-        console.error(`Error: ${errorMessage}`);
-      }
-      process.exit(1);
+      await handleCommandError(error, 'signing-keys', 'create', options);
     }
   });

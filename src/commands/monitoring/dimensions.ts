@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface DimensionsOptions {
@@ -30,14 +31,6 @@ export const dimensionsCommand = new Command()
         console.log(`${dimension.name}: ${dimension.display_name}`);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      if (options.json) {
-        console.error(JSON.stringify({ error: errorMessage }, null, 2));
-      } else {
-        console.error(`Error: ${errorMessage}`);
-      }
-      process.exit(1);
+      await handleCommandError(error, 'monitoring', 'dimensions', options);
     }
   });

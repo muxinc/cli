@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface GetOptions {
@@ -33,14 +34,11 @@ export const getCommand = new Command()
         }
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      if (options.json) {
-        console.error(JSON.stringify({ error: errorMessage }, null, 2));
-      } else {
-        console.error(`Error: ${errorMessage}`);
-      }
-      process.exit(1);
+      await handleCommandError(
+        error,
+        'transcription-vocabularies',
+        'get',
+        options,
+      );
     }
   });

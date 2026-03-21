@@ -1,6 +1,7 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
 import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
+import { checkFetchPermissionError } from '@/lib/errors.ts';
 import { appendEvent, type StoredEvent } from '@/lib/events-store.ts';
 import { getAuthHeaders, getMuxBaseUrl } from '@/lib/mux.ts';
 import { parseSSEStream } from '@/lib/sse.ts';
@@ -95,15 +96,18 @@ export const listenCommand = new Command()
           signal: controller.signal,
         });
 
-        if (response.status === 401 || response.status === 403) {
-          console.error(
-            `Access denied (${response.status}). Your API token may not have "system" permissions.\n` +
-              'Manage your access tokens at: https://dashboard.mux.com/settings/access-tokens',
-          );
-          process.exit(1);
-        }
-
         if (!response.ok) {
+          // Check for permission issues before entering the reconnection loop.
+          // Permission errors are not transient and should not be retried.
+          const permError = await checkFetchPermissionError(response);
+          if (permError) {
+            if (options.json) {
+              console.error(JSON.stringify({ error: permError }));
+            } else {
+              console.error(`Error: ${permError}`);
+            }
+            process.exit(1);
+          }
           throw new Error(
             `Server returned ${response.status} ${response.statusText}`,
           );

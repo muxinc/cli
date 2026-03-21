@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 export const manageCommand = new Command()
@@ -52,9 +53,6 @@ export const manageCommand = new Command()
 
       root.render(React.createElement(AssetManageApp, { mux, onPrompt }));
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(`Error: ${errorMessage}`);
-      process.exit(1);
+      await handleCommandError(error, 'assets', 'list', {});
     }
   });

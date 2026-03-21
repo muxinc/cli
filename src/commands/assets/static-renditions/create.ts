@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/mux-node';
+import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 type Resolution = NonNullable<
@@ -85,15 +86,7 @@ export const createCommand = new Command()
         outputRendition(rendition, options.json, !options.wait);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      if (options.json) {
-        console.error(JSON.stringify({ error: errorMessage }, null, 2));
-      } else {
-        console.error(`Error: ${errorMessage}`);
-      }
-      process.exit(1);
+      await handleCommandError(error, 'assets', 'create', options);
     }
   });
 
