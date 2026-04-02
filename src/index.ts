@@ -4,6 +4,7 @@ import { CompletionsCommand } from '@cliffy/command/completions';
 import pkg from '../package.json';
 import { annotationsCommand } from './commands/annotations/index.ts';
 import { assetsCommand } from './commands/assets/index.ts';
+import { completionsInstallCommand } from './commands/completions-install.ts';
 import { deliveryUsageCommand } from './commands/delivery-usage/index.ts';
 import { dimensionsCommand } from './commands/dimensions/index.ts';
 import { drmConfigurationsCommand } from './commands/drm-configurations/index.ts';
@@ -86,7 +87,10 @@ const cli = new Command()
   .command('exports', exportsCommand)
   .command('webhooks', webhooksCommand)
   .command('whoami', whoamiCommand)
-  .command('completions', new CompletionsCommand());
+  .command(
+    'completions',
+    new CompletionsCommand().command('install', completionsInstallCommand),
+  );
 
 // Run the CLI
 if (import.meta.main) {
