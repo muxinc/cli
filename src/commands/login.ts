@@ -4,6 +4,7 @@ import { Command } from '@cliffy/command';
 import { listEnvironments, setEnvironment } from '../lib/config.ts';
 import { validateCredentials } from '../lib/mux.ts';
 import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
+import { getConfigPath } from '../lib/xdg.ts';
 
 export interface EnvVars {
   MUX_TOKEN_ID?: string;
@@ -132,7 +133,9 @@ export const loginCommand = new Command()
       environmentId: validation.environmentId,
     });
 
-    console.log(`✅ Credentials saved for environment: ${envName}`);
+    console.log(
+      `✅ Credentials saved to ${getConfigPath()} for environment: ${envName}`,
+    );
 
     if (existingEnvs.length === 0) {
       console.log(`✅ Set as default environment`);
