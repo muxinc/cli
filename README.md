@@ -82,24 +82,24 @@ The binary is self-contained and has no dependencies.
 
 ## Shell Completions
 
-Enable tab completion for commands, subcommands, and options in your shell:
+Enable tab completion for commands, subcommands, and options by adding the appropriate line to your shell's config file:
 
-**Bash** (add to `~/.bashrc`):
+**Bash:** Add the following line to `~/.bashrc`:
 ```bash
 source <(mux completions bash)
 ```
 
-**Zsh** (add to `~/.zshrc`):
+**Zsh:** Add the following line to `~/.zshrc`:
 ```bash
 source <(mux completions zsh)
 ```
 
-**Fish** (add to `~/.config/fish/config.fish`):
+**Fish:** Add the following line to `~/.config/fish/config.fish`:
 ```fish
 source (mux completions fish | psub)
 ```
 
-Restart your shell or source the config file to activate completions.
+After saving the file, restart your shell or source it (e.g. `source ~/.zshrc`) to activate completions.
 
 ## Getting Started
 
