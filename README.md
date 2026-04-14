@@ -19,6 +19,7 @@ A command-line interface for interacting with the Mux API, designed to provide a
   - [Transcription Vocabularies](#transcription-vocabularies)
   - [Delivery Usage](#delivery-usage)
   - [DRM Configurations](#drm-configurations)
+  - [Robots](#robots)
   - [Mux Data](#mux-data)
   - [Authentication & Environment Management](#authentication--environment-management)
 - [Configuration](#configuration)
@@ -812,6 +813,114 @@ mux drm-configurations get <drm-configuration-id>
 </details>
 
 <details>
+<summary><h3>Robots</h3></summary>
+
+Run AI-powered workflows on your video assets using [Mux Robots](https://docs.mux.com/guides/robots). Requires accepting the Robots terms of service in the [Mux Dashboard](https://dashboard.mux.com) and a token with `robots:read` and `robots:write` permissions.
+
+#### Job Management
+
+```bash
+# List all jobs (with optional filters)
+mux robots list [--workflow summarize] [--status completed] [--asset-id <id>]
+
+# Get full details about a specific job
+mux robots get <job-id> --workflow <type>
+
+# Cancel a running job
+mux robots cancel <job-id>
+
+# Delete a job permanently
+mux robots delete <job-id> [--force]
+```
+
+**List options:** `--workflow`, `--status`, `--asset-id`, `--limit`, `--page`, `--compact`
+
+#### `mux robots summarize <asset-id>`
+
+Generate a title, description, and tags for a video.
+
+**Options:**
+- `--tone <tone>` - `neutral`, `playful`, or `professional`
+- `--language-code <code>` - BCP 47 code of the caption track to analyze
+- `--output-language-code <code>` - BCP 47 code for the generated output
+- `--title-length <n>` - Maximum title length in words
+- `--description-length <n>` - Maximum description length in words
+- `--tag-count <n>` - Maximum number of tags (default: 10)
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots summarize abc123 --tone playful
+```
+
+#### `mux robots moderate <asset-id>`
+
+Analyze video content for policy violations.
+
+**Options:**
+- `--language-code <code>` - BCP 47 code for transcript analysis
+- `--sampling-interval <seconds>` - Interval between sampled thumbnails (min 5)
+- `--max-samples <n>` - Maximum number of thumbnails to sample
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots moderate abc123
+```
+
+#### `mux robots generate-chapters <asset-id>`
+
+Automatically generate chapters for a video.
+
+**Options:**
+- `--language-code <code>` - BCP 47 code of the caption track to analyze
+- `--output-language-code <code>` - BCP 47 code for output chapter titles
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots generate-chapters abc123
+```
+
+#### `mux robots ask-questions <asset-id>`
+
+Ask questions about a video and get answers.
+
+**Options:**
+- `--question <question>` - Question to ask (required, repeatable)
+- `--language-code <code>` - BCP 47 code of the caption track to analyze
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots ask-questions abc123 --question "What is this video about?" --question "Are there children?"
+```
+
+#### `mux robots find-key-moments <asset-id>`
+
+Find key moments and highlights in a video.
+
+**Options:**
+- `--max-moments <n>` - Maximum number of key moments to extract (default: 5)
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots find-key-moments abc123 --max-moments 3
+```
+
+#### `mux robots translate-captions <asset-id>`
+
+Translate captions on a video to another language.
+
+**Options:**
+- `--track-id <id>` - Source caption track ID to translate (required)
+- `--to-language-code <code>` - BCP 47 code for translated output (required)
+- `--no-upload` - Do not upload the translated VTT to Mux
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots translate-captions abc123 --track-id track456 --to-language-code es
+```
+
+</details>
+
+<details>
 <summary><h3>Mux Data</h3></summary>
 
 Commands for video analytics, monitoring, and incident tracking via the Mux Data API.
@@ -1033,6 +1142,7 @@ src/
 │   ├── transcription-vocabularies/   # Transcription vocabulary management
 │   ├── delivery-usage/               # Delivery usage reports
 │   ├── drm-configurations/          # DRM configuration management
+│   ├── robots/                       # Mux Robots AI workflows
 │   ├── signing-keys/                 # Signing key management
 │   ├── video-views/                  # Mux Data: video view analytics
 │   ├── metrics/                      # Mux Data: metric analytics
@@ -1054,6 +1164,7 @@ src/
 │   ├── formatters.ts                 # Output formatting
 │   ├── data-filters.ts               # Mux Data filter utilities
 │   ├── mux.ts                        # Mux API client
+│   ├── robots.ts                     # Mux Robots API client
 │   ├── urls.ts                       # URL generation
 │   ├── signing.ts                    # JWT signing
 │   ├── webhook-signing.ts            # Webhook signature generation

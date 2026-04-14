@@ -18,6 +18,7 @@ import { metricsCommand } from './commands/metrics/index.ts';
 import { monitoringCommand } from './commands/monitoring/index.ts';
 import { playbackIdsCommand } from './commands/playback-ids/index.ts';
 import { playbackRestrictionsCommand } from './commands/playback-restrictions/index.ts';
+import { robotsCommand } from './commands/robots/index.ts';
 import { signCommand } from './commands/sign.ts';
 import { signingKeysCommand } from './commands/signing-keys/index.ts';
 import { transcriptionVocabulariesCommand } from './commands/transcription-vocabularies/index.ts';
@@ -84,6 +85,7 @@ const cli = new Command()
   .command('dimensions', dimensionsCommand)
   .command('errors', errorsCommand)
   .command('exports', exportsCommand)
+  .command('robots', robotsCommand)
   .command('webhooks', webhooksCommand)
   .command('whoami', whoamiCommand)
   .command('completions', new CompletionsCommand());
