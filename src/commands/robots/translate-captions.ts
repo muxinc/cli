@@ -10,7 +10,8 @@ interface TranslateCaptionsOptions {
   json?: boolean;
 }
 
-export const translateCaptionsCommand = new Command()
+// biome-ignore lint/suspicious/noExplicitAny: Cliffy's chained types are too complex for TS to infer
+export const translateCaptionsCommand: Command<any> = new Command()
   .description(
     'Create a job to translate captions on a video to another language',
   )

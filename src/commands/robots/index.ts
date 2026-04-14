@@ -10,7 +10,8 @@ import { moderateCommand } from './moderate.ts';
 import { summarizeCommand } from './summarize.ts';
 import { translateCaptionsCommand } from './translate-captions.ts';
 
-export const robotsCommand = new Command()
+// biome-ignore lint/suspicious/noExplicitAny: Cliffy's chained types are too complex for TS to infer
+export const robotsCommand: Command<any> = new Command()
   .description('Run AI-powered workflows on your video assets using Mux Robots')
   .action(function () {
     this.showHelp();
