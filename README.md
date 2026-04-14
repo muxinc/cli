@@ -82,7 +82,17 @@ The binary is self-contained and has no dependencies.
 
 ## Shell Completions
 
-Enable tab completion for commands, subcommands, and options by adding the appropriate line to your shell's config file:
+Enable tab completion for commands, subcommands, and options in your shell:
+
+```bash
+mux completions install
+```
+
+This detects your shell and adds the appropriate source line to your config file (e.g. `~/.zshrc`). Restart your shell or source the file to activate completions.
+
+### Manual setup
+
+If you prefer to configure completions yourself, add the appropriate line to your shell's config file:
 
 **Bash:** Add the following line to `~/.bashrc`:
 ```bash
