@@ -2,13 +2,18 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Command } from '@cliffy/command';
 import { listEnvironments, setEnvironment } from '../lib/config.ts';
-import { validateCredentials } from '../lib/mux.ts';
+import {
+  DEFAULT_BASE_URL,
+  getMuxBaseUrl,
+  validateCredentials,
+} from '../lib/mux.ts';
 import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
 import { getConfigPath } from '../lib/xdg.ts';
 
 export interface EnvVars {
   MUX_TOKEN_ID?: string;
   MUX_TOKEN_SECRET?: string;
+  MUX_BASE_URL?: string;
 }
 
 /**
@@ -48,6 +53,8 @@ export async function parseEnvFile(filePath: string): Promise<EnvVars> {
         envVars.MUX_TOKEN_ID = value;
       } else if (key === 'MUX_TOKEN_SECRET') {
         envVars.MUX_TOKEN_SECRET = value;
+      } else if (key === 'MUX_BASE_URL') {
+        envVars.MUX_BASE_URL = value;
       }
     }
   }
@@ -80,6 +87,8 @@ export const loginCommand = new Command()
       );
     }
 
+    let baseUrl: string;
+
     if (options.envFile) {
       // Read from .env file
       console.log(`Reading credentials from ${options.envFile}...`);
@@ -95,6 +104,9 @@ export const loginCommand = new Command()
 
       tokenId = envVars.MUX_TOKEN_ID;
       tokenSecret = envVars.MUX_TOKEN_SECRET;
+      baseUrl = getMuxBaseUrl({
+        environment: { baseUrl: envVars.MUX_BASE_URL },
+      });
     } else {
       // Interactive prompts
       console.log('Enter your Mux API credentials.');
@@ -111,13 +123,15 @@ export const loginCommand = new Command()
       if (!tokenSecret.trim()) {
         throw new Error('Token Secret is required');
       }
+
+      baseUrl = getMuxBaseUrl(null);
     }
 
-    // Validate credentials
     console.log('Validating credentials...');
     const validation = await validateCredentials(
       tokenId.trim(),
       tokenSecret.trim(),
+      baseUrl,
     );
 
     if (!validation.valid) {
@@ -131,6 +145,7 @@ export const loginCommand = new Command()
       tokenId: tokenId.trim(),
       tokenSecret: tokenSecret.trim(),
       environmentId: validation.environmentId,
+      ...(baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
     });
 
     console.log(

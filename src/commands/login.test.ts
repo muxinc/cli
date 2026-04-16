@@ -111,6 +111,22 @@ MUX_TOKEN_SECRET = test_secret_456`,
     expect(result.MUX_TOKEN_SECRET).toBe('test_secret_456');
   });
 
+  it('should parse MUX_BASE_URL', async () => {
+    const envPath = join(testDir, '.env');
+    await Bun.write(
+      envPath,
+      `MUX_TOKEN_ID=test_id_123
+MUX_TOKEN_SECRET=test_secret_456
+MUX_BASE_URL=https://api.staging.mux.com`,
+    );
+
+    const result = await parseEnvFile(envPath);
+
+    expect(result.MUX_TOKEN_ID).toBe('test_id_123');
+    expect(result.MUX_TOKEN_SECRET).toBe('test_secret_456');
+    expect(result.MUX_BASE_URL).toBe('https://api.staging.mux.com');
+  });
+
   it('should ignore other environment variables', async () => {
     const envPath = join(testDir, '.env');
     await Bun.write(

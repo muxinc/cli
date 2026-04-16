@@ -61,7 +61,7 @@ export const listenCommand = new Command()
     }
 
     const authHeaders = await getAuthHeaders();
-    const baseUrl = getMuxBaseUrl();
+    const baseUrl = getMuxBaseUrl(env);
     const url = `${baseUrl}/system/v1/webhook-events/stream`;
 
     let signingSecret: string | undefined;
