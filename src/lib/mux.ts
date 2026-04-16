@@ -33,9 +33,12 @@ export async function getMuxBaseUrl(): Promise<string> {
 }
 
 /**
- * Get auth headers for raw fetch requests to Mux API
+ * Get auth headers and base URL in a single config read.
  */
-export async function getAuthHeaders(): Promise<Record<string, string>> {
+export async function getAuthContext(): Promise<{
+  headers: Record<string, string>;
+  baseUrl: string;
+}> {
   const env = await getCurrentEnvironment();
   if (!env) {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
@@ -45,9 +48,19 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
     `${env.environment.tokenId}:${env.environment.tokenSecret}`,
   );
   return {
-    Authorization: `Basic ${credentials}`,
-    'User-Agent': getUserAgent(),
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      'User-Agent': getUserAgent(),
+    },
+    baseUrl: resolveBaseUrl(env),
   };
+}
+
+/**
+ * Get auth headers for raw fetch requests to Mux API
+ */
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  return (await getAuthContext()).headers;
 }
 
 /**

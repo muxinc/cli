@@ -1,5 +1,5 @@
 import { AuthenticationError, NotFoundError } from '@mux/mux-node';
-import { getAuthHeaders, getMuxBaseUrl } from './mux.ts';
+import { getAuthContext } from './mux.ts';
 
 /**
  * Format a permission error message for display.
@@ -47,8 +47,7 @@ async function fetchTokenInfo(): Promise<{
   tokenName?: string;
 } | null> {
   try {
-    const headers = await getAuthHeaders();
-    const baseUrl = await getMuxBaseUrl();
+    const { headers, baseUrl } = await getAuthContext();
     const response = await fetch(`${baseUrl}/system/v1/whoami`, { headers });
 
     if (!response.ok) return null;

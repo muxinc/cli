@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import { handleCommandError } from '@/lib/errors.ts';
-import { DEFAULT_BASE_URL, getAuthHeaders, getMuxBaseUrl } from '../lib/mux.ts';
+import { DEFAULT_BASE_URL, getAuthContext } from '../lib/mux.ts';
 
 interface WhoAmIOptions {
   json?: boolean;
@@ -11,8 +11,7 @@ export const whoamiCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: WhoAmIOptions) => {
     try {
-      const headers = await getAuthHeaders();
-      const baseUrl = await getMuxBaseUrl();
+      const { headers, baseUrl } = await getAuthContext();
       const response = await fetch(`${baseUrl}/system/v1/whoami`, { headers });
 
       if (!response.ok) {
