@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { getCurrentEnvironment } from './config.ts';
 import { setEnvironment } from './config.ts';
-import { DEFAULT_BASE_URL, getMuxBaseUrl } from './mux.ts';
+import { DEFAULT_BASE_URL, getMuxUrl } from './mux.ts';
 
-describe('getMuxBaseUrl', () => {
+describe('getMuxUrl', () => {
   let testConfigDir: string;
   let originalXdgConfigHome: string | undefined;
   let originalMuxBaseUrl: string | undefined;
@@ -33,7 +34,8 @@ describe('getMuxBaseUrl', () => {
   });
 
   it('should return default when no env var or config', async () => {
-    expect(await getMuxBaseUrl()).toBe(DEFAULT_BASE_URL);
+    const env = await getCurrentEnvironment();
+    expect(getMuxUrl(env)).toBe(DEFAULT_BASE_URL);
   });
 
   it('should prefer MUX_BASE_URL env var over everything', async () => {
@@ -44,7 +46,8 @@ describe('getMuxBaseUrl', () => {
       baseUrl: 'https://config.example.com',
     });
 
-    expect(await getMuxBaseUrl()).toBe('https://env-var.example.com');
+    const env = await getCurrentEnvironment();
+    expect(getMuxUrl(env)).toBe('https://env-var.example.com');
   });
 
   it('should use config baseUrl when no env var is set', async () => {
@@ -54,7 +57,8 @@ describe('getMuxBaseUrl', () => {
       baseUrl: 'https://api.staging.mux.com',
     });
 
-    expect(await getMuxBaseUrl()).toBe('https://api.staging.mux.com');
+    const env = await getCurrentEnvironment();
+    expect(getMuxUrl(env)).toBe('https://api.staging.mux.com');
   });
 
   it('should fall back to default when config has no baseUrl', async () => {
@@ -63,6 +67,7 @@ describe('getMuxBaseUrl', () => {
       tokenSecret: 'secret',
     });
 
-    expect(await getMuxBaseUrl()).toBe(DEFAULT_BASE_URL);
+    const env = await getCurrentEnvironment();
+    expect(getMuxUrl(env)).toBe(DEFAULT_BASE_URL);
   });
 });

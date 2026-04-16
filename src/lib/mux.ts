@@ -14,22 +14,13 @@ function getUserAgent(): string {
 /**
  * Resolve the Mux API base URL.
  * Priority: MUX_BASE_URL env var > config baseUrl > default
- * Pass a pre-fetched environment to avoid redundant config reads.
  */
-export function resolveBaseUrl(
+export function getMuxUrl(
   env?: { environment: { baseUrl?: string } } | null,
 ): string {
   return (
     process.env.MUX_BASE_URL || env?.environment.baseUrl || DEFAULT_BASE_URL
   );
-}
-
-/**
- * Get the Mux API base URL (reads config if needed).
- */
-export async function getMuxBaseUrl(): Promise<string> {
-  const env = await getCurrentEnvironment();
-  return resolveBaseUrl(env);
 }
 
 /**
@@ -52,7 +43,7 @@ export async function getAuthContext(): Promise<{
       Authorization: `Basic ${credentials}`,
       'User-Agent': getUserAgent(),
     },
-    baseUrl: resolveBaseUrl(env),
+    baseUrl: getMuxUrl(env),
   };
 }
 
@@ -73,7 +64,7 @@ export async function createAuthenticatedMuxClient(): Promise<Mux> {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
   }
 
-  const baseURL = resolveBaseUrl(env);
+  const baseURL = getMuxUrl(env);
 
   return new Mux({
     tokenId: env.environment.tokenId,
@@ -93,7 +84,7 @@ export async function validateCredentials(
   overrideBaseUrl?: string,
 ): Promise<{ valid: boolean; environmentId?: string; error?: string }> {
   try {
-    const baseUrl = overrideBaseUrl || (await getMuxBaseUrl());
+    const baseUrl = overrideBaseUrl || getMuxUrl(await getCurrentEnvironment());
     const credentials = btoa(`${tokenId}:${tokenSecret}`);
     const response = await fetch(`${baseUrl}/system/v1/whoami`, {
       headers: {

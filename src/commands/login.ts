@@ -4,7 +4,7 @@ import { Command } from '@cliffy/command';
 import { listEnvironments, setEnvironment } from '../lib/config.ts';
 import {
   DEFAULT_BASE_URL,
-  resolveBaseUrl,
+  getMuxUrl,
   validateCredentials,
 } from '../lib/mux.ts';
 import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
@@ -104,7 +104,7 @@ export const loginCommand = new Command()
 
       tokenId = envVars.MUX_TOKEN_ID;
       tokenSecret = envVars.MUX_TOKEN_SECRET;
-      baseUrl = resolveBaseUrl({
+      baseUrl = getMuxUrl({
         environment: { baseUrl: envVars.MUX_BASE_URL },
       });
     } else {
@@ -124,7 +124,7 @@ export const loginCommand = new Command()
         throw new Error('Token Secret is required');
       }
 
-      baseUrl = resolveBaseUrl(null);
+      baseUrl = getMuxUrl(null);
     }
 
     console.log('Validating credentials...');
