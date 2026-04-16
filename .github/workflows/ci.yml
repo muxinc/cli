@@ -59,3 +59,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build binary
         run: bun build --compile --minify --sourcemap ./src/index.ts --target=bun-${{ matrix.target }} --outfile ./dist/mux-${{ matrix.target }}
+      - name: Smoke test binary
+        run: ./dist/mux-${{ matrix.target }} --version
