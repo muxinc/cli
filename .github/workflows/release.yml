@@ -35,7 +35,9 @@ jobs:
         run: bun build --compile --minify --sourcemap ./src/index.ts --target=bun-${{ matrix.target }} --outfile ./dist/mux-${{ matrix.target }}
       - name: Codesign darwin binary (ad-hoc)
         if: startsWith(matrix.target, 'darwin-')
-        run: codesign --sign - --force ./dist/mux-${{ matrix.target }}
+        run: |
+          codesign --remove-signature ./dist/mux-${{ matrix.target }}
+          codesign --sign - ./dist/mux-${{ matrix.target }}
       - name: Smoke test binary
         run: ./dist/mux-${{ matrix.target }} --version
       - name: Verify darwin binary is codesigned
