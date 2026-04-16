@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getCurrentEnvironment } from './config.ts';
 import { setEnvironment } from './config.ts';
-import { DEFAULT_BASE_URL, getMuxUrl } from './mux.ts';
+import { DEFAULT_BASE_URL, getMuxBaseUrl } from './mux.ts';
 
-describe('getMuxUrl', () => {
+describe('getMuxBaseUrl', () => {
   let testConfigDir: string;
   let originalXdgConfigHome: string | undefined;
   let originalMuxBaseUrl: string | undefined;
@@ -35,7 +35,7 @@ describe('getMuxUrl', () => {
 
   it('should return default when no env var or config', async () => {
     const env = await getCurrentEnvironment();
-    expect(getMuxUrl(env)).toBe(DEFAULT_BASE_URL);
+    expect(getMuxBaseUrl(env)).toBe(DEFAULT_BASE_URL);
   });
 
   it('should prefer MUX_BASE_URL env var over everything', async () => {
@@ -47,7 +47,7 @@ describe('getMuxUrl', () => {
     });
 
     const env = await getCurrentEnvironment();
-    expect(getMuxUrl(env)).toBe('https://env-var.example.com');
+    expect(getMuxBaseUrl(env)).toBe('https://env-var.example.com');
   });
 
   it('should use config baseUrl when no env var is set', async () => {
@@ -58,7 +58,7 @@ describe('getMuxUrl', () => {
     });
 
     const env = await getCurrentEnvironment();
-    expect(getMuxUrl(env)).toBe('https://api.staging.mux.com');
+    expect(getMuxBaseUrl(env)).toBe('https://api.staging.mux.com');
   });
 
   it('should fall back to default when config has no baseUrl', async () => {
@@ -68,6 +68,6 @@ describe('getMuxUrl', () => {
     });
 
     const env = await getCurrentEnvironment();
-    expect(getMuxUrl(env)).toBe(DEFAULT_BASE_URL);
+    expect(getMuxBaseUrl(env)).toBe(DEFAULT_BASE_URL);
   });
 });
