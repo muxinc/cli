@@ -12,20 +12,20 @@ function getUserAgent(): string {
 }
 
 /**
- * Get the Mux API base URL.
+ * Resolve the Mux API base URL.
  * Priority: MUX_BASE_URL env var > config baseUrl > default
+ * Pass a pre-fetched environment to avoid redundant config reads.
+ */
+export function resolveBaseUrl(env?: { environment: { baseUrl?: string } } | null): string {
+  return process.env.MUX_BASE_URL || env?.environment.baseUrl || DEFAULT_BASE_URL;
+}
+
+/**
+ * Get the Mux API base URL (reads config if needed).
  */
 export async function getMuxBaseUrl(): Promise<string> {
-  if (process.env.MUX_BASE_URL) {
-    return process.env.MUX_BASE_URL;
-  }
-
   const env = await getCurrentEnvironment();
-  if (env?.environment.baseUrl) {
-    return env.environment.baseUrl;
-  }
-
-  return DEFAULT_BASE_URL;
+  return resolveBaseUrl(env);
 }
 
 /**
@@ -56,8 +56,7 @@ export async function createAuthenticatedMuxClient(): Promise<Mux> {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
   }
 
-  const baseURL =
-    process.env.MUX_BASE_URL || env.environment.baseUrl || DEFAULT_BASE_URL;
+  const baseURL = resolveBaseUrl(env);
 
   return new Mux({
     tokenId: env.environment.tokenId,
