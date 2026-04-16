@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Command } from '@cliffy/command';
 import { listEnvironments, setEnvironment } from '../lib/config.ts';
-import { DEFAULT_BASE_URL, validateCredentials } from '../lib/mux.ts';
+import { DEFAULT_BASE_URL, resolveBaseUrl, validateCredentials } from '../lib/mux.ts';
 import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
 import { getConfigPath } from '../lib/xdg.ts';
 
@@ -83,9 +83,7 @@ export const loginCommand = new Command()
       );
     }
 
-    // Resolve base URL: env-file > MUX_BASE_URL env var > default
-    // Only persist to config if nonstandard
-    let baseUrl: string | undefined;
+    let baseUrl: string;
 
     if (options.envFile) {
       // Read from .env file
@@ -102,7 +100,7 @@ export const loginCommand = new Command()
 
       tokenId = envVars.MUX_TOKEN_ID;
       tokenSecret = envVars.MUX_TOKEN_SECRET;
-      baseUrl = envVars.MUX_BASE_URL || process.env.MUX_BASE_URL;
+      baseUrl = resolveBaseUrl({ environment: { baseUrl: envVars.MUX_BASE_URL } });
     } else {
       // Interactive prompts
       console.log('Enter your Mux API credentials.');
@@ -120,11 +118,10 @@ export const loginCommand = new Command()
         throw new Error('Token Secret is required');
       }
 
-      baseUrl = process.env.MUX_BASE_URL;
+      baseUrl = resolveBaseUrl(null);
     }
 
-    // Validate credentials against the resolved base URL (never fall through to config)
-    const validationUrl = baseUrl || DEFAULT_BASE_URL;
+    const validationUrl = baseUrl;
     console.log('Validating credentials...');
     const validation = await validateCredentials(
       tokenId.trim(),
@@ -143,7 +140,7 @@ export const loginCommand = new Command()
       tokenId: tokenId.trim(),
       tokenSecret: tokenSecret.trim(),
       environmentId: validation.environmentId,
-      ...(baseUrl && baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
+      ...(baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
     });
 
     console.log(
