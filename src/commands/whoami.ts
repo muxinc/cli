@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import { handleCommandError } from '@/lib/errors.ts';
-import { getAuthHeaders, getMuxBaseUrl } from '../lib/mux.ts';
+import { DEFAULT_BASE_URL, getAuthHeaders, getMuxBaseUrl } from '../lib/mux.ts';
 
 interface WhoAmIOptions {
   json?: boolean;
@@ -38,6 +38,9 @@ export const whoamiCommand = new Command()
       console.log(
         `Permissions:   ${(data.permissions as string[]).join(', ')}`,
       );
+      if (baseUrl !== DEFAULT_BASE_URL) {
+        console.log(`API endpoint:  ${baseUrl}`);
+      }
     } catch (error) {
       await handleCommandError(error, 'whoami', 'get', options);
     }
