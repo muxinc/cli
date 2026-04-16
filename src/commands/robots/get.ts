@@ -1,55 +1,30 @@
 import { Command } from '@cliffy/command';
-import type Mux from '@mux/mux-node';
-import type {
-  AskQuestionsJob,
-  FindKeyMomentsJob,
-  GenerateChaptersJob,
-  ModerateJob,
-  SummarizeJob,
-  TranslateCaptionsJob,
-} from '@mux/mux-node/resources/robots-preview/jobs';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatCreatedAt } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import { type RobotsWorkflow, retrieveRobotsJob } from './_shared.ts';
 
-type AnyJob =
-  | AskQuestionsJob
-  | FindKeyMomentsJob
-  | GenerateChaptersJob
-  | ModerateJob
-  | SummarizeJob
-  | TranslateCaptionsJob;
-
-type Workflow = AnyJob['workflow'];
+const WORKFLOWS: RobotsWorkflow[] = [
+  'ask-questions',
+  'find-key-moments',
+  'generate-chapters',
+  'moderate',
+  'summarize',
+  'translate-captions',
+];
 
 interface GetOptions {
   workflow: string;
   json?: boolean;
 }
 
-function retrieveJob(
-  mux: Mux,
-  workflow: string,
-  jobId: string,
-): Promise<AnyJob> {
-  switch (workflow as Workflow) {
-    case 'ask-questions':
-      return mux.robotsPreview.jobs.askQuestions.retrieve(jobId);
-    case 'find-key-moments':
-      return mux.robotsPreview.jobs.findKeyMoments.retrieve(jobId);
-    case 'generate-chapters':
-      return mux.robotsPreview.jobs.generateChapters.retrieve(jobId);
-    case 'moderate':
-      return mux.robotsPreview.jobs.moderate.retrieve(jobId);
-    case 'summarize':
-      return mux.robotsPreview.jobs.summarize.retrieve(jobId);
-    case 'translate-captions':
-      return mux.robotsPreview.jobs.translateCaptions.retrieve(jobId);
-    default:
-      throw new Error(
-        `Unknown workflow: ${workflow}. Must be one of: ask-questions, find-key-moments, generate-chapters, moderate, summarize, translate-captions.`,
-      );
+function assertWorkflow(workflow: string): RobotsWorkflow {
+  if (!WORKFLOWS.includes(workflow as RobotsWorkflow)) {
+    throw new Error(
+      `Unknown workflow: ${workflow}. Must be one of: ${WORKFLOWS.join(', ')}.`,
+    );
   }
+  return workflow as RobotsWorkflow;
 }
 
 export const getCommand = new Command()
@@ -63,8 +38,9 @@ export const getCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: GetOptions, jobId: string) => {
     try {
+      const workflow = assertWorkflow(options.workflow);
       const mux = await createAuthenticatedMuxClient();
-      const job = await retrieveJob(mux, options.workflow, jobId);
+      const job = await retrieveRobotsJob(mux, workflow, jobId);
 
       if (options.json) {
         console.log(JSON.stringify(job, null, 2));
