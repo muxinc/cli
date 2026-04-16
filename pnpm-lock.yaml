@@ -18,8 +18,8 @@ importers:
         specifier: npm:@jsr/cliffy__prompt@1.0.0-rc.8
         version: '@jsr/cliffy__prompt@1.0.0-rc.8'
       '@mux/mux-node':
-        specifier: file:./mux-mux-node-v14.0.0-alpha.4.tgz
-        version: file:mux-mux-node-v14.0.0-alpha.4.tgz
+        specifier: ^14.0.0
+        version: 14.0.0
       '@opentui/core':
         specifier: ^0.1.50
         version: 0.1.50(stage-js@1.0.0-alpha.17)(typescript@5.9.3)(web-tree-sitter@0.25.10)
@@ -278,9 +278,8 @@ packages:
   '@jsr/std__text@1.0.16':
     resolution: {integrity: sha512-UawOIn+Vu0BBusfOpToMXHISa/z8vDUKxXntQGVM5w6e9W1XkFzylnbc0cWWa9f0dESlxDyjvReHzPNM86hYlA==, tarball: https://npm.jsr.io/~/11/@jsr/std__text/1.0.16.tgz}
 
-  '@mux/mux-node@file:mux-mux-node-v14.0.0-alpha.4.tgz':
-    resolution: {integrity: sha512-wWi0DLpa314DCFEWmhI6N8QG1d5TTH9SSuensbob13G4tu/JMfmtpRvx2ZlT0RJ6UtT7hujZyQOSQCTHWInH1w==, tarball: file:mux-mux-node-v14.0.0-alpha.4.tgz}
-    version: 14.0.0-alpha.4
+  '@mux/mux-node@14.0.0':
+    resolution: {integrity: sha512-jhp1a7OACEQKzOr7Zz9yquW0Gma/XSWvbvUnRiRRMs5ObNWKAaRVDCMBEorbVDawDTxwlQNfGKViuvzCXWUJpQ==}
     hasBin: true
 
   '@opentui/core-darwin-arm64@0.1.50':
@@ -885,7 +884,7 @@ snapshots:
     dependencies:
       '@jsr/std__regexp': 1.0.1
 
-  '@mux/mux-node@file:mux-mux-node-v14.0.0-alpha.4.tgz': {}
+  '@mux/mux-node@14.0.0': {}
 
   '@opentui/core-darwin-arm64@0.1.50':
     optional: true

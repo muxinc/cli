@@ -52,7 +52,7 @@
     "@cliffy/ansi": "jsr:1.0.0-rc.8",
     "@cliffy/command": "jsr:1.0.0-rc.8",
     "@cliffy/prompt": "npm:@jsr/cliffy__prompt@1.0.0-rc.8",
-    "@mux/mux-node": "file:./mux-mux-node-v14.0.0-alpha.4.tgz",
+    "@mux/mux-node": "^14.0.0",
     "@opentui/core": "^0.1.50",
     "@opentui/react": "^0.1.50",
     "@std/path": "npm:@jsr/std__path@^1.1.3",
