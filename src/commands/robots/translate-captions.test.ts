@@ -7,16 +7,22 @@ import {
   spyOn,
   test,
 } from 'bun:test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { translateCaptionsCommand } from './translate-captions.ts';
 
 // Note: These tests focus on CLI flag parsing and command structure
 // They do NOT test the actual Mux API integration (that's tested via E2E)
 
 describe('mux robots translate-captions', () => {
+  let tempDir: string;
   let exitSpy: Mock<typeof process.exit>;
   let consoleErrorSpy: Mock<typeof console.error>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'mux-cli-robots-test-'));
+
     exitSpy = spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit called');
     }) as never);
@@ -24,7 +30,8 @@ describe('mux robots translate-captions', () => {
     consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
     exitSpy?.mockRestore();
     consoleErrorSpy?.mockRestore();
   });
@@ -80,6 +87,20 @@ describe('mux robots translate-captions', () => {
         .find((o) => o.name === 'json');
       expect(opt).toBeDefined();
     });
+
+    test('has --wait flag', () => {
+      const opt = translateCaptionsCommand
+        .getOptions()
+        .find((o) => o.name === 'wait');
+      expect(opt).toBeDefined();
+    });
+
+    test('has --file flag', () => {
+      const opt = translateCaptionsCommand
+        .getOptions()
+        .find((o) => o.name === 'file');
+      expect(opt).toBeDefined();
+    });
   });
 
   describe('Input validation', () => {
@@ -91,6 +112,48 @@ describe('mux robots translate-captions', () => {
       }
 
       expect(exitSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('--file mode', () => {
+    test('errors when config file does not exist', async () => {
+      const configPath = join(tempDir, 'nope.json');
+      try {
+        await translateCaptionsCommand.parse([
+          'asset_abc',
+          '--file',
+          configPath,
+        ]);
+      } catch (_error) {
+        // Expected
+      }
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const msg = consoleErrorSpy.mock.calls[0]?.[0] ?? '';
+      expect(msg).toMatch(/file not found/i);
+    });
+
+    test('errors when --file combined with --track-id', async () => {
+      const configPath = join(tempDir, 'config.json');
+      await writeFile(
+        configPath,
+        JSON.stringify({ track_id: 'track_1', to_language_code: 'es' }),
+      );
+      try {
+        await translateCaptionsCommand.parse([
+          'asset_abc',
+          '--file',
+          configPath,
+          '--track-id',
+          'track_2',
+          '--to-language-code',
+          'es',
+        ]);
+      } catch (_error) {
+        // Expected
+      }
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const msg = consoleErrorSpy.mock.calls[0]?.[0] ?? '';
+      expect(msg).toMatch(/--file cannot be combined/i);
     });
   });
 });
