@@ -63,4 +63,4 @@ jobs:
         run: ./dist/mux-${{ matrix.target }} --version
       - name: Verify darwin binary is codesigned
         if: startsWith(matrix.target, 'darwin-')
-        run: codesign --verify --strict ./dist/mux-${{ matrix.target }}
+        run: codesign -vvv --verify --strict ./dist/mux-${{ matrix.target }}
