@@ -185,5 +185,24 @@ describe('mux robots find-key-moments', () => {
       const msg = consoleErrorSpy.mock.calls[0]?.[0] ?? '';
       expect(msg).toMatch(/--file cannot be combined/i);
     });
+
+    test('errors with FILE_MUTEX when --file combined with only --target-duration-max-ms', async () => {
+      const configPath = join(tempDir, 'config.json');
+      await writeFile(configPath, JSON.stringify({ max_moments: 3 }));
+      try {
+        await findKeyMomentsCommand.parse([
+          'asset_abc',
+          '--file',
+          configPath,
+          '--target-duration-max-ms',
+          '5000',
+        ]);
+      } catch (_error) {
+        // Expected
+      }
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const msg = consoleErrorSpy.mock.calls[0]?.[0] ?? '';
+      expect(msg).toMatch(/--file cannot be combined/i);
+    });
   });
 });

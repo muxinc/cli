@@ -64,17 +64,20 @@ export const findKeyMomentsCommand: Command<any> = new Command()
     try {
       const minMs = options.targetDurationMinMs;
       const maxMs = options.targetDurationMaxMs;
+
+      const hasShapeFlags =
+        options.maxMoments !== undefined ||
+        minMs !== undefined ||
+        maxMs !== undefined;
+
+      if (options.file && hasShapeFlags) {
+        throw new Error(FILE_MUTEX_MSG);
+      }
+
       if ((minMs === undefined) !== (maxMs === undefined)) {
         throw new Error(
           '--target-duration-min-ms and --target-duration-max-ms must be provided together.',
         );
-      }
-
-      const hasShapeFlags =
-        options.maxMoments !== undefined || minMs !== undefined;
-
-      if (options.file && hasShapeFlags) {
-        throw new Error(FILE_MUTEX_MSG);
       }
 
       let parameters: FindKeyMomentsJobParameters;
