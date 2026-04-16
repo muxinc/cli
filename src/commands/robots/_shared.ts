@@ -81,6 +81,14 @@ export function retrieveRobotsJob(
   }
 }
 
+export function assertJobCompleted(job: AnyRobotsJob): void {
+  if (job.status === 'completed') return;
+  const details = job.errors?.length
+    ? `: ${job.errors.map((e) => `${e.type}: ${e.message}`).join('; ')}`
+    : '';
+  throw new Error(`Job ${job.id} ended with status "${job.status}"${details}`);
+}
+
 export async function pollForRobotsJob(
   mux: Mux,
   workflow: RobotsWorkflow,

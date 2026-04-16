@@ -6,6 +6,7 @@ import type {
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import {
+  assertJobCompleted,
   FILE_MUTEX_MSG,
   loadJobParameters,
   pollForRobotsJob,
@@ -165,13 +166,12 @@ export const summarizeCommand: Command<any> = new Command()
 
       if (options.json) {
         console.log(JSON.stringify(job, null, 2));
-        return;
-      }
-
-      if (options.wait && job.outputs) {
+      } else if (options.wait && job.outputs) {
         console.log('Outputs:');
         console.log(JSON.stringify(job.outputs, null, 2));
       }
+
+      if (options.wait) assertJobCompleted(job);
     } catch (error) {
       await handleCommandError(error, 'robots', 'summarize', options);
     }
