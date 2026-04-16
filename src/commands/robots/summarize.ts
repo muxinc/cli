@@ -148,6 +148,12 @@ export const summarizeCommand: Command<any> = new Command()
       const mux = await createAuthenticatedMuxClient();
       let job = await mux.robotsPreview.jobs.summarize.create(body);
 
+      if (!options.json) {
+        console.log('Summarize job created');
+        console.log(`  Job ID: ${job.id}`);
+        console.log(`  Status: ${job.status}`);
+      }
+
       if (options.wait) {
         job = (await pollForRobotsJob(
           mux,
@@ -162,9 +168,6 @@ export const summarizeCommand: Command<any> = new Command()
         return;
       }
 
-      console.log('Summarize job created');
-      console.log(`  Job ID: ${job.id}`);
-      console.log(`  Status: ${job.status}`);
       if (options.wait && job.outputs) {
         console.log('Outputs:');
         console.log(JSON.stringify(job.outputs, null, 2));

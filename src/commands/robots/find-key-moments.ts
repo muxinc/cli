@@ -99,6 +99,12 @@ export const findKeyMomentsCommand: Command<any> = new Command()
       const mux = await createAuthenticatedMuxClient();
       let job = await mux.robotsPreview.jobs.findKeyMoments.create(body);
 
+      if (!options.json) {
+        console.log('Find key moments job created');
+        console.log(`  Job ID: ${job.id}`);
+        console.log(`  Status: ${job.status}`);
+      }
+
       if (options.wait) {
         job = (await pollForRobotsJob(
           mux,
@@ -113,9 +119,6 @@ export const findKeyMomentsCommand: Command<any> = new Command()
         return;
       }
 
-      console.log('Find key moments job created');
-      console.log(`  Job ID: ${job.id}`);
-      console.log(`  Status: ${job.status}`);
       if (options.wait && job.outputs) {
         console.log('Outputs:');
         console.log(JSON.stringify(job.outputs, null, 2));
