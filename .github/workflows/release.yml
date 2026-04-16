@@ -35,6 +35,9 @@ jobs:
         run: bun build --compile --minify --sourcemap ./src/index.ts --target=bun-${{ matrix.target }} --outfile ./dist/mux-${{ matrix.target }}
       - name: Smoke test binary
         run: ./dist/mux-${{ matrix.target }} --version
+      - name: Verify darwin binary is codesigned
+        if: startsWith(matrix.target, 'darwin-')
+        run: codesign --verify --strict ./dist/mux-${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
           name: mux-${{ matrix.target }}
