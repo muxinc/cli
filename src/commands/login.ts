@@ -121,12 +121,11 @@ export const loginCommand = new Command()
       baseUrl = resolveBaseUrl(null);
     }
 
-    const validationUrl = baseUrl;
     console.log('Validating credentials...');
     const validation = await validateCredentials(
       tokenId.trim(),
       tokenSecret.trim(),
-      validationUrl,
+      baseUrl,
     );
 
     if (!validation.valid) {
