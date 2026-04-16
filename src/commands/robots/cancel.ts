@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import { handleCommandError } from '@/lib/errors.ts';
-import { cancelJob } from '@/lib/robots.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface CancelOptions {
   json?: boolean;
@@ -12,14 +12,14 @@ export const cancelCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: CancelOptions, jobId: string) => {
     try {
-      const result = await cancelJob(jobId);
+      const mux = await createAuthenticatedMuxClient();
+      const job = await mux.robotsPreview.jobs.cancel(jobId);
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify(job, null, 2));
         return;
       }
 
-      const job = result.data;
       console.log(`Job ${job.id} cancelled`);
       console.log(`  Workflow: ${job.workflow}`);
       console.log(`  Status: ${job.status}`);

@@ -1,7 +1,11 @@
 import { Command } from '@cliffy/command';
+import type { JobListParams } from '@mux/mux-node/resources/robots-preview/jobs';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatCreatedAt } from '@/lib/formatters.ts';
-import { listJobs } from '@/lib/robots.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+
+type JobWorkflow = NonNullable<JobListParams['workflow']>;
+type JobStatus = NonNullable<JobListParams['status']>;
 
 interface ListOptions {
   workflow?: string;
@@ -29,20 +33,23 @@ export const listCommand = new Command()
   .option('--compact', 'Output one line per job (grep-friendly)')
   .action(async (options: ListOptions) => {
     try {
-      const result = await listJobs({
-        workflow: options.workflow,
-        status: options.status,
-        assetId: options.assetId,
+      const mux = await createAuthenticatedMuxClient();
+
+      const params: JobListParams = {
         limit: options.limit,
         page: options.page,
-      });
+      };
+      if (options.workflow) params.workflow = options.workflow as JobWorkflow;
+      if (options.status) params.status = options.status as JobStatus;
+      if (options.assetId) params.asset_id = options.assetId;
+
+      const response = await mux.robotsPreview.jobs.list(params);
+      const data = response.data ?? [];
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify({ data }, null, 2));
         return;
       }
-
-      const data = result.data ?? [];
 
       if (data.length === 0) {
         console.log('No jobs found.');
@@ -58,11 +65,7 @@ export const listCommand = new Command()
           console.log(`Job ID: ${job.id}`);
           console.log(`  Workflow: ${job.workflow}`);
           console.log(`  Status: ${job.status}`);
-          if (job.created_at !== undefined) {
-            console.log(
-              `  Created: ${formatCreatedAt(String(job.created_at))}`,
-            );
-          }
+          console.log(`  Created: ${formatCreatedAt(String(job.created_at))}`);
           console.log('');
         }
       }

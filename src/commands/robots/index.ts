@@ -1,7 +1,6 @@
 import { Command } from '@cliffy/command';
 import { askQuestionsCommand } from './ask-questions.ts';
 import { cancelCommand } from './cancel.ts';
-import { deleteCommand } from './delete.ts';
 import { findKeyMomentsCommand } from './find-key-moments.ts';
 import { generateChaptersCommand } from './generate-chapters.ts';
 import { getCommand } from './get.ts';
@@ -18,7 +17,6 @@ export const robotsCommand: Command<any> = new Command()
   })
   .command('list', listCommand)
   .command('get', getCommand)
-  .command('delete', deleteCommand)
   .command('cancel', cancelCommand)
   .command('summarize', summarizeCommand)
   .command('moderate', moderateCommand)

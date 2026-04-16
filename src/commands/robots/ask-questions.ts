@@ -1,6 +1,10 @@
 import { Command } from '@cliffy/command';
+import type {
+  AskQuestionCreateParams,
+  AskQuestionsJobParameters,
+} from '@mux/mux-node/resources/robots-preview/jobs';
 import { handleCommandError } from '@/lib/errors.ts';
-import { createJob } from '@/lib/robots.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface AskQuestionsOptions {
   question: string[];
@@ -28,27 +32,26 @@ export const askQuestionsCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: AskQuestionsOptions, assetId: string) => {
     try {
-      const questions = options.question.map((q) => ({ question: q }));
-      const params: Record<string, unknown> = {
+      const parameters: AskQuestionsJobParameters = {
         asset_id: assetId,
-        questions,
+        questions: options.question.map((q) => ({ question: q })),
       };
       if (options.languageCode !== undefined)
-        params.language_code = options.languageCode;
+        parameters.language_code = options.languageCode;
 
-      const body: Record<string, unknown> = { parameters: params };
+      const body: AskQuestionCreateParams = { parameters };
       if (options.passthrough !== undefined)
         body.passthrough = options.passthrough;
 
-      const result = await createJob('ask-questions', body);
+      const mux = await createAuthenticatedMuxClient();
+      const job = await mux.robotsPreview.jobs.askQuestions.create(body);
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify(job, null, 2));
         return;
       }
 
-      const job = result.data;
-      console.log(`Ask questions job created`);
+      console.log('Ask questions job created');
       console.log(`  Job ID: ${job.id}`);
       console.log(`  Status: ${job.status}`);
     } catch (error) {

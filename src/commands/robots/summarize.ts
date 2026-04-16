@@ -1,6 +1,12 @@
 import { Command } from '@cliffy/command';
+import type {
+  SummarizeCreateParams,
+  SummarizeJobParameters,
+} from '@mux/mux-node/resources/robots-preview/jobs';
 import { handleCommandError } from '@/lib/errors.ts';
-import { createJob } from '@/lib/robots.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+
+type Tone = NonNullable<SummarizeJobParameters['tone']>;
 
 interface SummarizeOptions {
   tone?: string;
@@ -46,31 +52,32 @@ export const summarizeCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: SummarizeOptions, assetId: string) => {
     try {
-      const params: Record<string, unknown> = { asset_id: assetId };
-      if (options.tone !== undefined) params.tone = options.tone;
+      const parameters: SummarizeJobParameters = { asset_id: assetId };
+      if (options.tone !== undefined) parameters.tone = options.tone as Tone;
       if (options.languageCode !== undefined)
-        params.language_code = options.languageCode;
+        parameters.language_code = options.languageCode;
       if (options.outputLanguageCode !== undefined)
-        params.output_language_code = options.outputLanguageCode;
+        parameters.output_language_code = options.outputLanguageCode;
       if (options.titleLength !== undefined)
-        params.title_length = options.titleLength;
+        parameters.title_length = options.titleLength;
       if (options.descriptionLength !== undefined)
-        params.description_length = options.descriptionLength;
-      if (options.tagCount !== undefined) params.tag_count = options.tagCount;
+        parameters.description_length = options.descriptionLength;
+      if (options.tagCount !== undefined)
+        parameters.tag_count = options.tagCount;
 
-      const body: Record<string, unknown> = { parameters: params };
+      const body: SummarizeCreateParams = { parameters };
       if (options.passthrough !== undefined)
         body.passthrough = options.passthrough;
 
-      const result = await createJob('summarize', body);
+      const mux = await createAuthenticatedMuxClient();
+      const job = await mux.robotsPreview.jobs.summarize.create(body);
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify(job, null, 2));
         return;
       }
 
-      const job = result.data;
-      console.log(`Summarize job created`);
+      console.log('Summarize job created');
       console.log(`  Job ID: ${job.id}`);
       console.log(`  Status: ${job.status}`);
     } catch (error) {

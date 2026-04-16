@@ -1,11 +1,17 @@
 import { Command } from '@cliffy/command';
+import type {
+  ModerateCreateParams,
+  ModerateJobParameters,
+} from '@mux/mux-node/resources/robots-preview/jobs';
 import { handleCommandError } from '@/lib/errors.ts';
-import { createJob } from '@/lib/robots.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface ModerateOptions {
   languageCode?: string;
   samplingInterval?: number;
   maxSamples?: number;
+  thresholdSexual?: number;
+  thresholdViolence?: number;
   passthrough?: string;
   json?: boolean;
 }
@@ -17,7 +23,7 @@ export const moderateCommand = new Command()
   .arguments('<asset-id:string>')
   .option(
     '--language-code <languageCode:string>',
-    'BCP 47 language code for transcript analysis',
+    'BCP 47 language code for transcript analysis (audio-only assets)',
   )
   .option(
     '--sampling-interval <samplingInterval:number>',
@@ -28,33 +34,51 @@ export const moderateCommand = new Command()
     'Maximum number of thumbnails to sample',
   )
   .option(
+    '--threshold-sexual <thresholdSexual:number>',
+    'Score threshold (0.0-1.0) for sexual content (default 0.7)',
+  )
+  .option(
+    '--threshold-violence <thresholdViolence:number>',
+    'Score threshold (0.0-1.0) for violent content (default 0.8)',
+  )
+  .option(
     '--passthrough <passthrough:string>',
     'Arbitrary metadata returned in API responses (max 255 chars)',
   )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: ModerateOptions, assetId: string) => {
     try {
-      const params: Record<string, unknown> = { asset_id: assetId };
+      const parameters: ModerateJobParameters = { asset_id: assetId };
       if (options.languageCode !== undefined)
-        params.language_code = options.languageCode;
+        parameters.language_code = options.languageCode;
       if (options.samplingInterval !== undefined)
-        params.sampling_interval = options.samplingInterval;
+        parameters.sampling_interval = options.samplingInterval;
       if (options.maxSamples !== undefined)
-        params.max_samples = options.maxSamples;
+        parameters.max_samples = options.maxSamples;
+      if (
+        options.thresholdSexual !== undefined ||
+        options.thresholdViolence !== undefined
+      ) {
+        parameters.thresholds = {};
+        if (options.thresholdSexual !== undefined)
+          parameters.thresholds.sexual = options.thresholdSexual;
+        if (options.thresholdViolence !== undefined)
+          parameters.thresholds.violence = options.thresholdViolence;
+      }
 
-      const body: Record<string, unknown> = { parameters: params };
+      const body: ModerateCreateParams = { parameters };
       if (options.passthrough !== undefined)
         body.passthrough = options.passthrough;
 
-      const result = await createJob('moderate', body);
+      const mux = await createAuthenticatedMuxClient();
+      const job = await mux.robotsPreview.jobs.moderate.create(body);
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify(job, null, 2));
         return;
       }
 
-      const job = result.data;
-      console.log(`Moderate job created`);
+      console.log('Moderate job created');
       console.log(`  Job ID: ${job.id}`);
       console.log(`  Status: ${job.status}`);
     } catch (error) {

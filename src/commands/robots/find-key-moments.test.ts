@@ -51,6 +51,20 @@ describe('mux robots find-key-moments', () => {
       expect(opt).toBeDefined();
     });
 
+    test('has --target-duration-min-ms flag', () => {
+      const opt = findKeyMomentsCommand
+        .getOptions()
+        .find((o) => o.name === 'target-duration-min-ms');
+      expect(opt).toBeDefined();
+    });
+
+    test('has --target-duration-max-ms flag', () => {
+      const opt = findKeyMomentsCommand
+        .getOptions()
+        .find((o) => o.name === 'target-duration-max-ms');
+      expect(opt).toBeDefined();
+    });
+
     test('has --passthrough flag', () => {
       const opt = findKeyMomentsCommand
         .getOptions()

@@ -179,6 +179,12 @@ async function createFromUploads(
 
     const upload = await mux.video.uploads.create(uploadParams);
 
+    if (!upload.url) {
+      throw new Error(
+        `Mux returned upload ${upload.id} without a signed URL; cannot upload ${file.name}.`,
+      );
+    }
+
     // Upload the file
     await uploadFile(file.path, upload.url, upload.id, (percent) => {
       if (!options.json && percent === 100) {

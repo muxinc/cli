@@ -63,6 +63,20 @@ describe('mux robots moderate', () => {
       expect(opt).toBeDefined();
     });
 
+    test('has --threshold-sexual flag', () => {
+      const opt = moderateCommand
+        .getOptions()
+        .find((o) => o.name === 'threshold-sexual');
+      expect(opt).toBeDefined();
+    });
+
+    test('has --threshold-violence flag', () => {
+      const opt = moderateCommand
+        .getOptions()
+        .find((o) => o.name === 'threshold-violence');
+      expect(opt).toBeDefined();
+    });
+
     test('has --passthrough flag', () => {
       const opt = moderateCommand
         .getOptions()

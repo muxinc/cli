@@ -1,11 +1,55 @@
 import { Command } from '@cliffy/command';
+import type Mux from '@mux/mux-node';
+import type {
+  AskQuestionsJob,
+  FindKeyMomentsJob,
+  GenerateChaptersJob,
+  ModerateJob,
+  SummarizeJob,
+  TranslateCaptionsJob,
+} from '@mux/mux-node/resources/robots-preview/jobs';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatCreatedAt } from '@/lib/formatters.ts';
-import { getJob } from '@/lib/robots.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+
+type AnyJob =
+  | AskQuestionsJob
+  | FindKeyMomentsJob
+  | GenerateChaptersJob
+  | ModerateJob
+  | SummarizeJob
+  | TranslateCaptionsJob;
+
+type Workflow = AnyJob['workflow'];
 
 interface GetOptions {
   workflow: string;
   json?: boolean;
+}
+
+function retrieveJob(
+  mux: Mux,
+  workflow: string,
+  jobId: string,
+): Promise<AnyJob> {
+  switch (workflow as Workflow) {
+    case 'ask-questions':
+      return mux.robotsPreview.jobs.askQuestions.retrieve(jobId);
+    case 'find-key-moments':
+      return mux.robotsPreview.jobs.findKeyMoments.retrieve(jobId);
+    case 'generate-chapters':
+      return mux.robotsPreview.jobs.generateChapters.retrieve(jobId);
+    case 'moderate':
+      return mux.robotsPreview.jobs.moderate.retrieve(jobId);
+    case 'summarize':
+      return mux.robotsPreview.jobs.summarize.retrieve(jobId);
+    case 'translate-captions':
+      return mux.robotsPreview.jobs.translateCaptions.retrieve(jobId);
+    default:
+      throw new Error(
+        `Unknown workflow: ${workflow}. Must be one of: ask-questions, find-key-moments, generate-chapters, moderate, summarize, translate-captions.`,
+      );
+  }
 }
 
 export const getCommand = new Command()
@@ -19,35 +63,27 @@ export const getCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: GetOptions, jobId: string) => {
     try {
-      const result = await getJob(options.workflow, jobId);
-      const job = result.data;
+      const mux = await createAuthenticatedMuxClient();
+      const job = await retrieveJob(mux, options.workflow, jobId);
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify(job, null, 2));
         return;
       }
 
       console.log(`Job ID: ${job.id}`);
       console.log(`Workflow: ${job.workflow}`);
       console.log(`Status: ${job.status}`);
-      if (job.units_consumed !== undefined) {
-        console.log(`Units consumed: ${job.units_consumed}`);
-      }
-      if (job.created_at !== undefined) {
-        console.log(`Created: ${formatCreatedAt(String(job.created_at))}`);
-      }
-      if (job.updated_at !== undefined) {
-        console.log(`Updated: ${formatCreatedAt(String(job.updated_at))}`);
-      }
+      console.log(`Units consumed: ${job.units_consumed}`);
+      console.log(`Created: ${formatCreatedAt(String(job.created_at))}`);
+      console.log(`Updated: ${formatCreatedAt(String(job.updated_at))}`);
       if (job.passthrough) {
         console.log(`Passthrough: ${job.passthrough}`);
       }
 
-      if (job.parameters) {
-        console.log('Parameters:');
-        for (const [key, value] of Object.entries(job.parameters)) {
-          console.log(`  ${key}: ${JSON.stringify(value)}`);
-        }
+      console.log('Parameters:');
+      for (const [key, value] of Object.entries(job.parameters)) {
+        console.log(`  ${key}: ${JSON.stringify(value)}`);
       }
 
       if (job.outputs) {

@@ -1,11 +1,15 @@
 import { Command } from '@cliffy/command';
+import type {
+  TranslateCaptionCreateParams,
+  TranslateCaptionsJobParameters,
+} from '@mux/mux-node/resources/robots-preview/jobs';
 import { handleCommandError } from '@/lib/errors.ts';
-import { createJob } from '@/lib/robots.ts';
+import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface TranslateCaptionsOptions {
   trackId: string;
   toLanguageCode: string;
-  noUpload?: boolean;
+  upload?: boolean;
   passthrough?: string;
   json?: boolean;
 }
@@ -19,9 +23,7 @@ export const translateCaptionsCommand: Command<any> = new Command()
   .option(
     '--track-id <trackId:string>',
     'Source caption track ID to translate',
-    {
-      required: true,
-    },
+    { required: true },
   )
   .option(
     '--to-language-code <toLanguageCode:string>',
@@ -39,28 +41,28 @@ export const translateCaptionsCommand: Command<any> = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: TranslateCaptionsOptions, assetId: string) => {
     try {
-      const params: Record<string, unknown> = {
+      const parameters: TranslateCaptionsJobParameters = {
         asset_id: assetId,
         track_id: options.trackId,
         to_language_code: options.toLanguageCode,
       };
-      if (options.noUpload) {
-        params.upload_to_mux = false;
+      if (options.upload === false) {
+        parameters.upload_to_mux = false;
       }
 
-      const body: Record<string, unknown> = { parameters: params };
+      const body: TranslateCaptionCreateParams = { parameters };
       if (options.passthrough !== undefined)
         body.passthrough = options.passthrough;
 
-      const result = await createJob('translate-captions', body);
+      const mux = await createAuthenticatedMuxClient();
+      const job = await mux.robotsPreview.jobs.translateCaptions.create(body);
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify(job, null, 2));
         return;
       }
 
-      const job = result.data;
-      console.log(`Translate captions job created`);
+      console.log('Translate captions job created');
       console.log(`  Job ID: ${job.id}`);
       console.log(`  Status: ${job.status}`);
     } catch (error) {
