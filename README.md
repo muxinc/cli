@@ -828,9 +828,6 @@ mux robots get <job-id> --workflow <type>
 
 # Cancel a running job
 mux robots cancel <job-id>
-
-# Delete a job permanently
-mux robots delete <job-id> [--force]
 ```
 
 **List options:** `--workflow`, `--status`, `--asset-id`, `--limit`, `--page`, `--compact`
@@ -857,13 +854,15 @@ mux robots summarize abc123 --tone playful
 Analyze video content for policy violations.
 
 **Options:**
-- `--language-code <code>` - BCP 47 code for transcript analysis
+- `--language-code <code>` - BCP 47 code for transcript analysis (audio-only assets)
 - `--sampling-interval <seconds>` - Interval between sampled thumbnails (min 5)
 - `--max-samples <n>` - Maximum number of thumbnails to sample
+- `--threshold-sexual <n>` - Score threshold (0.0-1.0) for sexual content (default: 0.7)
+- `--threshold-violence <n>` - Score threshold (0.0-1.0) for violent content (default: 0.8)
 - `--passthrough <string>` - Arbitrary metadata (max 255 chars)
 
 ```bash
-mux robots moderate abc123
+mux robots moderate abc123 --threshold-sexual 0.5 --threshold-violence 0.9
 ```
 
 #### `mux robots generate-chapters <asset-id>`
@@ -898,10 +897,12 @@ Find key moments and highlights in a video.
 
 **Options:**
 - `--max-moments <n>` - Maximum number of key moments to extract (default: 5)
+- `--target-duration-min-ms <ms>` - Preferred minimum highlight duration in milliseconds (must be paired with max)
+- `--target-duration-max-ms <ms>` - Preferred maximum highlight duration in milliseconds (must be paired with min)
 - `--passthrough <string>` - Arbitrary metadata (max 255 chars)
 
 ```bash
-mux robots find-key-moments abc123 --max-moments 3
+mux robots find-key-moments abc123 --max-moments 3 --target-duration-min-ms 15000 --target-duration-max-ms 45000
 ```
 
 #### `mux robots translate-captions <asset-id>`
@@ -1164,7 +1165,6 @@ src/
 │   ├── formatters.ts                 # Output formatting
 │   ├── data-filters.ts               # Mux Data filter utilities
 │   ├── mux.ts                        # Mux API client
-│   ├── robots.ts                     # Mux Robots API client
 │   ├── urls.ts                       # URL generation
 │   ├── signing.ts                    # JWT signing
 │   ├── webhook-signing.ts            # Webhook signature generation
