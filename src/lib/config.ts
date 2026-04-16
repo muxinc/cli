@@ -7,6 +7,7 @@ export interface Environment {
   tokenId: string;
   tokenSecret: string;
   environmentId?: string;
+  baseUrl?: string;
   signingKeyId?: string;
   signingPrivateKey?: string;
   forwardUrl?: string;

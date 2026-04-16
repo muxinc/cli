@@ -3,7 +3,7 @@ import pkg from '../../package.json';
 import { getCurrentEnvironment } from './config.ts';
 import { isAgentMode } from './context.ts';
 
-const DEFAULT_BASE_URL = 'https://api.mux.com';
+export const DEFAULT_BASE_URL = 'https://api.mux.com';
 
 function getUserAgent(): string {
   return isAgentMode()
@@ -12,10 +12,20 @@ function getUserAgent(): string {
 }
 
 /**
- * Get the Mux API base URL, respecting MUX_BASE_URL env var
+ * Get the Mux API base URL.
+ * Priority: MUX_BASE_URL env var > config baseUrl > default
  */
-export function getMuxBaseUrl(): string {
-  return process.env.MUX_BASE_URL || DEFAULT_BASE_URL;
+export async function getMuxBaseUrl(): Promise<string> {
+  if (process.env.MUX_BASE_URL) {
+    return process.env.MUX_BASE_URL;
+  }
+
+  const env = await getCurrentEnvironment();
+  if (env?.environment.baseUrl) {
+    return env.environment.baseUrl;
+  }
+
+  return DEFAULT_BASE_URL;
 }
 
 /**
@@ -60,9 +70,10 @@ export async function createAuthenticatedMuxClient(): Promise<Mux> {
 export async function validateCredentials(
   tokenId: string,
   tokenSecret: string,
+  overrideBaseUrl?: string,
 ): Promise<{ valid: boolean; environmentId?: string; error?: string }> {
   try {
-    const baseUrl = getMuxBaseUrl();
+    const baseUrl = overrideBaseUrl || (await getMuxBaseUrl());
     const credentials = btoa(`${tokenId}:${tokenSecret}`);
     const response = await fetch(`${baseUrl}/system/v1/whoami`, {
       headers: {

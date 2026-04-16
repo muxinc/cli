@@ -48,7 +48,7 @@ async function fetchTokenInfo(): Promise<{
 } | null> {
   try {
     const headers = await getAuthHeaders();
-    const baseUrl = getMuxBaseUrl();
+    const baseUrl = await getMuxBaseUrl();
     const response = await fetch(`${baseUrl}/system/v1/whoami`, { headers });
 
     if (!response.ok) return null;
