@@ -16,8 +16,12 @@ function getUserAgent(): string {
  * Priority: MUX_BASE_URL env var > config baseUrl > default
  * Pass a pre-fetched environment to avoid redundant config reads.
  */
-export function resolveBaseUrl(env?: { environment: { baseUrl?: string } } | null): string {
-  return process.env.MUX_BASE_URL || env?.environment.baseUrl || DEFAULT_BASE_URL;
+export function resolveBaseUrl(
+  env?: { environment: { baseUrl?: string } } | null,
+): string {
+  return (
+    process.env.MUX_BASE_URL || env?.environment.baseUrl || DEFAULT_BASE_URL
+  );
 }
 
 /**

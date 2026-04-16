@@ -2,7 +2,11 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Command } from '@cliffy/command';
 import { listEnvironments, setEnvironment } from '../lib/config.ts';
-import { DEFAULT_BASE_URL, resolveBaseUrl, validateCredentials } from '../lib/mux.ts';
+import {
+  DEFAULT_BASE_URL,
+  resolveBaseUrl,
+  validateCredentials,
+} from '../lib/mux.ts';
 import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
 import { getConfigPath } from '../lib/xdg.ts';
 
@@ -100,7 +104,9 @@ export const loginCommand = new Command()
 
       tokenId = envVars.MUX_TOKEN_ID;
       tokenSecret = envVars.MUX_TOKEN_SECRET;
-      baseUrl = resolveBaseUrl({ environment: { baseUrl: envVars.MUX_BASE_URL } });
+      baseUrl = resolveBaseUrl({
+        environment: { baseUrl: envVars.MUX_BASE_URL },
+      });
     } else {
       // Interactive prompts
       console.log('Enter your Mux API credentials.');
