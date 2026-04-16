@@ -3,7 +3,7 @@ import { Command } from '@cliffy/command';
 import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
 import { checkFetchPermissionError } from '@/lib/errors.ts';
 import { appendEvent, type StoredEvent } from '@/lib/events-store.ts';
-import { getAuthHeaders, getMuxBaseUrl } from '@/lib/mux.ts';
+import { getAuthHeaders, resolveBaseUrl } from '@/lib/mux.ts';
 import { parseSSEStream } from '@/lib/sse.ts';
 import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
@@ -61,7 +61,7 @@ export const listenCommand = new Command()
     }
 
     const authHeaders = await getAuthHeaders();
-    const baseUrl = await getMuxBaseUrl();
+    const baseUrl = resolveBaseUrl(env);
     const url = `${baseUrl}/system/v1/webhook-events/stream`;
 
     let signingSecret: string | undefined;
