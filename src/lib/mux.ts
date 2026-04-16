@@ -56,7 +56,8 @@ export async function createAuthenticatedMuxClient(): Promise<Mux> {
     throw new Error("Not logged in. Please run 'mux login' to authenticate.");
   }
 
-  const baseURL = await getMuxBaseUrl();
+  const baseURL =
+    process.env.MUX_BASE_URL || env.environment.baseUrl || DEFAULT_BASE_URL;
 
   return new Mux({
     tokenId: env.environment.tokenId,

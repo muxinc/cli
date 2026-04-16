@@ -83,6 +83,8 @@ export const loginCommand = new Command()
       );
     }
 
+    // Resolve base URL: env-file > MUX_BASE_URL env var > default
+    // Only persist to config if nonstandard
     let baseUrl: string | undefined;
 
     if (options.envFile) {
@@ -100,10 +102,7 @@ export const loginCommand = new Command()
 
       tokenId = envVars.MUX_TOKEN_ID;
       tokenSecret = envVars.MUX_TOKEN_SECRET;
-
-      if (envVars.MUX_BASE_URL && envVars.MUX_BASE_URL !== DEFAULT_BASE_URL) {
-        baseUrl = envVars.MUX_BASE_URL;
-      }
+      baseUrl = envVars.MUX_BASE_URL || process.env.MUX_BASE_URL;
     } else {
       // Interactive prompts
       console.log('Enter your Mux API credentials.');
@@ -120,14 +119,17 @@ export const loginCommand = new Command()
       if (!tokenSecret.trim()) {
         throw new Error('Token Secret is required');
       }
+
+      baseUrl = process.env.MUX_BASE_URL;
     }
 
-    // Validate credentials
+    // Validate credentials against the resolved base URL (never fall through to config)
+    const validationUrl = baseUrl || DEFAULT_BASE_URL;
     console.log('Validating credentials...');
     const validation = await validateCredentials(
       tokenId.trim(),
       tokenSecret.trim(),
-      baseUrl || DEFAULT_BASE_URL,
+      validationUrl,
     );
 
     if (!validation.valid) {
@@ -141,7 +143,7 @@ export const loginCommand = new Command()
       tokenId: tokenId.trim(),
       tokenSecret: tokenSecret.trim(),
       environmentId: validation.environmentId,
-      ...(baseUrl && { baseUrl }),
+      ...(baseUrl && baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
     });
 
     console.log(
