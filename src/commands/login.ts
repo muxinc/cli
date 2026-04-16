@@ -127,7 +127,7 @@ export const loginCommand = new Command()
     const validation = await validateCredentials(
       tokenId.trim(),
       tokenSecret.trim(),
-      baseUrl,
+      baseUrl || DEFAULT_BASE_URL,
     );
 
     if (!validation.valid) {
