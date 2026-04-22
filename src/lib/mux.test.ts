@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getCurrentEnvironment } from './config.ts';
-import { setEnvironment } from './config.ts';
+import { getCurrentEnvironment, setEnvironment } from './config.ts';
 import { DEFAULT_BASE_URL, getMuxBaseUrl } from './mux.ts';
 
 describe('getMuxBaseUrl', () => {
