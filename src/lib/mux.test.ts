@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getCurrentEnvironment } from './config.ts';
-import { setEnvironment } from './config.ts';
+import { getCurrentEnvironment, setEnvironment } from './config.ts';
 import { DEFAULT_BASE_URL, getMuxBaseUrl } from './mux.ts';
 
 describe('getMuxBaseUrl', () => {
@@ -54,11 +53,11 @@ describe('getMuxBaseUrl', () => {
     await setEnvironment('default', {
       tokenId: 'id',
       tokenSecret: 'secret',
-      baseUrl: 'https://api.staging.mux.com',
+      baseUrl: 'https://config.example.com',
     });
 
     const env = await getCurrentEnvironment();
-    expect(getMuxBaseUrl(env)).toBe('https://api.staging.mux.com');
+    expect(getMuxBaseUrl(env)).toBe('https://config.example.com');
   });
 
   it('should fall back to default when config has no baseUrl', async () => {

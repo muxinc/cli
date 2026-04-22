@@ -117,14 +117,14 @@ MUX_TOKEN_SECRET = test_secret_456`,
       envPath,
       `MUX_TOKEN_ID=test_id_123
 MUX_TOKEN_SECRET=test_secret_456
-MUX_BASE_URL=https://api.staging.mux.com`,
+MUX_BASE_URL=https://api.example.com`,
     );
 
     const result = await parseEnvFile(envPath);
 
     expect(result.MUX_TOKEN_ID).toBe('test_id_123');
     expect(result.MUX_TOKEN_SECRET).toBe('test_secret_456');
-    expect(result.MUX_BASE_URL).toBe('https://api.staging.mux.com');
+    expect(result.MUX_BASE_URL).toBe('https://api.example.com');
   });
 
   it('should ignore other environment variables', async () => {
