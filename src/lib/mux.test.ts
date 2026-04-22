@@ -54,11 +54,11 @@ describe('getMuxBaseUrl', () => {
     await setEnvironment('default', {
       tokenId: 'id',
       tokenSecret: 'secret',
-      baseUrl: 'https://api.staging.mux.com',
+      baseUrl: 'https://config.example.com',
     });
 
     const env = await getCurrentEnvironment();
-    expect(getMuxBaseUrl(env)).toBe('https://api.staging.mux.com');
+    expect(getMuxBaseUrl(env)).toBe('https://config.example.com');
   });
 
   it('should fall back to default when config has no baseUrl', async () => {
