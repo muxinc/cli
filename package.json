@@ -31,8 +31,14 @@
   "bin": {
     "mux": "bin/mux"
   },
+  "pi": {
+    "skills": [
+      "skills/mux-cli"
+    ]
+  },
   "files": [
     "bin",
+    "skills",
     "README.md",
     "LICENSE"
   ],
