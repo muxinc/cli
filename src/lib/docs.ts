@@ -1,11 +1,10 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { getCacheDir } from './xdg.ts';
 
 export const DOCS_RELATIVE_ROOT = 'apps/web/app/docs';
 export const DOCS_GUIDES_RELATIVE_ROOT = `${DOCS_RELATIVE_ROOT}/_guides`;
-export const DOCS_GUIDES_MDX_SPARSE_PATTERN = `/${DOCS_GUIDES_RELATIVE_ROOT}/**/*.mdx`;
 export const MUX_DOCS_REPO_URL = 'https://github.com/muxinc/mux.com.git';
 export const DOCS_BASE_URL = 'https://docs.mux.com';
 export const MUX_DOCS_MANIFEST_URL = `${DOCS_BASE_URL}/.well-known/mux-docs/manifest.json`;
@@ -121,16 +120,19 @@ export interface SearchDocsIndexOptions {
   limit?: number;
 }
 
-/**
- * Get the cache checkout path for the mux.com docs repository.
- */
+export type DocsContentFormat = 'markdown' | 'raw';
+
+interface JsonFetchResponse {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+}
+
 export function getDocsRepoCachePath(): string {
   return join(getCacheDir(), 'docs', 'mux.com');
 }
 
-/**
- * Get the path where the generated docs search index is cached.
- */
 export function getDocsIndexCachePath(): string {
   return join(getCacheDir(), 'docs', 'index.json');
 }
@@ -177,10 +179,10 @@ export async function updatePublishedDocsCache(
 
 export async function readCachedDocsIndex(): Promise<DocsIndex> {
   const cachePaths = getDocsArtifactCachePaths();
-  const publishedIndex = await readJson<PublishedDocsIndex>(
+  const cachedIndex = await readJson<PublishedDocsIndex | DocsIndex>(
     cachePaths.indexPath,
   );
-  return normalizePublishedDocsIndex(publishedIndex, cachePaths.indexPath);
+  return normalizeCachedDocsIndex(cachedIndex, cachePaths.indexPath);
 }
 
 export function hasCachedDocsIndex(): boolean {
@@ -200,6 +202,45 @@ export function getPublishedDocsSource(index: DocsIndex): PublishedDocsSource {
   };
 }
 
+export function getCachedDocsSource(index: DocsIndex): DocsIndexSource {
+  if (index.source === 'published') {
+    return getPublishedDocsSource(index);
+  }
+
+  return {
+    kind: 'cache',
+    source: 'cache',
+    repoPath: index.repoPath,
+    docsRoot: index.docsRoot,
+    repoUrl: index.repoUrl,
+  };
+}
+
+function normalizeCachedDocsIndex(
+  index: PublishedDocsIndex | DocsIndex,
+  cachePath: string,
+): DocsIndex {
+  if (isDocsIndex(index)) {
+    return index;
+  }
+
+  return normalizePublishedDocsIndex(index, cachePath);
+}
+
+function isDocsIndex(
+  index: PublishedDocsIndex | DocsIndex,
+): index is DocsIndex {
+  const firstEntry = index.entries[0];
+
+  return (
+    'repoPath' in index &&
+    'repoUrl' in index &&
+    'docsRoot' in index &&
+    (firstEntry === undefined ||
+      ('relativePath' in firstEntry && 'absolutePath' in firstEntry))
+  );
+}
+
 function normalizePublishedDocsIndex(
   index: PublishedDocsIndex,
   cachePath: string,
@@ -207,7 +248,7 @@ function normalizePublishedDocsIndex(
   return {
     generatedAt: index.generatedAt,
     repoPath: dirname(cachePath),
-    repoUrl: MUX_DOCS_INDEX_URL,
+    repoUrl: MUX_DOCS_REPO_URL,
     docsRoot: index.docsRoot,
     source: 'published',
     version: index.version,
@@ -232,57 +273,19 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+  const response = (await fetch(url)) as unknown as JsonFetchResponse;
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    const body = await response.text();
+    const details = body.trim();
+    throw new Error(
+      `Failed to fetch ${url}: ${response.status}${details ? ` ${details}` : ''}`,
+    );
   }
 
   return (await response.json()) as T;
 }
 
-/**
- * Git arguments for a shallow, partial, sparse clone of the mux.com repository.
- *
- * This avoids checking out or downloading blobs for the rest of the application
- * repository. Git may still download commit and tree metadata, but file content
- * outside MDX files under DOCS_GUIDES_RELATIVE_ROOT is not fetched into the
- * local checkout.
- */
-export function getDocsSparseCloneArgs(
-  repoUrl: string,
-  repoPath: string,
-): string[] {
-  return [
-    'clone',
-    '--depth=1',
-    '--filter=blob:none',
-    '--sparse',
-    repoUrl,
-    repoPath,
-  ];
-}
-
-export function getDocsSparseCheckoutArgs(repoPath: string): string[] {
-  return [
-    '-C',
-    repoPath,
-    'sparse-checkout',
-    'set',
-    '--no-cone',
-    DOCS_GUIDES_MDX_SPARSE_PATTERN,
-  ];
-}
-
-/**
- * Resolve the docs source for the current command.
- *
- * Precedence:
- * 1. Explicit command option
- * 2. MUX_DOCS_PATH
- * 3. Sibling ../mux.com checkout for local Mux development
- * 4. XDG cache checkout used by `mux docs update`
- */
 export async function resolveDocsSource(
   options: ResolveDocsSourceOptions = {},
 ): Promise<DocsSource> {
@@ -351,84 +354,6 @@ function hasDocsRoot(repoPath: string): boolean {
 }
 
 /**
- * Clone or refresh the cached mux.com checkout used as the default docs source.
- */
-export async function updateCachedDocsRepo(
-  options: { force?: boolean; repoUrl?: string } = {},
-): Promise<DocsSource> {
-  const repoUrl = options.repoUrl ?? MUX_DOCS_REPO_URL;
-  const repoPath = getDocsRepoCachePath();
-
-  if (options.force) {
-    await rm(repoPath, { recursive: true, force: true });
-  }
-
-  if (existsSync(join(repoPath, '.git'))) {
-    if (!(await isSparseDocsCheckout(repoPath))) {
-      await rm(repoPath, { recursive: true, force: true });
-      await cloneSparseDocsRepo(repoUrl, repoPath);
-    } else {
-      await runGit(getDocsSparseCheckoutArgs(repoPath));
-      await runGit(['-C', repoPath, 'pull', '--ff-only']);
-    }
-  } else {
-    await rm(repoPath, { recursive: true, force: true });
-    await cloneSparseDocsRepo(repoUrl, repoPath);
-  }
-
-  if (!hasDocsRoot(repoPath)) {
-    throw new Error(
-      `The docs repository did not contain ${DOCS_GUIDES_RELATIVE_ROOT}: ${repoPath}`,
-    );
-  }
-
-  return {
-    kind: 'cache',
-    source: 'cache',
-    repoPath,
-    docsRoot: join(repoPath, DOCS_RELATIVE_ROOT),
-    repoUrl,
-  };
-}
-
-async function cloneSparseDocsRepo(
-  repoUrl: string,
-  repoPath: string,
-): Promise<void> {
-  await mkdir(dirname(repoPath), { recursive: true });
-  await runGit(getDocsSparseCloneArgs(repoUrl, repoPath));
-  await runGit(getDocsSparseCheckoutArgs(repoPath));
-}
-
-async function isSparseDocsCheckout(repoPath: string): Promise<boolean> {
-  const sparseCheckoutPath = join(repoPath, '.git', 'info', 'sparse-checkout');
-
-  if (!existsSync(sparseCheckoutPath)) {
-    return false;
-  }
-
-  const content = await readFile(sparseCheckoutPath, 'utf-8');
-  return content.includes(DOCS_GUIDES_MDX_SPARSE_PATTERN);
-}
-
-async function runGit(args: string[]): Promise<void> {
-  const proc = Bun.spawn(['git', ...args], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    const message = stderr.trim() || stdout.trim() || `git ${args.join(' ')}`;
-    throw new Error(message);
-  }
-}
-
-/**
  * Build a lightweight local search index from docs markdown and MDX files.
  */
 export async function loadDocsIndex(
@@ -440,7 +365,7 @@ export async function loadDocsIndex(
     hasCachedDocsIndex()
   ) {
     const index = await readCachedDocsIndex();
-    return { index, source: getPublishedDocsSource(index) };
+    return { index, source: getCachedDocsSource(index) };
   }
 
   const source = await resolveDocsSource({
@@ -604,9 +529,6 @@ function toPosixPath(path: string): string {
   return path.split('\\').join('/');
 }
 
-/**
- * Search a generated docs index using simple deterministic term scoring.
- */
 export function searchDocsIndex(
   index: DocsIndex,
   query: string,
@@ -750,6 +672,27 @@ export async function readDocContent(entry: DocsIndexEntry): Promise<string> {
   }
 
   return readFile(entry.absolutePath, 'utf-8');
+}
+
+export function formatDocContent(
+  content: string,
+  format: DocsContentFormat = 'markdown',
+): string {
+  if (format === 'raw') {
+    return content;
+  }
+
+  return stripFrontmatterBlock(content);
+}
+
+function stripFrontmatterBlock(content: string): string {
+  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/);
+
+  if (!match) {
+    return content;
+  }
+
+  return content.slice(match[0].length).replace(/^\s*\r?\n/, '');
 }
 
 export async function writeDocsIndexCache(index: DocsIndex): Promise<void> {

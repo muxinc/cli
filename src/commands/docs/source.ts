@@ -1,6 +1,6 @@
 import { Command } from '@cliffy/command';
 import {
-  getPublishedDocsSource,
+  getCachedDocsSource,
   hasCachedDocsIndex,
   readCachedDocsIndex,
   resolveDocsSource,
@@ -17,16 +17,22 @@ export const sourceCommand = new Command()
     try {
       if (!process.env.MUX_DOCS_PATH && hasCachedDocsIndex()) {
         const index = await readCachedDocsIndex();
-        const source = getPublishedDocsSource(index);
+        const source = getCachedDocsSource(index);
 
         if (options.json) {
           console.log(JSON.stringify(source, null, 2));
           return;
         }
 
-        console.log('Source: published');
-        console.log(`Index: ${source.indexPath}`);
-        console.log(`Manifest: ${source.manifestPath}`);
+        console.log(`Source: ${source.source}`);
+        if (source.source === 'published') {
+          console.log(`Index: ${source.indexPath}`);
+          console.log(`Manifest: ${source.manifestPath}`);
+        } else {
+          console.log(`Repository: ${source.repoPath}`);
+          console.log(`Docs root: ${source.docsRoot}`);
+          console.log(`Remote: ${source.repoUrl}`);
+        }
         console.log(`Documents: ${index.entries.length}`);
         return;
       }

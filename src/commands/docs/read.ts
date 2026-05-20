@@ -1,5 +1,10 @@
 import { Command } from '@cliffy/command';
-import { findDocById, loadDocsIndex, readDocContent } from '@/lib/docs.ts';
+import {
+  findDocById,
+  formatDocContent,
+  loadDocsIndex,
+  readDocContent,
+} from '@/lib/docs.ts';
 
 interface ReadOptions {
   format?: 'markdown' | 'raw';
@@ -32,7 +37,10 @@ export const readCommand = new Command()
         throw new Error(`Docs page not found: ${docId}`);
       }
 
-      const content = await readDocContent(doc);
+      const content = formatDocContent(
+        await readDocContent(doc),
+        options.format,
+      );
 
       if (options.json) {
         console.log(

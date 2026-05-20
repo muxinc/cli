@@ -4,14 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   buildDocsIndex,
-  DOCS_GUIDES_MDX_SPARSE_PATTERN,
   DOCS_GUIDES_RELATIVE_ROOT,
   DOCS_RELATIVE_ROOT,
   findDocById,
+  formatDocContent,
+  getCachedDocsSource,
   getDocsArtifactCachePaths,
   getDocsRepoCachePath,
-  getDocsSparseCheckoutArgs,
-  getDocsSparseCloneArgs,
   MUX_DOCS_INDEX_URL,
   MUX_DOCS_MANIFEST_URL,
   MUX_DOCS_REPO_URL,
@@ -20,6 +19,7 @@ import {
   resolveDocsSource,
   searchDocsIndex,
   updatePublishedDocsCache,
+  writeDocsIndexCache,
 } from './docs.ts';
 
 async function writeDoc(
@@ -131,34 +131,6 @@ describe('Mux docs source resolution', () => {
     await expect(
       resolveDocsSource({ explicitPath: invalidRepo, cwd: testDir }),
     ).rejects.toThrow(/apps\/web\/app\/docs/);
-  });
-});
-
-describe('Mux docs cache git arguments', () => {
-  it('uses a shallow partial sparse clone for the mux.com docs repo', () => {
-    const repoPath = '/tmp/mux-docs-cache';
-
-    expect(getDocsSparseCloneArgs(MUX_DOCS_REPO_URL, repoPath)).toEqual([
-      'clone',
-      '--depth=1',
-      '--filter=blob:none',
-      '--sparse',
-      MUX_DOCS_REPO_URL,
-      repoPath,
-    ]);
-  });
-
-  it('sets the sparse checkout to only the docs root', () => {
-    const repoPath = '/tmp/mux-docs-cache';
-
-    expect(getDocsSparseCheckoutArgs(repoPath)).toEqual([
-      '-C',
-      repoPath,
-      'sparse-checkout',
-      'set',
-      '--no-cone',
-      DOCS_GUIDES_MDX_SPARSE_PATTERN,
-    ]);
   });
 });
 
@@ -279,11 +251,62 @@ describe('Mux published docs artifacts', () => {
     const doc = findDocById(index, 'create-assets');
 
     expect(index.source).toBe('published');
+    expect(index.repoUrl).toBe(MUX_DOCS_REPO_URL);
     expect(results[0]?.entry.id).toBe('create-assets');
     expect(doc?.relativePath).toBe(
       'app/docs/_guides/developer/create-assets.mdx',
     );
     expect(doc ? await readDocContent(doc) : '').toContain('Upload and encode');
+  });
+
+  it('preserves locally generated docs indexes written to the cache', async () => {
+    const repoPath = join(testDir, 'mux.com');
+    const generatedAt = new Date().toISOString();
+    const absolutePath = join(
+      repoPath,
+      DOCS_GUIDES_RELATIVE_ROOT,
+      'developer/create-assets.mdx',
+    );
+    const localIndex = {
+      generatedAt,
+      repoPath,
+      repoUrl: MUX_DOCS_REPO_URL,
+      docsRoot: join(repoPath, DOCS_RELATIVE_ROOT),
+      source: 'local' as const,
+      entries: [
+        {
+          id: 'create-assets',
+          title: 'Create assets',
+          description: 'Create Mux video assets.',
+          product: 'video',
+          relativePath: 'apps/web/app/docs/_guides/developer/create-assets.mdx',
+          absolutePath,
+          route: '/guides/developer/create-assets',
+          url: 'https://docs.mux.com/guides/developer/create-assets',
+          headings: ['Create assets'],
+          content: '# Create assets\n\nUpload and encode video with Mux.',
+        },
+      ],
+    };
+
+    await writeDocsIndexCache(localIndex);
+
+    const index = await readCachedDocsIndex();
+    const doc = findDocById(
+      index,
+      'apps/web/app/docs/_guides/developer/create-assets.mdx',
+    );
+    const source = getCachedDocsSource(index);
+
+    expect(index).toEqual(localIndex);
+    expect(doc?.absolutePath).toBe(absolutePath);
+    expect(source).toEqual({
+      kind: 'cache',
+      source: 'cache',
+      repoPath,
+      docsRoot: join(repoPath, DOCS_RELATIVE_ROOT),
+      repoUrl: MUX_DOCS_REPO_URL,
+    });
   });
 
   it('uses public docs artifact URLs by default', async () => {
@@ -426,5 +449,24 @@ Use assets when you want to upload, ingest, encode, and play video with Mux.
 
     expect(content).toContain('title: Verify webhook signatures');
     expect(content).toContain('mux-signature');
+  });
+
+  it('formats docs content as markdown or raw MDX', () => {
+    const content = `---
+title: Verify webhook signatures
+---
+
+# Verify webhook signatures
+
+Mux includes a \`mux-signature\` header.
+`;
+
+    expect(
+      formatDocContent(content, 'markdown'),
+    ).toBe(`# Verify webhook signatures
+
+Mux includes a \`mux-signature\` header.
+`);
+    expect(formatDocContent(content, 'raw')).toBe(content);
   });
 });
