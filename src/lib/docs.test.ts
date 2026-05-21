@@ -361,6 +361,36 @@ Use assets when you want to upload, ingest, encode, and play video with Mux.
 
     await writeDoc(
       repoPath,
+      'developer/upload-files-directly.mdx',
+      `---
+title: Upload files directly
+product: video
+description: Direct Uploads let browser clients upload video files to Mux.
+---
+
+# Upload files directly
+
+Create a direct upload when you want users to upload videos from the browser.
+`,
+    );
+
+    await writeDoc(
+      repoPath,
+      'developer/secure-video-playback.mdx',
+      `---
+title: Secure video playback
+product: video
+description: Use signed playback URLs and JWTs to protect video playback.
+---
+
+# Create a signed playback URL
+
+Use a playback ID with a signed playback policy and create a JWT playback token.
+`,
+    );
+
+    await writeDoc(
+      repoPath,
       'developer/not-indexed.md',
       '# Markdown files are not indexed or checked out for end users',
     );
@@ -385,7 +415,7 @@ Use assets when you want to upload, ingest, encode, and play video with Mux.
   it('builds an index from MDX docs under apps/web/app/docs', async () => {
     const index = await buildDocsIndex({ repoPath });
 
-    expect(index.entries).toHaveLength(2);
+    expect(index.entries).toHaveLength(4);
     expect(index.generatedAt).toBeDefined();
     expect(index.repoUrl).toBe(MUX_DOCS_REPO_URL);
 
@@ -410,10 +440,51 @@ Use assets when you want to upload, ingest, encode, and play video with Mux.
       limit: 5,
     });
 
-    expect(results).toHaveLength(1);
     expect(results[0]?.entry.id).toBe('verify-webhook-signatures');
     expect(results[0]?.score).toBeGreaterThan(0);
-    expect(results[0]?.snippet).toMatch(/HMAC|signature/i);
+    expect(results[0]?.snippet).toMatch(/HMAC|signature|signing/i);
+  });
+
+  it('normalizes natural language upload queries', async () => {
+    const index = await buildDocsIndex({ repoPath });
+    const results = searchDocsIndex(
+      index,
+      'how can users upload videos from the browser',
+      { limit: 3 },
+    );
+
+    expect(results[0]?.entry.id).toBe('upload-files-directly');
+  });
+
+  it('expands Mux product synonyms for signed playback queries', async () => {
+    const index = await buildDocsIndex({ repoPath });
+    const results = searchDocsIndex(
+      index,
+      'secure videos with jwt signed urls',
+      {
+        limit: 3,
+      },
+    );
+
+    expect(results[0]?.entry.id).toBe('secure-video-playback');
+  });
+
+  it('normalizes separators and plural terms', async () => {
+    const index = await buildDocsIndex({ repoPath });
+    const playbackResults = searchDocsIndex(index, 'playback_id policy', {
+      limit: 3,
+    });
+    const assetResults = searchDocsIndex(index, 'assets', { limit: 3 });
+
+    expect(playbackResults[0]?.entry.id).toBe('secure-video-playback');
+    expect(assetResults[0]?.entry.id).toBe('create-assets');
+  });
+
+  it('expands shorthand terms for webhook signatures', async () => {
+    const index = await buildDocsIndex({ repoPath });
+    const results = searchDocsIndex(index, 'webhook sig', { limit: 3 });
+
+    expect(results[0]?.entry.id).toBe('verify-webhook-signatures');
   });
 
   it('honors search result limits', async () => {

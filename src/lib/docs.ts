@@ -353,9 +353,6 @@ function hasDocsRoot(repoPath: string): boolean {
   return existsSync(join(repoPath, DOCS_GUIDES_RELATIVE_ROOT));
 }
 
-/**
- * Build a lightweight local search index from docs markdown and MDX files.
- */
 export async function loadDocsIndex(
   options: { explicitPath?: string } = {},
 ): Promise<{ index: DocsIndex; source: DocsIndexSource }> {
@@ -534,19 +531,19 @@ export function searchDocsIndex(
   query: string,
   options: SearchDocsIndexOptions = {},
 ): DocsSearchResult[] {
-  const terms = tokenize(query);
-  if (terms.length === 0) return [];
+  const normalizedQuery = normalizeDocsSearchQuery(query);
+  if (normalizedQuery.terms.length === 0) return [];
 
   const results: DocsSearchResult[] = [];
 
   for (const entry of index.entries) {
-    const score = scoreEntry(entry, terms, query);
+    const score = scoreEntry(entry, normalizedQuery);
     if (score <= 0) continue;
 
     results.push({
       entry,
       score,
-      snippet: makeSnippet(entry, terms),
+      snippet: makeSnippet(entry, normalizedQuery),
     });
   }
 
@@ -556,10 +553,94 @@ export function searchDocsIndex(
   return results.slice(0, options.limit ?? 10);
 }
 
+interface NormalizedDocsSearchQuery {
+  terms: string[];
+  phrases: string[];
+}
+
+const STOP_WORDS = new Set([
+  'a',
+  'about',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'can',
+  'do',
+  'does',
+  'for',
+  'from',
+  'get',
+  'how',
+  'i',
+  'in',
+  'is',
+  'it',
+  'me',
+  'my',
+  'of',
+  'on',
+  'or',
+  'the',
+  'to',
+  'use',
+  'using',
+  'with',
+]);
+
+const SHORT_SEARCH_TERMS = new Set([
+  'ai',
+  'api',
+  'drm',
+  'hls',
+  'id',
+  'jwt',
+  'mp4',
+  'sdk',
+  'srt',
+]);
+
+const TERM_SYNONYMS: Record<string, string[]> = {
+  browser: ['direct', 'upload'],
+  caption: ['subtitle', 'subtitles', 'text', 'track', 'transcript'],
+  captions: ['subtitle', 'subtitles', 'text', 'track', 'transcript'],
+  drm: ['digital', 'rights', 'management', 'protected'],
+  hls: ['playback', 'streaming', 'm3u8'],
+  jwt: ['signed', 'playback', 'token', 'url'],
+  sig: ['signature', 'mux', 'hmac'],
+  signature: ['mux', 'hmac'],
+  signatures: ['signature', 'mux', 'hmac'],
+  subtitle: ['caption', 'captions', 'text', 'track', 'transcript'],
+  subtitles: ['caption', 'captions', 'text', 'track', 'transcript'],
+  token: ['jwt', 'signed'],
+  tokens: ['jwt', 'signed'],
+  transcript: ['captions', 'subtitles', 'text', 'track'],
+};
+
+const PHRASE_SYNONYMS: Array<[string, string[]]> = [
+  [
+    'webhook sig',
+    ['webhook signature', 'mux signature', 'mux-signature', 'hmac'],
+  ],
+  ['webhook signature', ['mux-signature', 'hmac']],
+  ['signed url', ['signed playback', 'playback token', 'jwt']],
+  ['signed urls', ['signed playback', 'playback token', 'jwt']],
+  ['signed playback', ['jwt', 'playback token', 'signed url']],
+  ['playback id', ['playback-id', 'playback_id', 'playback ids']],
+  ['playback ids', ['playback-id', 'playback_id', 'playback id']],
+  ['direct upload', ['browser upload', 'upload files directly']],
+  ['browser upload', ['direct upload', 'upload files directly']],
+  ['upload from browser', ['direct upload', 'upload files directly']],
+  ['stream key', ['live stream', 'rtmp']],
+  ['live stream', ['stream key', 'rtmp', 'broadcast']],
+  ['text track', ['captions', 'subtitles', 'transcripts']],
+];
+
 function scoreEntry(
   entry: DocsIndexEntry,
-  terms: string[],
-  query: string,
+  query: NormalizedDocsSearchQuery,
 ): number {
   const fields = [
     { value: entry.title, weight: 8 },
@@ -567,42 +648,42 @@ function scoreEntry(
     { value: entry.headings.join(' '), weight: 4 },
     { value: entry.id, weight: 3 },
     { value: entry.content, weight: 1 },
-  ];
+  ].map((field) => ({
+    value: normalizeSearchText(field.value),
+    weight: field.weight,
+  }));
 
   let score = 0;
-  for (const term of terms) {
+  for (const term of query.terms) {
     for (const field of fields) {
-      score += countOccurrences(field.value, term) * field.weight;
+      score += countTermOccurrences(field.value, term) * field.weight;
     }
   }
 
-  const phrase = query.toLowerCase().trim();
-  if (phrase) {
-    if (entry.title.toLowerCase().includes(phrase)) score += 50;
-    if ((entry.description ?? '').toLowerCase().includes(phrase)) score += 25;
-    if (entry.headings.join(' ').toLowerCase().includes(phrase)) score += 20;
-    if (entry.content.toLowerCase().includes(phrase)) score += 5;
+  for (const phrase of query.phrases) {
+    for (const field of fields) {
+      if (field.value.includes(phrase)) {
+        score += field.weight * phrase.split(' ').length * 6;
+      }
+    }
   }
 
   return score;
 }
 
-function countOccurrences(value: string, term: string): number {
+function countTermOccurrences(value: string, term: string): number {
   if (!value) return 0;
 
-  const normalized = value.toLowerCase();
-  let count = 0;
-  let index = normalized.indexOf(term);
-
-  while (index !== -1) {
-    count += 1;
-    index = normalized.indexOf(term, index + term.length);
-  }
-
-  return count;
+  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Array.from(
+    value.matchAll(new RegExp(`(?:^|\\s)${escapedTerm}(?=\\s|$)`, 'g')),
+  ).length;
 }
 
-function makeSnippet(entry: DocsIndexEntry, terms: string[]): string {
+function makeSnippet(
+  entry: DocsIndexEntry,
+  query: NormalizedDocsSearchQuery,
+): string {
   const lines = entry.content
     .replace(/^---[\s\S]*?---\s*/, '')
     .split('\n')
@@ -610,8 +691,11 @@ function makeSnippet(entry: DocsIndexEntry, terms: string[]): string {
     .filter(Boolean);
 
   const matchingLine = lines.find((line) => {
-    const normalized = line.toLowerCase();
-    return terms.some((term) => normalized.includes(term));
+    const normalized = normalizeSearchText(line);
+    return (
+      query.phrases.some((phrase) => normalized.includes(phrase)) ||
+      query.terms.some((term) => normalized.includes(term))
+    );
   });
 
   return truncate(matchingLine ?? entry.description ?? entry.title, 220);
@@ -622,21 +706,98 @@ function truncate(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
-function tokenize(query: string): string[] {
-  return Array.from(
-    new Set(
-      query
-        .toLowerCase()
-        .split(/[^a-z0-9_/-]+/)
-        .map((term) => term.trim())
-        .filter(Boolean),
+function normalizeDocsSearchQuery(query: string): NormalizedDocsSearchQuery {
+  const normalized = normalizeSearchText(query);
+  const terms = new Set(tokenizeNormalizedText(normalized));
+  const phrases = new Set<string>([normalized].filter(Boolean));
+
+  for (const term of Array.from(terms)) {
+    for (const synonym of TERM_SYNONYMS[term] ?? []) {
+      for (const synonymTerm of tokenizeNormalizedText(
+        normalizeSearchText(synonym),
+      )) {
+        terms.add(synonymTerm);
+      }
+    }
+  }
+
+  for (const [phrase, synonyms] of PHRASE_SYNONYMS) {
+    const normalizedPhrase = normalizeSearchText(phrase);
+    if (!normalized.includes(normalizedPhrase)) continue;
+
+    addPhraseWithTerms(normalizedPhrase, phrases, terms);
+    for (const synonym of synonyms) {
+      addPhraseWithTerms(normalizeSearchText(synonym), phrases, terms);
+    }
+  }
+
+  if (
+    terms.has('upload') &&
+    ['browser', 'web', 'client', 'user'].some((term) => terms.has(term))
+  ) {
+    addPhraseWithTerms('direct upload', phrases, terms);
+    addPhraseWithTerms('upload files directly', phrases, terms);
+  }
+
+  return {
+    terms: Array.from(terms),
+    phrases: Array.from(phrases).filter(
+      (phrase) => phrase.split(' ').length > 1,
     ),
-  );
+  };
 }
 
-/**
- * Find a docs entry by id, route, URL, or repository-relative path.
- */
+function addPhraseWithTerms(
+  phrase: string,
+  phrases: Set<string>,
+  terms: Set<string>,
+): void {
+  if (!phrase) return;
+
+  phrases.add(phrase);
+  for (const phraseTerm of tokenizeNormalizedText(phrase)) {
+    terms.add(phraseTerm);
+  }
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[_/-]+/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function tokenizeNormalizedText(value: string): string[] {
+  const terms = new Set<string>();
+
+  for (const term of value.split(' ')) {
+    if (!isSearchableTerm(term)) continue;
+
+    terms.add(term);
+    const stemmed = stemSearchTerm(term);
+    if (stemmed !== term && isSearchableTerm(stemmed)) {
+      terms.add(stemmed);
+    }
+  }
+
+  return Array.from(terms);
+}
+
+function isSearchableTerm(term: string): boolean {
+  if (!term || STOP_WORDS.has(term)) return false;
+  return term.length > 2 || SHORT_SEARCH_TERMS.has(term);
+}
+
+function stemSearchTerm(term: string): string {
+  if (term.length <= 3) return term;
+  if (term.endsWith('ies') && term.length > 4) return `${term.slice(0, -3)}y`;
+  if (term.endsWith('sses')) return term.slice(0, -2);
+  if (term.endsWith('s') && !term.endsWith('ss')) return term.slice(0, -1);
+  return term;
+}
+
 export function findDocById(
   index: DocsIndex,
   idOrPath: string,
@@ -663,9 +824,6 @@ function normalizeIdentifier(value: string): string {
     .replace(/^\/+/, '');
 }
 
-/**
- * Read raw markdown/MDX content for an indexed docs entry.
- */
 export async function readDocContent(entry: DocsIndexEntry): Promise<string> {
   if (entry.content) {
     return entry.content;
