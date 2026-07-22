@@ -7,6 +7,7 @@ import { assetsCommand } from './commands/assets/index.ts';
 import { completionsInstallCommand } from './commands/completions-install.ts';
 import { deliveryUsageCommand } from './commands/delivery-usage/index.ts';
 import { dimensionsCommand } from './commands/dimensions/index.ts';
+import { docsCommand } from './commands/docs/index.ts';
 import { drmConfigurationsCommand } from './commands/drm-configurations/index.ts';
 import { envCommand } from './commands/env/index.ts';
 import { errorsCommand } from './commands/errors/index.ts';
@@ -68,6 +69,7 @@ const cli = new Command()
   .command('login', loginCommand)
   .command('logout', logoutCommand)
   .command('env', envCommand)
+  .command('docs', docsCommand)
   .command('assets', assetsCommand)
   .command('live', liveCommand)
   .command('playback-ids', playbackIdsCommand)
