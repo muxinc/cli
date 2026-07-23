@@ -11,7 +11,7 @@ interface DocsPathOptions {
   json?: boolean;
 }
 
-export const docsPathCommand = new Command()
+export const skillsPathCommand = new Command()
   .description(
     'Write the agent skills embedded in this CLI build to the Mux data directory and print their paths',
   )
@@ -45,6 +45,6 @@ export const docsPathCommand = new Command()
         console.log(`  ${skill.name.padEnd(14)} ${skill.path}`);
       }
     } catch (error) {
-      await handleCommandError(error, 'docs', 'path', options);
+      await handleCommandError(error, 'skills', 'path', options);
     }
   });

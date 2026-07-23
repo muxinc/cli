@@ -15,7 +15,7 @@ interface DocsInstallOptions {
   json?: boolean;
 }
 
-export const docsInstallCommand = new Command()
+export const skillsInstallCommand = new Command()
   .description(
     'Install the embedded agent skills into an agent skills directory.\n\nDefaults to ~/.claude/skills, which Claude Code loads automatically — no CLAUDE.md or AGENTS.md changes needed. Re-run after upgrading the CLI to refresh the installed copy.',
   )
@@ -56,6 +56,6 @@ export const docsInstallCommand = new Command()
         'Claude Code loads these automatically in new sessions. Re-run this command after upgrading the CLI.',
       );
     } catch (error) {
-      await handleCommandError(error, 'docs', 'install', options);
+      await handleCommandError(error, 'skills', 'install', options);
     }
   });
