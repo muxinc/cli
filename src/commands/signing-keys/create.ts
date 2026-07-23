@@ -1,12 +1,19 @@
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment, setEnvironment } from '@/lib/config.ts';
+import { setEnvironment } from '@/lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
-import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
+import {
+  createAuthenticatedMuxClient,
+  resolveActiveEnvironment,
+} from '@/lib/mux.ts';
 import { confirmPrompt } from '@/lib/prompt.ts';
 
 interface CreateOptions {
   json?: boolean;
 }
+
+const NOT_SAVED_NOTE =
+  'No stored environment matches the active credentials, so the private key was not saved. Set MUX_SIGNING_KEY and MUX_PRIVATE_KEY to sign URLs with it.';
 
 export const createCommand = new Command()
   .description(
@@ -18,18 +25,16 @@ export const createCommand = new Command()
       // Initialize authenticated Mux client
       const mux = await createAuthenticatedMuxClient();
 
-      // Get current environment
-      const currentEnv = await getCurrentEnvironment();
-      if (!currentEnv) {
-        throw new Error(
-          "No environment configured. Please run 'mux login' first.",
-        );
-      }
+      // The key is only saved when the stored environment matches the active
+      // credentials; otherwise it would desync from the environment the key
+      // was actually created in.
+      const active = await resolveActiveEnvironment();
+      const target = active.stored;
 
       // Check if a signing key already exists
-      if (currentEnv.environment.signingKeyId && !options.json) {
+      if (target?.environment.signingKeyId && !wantsJson(options)) {
         const confirmed = await confirmPrompt({
-          message: `Environment '${currentEnv.name}' already has a signing key (${currentEnv.environment.signingKeyId}). Replace it?`,
+          message: `Environment '${target.name}' already has a signing key (${target.environment.signingKeyId}). Replace it?`,
           default: false,
         });
 
@@ -47,37 +52,67 @@ export const createCommand = new Command()
       const privateKey = signingKey.private_key;
       const createdAt = signingKey.created_at;
 
-      // Store the signing key in the current environment config
-      // Wrap in try-catch to prevent privateKey from leaking in error messages
-      try {
-        await setEnvironment(currentEnv.name, {
-          ...currentEnv.environment,
-          signingKeyId: keyId,
-          signingPrivateKey: privateKey,
-        });
-      } catch (err) {
-        throw new Error(
-          `Failed to save signing key to config: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        );
+      if (target) {
+        // Store the signing key in the matching environment config
+        // Wrap in try-catch to prevent privateKey from leaking in error messages
+        try {
+          await setEnvironment(target.name, {
+            ...target.environment,
+            signingKeyId: keyId,
+            signingPrivateKey: privateKey,
+          });
+        } catch (err) {
+          throw new Error(
+            `Failed to save signing key to config: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          );
+        }
+
+        if (wantsJson(options)) {
+          console.log(
+            JSON.stringify(
+              {
+                id: keyId,
+                created_at: createdAt,
+                environment: target.name,
+                saved: true,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.log(
+            `Signing key created and saved to environment: ${target.name}`,
+          );
+          console.log(`Key ID: ${keyId}`);
+        }
+        return;
       }
 
-      if (options.json) {
+      // No matching stored environment: emit the private key once instead of
+      // persisting it. The API only returns it at creation time.
+      if (wantsJson(options)) {
         console.log(
           JSON.stringify(
             {
               id: keyId,
               created_at: createdAt,
-              environment: currentEnv.name,
+              private_key: privateKey,
+              saved: false,
+              note: NOT_SAVED_NOTE,
             },
             null,
             2,
           ),
         );
       } else {
-        console.log(
-          `Signing key created and saved to environment: ${currentEnv.name}`,
-        );
-        console.log(`Key ID: ${keyId}`);
+        console.log(`Signing key created: ${keyId}`);
+        console.log('Private key (base64, shown once, not saved):');
+        console.log(privateKey);
+        console.log();
+        console.log(NOT_SAVED_NOTE);
+        console.log(`  export MUX_SIGNING_KEY=${keyId}`);
+        console.log('  export MUX_PRIVATE_KEY=<private key above>');
       }
     } catch (error) {
       await handleCommandError(error, 'signing-keys', 'create', options);

@@ -1,6 +1,9 @@
 import { Command } from '@cliffy/command';
-import Mux from '@mux/mux-node';
-import { getCurrentEnvironment } from '../lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
+import {
+  createAuthenticatedMuxClient,
+  resolveActiveEnvironment,
+} from '../lib/mux.ts';
 import { getSignedUrl } from '../lib/urls.ts';
 
 interface SignOptions {
@@ -120,34 +123,39 @@ export const signCommand = new Command()
   )
   .action(async (options: SignOptions, playbackId: string) => {
     try {
-      // Get current environment to retrieve signing keys
-      const currentEnv = await getCurrentEnvironment();
-      if (!currentEnv) {
-        throw new Error(
-          'No environment configured.\n\n' +
-            'Signing requires an authenticated environment.\n' +
-            "Please run 'mux login' first.",
-        );
+      // Resolve signing key material.
+      // Priority: MUX_SIGNING_KEY/MUX_PRIVATE_KEY env vars > stored config
+      // (consistent with how MUX_TOKEN_ID/MUX_TOKEN_SECRET take precedence).
+      // Env vars are only used when both are set and non-empty. Stored keys
+      // are only used when the stored environment matches the active
+      // credentials, so tokens for one environment cannot mint JWTs with
+      // another environment's key.
+      let keyId: string | undefined;
+      let keySecret: string | undefined;
+      const envSigningKey = process.env.MUX_SIGNING_KEY;
+      const envPrivateKey = process.env.MUX_PRIVATE_KEY;
+      if (envSigningKey && envPrivateKey) {
+        keyId = envSigningKey;
+        keySecret = envPrivateKey;
+      } else {
+        const active = await resolveActiveEnvironment();
+        keyId = active.stored?.environment.signingKeyId;
+        keySecret = active.stored?.environment.signingPrivateKey;
       }
 
-      // Check if signing keys are configured
-      if (
-        !currentEnv.environment.signingKeyId ||
-        !currentEnv.environment.signingPrivateKey
-      ) {
+      if (!keyId || !keySecret) {
         throw new Error(
-          'Signing keys not configured for this environment.\n\n' +
+          'Signing keys not configured.\n\n' +
             'To create and configure a signing key, run:\n' +
             '  mux signing-keys create\n\n' +
-            'This will create a new signing key and automatically configure it for your current environment.',
+            'This creates a new signing key and saves it to your current environment.\n' +
+            'Alternatively, set the MUX_SIGNING_KEY and MUX_PRIVATE_KEY environment variables.',
         );
       }
 
-      // Create Mux client
-      const mux = new Mux({
-        tokenId: currentEnv.environment.tokenId,
-        tokenSecret: currentEnv.environment.tokenSecret,
-      });
+      // Create Mux client (signing is local; credentials resolve from env
+      // vars or stored config like every other command)
+      const mux = await createAuthenticatedMuxClient();
 
       const tokenType =
         options.type && isValidTokenType(options.type) ? options.type : 'video';
@@ -156,8 +164,8 @@ export const signCommand = new Command()
 
       // Build sign options, casting to work around SDK's strict Record<string, string> typing
       const signOptions = {
-        keyId: currentEnv.environment.signingKeyId,
-        keySecret: currentEnv.environment.signingPrivateKey,
+        keyId,
+        keySecret,
         type: tokenType,
         expiration: options.expiration || '7d',
         ...(params ? { params } : {}),
@@ -173,7 +181,7 @@ export const signCommand = new Command()
       // Output based on format options
       if (options.tokenOnly) {
         console.log(token);
-      } else if (options.json) {
+      } else if (wantsJson(options)) {
         console.log(
           JSON.stringify(
             {
@@ -195,7 +203,7 @@ export const signCommand = new Command()
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.error(JSON.stringify({ error: errorMessage }, null, 2));
       } else {
         console.error(`Error: ${errorMessage}`);

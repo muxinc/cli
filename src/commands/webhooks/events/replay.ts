@@ -1,11 +1,10 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
+import { updateEnvironment } from '@/lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
 import { getEventById, getRecentEvents } from '@/lib/events-store.ts';
-import {
-  buildSignedHeaders,
-  getSigningSecretForCurrentEnv,
-} from '@/lib/webhook-signing.ts';
+import { resolveActiveEnvironment } from '@/lib/mux.ts';
+import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
 interface ReplayOptions {
   forwardTo?: string;
@@ -47,24 +46,23 @@ export const replayCommand = new Command()
         process.exit(1);
       }
 
-      const env = await getCurrentEnvironment();
-      if (!env) {
-        console.error("Not logged in. Please run 'mux login' to authenticate.");
-        process.exit(1);
-      }
-      const environmentId = env.environment.environmentId ?? env.name;
+      const active = await resolveActiveEnvironment();
+      const environmentId = active.environmentId;
+      const signingSecretKey = active.stored?.name ?? active.environmentId;
 
       // Use provided --forward-to, or fall back to the saved URL
-      if (!options.forwardTo && env.environment.forwardUrl) {
-        options.forwardTo = env.environment.forwardUrl;
+      if (!options.forwardTo && active.stored?.environment.forwardUrl) {
+        options.forwardTo = active.stored.environment.forwardUrl;
       }
 
-      // Save the forward URL if a new one was provided
+      // Save the forward URL if a new one was provided. Only persisted when
+      // the stored environment matches the active credentials.
       if (
         options.forwardTo &&
-        options.forwardTo !== env.environment.forwardUrl
+        active.stored &&
+        options.forwardTo !== active.stored.environment.forwardUrl
       ) {
-        await updateEnvironment(env.name, {
+        await updateEnvironment(active.stored.name, {
           forwardUrl: options.forwardTo,
         });
       }
@@ -82,13 +80,13 @@ export const replayCommand = new Command()
           return;
         }
 
-        const signingSecret = await getSigningSecretForCurrentEnv();
+        const signingSecret = await getSigningSecret(signingSecretKey);
         const { status } = await forwardEvent(
           options.forwardTo,
           event.payload,
           signingSecret,
         );
-        if (options.json) {
+        if (wantsJson(options)) {
           console.log(JSON.stringify({ status, eventId: event.id }, null, 2));
         } else if (status >= 200 && status < 300) {
           console.log(
@@ -111,7 +109,7 @@ export const replayCommand = new Command()
       }
 
       if (!options.forwardTo) {
-        if (options.json) {
+        if (wantsJson(options)) {
           console.log(JSON.stringify(events, null, 2));
         } else {
           for (const event of events) {
@@ -121,7 +119,7 @@ export const replayCommand = new Command()
         return;
       }
 
-      const signingSecret = await getSigningSecretForCurrentEnv();
+      const signingSecret = await getSigningSecret(signingSecretKey);
 
       let forwarded = 0;
       let failed = 0;
@@ -134,14 +132,14 @@ export const replayCommand = new Command()
           );
           if (status >= 200 && status < 300) {
             forwarded++;
-            if (!options.json) {
+            if (!wantsJson(options)) {
               console.log(
                 `${colors.green(`[${status}]`)}  ${event.type.padEnd(30)}  ${event.id}`,
               );
             }
           } else {
             failed++;
-            if (!options.json) {
+            if (!wantsJson(options)) {
               console.log(
                 `${colors.red(`[${status}]`)}  ${event.type.padEnd(30)}  ${event.id}`,
               );
@@ -149,7 +147,7 @@ export const replayCommand = new Command()
           }
         } catch {
           failed++;
-          if (!options.json) {
+          if (!wantsJson(options)) {
             console.log(
               `${colors.red('[ERR]')}  ${event.type.padEnd(30)}  ${event.id}`,
             );
@@ -157,7 +155,7 @@ export const replayCommand = new Command()
         }
       }
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify({ forwarded, failed }, null, 2));
       } else {
         console.log(
@@ -167,7 +165,7 @@ export const replayCommand = new Command()
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      if (options.json) {
+      if (wantsJson(options)) {
         console.error(JSON.stringify({ error: errorMessage }, null, 2));
       } else {
         console.error(`Error: ${errorMessage}`);

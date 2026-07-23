@@ -1,9 +1,10 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
+import { updateEnvironment } from '@/lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
 import { checkFetchPermissionError } from '@/lib/errors.ts';
 import { appendEvent, type StoredEvent } from '@/lib/events-store.ts';
-import { getAuthHeaders, getMuxBaseUrl } from '@/lib/mux.ts';
+import { getAuthHeaders, resolveActiveEnvironment } from '@/lib/mux.ts';
 import { parseSSEStream } from '@/lib/sse.ts';
 import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
@@ -32,7 +33,7 @@ export const listenCommand = new Command()
     let backoffMs = INITIAL_BACKOFF_MS;
 
     function printSummary() {
-      if (options.json) return;
+      if (wantsJson(options)) return;
       console.log(`\n${eventCount} event(s) received.`);
       if (options.forwardTo) {
         console.log(
@@ -47,29 +48,42 @@ export const listenCommand = new Command()
       process.exit(0);
     });
 
-    const env = await getCurrentEnvironment();
-    if (!env) {
-      console.error("Not logged in. Please run 'mux login' to authenticate.");
+    let active: Awaited<ReturnType<typeof resolveActiveEnvironment>>;
+    try {
+      active = await resolveActiveEnvironment();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (wantsJson(options)) {
+        console.error(JSON.stringify({ error: message }, null, 2));
+      } else {
+        console.error(`Error: ${message}`);
+      }
       process.exit(1);
     }
 
-    // Save the forward URL for use by replay/browse
-    if (options.forwardTo && options.forwardTo !== env.environment.forwardUrl) {
-      await updateEnvironment(env.name, {
+    // Save the forward URL for use by replay/browse. Only persisted when the
+    // stored environment matches the active credentials.
+    if (
+      options.forwardTo &&
+      active.stored &&
+      options.forwardTo !== active.stored.environment.forwardUrl
+    ) {
+      await updateEnvironment(active.stored.name, {
         forwardUrl: options.forwardTo,
       });
     }
 
     const authHeaders = await getAuthHeaders();
-    const baseUrl = getMuxBaseUrl(env);
-    const url = `${baseUrl}/system/v1/webhook-events/stream`;
+    const url = `${active.baseUrl}/system/v1/webhook-events/stream`;
 
     let signingSecret: string | undefined;
     if (options.forwardTo) {
-      signingSecret = await getSigningSecret(env.name);
+      signingSecret = await getSigningSecret(
+        active.stored?.name ?? active.environmentId,
+      );
     }
 
-    if (!options.json) {
+    if (!wantsJson(options)) {
       console.log(`Connecting...`);
       if (options.forwardTo) {
         console.log(`Forwarding events to ${options.forwardTo}`);
@@ -101,7 +115,7 @@ export const listenCommand = new Command()
           // Permission errors are not transient and should not be retried.
           const permError = await checkFetchPermissionError(response);
           if (permError) {
-            if (options.json) {
+            if (wantsJson(options)) {
               console.error(JSON.stringify({ error: permError }));
             } else {
               console.error(`Error: ${permError}`);
@@ -123,7 +137,7 @@ export const listenCommand = new Command()
         )) {
           if (sseEvent.event === 'connected') {
             backoffMs = INITIAL_BACKOFF_MS;
-            if (!options.json) {
+            if (!wantsJson(options)) {
               console.log(colors.dim('Connected to event stream.\n'));
             }
             continue;
@@ -144,7 +158,7 @@ export const listenCommand = new Command()
             id: eventId,
             type: eventType,
             timestamp,
-            environmentId: env.environment.environmentId ?? env.name,
+            environmentId: active.environmentId,
             payload: parsed,
           };
 
@@ -174,7 +188,7 @@ export const listenCommand = new Command()
             }
           }
 
-          if (options.json) {
+          if (wantsJson(options)) {
             console.log(JSON.stringify(parsed));
           } else {
             const time = new Date().toLocaleTimeString();
@@ -195,7 +209,7 @@ export const listenCommand = new Command()
         }
 
         // Stream ended naturally (server closed connection) — reconnect
-        if (!options.json) {
+        if (!wantsJson(options)) {
           console.log(colors.dim('\nStream ended.'));
         }
       } catch (error) {
@@ -210,13 +224,13 @@ export const listenCommand = new Command()
           errorMessage.includes('getaddrinfo')
         ) {
           console.error(
-            `Error: Could not resolve hostname for ${baseUrl}\n` +
+            `Error: Could not resolve hostname for ${active.baseUrl}\n` +
               'Check that MUX_BASE_URL is set correctly and the host is reachable.',
           );
           process.exit(1);
         }
 
-        if (!options.json) {
+        if (!wantsJson(options)) {
           if (
             errorMessage.includes('ECONNREFUSED') ||
             errorMessage.includes('ECONNRESET') ||
@@ -233,7 +247,7 @@ export const listenCommand = new Command()
 
       // Backoff before reconnecting
       if (!controller.signal.aborted) {
-        if (!options.json) {
+        if (!wantsJson(options)) {
           console.log(colors.dim(`Reconnecting in ${backoffMs / 1000}s...`));
         }
         await new Promise<void>((resolve) => {
