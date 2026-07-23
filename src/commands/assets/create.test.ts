@@ -10,6 +10,7 @@ import {
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setAgentMode } from '@/lib/context.ts';
 import { createCommand } from './create.ts';
 
 // Note: These tests focus on CLI flag parsing and input validation
@@ -36,6 +37,7 @@ describe('mux assets create command', () => {
     await rm(tempDir, { recursive: true, force: true });
     exitSpy?.mockRestore();
     consoleErrorSpy?.mockRestore();
+    setAgentMode(false);
   });
 
   describe('Flag combinations and validation', () => {
@@ -190,6 +192,83 @@ describe('mux assets create command', () => {
       const errorMessage = consoleErrorSpy.mock.calls[0][0];
       expect(errorMessage).toMatch(/No files found matching pattern/i);
     });
+
+    test('fails fast in agent mode when multiple files need confirmation and -y is omitted', async () => {
+      setAgentMode(true);
+      const fileA = join(tempDir, 'a.mp4');
+      const fileB = join(tempDir, 'b.mp4');
+      await writeFile(fileA, 'fake video content');
+      await writeFile(fileB, 'fake video content');
+
+      try {
+        await createCommand.parse(['--upload', fileA, '--upload', fileB]);
+      } catch (_error) {
+        // Expected to throw via mocked process.exit
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const parsed = JSON.parse(String(consoleErrorSpy.mock.calls[0][0]));
+      expect(parsed.error).toMatch(/-y/);
+      expect(parsed.error).toMatch(/2 files/);
+    });
+
+    test('fails fast with --json when multiple files need confirmation and -y is omitted', async () => {
+      const fileA = join(tempDir, 'a.mp4');
+      const fileB = join(tempDir, 'b.mp4');
+      await writeFile(fileA, 'fake video content');
+      await writeFile(fileB, 'fake video content');
+
+      try {
+        await createCommand.parse([
+          '--upload',
+          fileA,
+          '--upload',
+          fileB,
+          '--json',
+        ]);
+      } catch (_error) {
+        // Expected to throw via mocked process.exit
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const parsed = JSON.parse(String(consoleErrorSpy.mock.calls[0][0]));
+      expect(parsed.error).toMatch(/-y/);
+    });
+
+    test('does not require -y for a single file in agent mode', async () => {
+      // Isolate credentials so the command fails at the auth step, which
+      // comes after the confirmation check, without touching the network.
+      const originalXdg = process.env.XDG_CONFIG_HOME;
+      const originalTokenId = process.env.MUX_TOKEN_ID;
+      const originalTokenSecret = process.env.MUX_TOKEN_SECRET;
+      process.env.XDG_CONFIG_HOME = tempDir;
+      delete process.env.MUX_TOKEN_ID;
+      delete process.env.MUX_TOKEN_SECRET;
+
+      try {
+        setAgentMode(true);
+        const fileA = join(tempDir, 'a.mp4');
+        await writeFile(fileA, 'fake video content');
+
+        try {
+          await createCommand.parse(['--upload', fileA]);
+        } catch (_error) {
+          // Expected to fail at the auth step
+        }
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        const errorMessage = String(consoleErrorSpy.mock.calls[0]?.[0] || '');
+        expect(errorMessage).not.toContain('-y');
+      } finally {
+        if (originalXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+        else process.env.XDG_CONFIG_HOME = originalXdg;
+        if (originalTokenId === undefined) delete process.env.MUX_TOKEN_ID;
+        else process.env.MUX_TOKEN_ID = originalTokenId;
+        if (originalTokenSecret === undefined)
+          delete process.env.MUX_TOKEN_SECRET;
+        else process.env.MUX_TOKEN_SECRET = originalTokenSecret;
+      }
+    });
   });
 
   describe('Output formatting flags', () => {
@@ -205,6 +284,26 @@ describe('mux assets create command', () => {
         .getOptions()
         .find((opt) => opt.name === 'yes');
       expect(yesOption).toBeDefined();
+    });
+
+    test('emits machine-readable JSON errors in agent mode without --json', async () => {
+      setAgentMode(true);
+
+      try {
+        await createCommand.parse([
+          '--url',
+          'https://example.com/video.mp4',
+          '--file',
+          join(tempDir, 'config.json'),
+        ]);
+      } catch (_error) {
+        // Expected to throw via mocked process.exit
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const errorMessage = String(consoleErrorSpy.mock.calls[0][0]);
+      const parsed = JSON.parse(errorMessage);
+      expect(parsed.error).toMatch(/Cannot use multiple input methods/);
     });
   });
 
