@@ -1,6 +1,7 @@
 import { Command } from '@cliffy/command';
 import { skillsInstallCommand } from './install.ts';
 import { skillsPathCommand } from './path.ts';
+import { skillsUpdateCommand } from './update.ts';
 
 // biome-ignore lint/suspicious/noExplicitAny: Cliffy's chained types are too complex for TS to infer
 export const skillsCommand: Command<any> = new Command()
@@ -11,4 +12,5 @@ export const skillsCommand: Command<any> = new Command()
     this.showHelp();
   })
   .command('path', skillsPathCommand)
-  .command('install', skillsInstallCommand);
+  .command('install', skillsInstallCommand)
+  .command('update', skillsUpdateCommand);
