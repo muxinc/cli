@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatLiveStream } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -19,7 +20,7 @@ export const getCommand = new Command()
       // Fetch live stream details
       const stream = await mux.video.liveStreams.retrieve(streamId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(stream, null, 2));
       } else {
         formatLiveStream(stream);

@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { buildDataFilterParams } from '@/lib/data-filters.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -77,7 +78,7 @@ export const listCommand = new Command()
 
       const response = await mux.data.videoViews.list(params as never);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(response, null, 2));
         return;
       }

@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -17,7 +18,7 @@ export const getCommand = new Command()
       const response = await mux.data.incidents.retrieve(incidentId);
       const incident = response.data;
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(response, null, 2));
       } else {
         console.log(`Incident ID: ${incident.id}`);

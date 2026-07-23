@@ -27,30 +27,10 @@ import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
 import { webhooksCommand } from './commands/webhooks/index.ts';
 import { whoamiCommand } from './commands/whoami.ts';
-import { setAgentMode } from './lib/context.ts';
+import { isAgentMode, preprocessArgs } from './lib/context.ts';
 import { checkForUpdate, refreshUpdateCache } from './lib/update-notifier.ts';
 
 const VERSION = pkg.version;
-
-/**
- * Preprocess argv to handle --agent flag before Cliffy parses it.
- * Strips --agent from args, enables agent mode, and injects --json.
- */
-function preprocessArgs(argv: string[]): string[] {
-  const agentIndex = argv.indexOf('--agent');
-  if (agentIndex === -1) {
-    return argv;
-  }
-
-  setAgentMode(true);
-  const args = argv.filter((_, i) => i !== agentIndex);
-
-  if (!args.includes('--json')) {
-    args.push('--json');
-  }
-
-  return args;
-}
 
 // Main CLI command
 const cli = new Command()
@@ -108,10 +88,15 @@ if (import.meta.main) {
   try {
     await cli.parse(preprocessArgs(Bun.argv.slice(2)));
   } catch (error) {
-    if (error instanceof Error) {
-      console.error(`Error: ${error.message}`);
+    const message =
+      error instanceof Error ? error.message : 'An unknown error occurred';
+    // Commands format their own errors via handleCommandError; this is the
+    // fallback for errors that escape them, so it must stay machine-readable
+    // for agent and --json callers.
+    if (isAgentMode() || Bun.argv.includes('--json')) {
+      console.error(JSON.stringify({ error: message }, null, 2));
     } else {
-      console.error('An unknown error occurred');
+      console.error(`Error: ${message}`);
     }
     process.exit(1);
   }

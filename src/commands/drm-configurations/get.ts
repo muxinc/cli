@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -17,7 +18,7 @@ export const getCommand = new Command()
       const config =
         await mux.video.drmConfigurations.retrieve(drmConfigurationId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(config, null, 2));
       } else {
         console.log(`DRM Configuration ID: ${config.id}`);

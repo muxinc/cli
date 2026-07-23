@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import {
@@ -42,7 +43,7 @@ export const createCommand = new Command()
         policy,
       );
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(
           JSON.stringify(
             {

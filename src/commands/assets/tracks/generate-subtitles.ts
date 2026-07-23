@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -54,7 +55,7 @@ export const generateSubtitlesCommand = new Command()
           { generated_subtitles: [subtitle as never] },
         );
 
-        if (options.json) {
+        if (wantsJson(options)) {
           console.log(JSON.stringify(result, null, 2));
         } else {
           console.log('Subtitle generation started successfully');

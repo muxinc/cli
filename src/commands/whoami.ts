@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { DEFAULT_BASE_URL, getAuthContext } from '../lib/mux.ts';
 
@@ -21,7 +22,7 @@ export const whoamiCommand = new Command()
       const body = (await response.json()) as { data: Record<string, unknown> };
       const data = body.data;
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(data, null, 2));
         return;
       }

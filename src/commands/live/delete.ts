@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { confirmPrompt } from '@/lib/prompt.ts';
@@ -21,9 +22,9 @@ export const deleteCommand = new Command()
       // Confirm deletion unless --force flag is provided
       if (!options.force) {
         // For JSON mode, require explicit --force flag for safety
-        if (options.json) {
+        if (wantsJson(options)) {
           throw new Error(
-            'Deletion requires --force flag when using --json output',
+            'Deletion requires the --force flag with --json or in agent mode',
           );
         }
 
@@ -41,7 +42,7 @@ export const deleteCommand = new Command()
       // Delete the live stream
       await mux.video.liveStreams.delete(streamId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify({ success: true, streamId }, null, 2));
       } else {
         console.log(`Live stream ${streamId} deleted successfully`);

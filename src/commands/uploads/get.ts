@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -16,7 +17,7 @@ export const getCommand = new Command()
 
       const upload = await mux.video.uploads.retrieve(uploadId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(upload, null, 2));
       } else {
         console.log(`Upload ID: ${upload.id}`);

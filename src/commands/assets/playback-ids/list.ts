@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { getPlayerUrl, getStreamUrl } from '@/lib/urls.ts';
@@ -18,7 +19,7 @@ export const listCommand = new Command()
       const asset = await mux.video.assets.retrieve(assetId);
       const playbackIds = asset.playback_ids ?? [];
 
-      if (options.json) {
+      if (wantsJson(options)) {
         const output = playbackIds.map((p) => ({
           id: p.id,
           policy: p.policy,

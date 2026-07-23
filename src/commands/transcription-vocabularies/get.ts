@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -17,7 +18,7 @@ export const getCommand = new Command()
       const vocabulary =
         await mux.video.transcriptionVocabularies.retrieve(vocabularyId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(vocabulary, null, 2));
       } else {
         console.log(`Vocabulary ID: ${vocabulary.id}`);

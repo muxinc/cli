@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -18,7 +19,7 @@ export const completeCommand = new Command()
 
       await mux.video.liveStreams.complete(streamId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify({ success: true, streamId }, null, 2));
       } else {
         console.log(`Live stream ${streamId} completed successfully`);

@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import { readConfig } from '@/lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -35,7 +36,7 @@ export const listCommand = new Command()
         }
       }
 
-      if (options.json) {
+      if (wantsJson(options)) {
         const data = [];
         for await (const key of signingKeys) {
           const envs = activeKeys.get(key.id);

@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { createPlaybackId, type PlaybackIdPolicy } from '@/lib/playback-ids.ts';
@@ -35,7 +36,7 @@ export const createCommand = new Command()
 
       const playbackId = await createPlaybackId(mux, assetId, policy);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(
           JSON.stringify(
             {

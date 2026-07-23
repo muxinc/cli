@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { confirmPrompt } from '@/lib/prompt.ts';
@@ -18,9 +19,9 @@ export const cancelCommand = new Command()
       const mux = await createAuthenticatedMuxClient();
 
       if (!options.force) {
-        if (options.json) {
+        if (wantsJson(options)) {
           throw new Error(
-            'Cancellation requires --force flag when using --json output',
+            'Cancellation requires the --force flag with --json or in agent mode',
           );
         }
 
@@ -37,7 +38,7 @@ export const cancelCommand = new Command()
 
       const upload = await mux.video.uploads.cancel(uploadId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(upload, null, 2));
       } else {
         console.log(`Upload ${uploadId} cancelled successfully`);

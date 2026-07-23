@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type { Asset } from '@mux/mux-node/resources/video/assets';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import {
   formatAssetStatus,
@@ -59,7 +60,7 @@ export const listCommand = new Command()
       // Fetch assets
       const response = await mux.video.assets.list(params);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(response, null, 2));
       } else if (options.compact) {
         // Compact output - one line per asset, grep-friendly
