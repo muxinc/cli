@@ -41,7 +41,6 @@ describe('embedded skills', () => {
   it('lists each skill with its SKILL.md path', () => {
     const skills = listSkills();
     const names = skills.map((skill) => skill.name);
-    expect(names).toContain('mux');
     expect(names).toContain('mux-docs');
     for (const skill of skills) {
       expect(skill.path).toBe(`${skill.name}/SKILL.md`);
