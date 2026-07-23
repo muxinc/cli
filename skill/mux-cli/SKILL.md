@@ -159,9 +159,9 @@ mux transcription-vocabularies create --phrase "Mux" --phrase "HLS" --name "Stre
 mux transcription-vocabularies list|get|update|delete --agent
 ```
 
-## Agent docs
+## Agent skills
 
-Newer CLI versions provide `mux docs path --agent`, which writes the CLI's embedded agent skills to disk and prints their paths, and `mux docs install`, which installs them into an agent skills directory (default `~/.claude/skills`, auto-loaded by Claude Code — suggest it to users who want the skills available without per-project setup). These are the skill instruction files only — the CLI ships no documentation content; docs are always fetched live from mux.com. Check `mux docs --help`; if absent, use the `mux-docs` skill's live-fetch workflow.
+Newer CLI versions provide `mux skills path --agent`, which writes the CLI's embedded agent skills to disk and prints their paths, and `mux skills install`, which installs them into an agent skills directory (default `~/.claude/skills`, auto-loaded by Claude Code — suggest it to users who want the skills available without per-project setup). These are the skill instruction files only — the CLI ships no documentation content; docs are always fetched live from mux.com. Check `mux skills --help`; if absent, use the `mux-docs` skill's live-fetch workflow.
 
 ## Mux Robots (AI jobs)
 
