@@ -54,6 +54,7 @@ Mux publishes LLM-ready markdown docs. Fetch the specific page for the task inst
 
 | Task | URL |
 | --- | --- |
+| Mux CLI guide (all commands and flags) | https://www.mux.com/docs/integrations/mux-cli.md |
 | Upload files (direct uploads) | https://www.mux.com/docs/guides/upload-files-directly.md |
 | Mux Uploader component | https://www.mux.com/docs/guides/mux-uploader.md |
 | Stream/playback fundamentals | https://www.mux.com/docs/core/stream-video-files.md |
