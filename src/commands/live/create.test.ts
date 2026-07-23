@@ -19,6 +19,7 @@ describe('mux live create command', () => {
   let exitSpy: Mock<typeof process.exit>;
   let consoleErrorSpy: Mock<typeof console.error>;
   let consoleLogSpy: Mock<typeof console.log>;
+  let muxClientSpy: Mock<typeof muxModule.createAuthenticatedMuxClient>;
   let mockMuxClient: {
     video: {
       liveStreams: {
@@ -61,15 +62,18 @@ describe('mux live create command', () => {
     };
 
     // Mock createAuthenticatedMuxClient
-    spyOn(muxModule, 'createAuthenticatedMuxClient').mockResolvedValue(
-      mockMuxClient as unknown as Mux,
-    );
+    muxClientSpy = spyOn(
+      muxModule,
+      'createAuthenticatedMuxClient',
+    ).mockResolvedValue(mockMuxClient as unknown as Mux);
   });
 
   afterEach(() => {
     exitSpy?.mockRestore();
     consoleErrorSpy?.mockRestore();
     consoleLogSpy?.mockRestore();
+    // Restore the module spy so later test files get the real client
+    muxClientSpy?.mockRestore();
   });
 
   describe('Command metadata', () => {
