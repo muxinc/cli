@@ -38,4 +38,4 @@ Fetch the collection index for a topic area, then fetch the specific page it poi
 
 ## Self-healing
 
-If any URL here returns a 404, the docs have likely been reorganized: fetch https://www.mux.com/llms.txt, search it for the topic, and use the current URL. Consider opening a PR against `muxinc/skills` to fix the stale route.
+If any URL here returns a 404, the docs have likely been reorganized: fetch https://www.mux.com/llms.txt, search it for the topic, and use the current URL. Consider opening a PR against `muxinc/mux-skills` to fix the stale route.

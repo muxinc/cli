@@ -67,7 +67,7 @@ If a docs URL 404s, the docs have likely been reorganized. Do not give up after 
 
 ## Staying in sync
 
-- This skill is distributed from the `muxinc/skills` repository and ships embedded in the `mux` CLI. Updating the CLI (`brew upgrade mux` / `npm update -g @mux/cli`) updates the embedded skills; `mux skills path --agent` rewrites the on-disk copy to match the installed version, and `mux skills install` installs the skills into `~/.claude/skills` for automatic loading. You can also pull the latest directly from https://github.com/muxinc/skills.
+- This skill is distributed from the `muxinc/mux-skills` repository and ships embedded in the `mux` CLI. Updating the CLI (`brew upgrade mux` / `npm update -g @mux/cli`) updates the embedded skills; `mux skills path --agent` rewrites the on-disk copy to match the installed version, and `mux skills install` installs the skills into `~/.claude/skills` for automatic loading. You can also pull the latest directly from https://github.com/muxinc/mux-skills.
 - The CLI embeds only skill instruction files, never docs content — always fetch docs live using the workflow above. Check `mux skills --help` for what the installed version offers.
 
 ## Guardrails
