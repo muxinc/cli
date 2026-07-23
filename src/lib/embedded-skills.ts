@@ -21,7 +21,7 @@ export interface MaterializedSkills {
 }
 
 /**
- * Parse the manifest recording which muxinc/skills commit the embedded
+ * Parse the manifest recording which muxinc/mux-skills commit the embedded
  * skills were synced from.
  */
 export function getSkillsManifest(): SkillsManifest {

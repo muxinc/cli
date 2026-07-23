@@ -17,7 +17,7 @@ describe('embedded skills', () => {
 
   it('includes a manifest recording the source repository', () => {
     const manifest = getSkillsManifest();
-    expect(manifest.source).toBe('muxinc/skills');
+    expect(manifest.source).toBe('muxinc/mux-skills');
     expect(manifest.commit).toMatch(/^[0-9a-f]{40}$/);
   });
 

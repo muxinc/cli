@@ -2,7 +2,7 @@
 /**
  * Generates src/lib/embedded-skills.gen.ts from the contents of skill/.
  *
- * The skill/ directory is synced from muxinc/skills by the sync-skills
+ * The skill/ directory is synced from muxinc/mux-skills by the sync-skills
  * workflow. Embedding the files as string constants means every build target
  * (bun run, dist bundle, compiled binary) ships the skills with no runtime
  * filesystem or network dependency.

@@ -1,6 +1,6 @@
 name: Sync agent skills
 
-# Keeps skill/ in sync with the agent skills published in muxinc/skills.
+# Keeps skill/ in sync with the agent skills published in muxinc/mux-skills.
 # Triggered by a repository_dispatch from that repo on skill changes, with a
 # weekly cron as a backstop and workflow_dispatch for manual runs. Opens a PR
 # only when the synced content actually changed.
@@ -22,10 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check out muxinc/skills
+      - name: Check out muxinc/mux-skills
         uses: actions/checkout@v4
         with:
-          repository: muxinc/skills
+          repository: muxinc/mux-skills
           path: .skills-src
 
       - uses: oven-sh/setup-bun@v2
@@ -44,7 +44,7 @@ jobs:
               cp -R "$dir/references" "skill/$name/"
             fi
           done
-          printf '{\n  "source": "muxinc/skills",\n  "commit": "%s"\n}\n' "$SKILLS_SHA" > skill/manifest.json
+          printf '{\n  "source": "muxinc/mux-skills",\n  "commit": "%s"\n}\n' "$SKILLS_SHA" > skill/manifest.json
           rm -rf .skills-src
 
       - name: Regenerate embedded skills module
@@ -56,11 +56,11 @@ jobs:
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: 'chore: sync agent skills from muxinc/skills'
-          title: 'Sync agent skills from muxinc/skills'
+          commit-message: 'chore: sync agent skills from muxinc/mux-skills'
+          title: 'Sync agent skills from muxinc/mux-skills'
           body: |
             Automated sync of the agent skills embedded in the CLI from
-            [muxinc/skills](https://github.com/muxinc/skills). The source
+            [muxinc/mux-skills](https://github.com/muxinc/mux-skills). The source
             commit is recorded in `skill/manifest.json`.
 
             The next tagged release will embed these files in the compiled
