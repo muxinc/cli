@@ -132,6 +132,25 @@ mux login --name staging --env-file .env.staging
 
 The first environment you add becomes the default. See [Authentication & Environment Management](#authentication--environment-management) for more details.
 
+#### Credential sources and precedence
+
+The CLI resolves credentials from two sources, in order:
+
+1. **Environment variables** — `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET`. Used only when both are set and non-empty; a lone variable is ignored.
+2. **Stored login** — the environment saved by `mux login`.
+
+Environment variables take precedence over the stored login, matching the convention of tools like the GitHub, Stripe, and Vercel CLIs. When they shadow a stored login, the CLI prints a one-line notice on stderr (suppressed in agent mode).
+
+All values in a credential bundle come from the same source — the CLI never mixes sources:
+
+| Variable | Purpose |
+|----------|---------|
+| `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` | API credentials (both required to take effect) |
+| `MUX_BASE_URL` | API host override (applies to either source) |
+| `MUX_SIGNING_KEY` / `MUX_PRIVATE_KEY` | Signing key pair for `mux sign` (both required to take effect) |
+
+When credentials come from environment variables, the API host is `MUX_BASE_URL` or the default `https://api.mux.com` — never a stored environment's custom host. Similarly, `mux sign` only falls back to a stored environment's signing keys when that environment matches the active credentials, so tokens for one environment cannot mint tokens with another environment's key.
+
 ## Common Options
 
 These options are available on most commands and are not repeated in individual command docs below.
@@ -142,7 +161,7 @@ These options are available on most commands and are not repeated in individual 
 | `--compact` | One-line-per-item output, grep-friendly. Available on `list` commands. |
 | `--limit <n>` | Number of results to return (default: 25). Available on `list` commands. |
 | `--page <n>` | Page number for pagination (default: 1). Available on `list` commands. |
-| `-f, --force` | Skip confirmation prompts on destructive actions. **Required** when combining `--json` with `delete` commands. |
+| `-f, --force` | Skip confirmation prompts on destructive actions. **Required** for `delete` commands with `--json` or in agent mode. |
 | `--wait` | Poll until the resource is ready before returning. Available on `create` commands. |
 
 ## Webhook Forwarding
@@ -1035,7 +1054,7 @@ mux exports list                                       # list video view export 
 Authenticate with Mux and save credentials.
 
 **Options:**
-- `-f, --env-file <path>` - Path to .env file containing `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET`
+- `-f, --env-file <path>` - Path to .env file containing `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET`, and optionally `MUX_SIGNING_KEY` and `MUX_PRIVATE_KEY` (saved for `mux sign` when both are present)
 - `-n, --name <name>` - Name for this environment (default: `default`)
 
 ```bash
