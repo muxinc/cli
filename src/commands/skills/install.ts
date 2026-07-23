@@ -1,14 +1,12 @@
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Command } from '@cliffy/command';
 import { handleCommandError } from '@/lib/errors.ts';
 import {
+  getDefaultAgentSkillsDir,
   getSkillsManifest,
   installSkills,
   listSkills,
 } from '../../lib/embedded-skills.ts';
-
-const DEFAULT_TARGET = join(homedir(), '.claude', 'skills');
 
 interface DocsInstallOptions {
   dir: string;
@@ -17,10 +15,10 @@ interface DocsInstallOptions {
 
 export const skillsInstallCommand = new Command()
   .description(
-    'Install the embedded agent skills into an agent skills directory.\n\nDefaults to ~/.claude/skills, which Claude Code loads automatically — no CLAUDE.md or AGENTS.md changes needed. Re-run after upgrading the CLI to refresh the installed copy.',
+    'Install the embedded agent skills into an agent skills directory.\n\nDefaults to ~/.claude/skills, which Claude Code loads automatically — no CLAUDE.md or AGENTS.md changes needed. Run `mux skills update` after upgrading the CLI to refresh the installed copy.',
   )
   .option('--dir <path:string>', 'Target skills directory', {
-    default: DEFAULT_TARGET,
+    default: getDefaultAgentSkillsDir(),
   })
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: DocsInstallOptions) => {
@@ -53,7 +51,7 @@ export const skillsInstallCommand = new Command()
       }
       console.log('');
       console.log(
-        'Claude Code loads these automatically in new sessions. Re-run this command after upgrading the CLI.',
+        'Claude Code loads these automatically in new sessions. Run `mux skills update` after upgrading the CLI to refresh this copy.',
       );
     } catch (error) {
       await handleCommandError(error, 'skills', 'install', options);

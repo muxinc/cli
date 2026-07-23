@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   EMBEDDED_SKILLS,
   getSkillsManifest,
+  hasInstalledSkills,
   installSkills,
   listSkills,
   materializeSkills,
@@ -58,6 +59,17 @@ describe('materializeSkills', () => {
       for (const [relative, contents] of Object.entries(EMBEDDED_SKILLS)) {
         expect(await Bun.file(join(testDir, relative)).text()).toBe(contents);
       }
+    } finally {
+      await rm(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('detects whether skills are installed in a directory', async () => {
+    const testDir = await mkdtemp(join(tmpdir(), 'mux-cli-skills-test-'));
+    try {
+      expect(hasInstalledSkills(testDir)).toBe(false);
+      await installSkills(testDir);
+      expect(hasInstalledSkills(testDir)).toBe(true);
     } finally {
       await rm(testDir, { recursive: true, force: true });
     }

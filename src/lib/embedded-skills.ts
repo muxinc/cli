@@ -1,4 +1,6 @@
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { EMBEDDED_SKILLS } from './embedded-skills.gen.ts';
 import { getSkillsDir } from './xdg.ts';
@@ -54,6 +56,24 @@ export async function materializeSkills(
     files.push(destination);
   }
   return { dir: targetDir, files };
+}
+
+/**
+ * Default agent skills directory: ~/.claude/skills, which Claude Code loads
+ * automatically at session start.
+ */
+export function getDefaultAgentSkillsDir(): string {
+  return join(homedir(), '.claude', 'skills');
+}
+
+/**
+ * True if a previous `mux skills install` left a copy of any embedded skill
+ * in the target directory.
+ */
+export function hasInstalledSkills(
+  targetDir: string = getDefaultAgentSkillsDir(),
+): boolean {
+  return listSkills().some((skill) => existsSync(join(targetDir, skill.path)));
 }
 
 /**
