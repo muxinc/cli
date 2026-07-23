@@ -67,7 +67,7 @@ If a docs URL 404s, the docs have likely been reorganized. Do not give up after 
 
 ## Staying in sync
 
-- This skill is distributed from the `muxinc/skills` repository. If the Mux CLI is installed, refresh installed skills with `mux skills update`; otherwise pull the latest from https://github.com/muxinc/skills.
+- This skill is distributed from the `muxinc/skills` repository and ships embedded in the `mux` CLI. Updating the CLI (`brew upgrade mux` / `npm update -g @mux/cli`) updates the embedded skills; `mux docs path --agent` rewrites the on-disk copy to match the installed version. You can also pull the latest directly from https://github.com/muxinc/skills.
 - If the `mux` CLI is installed, `mux docs path --json` prints the local paths to its embedded agent skill and bundled docs — useful offline. Check `mux docs --help` for what the installed version offers; when the network is available, prefer the live fetch workflow above so answers reflect today's published docs.
 
 ## Guardrails
