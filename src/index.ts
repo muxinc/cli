@@ -57,7 +57,9 @@ function preprocessArgs(argv: string[]): string[] {
 const cli = new Command()
   .name('mux')
   .version(VERSION)
-  .description('Official Mux CLI for interacting with Mux APIs')
+  .description(
+    'Official Mux CLI for interacting with Mux APIs\n\nAgent support:\n  Run `mux docs path --json` to locate the embedded agent skills, or\n  `mux docs install` to install them into ~/.claude/skills for Claude Code.',
+  )
   .globalOption(
     '--agent',
     'Agent mode: uses JSON output and identifies as an agent in User-Agent header.',

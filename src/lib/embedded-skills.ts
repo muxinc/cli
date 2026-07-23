@@ -55,3 +55,23 @@ export async function materializeSkills(
   }
   return { dir: targetDir, files };
 }
+
+/**
+ * Install the embedded skills into an agent's skills directory (for example
+ * ~/.claude/skills, which Claude Code loads automatically). Writes only the
+ * skill directories, not the sync manifest, so the target directory contains
+ * nothing but skills.
+ */
+export async function installSkills(
+  targetDir: string,
+): Promise<MaterializedSkills> {
+  const files: string[] = [];
+  for (const [relative, contents] of Object.entries(EMBEDDED_SKILLS)) {
+    if (relative === 'manifest.json') continue;
+    const destination = join(targetDir, relative);
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, contents);
+    files.push(destination);
+  }
+  return { dir: targetDir, files };
+}

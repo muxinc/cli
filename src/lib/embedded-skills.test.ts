@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   EMBEDDED_SKILLS,
   getSkillsManifest,
+  installSkills,
   listSkills,
   materializeSkills,
 } from './embedded-skills.ts';
@@ -57,6 +58,22 @@ describe('materializeSkills', () => {
       for (const [relative, contents] of Object.entries(EMBEDDED_SKILLS)) {
         expect(await Bun.file(join(testDir, relative)).text()).toBe(contents);
       }
+    } finally {
+      await rm(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('installs skill directories without the sync manifest', async () => {
+    const testDir = await mkdtemp(join(tmpdir(), 'mux-cli-skills-test-'));
+    try {
+      const { files } = await installSkills(testDir);
+      expect(files.length).toBe(Object.keys(EMBEDDED_SKILLS).length - 1);
+      expect(await Bun.file(join(testDir, 'manifest.json')).exists()).toBe(
+        false,
+      );
+      expect(
+        await Bun.file(join(testDir, 'mux-docs', 'SKILL.md')).exists(),
+      ).toBe(true);
     } finally {
       await rm(testDir, { recursive: true, force: true });
     }
