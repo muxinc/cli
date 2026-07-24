@@ -9,14 +9,15 @@ Mux publishes its entire documentation as agent-ready markdown, auto-generated f
 
 ## Workflow
 
-1. **Route.** Pick the most specific starting point:
-   - A known page URL (see collection indexes below to find one).
-   - A collection index for the topic area (small, fast to scan).
-   - An API reference bundle or spec (below) for exact request/response shapes.
-   - The Mux Robots guides (below) for AI video workflows — summaries, moderation, captions, chapters, and more.
-   - https://www.mux.com/llms.txt — the master index of every docs page — when you don't know where the topic lives.
-2. **Fetch** the page's markdown. Every docs page has a markdown version: append `.md` to its URL (e.g. `https://www.mux.com/docs/guides/start-live-streaming.md`).
+1. **Route — try these in order and stop at the first hit.** The order is cost-ordered: each step reads fewer tokens than the next.
+   1. If the `mux` CLI is installed, run `mux docs find "<topic>" --agent` — it searches the docs index CLI-side and returns only the matching page URLs, so you never read an index into context. (Check `mux docs --help`; older versions lack it.)
+   2. Construct the URL from a known pattern: the tables below (collections, Robots `robots-<task>.md`, API references) cover most topics.
+   3. Fetch the smallest collection index for the topic area (a few dozen lines).
+   4. Fetch https://www.mux.com/llms.txt — the master index of every docs page — only when the steps above fail.
+2. **Fetch ONE page** — the page's markdown version: append `.md` to its URL (e.g. `https://www.mux.com/docs/guides/start-live-streaming.md`). Only add an API reference bundle when you need exact request/response shapes; do not fetch extra pages "for context."
 3. **Answer from the fetched content** and cite the page URL.
+
+**Never fetch https://www.mux.com/llms-full.txt.** It is the entire documentation in a single file and will flood the context window; every page in it is reachable individually through the steps above.
 
 ## Collection indexes
 
@@ -32,7 +33,6 @@ Mux publishes its entire documentation as agent-ready markdown, auto-generated f
 | Example implementations | https://www.mux.com/docs/examples.txt |
 | Pricing and billing | https://www.mux.com/docs/pricing.txt |
 
-`https://www.mux.com/llms-full.txt` is the entire documentation in one file — very large; prefer per-page fetches.
 
 ## Mux Robots (AI video workflows)
 
@@ -63,7 +63,7 @@ All of these resources are also discoverable from the docs site itself: every do
 
 ## Self-healing
 
-If a docs URL 404s, the docs have likely been reorganized. Do not give up after one 404: fetch https://www.mux.com/llms.txt, search it for the topic, and use the current URL.
+If a docs URL 404s, the docs have likely been reorganized. Do not give up after one 404: run `mux docs find "<topic>" --agent` (or fetch https://www.mux.com/llms.txt and search it) to get the page's current URL.
 
 ## Staying in sync
 
