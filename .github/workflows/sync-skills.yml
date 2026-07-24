@@ -1,9 +1,13 @@
 name: Sync agent skills
 
-# Keeps skill/ in sync with the agent skills published in muxinc/mux-skills.
+# Keeps skill/ in sync with the agent skills published in muxinc/skills.
 # Triggered by a repository_dispatch from that repo on skill changes, with a
 # weekly cron as a backstop and workflow_dispatch for manual runs. Opens a PR
 # only when the synced content actually changed.
+#
+# EMBEDDED_SKILLS is an allowlist: muxinc/skills also publishes skills with
+# vendored reference docs (skills/mux), which the CLI intentionally does not
+# embed — the CLI ships routing skills only, never docs content.
 
 on:
   repository_dispatch:
@@ -16,16 +20,19 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  EMBEDDED_SKILLS: mux-docs
+
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check out muxinc/mux-skills
+      - name: Check out muxinc/skills
         uses: actions/checkout@v4
         with:
-          repository: muxinc/mux-skills
+          repository: muxinc/skills
           path: .skills-src
 
       - uses: oven-sh/setup-bun@v2
@@ -33,18 +40,14 @@ jobs:
       - name: Copy skills into skill/
         run: |
           set -euo pipefail
-          SKILLS_SHA=$(git -C .skills-src log -1 --format=%H -- plugins/mux/skills)
           rm -rf skill
           mkdir -p skill
-          for dir in .skills-src/plugins/mux/skills/*/; do
-            name=$(basename "$dir")
-            mkdir -p "skill/$name"
-            cp "$dir/SKILL.md" "skill/$name/"
-            if [ -d "$dir/references" ]; then
-              cp -R "$dir/references" "skill/$name/"
-            fi
+          for name in $EMBEDDED_SKILLS; do
+            test -f ".skills-src/skills/$name/SKILL.md"
+            cp -R ".skills-src/skills/$name" "skill/$name"
           done
-          printf '{\n  "source": "muxinc/mux-skills",\n  "commit": "%s"\n}\n' "$SKILLS_SHA" > skill/manifest.json
+          SKILLS_SHA=$(git -C .skills-src log -1 --format=%H -- $(printf "skills/%s " $EMBEDDED_SKILLS))
+          printf '{\n  "source": "muxinc/skills",\n  "commit": "%s"\n}\n' "$SKILLS_SHA" > skill/manifest.json
           rm -rf .skills-src
 
       - name: Regenerate embedded skills module
@@ -56,11 +59,11 @@ jobs:
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: 'chore: sync agent skills from muxinc/mux-skills'
-          title: 'Sync agent skills from muxinc/mux-skills'
+          commit-message: 'chore: sync agent skills from muxinc/skills'
+          title: 'Sync agent skills from muxinc/skills'
           body: |
             Automated sync of the agent skills embedded in the CLI from
-            [muxinc/mux-skills](https://github.com/muxinc/mux-skills). The source
+            [muxinc/skills](https://github.com/muxinc/skills). The source
             commit is recorded in `skill/manifest.json`.
 
             The next tagged release will embed these files in the compiled
