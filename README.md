@@ -147,7 +147,7 @@ All values in a credential bundle come from the same source — the CLI never mi
 |----------|---------|
 | `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` | API credentials (both required to take effect) |
 | `MUX_BASE_URL` | API host override (applies to either source) |
-| `MUX_SIGNING_KEY` / `MUX_PRIVATE_KEY` | Signing key pair for `mux sign` (both required to take effect) |
+| `MUX_SIGNING_KEY` / `MUX_PRIVATE_KEY` | Signing key pair for `mux sign` (both required to take effect; used alongside API credentials, not instead of them) |
 
 When credentials come from environment variables, the API host is `MUX_BASE_URL` or the default `https://api.mux.com` — never a stored environment's custom host. Similarly, `mux sign` only falls back to a stored environment's signing keys when that environment matches the active credentials, so tokens for one environment cannot mint tokens with another environment's key.
 

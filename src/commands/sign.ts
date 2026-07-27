@@ -149,7 +149,7 @@ export const signCommand = new Command()
             'To create and configure a signing key, run:\n' +
             '  mux signing-keys create\n\n' +
             'This creates a new signing key and saves it to your current environment.\n' +
-            'Alternatively, set the MUX_SIGNING_KEY and MUX_PRIVATE_KEY environment variables.',
+            'Alternatively, set the MUX_SIGNING_KEY and MUX_PRIVATE_KEY environment variables (API credentials are still required).',
         );
       }
 
