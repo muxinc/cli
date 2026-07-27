@@ -431,6 +431,47 @@ describe('auth fallback to environment variables', () => {
       expect(active.stored).toBeNull();
     });
 
+    it('prints the shadow notice when env vars redirect away from a stored login', async () => {
+      await setEnvironment('default', {
+        tokenId: 'stored_id',
+        tokenSecret: 'stored_secret',
+        environmentId: 'env_stored_123',
+      });
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+      mockWhoami('env_other_456');
+      const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+      let notices: string[];
+
+      try {
+        await resolveActiveEnvironment();
+        notices = errorSpy.mock.calls
+          .map((c) => String(c[0]))
+          .filter((m) => m.includes('MUX_TOKEN_ID'));
+      } finally {
+        errorSpy.mockRestore();
+      }
+
+      expect(notices).toHaveLength(1);
+    });
+
+    it('prints no notice when only env credentials exist', async () => {
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+      mockWhoami('env_from_whoami');
+      const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+      let callCount: number;
+
+      try {
+        await resolveActiveEnvironment();
+        callCount = errorSpy.mock.calls.length;
+      } finally {
+        errorSpy.mockRestore();
+      }
+
+      expect(callCount).toBe(0);
+    });
+
     it('resolves the base URL from the credential source, not the stored config', async () => {
       await setEnvironment('default', {
         tokenId: 'stored_id',

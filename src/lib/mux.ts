@@ -154,6 +154,10 @@ export async function resolveActiveEnvironment(): Promise<ActiveEnvironment> {
     };
   }
 
+  if (stored) {
+    noticeEnvCredentialsShadowStoredLogin();
+  }
+
   // The base URL follows the credential source: env var credentials never
   // inherit a stored environment's host (MUX_BASE_URL or default).
   const baseUrl = getMuxBaseUrl(null);
