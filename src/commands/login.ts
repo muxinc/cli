@@ -1,7 +1,11 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Command } from '@cliffy/command';
-import { listEnvironments, setEnvironment } from '../lib/config.ts';
+import {
+  getEnvironment,
+  listEnvironments,
+  setEnvironment,
+} from '../lib/config.ts';
 import { wantsJson } from '../lib/context.ts';
 import { handleCommandError } from '../lib/errors.ts';
 import {
@@ -220,8 +224,28 @@ export const loginCommand = new Command()
         throw new Error(validation.error || 'Invalid credentials');
       }
 
+      // Refreshing credentials must not destroy environment-bound state
+      // (signing keys, forward URL). Preserve those fields only when the
+      // new credentials verifiably belong to the same environment; carrying
+      // them across an environment change would desync the config.
+      const existing = await getEnvironment(envName);
+      const preserved =
+        existing?.environmentId &&
+        existing.environmentId === validation.environmentId
+          ? {
+              ...(existing.signingKeyId && {
+                signingKeyId: existing.signingKeyId,
+              }),
+              ...(existing.signingPrivateKey && {
+                signingPrivateKey: existing.signingPrivateKey,
+              }),
+              ...(existing.forwardUrl && { forwardUrl: existing.forwardUrl }),
+            }
+          : {};
+
       // Save to config
       await setEnvironment(envName, {
+        ...preserved,
         tokenId: tokenId.trim(),
         tokenSecret: tokenSecret.trim(),
         environmentId: validation.environmentId,

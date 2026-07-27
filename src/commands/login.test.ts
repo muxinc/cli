@@ -10,7 +10,7 @@ import {
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getEnvironment } from '../lib/config.ts';
+import { getEnvironment, setEnvironment } from '../lib/config.ts';
 import { setAgentMode } from '../lib/context.ts';
 import { credentialsFromEnv, loginCommand, parseEnvFile } from './login.ts';
 
@@ -513,6 +513,87 @@ describe('Login command - action', () => {
     const saved = await getEnvironment('default');
     expect(saved?.signingKeyId).toBe('key_env');
     expect(saved?.signingPrivateKey).toBe('private_env');
+  });
+
+  it('preserves saved signing keys and forwardUrl when re-logging into the same environment', async () => {
+    // The mocked /whoami returns env_mock_123, so this entry matches the
+    // environment the new credentials belong to.
+    await setEnvironment('default', {
+      tokenId: 'old_id',
+      tokenSecret: 'old_secret',
+      environmentId: 'env_mock_123',
+      signingKeyId: 'key_saved',
+      signingPrivateKey: 'private_saved',
+      forwardUrl: 'http://localhost:3000/webhooks',
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse([]);
+
+    const saved = await getEnvironment('default');
+    expect(saved?.tokenId).toBe('new_id');
+    expect(saved?.signingKeyId).toBe('key_saved');
+    expect(saved?.signingPrivateKey).toBe('private_saved');
+    expect(saved?.forwardUrl).toBe('http://localhost:3000/webhooks');
+  });
+
+  it('does not carry signing keys over when the new credentials belong to a different environment', async () => {
+    await setEnvironment('default', {
+      tokenId: 'old_id',
+      tokenSecret: 'old_secret',
+      environmentId: 'env_different_999',
+      signingKeyId: 'key_saved',
+      signingPrivateKey: 'private_saved',
+      forwardUrl: 'http://localhost:3000/webhooks',
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse([]);
+
+    const saved = await getEnvironment('default');
+    expect(saved?.tokenId).toBe('new_id');
+    expect(saved?.signingKeyId).toBeUndefined();
+    expect(saved?.signingPrivateKey).toBeUndefined();
+    expect(saved?.forwardUrl).toBeUndefined();
+  });
+
+  it('does not preserve fields from a legacy entry with no environmentId', async () => {
+    await setEnvironment('default', {
+      tokenId: 'old_id',
+      tokenSecret: 'old_secret',
+      signingKeyId: 'key_saved',
+      signingPrivateKey: 'private_saved',
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse([]);
+
+    const saved = await getEnvironment('default');
+    expect(saved?.signingKeyId).toBeUndefined();
+  });
+
+  it('prefers newly provided signing keys over preserved ones', async () => {
+    await setEnvironment('default', {
+      tokenId: 'old_id',
+      tokenSecret: 'old_secret',
+      environmentId: 'env_mock_123',
+      signingKeyId: 'key_saved',
+      signingPrivateKey: 'private_saved',
+    });
+    const envPath = join(testConfigDir, '.env');
+    await Bun.write(
+      envPath,
+      'MUX_TOKEN_ID=file_id\nMUX_TOKEN_SECRET=file_secret\nMUX_SIGNING_KEY=key_new\nMUX_PRIVATE_KEY=private_new',
+    );
+
+    await loginCommand.parse(['--env-file', envPath]);
+
+    const saved = await getEnvironment('default');
+    expect(saved?.signingKeyId).toBe('key_new');
+    expect(saved?.signingPrivateKey).toBe('private_new');
   });
 
   it('ignores signing keys when only one of the pair is present', async () => {
