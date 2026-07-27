@@ -10,6 +10,7 @@ import { confirmPrompt } from '@/lib/prompt.ts';
 
 interface CreateOptions {
   json?: boolean;
+  force?: boolean;
 }
 
 const NOT_SAVED_NOTE =
@@ -20,6 +21,7 @@ export const createCommand = new Command()
     'Create a signing key and save to current environment (private key only available at creation)',
   )
   .option('--json', 'Output JSON instead of pretty format')
+  .option('-f, --force', 'Replace an existing signing key without confirmation')
   .action(async (options: CreateOptions) => {
     try {
       // Initialize authenticated Mux client
@@ -31,8 +33,15 @@ export const createCommand = new Command()
       const active = await resolveActiveEnvironment();
       const target = active.stored;
 
-      // Check if a signing key already exists
-      if (target?.environment.signingKeyId && !wantsJson(options)) {
+      // Replacing an existing key is destructive: the saved private key is
+      // overwritten and cannot be retrieved again. Confirm unless --force.
+      if (target?.environment.signingKeyId && !options.force) {
+        if (wantsJson(options)) {
+          throw new Error(
+            `Environment '${target.name}' already has a signing key (${target.environment.signingKeyId}). Replacing it requires the --force flag with --json or in agent mode.`,
+          );
+        }
+
         const confirmed = await confirmPrompt({
           message: `Environment '${target.name}' already has a signing key (${target.environment.signingKeyId}). Replace it?`,
           default: false,

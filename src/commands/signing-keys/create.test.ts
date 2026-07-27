@@ -213,6 +213,49 @@ describe('mux signing-keys create command', () => {
       expect(parsed.saved).toBe(true);
     });
 
+    test('fails fast in JSON mode when a signing key exists and --force is omitted', async () => {
+      await setEnvironment('default', {
+        tokenId: 'stored_id',
+        tokenSecret: 'stored_secret',
+        environmentId: 'env_stored_123',
+        signingKeyId: 'key_existing',
+        signingPrivateKey: 'existing_private_key',
+      });
+      mockApi('env_stored_123');
+
+      try {
+        await createCommand.parse(['--json']);
+      } catch (_error) {
+        // Expected to throw via mocked process.exit
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
+      expect(parsed.error).toContain('--force');
+      expect(parsed.error).toContain('key_existing');
+      const saved = await getEnvironment('default');
+      expect(saved?.signingKeyId).toBe('key_existing');
+      expect(saved?.signingPrivateKey).toBe('existing_private_key');
+    });
+
+    test('replaces an existing signing key in JSON mode with --force', async () => {
+      await setEnvironment('default', {
+        tokenId: 'stored_id',
+        tokenSecret: 'stored_secret',
+        environmentId: 'env_stored_123',
+        signingKeyId: 'key_existing',
+        signingPrivateKey: 'existing_private_key',
+      });
+      mockApi('env_stored_123');
+
+      await createCommand.parse(['--json', '--force']);
+
+      const saved = await getEnvironment('default');
+      expect(saved?.signingKeyId).toBe('key_new_123');
+      const parsed = jsonOutput();
+      expect(parsed.saved).toBe(true);
+    });
+
     test('prints the private key with guidance in pretty mode when not saved', async () => {
       process.env.MUX_TOKEN_ID = 'env_id';
       process.env.MUX_TOKEN_SECRET = 'env_secret';
