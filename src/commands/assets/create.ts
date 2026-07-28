@@ -402,9 +402,11 @@ export const createCommand = new Command()
       if (opts.url) {
         result = await createFromUrl(mux, opts.url, opts);
 
-        if (json) {
+        // With --wait, JSON mode prints only the final asset state below so
+        // stdout stays a single JSON document.
+        if (json && !(opts.wait && result.id)) {
           console.log(JSON.stringify(result, null, 2));
-        } else {
+        } else if (!json) {
           console.log(`Asset created: ${result.id}`);
           console.log(`  Status: ${result.status}`);
           if (result.playback_ids && result.playback_ids.length > 0) {
@@ -427,9 +429,11 @@ export const createCommand = new Command()
       } else if (opts.file) {
         result = await createFromConfig(mux, opts.file, opts);
 
-        if (json) {
+        // With --wait, JSON mode prints only the final asset state below so
+        // stdout stays a single JSON document.
+        if (json && !(opts.wait && result.id)) {
           console.log(JSON.stringify(result, null, 2));
-        } else {
+        } else if (!json) {
           console.log(`Asset created: ${result.id}`);
           console.log(`  Status: ${result.status}`);
           if (result.playback_ids && result.playback_ids.length > 0) {
