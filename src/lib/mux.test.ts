@@ -11,7 +11,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getCurrentEnvironment, setEnvironment } from './config.ts';
-import { setAgentMode } from './context.ts';
+import { setAgentMode, setJsonFlag } from './context.ts';
 import {
   createAuthenticatedMuxClient,
   DEFAULT_BASE_URL,
@@ -121,6 +121,7 @@ describe('auth fallback to environment variables', () => {
       process.env.MUX_TOKEN_SECRET = originalTokenSecret;
     }
     setAgentMode(false);
+    setJsonFlag(false);
     await rm(testConfigDir, { recursive: true, force: true });
   });
 
@@ -193,6 +194,27 @@ describe('auth fallback to environment variables', () => {
       process.env.MUX_TOKEN_ID = 'env_token_id';
       process.env.MUX_TOKEN_SECRET = 'env_token_secret';
       setAgentMode(true);
+      const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+      let callCount: number;
+
+      try {
+        await getAuthContext();
+        callCount = errorSpy.mock.calls.length;
+      } finally {
+        errorSpy.mockRestore();
+      }
+
+      expect(callCount).toBe(0);
+    });
+
+    it('suppresses the notice when --json was passed', async () => {
+      await setEnvironment('default', {
+        tokenId: 'stored_id',
+        tokenSecret: 'stored_secret',
+      });
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+      setJsonFlag(true);
       const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
       let callCount: number;
 
@@ -501,6 +523,90 @@ describe('auth fallback to environment variables', () => {
       const active = await resolveActiveEnvironment();
 
       expect(active.baseUrl).toBe('https://stored.example.com');
+    });
+
+    it('skips whoami when env credentials byte-match a stored environment', async () => {
+      await setEnvironment('default', {
+        tokenId: 'same_id',
+        tokenSecret: 'same_secret',
+        environmentId: 'env_same_123',
+      });
+      process.env.MUX_TOKEN_ID = 'same_id';
+      process.env.MUX_TOKEN_SECRET = 'same_secret';
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => {
+        throw new Error('unexpected fetch');
+      }) as unknown as typeof fetch);
+
+      const active = await resolveActiveEnvironment();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(active.source).toBe('env');
+      expect(active.environmentId).toBe('env_same_123');
+      expect(active.stored?.name).toBe('default');
+    });
+
+    it('skips whoami when env credentials byte-match a non-default stored environment', async () => {
+      await setEnvironment('production', {
+        tokenId: 'prod_id',
+        tokenSecret: 'prod_secret',
+        environmentId: 'env_prod_123',
+      });
+      await setEnvironment('staging', {
+        tokenId: 'staging_id',
+        tokenSecret: 'staging_secret',
+        environmentId: 'env_staging_456',
+      });
+      process.env.MUX_TOKEN_ID = 'staging_id';
+      process.env.MUX_TOKEN_SECRET = 'staging_secret';
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => {
+        throw new Error('unexpected fetch');
+      }) as unknown as typeof fetch);
+
+      const active = await resolveActiveEnvironment();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(active.environmentId).toBe('env_staging_456');
+      expect(active.stored?.name).toBe('staging');
+    });
+
+    it('still calls whoami when the byte-matching environment has no environmentId', async () => {
+      await setEnvironment('legacy', {
+        tokenId: 'same_id',
+        tokenSecret: 'same_secret',
+      });
+      process.env.MUX_TOKEN_ID = 'same_id';
+      process.env.MUX_TOKEN_SECRET = 'same_secret';
+      mockWhoami('env_from_whoami');
+
+      const active = await resolveActiveEnvironment();
+
+      expect(fetchSpy).toHaveBeenCalled();
+      expect(active.environmentId).toBe('env_from_whoami');
+    });
+
+    it('wraps whoami network failures in an actionable error', async () => {
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => {
+        throw new TypeError('fetch failed');
+      }) as unknown as typeof fetch);
+
+      expect(resolveActiveEnvironment()).rejects.toThrow(
+        /failed to reach.*network/is,
+      );
+    });
+
+    it('wraps non-JSON whoami responses in an actionable error', async () => {
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+        (async () =>
+          new Response('<html>proxy</html>', {
+            status: 200,
+          })) as unknown as typeof fetch,
+      );
+
+      expect(resolveActiveEnvironment()).rejects.toThrow(/non-JSON response/);
     });
 
     it('throws when whoami rejects the env var credentials', async () => {

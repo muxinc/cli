@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import {
+  hasJsonFlag,
   isAgentMode,
   preprocessArgs,
   setAgentMode,
+  setJsonFlag,
   wantsJson,
 } from './context.ts';
 
@@ -34,6 +36,7 @@ describe('wantsJson', () => {
 describe('preprocessArgs', () => {
   afterEach(() => {
     setAgentMode(false);
+    setJsonFlag(false);
   });
 
   it('passes args through unchanged when --agent is absent', () => {
@@ -63,5 +66,16 @@ describe('preprocessArgs', () => {
     const result = preprocessArgs(['--agent', 'whoami']);
     expect(result).toEqual(['whoami']);
     expect(isAgentMode()).toBe(true);
+  });
+
+  it('records --json without stripping it', () => {
+    const result = preprocessArgs(['assets', 'list', '--json']);
+    expect(result).toEqual(['assets', 'list', '--json']);
+    expect(hasJsonFlag()).toBe(true);
+  });
+
+  it('does not record the json flag when --json is absent', () => {
+    preprocessArgs(['assets', 'list']);
+    expect(hasJsonFlag()).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 let agentMode = false;
+let jsonFlag = false;
 
 export function setAgentMode(value: boolean) {
   agentMode = value;
@@ -6,6 +7,19 @@ export function setAgentMode(value: boolean) {
 
 export function isAgentMode(): boolean {
   return agentMode;
+}
+
+export function setJsonFlag(value: boolean) {
+  jsonFlag = value;
+}
+
+/**
+ * Whether --json appeared anywhere in argv. Lets process-wide notices that
+ * cannot see per-command options (e.g. the env credential shadow warning)
+ * stay off stderr when output is meant to be machine-readable.
+ */
+export function hasJsonFlag(): boolean {
+  return jsonFlag;
 }
 
 /**
@@ -23,6 +37,10 @@ export function wantsJson(options: { json?: boolean }): boolean {
  * no --json flag is injected and commands without one still work.
  */
 export function preprocessArgs(argv: string[]): string[] {
+  if (argv.includes('--json')) {
+    setJsonFlag(true);
+  }
+
   const agentIndex = argv.indexOf('--agent');
   if (agentIndex === -1) {
     return argv;
