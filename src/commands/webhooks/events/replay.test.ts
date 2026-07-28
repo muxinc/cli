@@ -11,6 +11,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setEnvironment } from '@/lib/config.ts';
+import { closeDb } from '@/lib/events-store.ts';
 import { replayCommand } from './replay.ts';
 
 describe('mux webhooks events replay command', () => {
@@ -27,6 +28,9 @@ describe('mux webhooks events replay command', () => {
     originalXdgDataHome = process.env.XDG_DATA_HOME;
     process.env.XDG_CONFIG_HOME = join(testConfigDir, 'cfg');
     process.env.XDG_DATA_HOME = join(testConfigDir, 'data');
+    // The events store caches its sqlite handle module-wide; drop any handle
+    // another test file opened against its own (possibly deleted) temp dir.
+    closeDb();
 
     logSpy = spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
@@ -49,6 +53,7 @@ describe('mux webhooks events replay command', () => {
     logSpy?.mockRestore();
     errorSpy?.mockRestore();
     exitSpy?.mockRestore();
+    closeDb();
     await rm(testConfigDir, { recursive: true, force: true });
   });
 
@@ -82,7 +87,7 @@ describe('mux webhooks events replay command', () => {
     await setEnvironment('default', {
       tokenId: 'stored_id',
       tokenSecret: 'stored_secret',
-      environmentId: 'env_stored_123',
+      environmentId: 'env_replay_qa_isolated',
     });
 
     try {
@@ -99,7 +104,7 @@ describe('mux webhooks events replay command', () => {
     await setEnvironment('default', {
       tokenId: 'stored_id',
       tokenSecret: 'stored_secret',
-      environmentId: 'env_stored_123',
+      environmentId: 'env_replay_qa_isolated',
     });
 
     await replayCommand.parse(['--count', '5', '--json']);
