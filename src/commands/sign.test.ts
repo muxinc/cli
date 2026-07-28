@@ -330,7 +330,7 @@ describe('mux sign command', () => {
       expect(errorMessage).toContain('Signing keys not configured');
     });
 
-    test('ignores env signing keys when only one of the pair is set', async () => {
+    test('errors when MUX_SIGNING_KEY is set without MUX_PRIVATE_KEY', async () => {
       await setEnvironment('default', {
         tokenId: 'stored_id',
         tokenSecret: 'stored_secret',
@@ -339,8 +339,62 @@ describe('mux sign command', () => {
       });
       process.env.MUX_SIGNING_KEY = 'key_from_env';
 
-      await signCommand.parse(['test-playback-id', '--token-only']);
+      try {
+        await signCommand.parse(['test-playback-id', '--token-only']);
+      } catch (_error) {
+        // Expected to fail via mocked process.exit
+      }
 
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const errorMessage = String(consoleErrorSpy.mock.calls[0][0]);
+      expect(errorMessage).toContain('MUX_SIGNING_KEY is set');
+      expect(errorMessage).toContain('MUX_PRIVATE_KEY');
+    });
+
+    test('errors when MUX_PRIVATE_KEY is set without MUX_SIGNING_KEY', async () => {
+      await setEnvironment('default', {
+        tokenId: 'stored_id',
+        tokenSecret: 'stored_secret',
+        signingKeyId: 'key_from_config',
+        signingPrivateKey: privateKeyBase64,
+      });
+      process.env.MUX_PRIVATE_KEY = privateKeyBase64;
+
+      try {
+        await signCommand.parse(['test-playback-id', '--token-only']);
+      } catch (_error) {
+        // Expected to fail via mocked process.exit
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const errorMessage = String(consoleErrorSpy.mock.calls[0][0]);
+      expect(errorMessage).toContain('MUX_PRIVATE_KEY is set');
+      expect(errorMessage).toContain('MUX_SIGNING_KEY');
+    });
+
+    test('signs offline when env credentials byte-match the stored environment', async () => {
+      await setEnvironment('default', {
+        tokenId: 'same_id',
+        tokenSecret: 'same_secret',
+        environmentId: 'env_same_123',
+        signingKeyId: 'key_from_config',
+        signingPrivateKey: privateKeyBase64,
+      });
+      process.env.MUX_TOKEN_ID = 'same_id';
+      process.env.MUX_TOKEN_SECRET = 'same_secret';
+      const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+        (async () => {
+          throw new Error('unexpected fetch');
+        }) as unknown as typeof fetch,
+      );
+
+      try {
+        await signCommand.parse(['test-playback-id', '--token-only']);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+
+      expect(fetchSpy).not.toHaveBeenCalled();
       const payload = decodeJwtPayload(tokenFromOutput());
       expect(payload.kid).toBe('key_from_config');
     });

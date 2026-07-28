@@ -126,8 +126,9 @@ export const signCommand = new Command()
       // Resolve signing key material.
       // Priority: MUX_SIGNING_KEY/MUX_PRIVATE_KEY env vars > stored config
       // (consistent with how MUX_TOKEN_ID/MUX_TOKEN_SECRET take precedence).
-      // Env vars are only used when both are set and non-empty. Stored keys
-      // are only used when the stored environment matches the active
+      // A half-set pair is an error: falling back to a stored key would
+      // silently sign with a different environment's key. Stored keys are
+      // only used when the stored environment matches the active
       // credentials, so tokens for one environment cannot mint JWTs with
       // another environment's key.
       let keyId: string | undefined;
@@ -137,6 +138,13 @@ export const signCommand = new Command()
       if (envSigningKey && envPrivateKey) {
         keyId = envSigningKey;
         keySecret = envPrivateKey;
+      } else if (envSigningKey || envPrivateKey) {
+        const [set, missing] = envSigningKey
+          ? ['MUX_SIGNING_KEY', 'MUX_PRIVATE_KEY']
+          : ['MUX_PRIVATE_KEY', 'MUX_SIGNING_KEY'];
+        throw new Error(
+          `${set} is set but ${missing} is not. Set both to sign with that key pair, or unset ${set} to use the stored environment's signing keys.`,
+        );
       } else {
         const active = await resolveActiveEnvironment();
         keyId = active.stored?.environment.signingKeyId;
