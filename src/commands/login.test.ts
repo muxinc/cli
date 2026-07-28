@@ -497,6 +497,48 @@ describe('Login command - action', () => {
     expect(saved?.signingPrivateKey).toBe('private_base64');
   });
 
+  it('prefers the env file MUX_BASE_URL over the shell MUX_BASE_URL', async () => {
+    const originalBaseUrl = process.env.MUX_BASE_URL;
+    process.env.MUX_BASE_URL = 'https://shell.example.com';
+    const envPath = join(testConfigDir, '.env');
+    await Bun.write(
+      envPath,
+      'MUX_TOKEN_ID=file_id\nMUX_TOKEN_SECRET=file_secret\nMUX_BASE_URL=https://file.example.com',
+    );
+
+    try {
+      await loginCommand.parse(['--env-file', envPath]);
+    } finally {
+      if (originalBaseUrl === undefined) delete process.env.MUX_BASE_URL;
+      else process.env.MUX_BASE_URL = originalBaseUrl;
+    }
+
+    const saved = await getEnvironment('default');
+    expect(saved?.baseUrl).toBe('https://file.example.com');
+    const validationUrl = String(fetchSpy.mock.calls[0][0]);
+    expect(validationUrl.startsWith('https://file.example.com')).toBe(true);
+  });
+
+  it('falls back to the shell MUX_BASE_URL when the env file sets none', async () => {
+    const originalBaseUrl = process.env.MUX_BASE_URL;
+    process.env.MUX_BASE_URL = 'https://shell.example.com';
+    const envPath = join(testConfigDir, '.env');
+    await Bun.write(
+      envPath,
+      'MUX_TOKEN_ID=file_id\nMUX_TOKEN_SECRET=file_secret',
+    );
+
+    try {
+      await loginCommand.parse(['--env-file', envPath]);
+    } finally {
+      if (originalBaseUrl === undefined) delete process.env.MUX_BASE_URL;
+      else process.env.MUX_BASE_URL = originalBaseUrl;
+    }
+
+    const saved = await getEnvironment('default');
+    expect(saved?.baseUrl).toBe('https://shell.example.com');
+  });
+
   it('saves signing keys from environment variables when both are present', async () => {
     process.env.MUX_TOKEN_ID = 'env_id';
     process.env.MUX_TOKEN_SECRET = 'env_secret';

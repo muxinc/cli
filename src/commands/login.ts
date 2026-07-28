@@ -150,9 +150,11 @@ export const loginCommand = new Command()
 
         tokenId = envVars.MUX_TOKEN_ID;
         tokenSecret = envVars.MUX_TOKEN_SECRET;
-        baseUrl = getMuxBaseUrl({
-          environment: { baseUrl: envVars.MUX_BASE_URL },
-        });
+        // The file is the credential bundle: its MUX_BASE_URL wins over the
+        // shell's, so a leftover shell variable cannot silently rebind the
+        // file's tokens (and the saved environment) to a different host. The
+        // ambient variable or default applies only when the file sets none.
+        baseUrl = envVars.MUX_BASE_URL || getMuxBaseUrl(null);
         if (envVars.MUX_SIGNING_KEY && envVars.MUX_PRIVATE_KEY) {
           signingKeys = {
             signingKeyId: envVars.MUX_SIGNING_KEY,
