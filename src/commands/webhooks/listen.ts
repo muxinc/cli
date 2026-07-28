@@ -223,10 +223,14 @@ export const listenCommand = new Command()
           errorMessage.includes('ENOTFOUND') ||
           errorMessage.includes('getaddrinfo')
         ) {
-          console.error(
-            `Error: Could not resolve hostname for ${active.baseUrl}\n` +
-              'Check that MUX_BASE_URL is set correctly and the host is reachable.',
-          );
+          const message =
+            `Could not resolve hostname for ${active.baseUrl}. ` +
+            'Check that MUX_BASE_URL is set correctly and the host is reachable.';
+          if (wantsJson(options)) {
+            console.error(JSON.stringify({ error: message }, null, 2));
+          } else {
+            console.error(`Error: ${message}`);
+          }
           process.exit(1);
         }
 
