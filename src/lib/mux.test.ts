@@ -569,7 +569,7 @@ describe('auth fallback to environment variables', () => {
       expect(active.stored?.name).toBe('staging');
     });
 
-    it('still calls whoami when the byte-matching environment has no environmentId', async () => {
+    it('verifies a legacy byte-matching environment via whoami and still binds it', async () => {
       await setEnvironment('legacy', {
         tokenId: 'same_id',
         tokenSecret: 'same_secret',
@@ -582,6 +582,9 @@ describe('auth fallback to environment variables', () => {
 
       expect(fetchSpy).toHaveBeenCalled();
       expect(active.environmentId).toBe('env_from_whoami');
+      // Identical credentials mean the legacy entry IS this environment,
+      // even though it has no environmentId to match by id.
+      expect(active.stored?.name).toBe('legacy');
     });
 
     it('wraps whoami network failures in an actionable error', async () => {

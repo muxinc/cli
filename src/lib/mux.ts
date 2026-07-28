@@ -247,11 +247,17 @@ export async function resolveActiveEnvironment(): Promise<ActiveEnvironment> {
     );
   }
 
+  // A stored entry holding these exact credentials IS this environment,
+  // even when the entry predates environmentId stamping (legacy config):
+  // whoami just resolved which environment those credentials belong to.
+  const storedMatch =
+    (await findStoredEnvironmentById(environmentId, stored)) ?? sameCredentials;
+
   return {
     environmentId,
     source: 'env',
     baseUrl,
-    stored: await findStoredEnvironmentById(environmentId, stored),
+    stored: storedMatch,
   };
 }
 
