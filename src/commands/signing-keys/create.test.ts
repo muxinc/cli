@@ -4,13 +4,17 @@ import {
   describe,
   expect,
   type Mock,
+  mock,
   spyOn,
   test,
 } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type Mux from '@mux/mux-node';
+import * as configModule from '@/lib/config.ts';
 import { getEnvironment, setEnvironment } from '@/lib/config.ts';
+import * as muxModule from '@/lib/mux.ts';
 import { createCommand } from './create.ts';
 
 describe('mux signing-keys create command', () => {
@@ -44,31 +48,23 @@ describe('mux signing-keys create command', () => {
     let errorSpy: Mock<typeof console.error>;
     let exitSpy: Mock<typeof process.exit>;
     let fetchSpy: Mock<typeof fetch>;
+    let muxClientSpy: Mock<typeof muxModule.createAuthenticatedMuxClient>;
 
+    // The whoami probe in resolveActiveEnvironment uses fetch directly; the
+    // signing key creation goes through the SDK client, which binds fetch
+    // internally and cannot be reliably intercepted via globalThis.fetch —
+    // so the client itself is mocked (same pattern as live/create.test.ts).
     function mockApi(whoamiEnvironmentId: string) {
       fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
         input: string | URL | Request,
       ) => {
         const url = String(input instanceof Request ? input.url : input);
-        const jsonHeaders = { 'Content-Type': 'application/json' };
         if (url.includes('/system/v1/whoami')) {
           return new Response(
             JSON.stringify({
               data: { environment_id: whoamiEnvironmentId },
             }),
-            { status: 200, headers: jsonHeaders },
-          );
-        }
-        if (url.includes('signing-keys')) {
-          return new Response(
-            JSON.stringify({
-              data: {
-                id: 'key_new_123',
-                private_key: 'cHJpdmF0ZS1rZXktcGVt',
-                created_at: '1721500000',
-              },
-            }),
-            { status: 200, headers: jsonHeaders },
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
           );
         }
         throw new Error(`Unexpected fetch in test: ${url}`);
@@ -94,6 +90,25 @@ describe('mux signing-keys create command', () => {
       exitSpy = spyOn(process, 'exit').mockImplementation((() => {
         throw new Error('process.exit called');
       }) as never);
+      muxClientSpy = spyOn(
+        muxModule,
+        'createAuthenticatedMuxClient',
+      ).mockImplementation(
+        async () =>
+          ({
+            system: {
+              signingKeys: {
+                create: mock(() =>
+                  Promise.resolve({
+                    id: 'key_new_123',
+                    private_key: 'cHJpdmF0ZS1rZXktcGVt',
+                    created_at: '1721500000',
+                  }),
+                ),
+              },
+            },
+          }) as unknown as Mux,
+      );
     });
 
     afterEach(async () => {
@@ -111,6 +126,7 @@ describe('mux signing-keys create command', () => {
       errorSpy?.mockRestore();
       exitSpy?.mockRestore();
       fetchSpy?.mockRestore();
+      muxClientSpy?.mockRestore();
       await rm(testConfigDir, { recursive: true, force: true });
     });
 
@@ -254,6 +270,34 @@ describe('mux signing-keys create command', () => {
       expect(saved?.signingKeyId).toBe('key_new_123');
       const parsed = jsonOutput();
       expect(parsed.saved).toBe(true);
+    });
+
+    test('emits the private key once when saving to config fails', async () => {
+      await setEnvironment('default', {
+        tokenId: 'stored_id',
+        tokenSecret: 'stored_secret',
+        environmentId: 'env_stored_123',
+      });
+      mockApi('env_stored_123');
+      const updateSpy = spyOn(
+        configModule,
+        'updateEnvironment',
+      ).mockImplementation(() => Promise.reject(new Error('disk full')));
+
+      try {
+        await createCommand.parse(['--json']);
+      } finally {
+        updateSpy.mockRestore();
+      }
+
+      expect(exitSpy).not.toHaveBeenCalled();
+      const parsed = jsonOutput();
+      expect(parsed.saved).toBe(false);
+      expect(parsed.private_key).toBe('cHJpdmF0ZS1rZXktcGVt');
+      expect(String(parsed.note)).toContain('failed');
+      const stderr = errorSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(stderr).toContain('Failed to save signing key');
+      expect(stderr).not.toContain('cHJpdmF0ZS1rZXktcGVt');
     });
 
     test('prints the private key with guidance in pretty mode when not saved', async () => {

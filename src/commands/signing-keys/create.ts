@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import { setEnvironment } from '@/lib/config.ts';
+import { updateEnvironment } from '@/lib/config.ts';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import {
@@ -15,6 +15,9 @@ interface CreateOptions {
 
 const NOT_SAVED_NOTE =
   'No stored environment matches the active credentials, so the private key was not saved. Set MUX_SIGNING_KEY and MUX_PRIVATE_KEY to sign URLs with it.';
+
+const SAVE_FAILED_NOTE =
+  'Saving to the environment config failed, so the private key is shown here instead — this is the only time it is available. Set MUX_SIGNING_KEY and MUX_PRIVATE_KEY to sign URLs with it.';
 
 export const createCommand = new Command()
   .description(
@@ -61,45 +64,54 @@ export const createCommand = new Command()
       const privateKey = signingKey.private_key;
       const createdAt = signingKey.created_at;
 
+      let saveFailed = false;
       if (target) {
-        // Store the signing key in the matching environment config
-        // Wrap in try-catch to prevent privateKey from leaking in error messages
+        // Persist only the two signing fields. updateEnvironment re-reads
+        // the config before merging, so fields another command wrote while
+        // the API calls above were in flight (e.g. a forwardUrl saved by a
+        // long-running `webhooks listen`) are not clobbered.
         try {
-          await setEnvironment(target.name, {
-            ...target.environment,
+          await updateEnvironment(target.name, {
             signingKeyId: keyId,
             signingPrivateKey: privateKey,
           });
+
+          if (wantsJson(options)) {
+            console.log(
+              JSON.stringify(
+                {
+                  id: keyId,
+                  created_at: createdAt,
+                  environment: target.name,
+                  saved: true,
+                },
+                null,
+                2,
+              ),
+            );
+          } else {
+            console.log(
+              `Signing key created and saved to environment: ${target.name}`,
+            );
+            console.log(`Key ID: ${keyId}`);
+          }
+          return;
         } catch (err) {
-          throw new Error(
+          // The key already exists server-side and the API only returns the
+          // private key at creation time — swallowing it here would lose it
+          // forever. Report the save failure on stderr and fall through to
+          // the emit-once output below.
+          console.error(
             `Failed to save signing key to config: ${err instanceof Error ? err.message : 'Unknown error'}`,
           );
+          saveFailed = true;
         }
-
-        if (wantsJson(options)) {
-          console.log(
-            JSON.stringify(
-              {
-                id: keyId,
-                created_at: createdAt,
-                environment: target.name,
-                saved: true,
-              },
-              null,
-              2,
-            ),
-          );
-        } else {
-          console.log(
-            `Signing key created and saved to environment: ${target.name}`,
-          );
-          console.log(`Key ID: ${keyId}`);
-        }
-        return;
       }
 
-      // No matching stored environment: emit the private key once instead of
-      // persisting it. The API only returns it at creation time.
+      // No matching stored environment (or the save failed): emit the
+      // private key once instead of persisting it. The API only returns it
+      // at creation time.
+      const note = saveFailed ? SAVE_FAILED_NOTE : NOT_SAVED_NOTE;
       if (wantsJson(options)) {
         console.log(
           JSON.stringify(
@@ -108,7 +120,7 @@ export const createCommand = new Command()
               created_at: createdAt,
               private_key: privateKey,
               saved: false,
-              note: NOT_SAVED_NOTE,
+              note,
             },
             null,
             2,
@@ -119,7 +131,7 @@ export const createCommand = new Command()
         console.log('Private key (base64, shown once, not saved):');
         console.log(privateKey);
         console.log();
-        console.log(NOT_SAVED_NOTE);
+        console.log(note);
         console.log(`  export MUX_SIGNING_KEY=${keyId}`);
         console.log('  export MUX_PRIVATE_KEY=<private key above>');
       }
