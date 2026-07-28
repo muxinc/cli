@@ -34,16 +34,15 @@ export const replayCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: ReplayOptions, eventId?: string) => {
     try {
+      // Thrown (not printed) so the catch below formats them per wantsJson.
       if (!eventId && !options.count) {
-        console.error(
+        throw new Error(
           'Provide an event ID or use --count <n> to replay the last N events.',
         );
-        process.exit(1);
       }
 
       if (eventId && options.count) {
-        console.error('Cannot use both an event ID and --count.');
-        process.exit(1);
+        throw new Error('Cannot use both an event ID and --count.');
       }
 
       const active = await resolveActiveEnvironment();
@@ -71,8 +70,7 @@ export const replayCommand = new Command()
       if (eventId) {
         const event = getEventById(eventId, environmentId);
         if (!event) {
-          console.error(`Event not found: ${eventId}`);
-          process.exit(1);
+          throw new Error(`Event not found: ${eventId}`);
         }
 
         if (!options.forwardTo) {
@@ -104,7 +102,15 @@ export const replayCommand = new Command()
       const count = options.count as number;
       const events = getRecentEvents(environmentId, count);
       if (events.length === 0) {
-        console.log('No stored events to replay.');
+        if (wantsJson(options)) {
+          console.log(
+            options.forwardTo
+              ? JSON.stringify({ forwarded: 0, failed: 0 }, null, 2)
+              : JSON.stringify([], null, 2),
+          );
+        } else {
+          console.log('No stored events to replay.');
+        }
         return;
       }
 
