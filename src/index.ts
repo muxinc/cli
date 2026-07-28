@@ -27,7 +27,7 @@ import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
 import { webhooksCommand } from './commands/webhooks/index.ts';
 import { whoamiCommand } from './commands/whoami.ts';
-import { isAgentMode, preprocessArgs } from './lib/context.ts';
+import { hasJsonFlag, isAgentMode, preprocessArgs } from './lib/context.ts';
 import { checkForUpdate, refreshUpdateCache } from './lib/update-notifier.ts';
 
 const VERSION = pkg.version;
@@ -82,7 +82,12 @@ if (import.meta.main) {
   refreshUpdateCache().catch(() => {});
 
   process.on('exit', () => {
-    if (updateNotice) console.error(updateNotice);
+    // Suppressed in agent/--json runs: stderr carries machine-readable
+    // errors there and must not mix in prose (same rule as the env
+    // credential shadow notice).
+    if (updateNotice && !isAgentMode() && !hasJsonFlag()) {
+      console.error(updateNotice);
+    }
   });
 
   try {
