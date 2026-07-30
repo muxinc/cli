@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatAsset } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -19,7 +20,7 @@ export const getCommand = new Command()
       // Fetch asset details
       const asset = await mux.video.assets.retrieve(assetId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(asset, null, 2));
       } else {
         formatAsset(asset);

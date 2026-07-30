@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/mux-node';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { expandGlobPattern, uploadFile } from '@/lib/file-upload.ts';
 import { parseAssetConfig } from '@/lib/json-config.ts';
@@ -112,7 +113,7 @@ async function createFromUploads(
 
   // Show files and confirm (unless -y flag)
   if (!options.yes && files.length > 1) {
-    if (!options.json) {
+    if (!wantsJson(options)) {
       console.log(`Found ${files.length} files to upload:`);
       const totalSize = files.reduce((sum, f) => sum + f.size, 0);
       for (const file of files) {
@@ -136,7 +137,7 @@ async function createFromUploads(
 
   // Upload each file
   for (const file of files) {
-    if (!options.json) {
+    if (!wantsJson(options)) {
       console.log(`Uploading ${file.name}...`);
     }
 
@@ -187,7 +188,7 @@ async function createFromUploads(
 
     // Upload the file
     await uploadFile(file.path, upload.url, upload.id, (percent) => {
-      if (!options.json && percent === 100) {
+      if (!wantsJson(options) && percent === 100) {
         console.log(`${file.name} uploaded`);
       }
     });
@@ -348,6 +349,7 @@ export const createCommand = new Command()
   // biome-ignore lint: Cliffy infers upload as string but collect makes it string[]
   .action(async (options: any, ...args: unknown[]) => {
     const opts = options as CreateOptions;
+    const json = wantsJson(opts);
     // Merge positional args (from shell glob expansion) into upload list
     const extraFiles = args
       .flat()
@@ -381,6 +383,14 @@ export const createCommand = new Command()
             `No files found matching pattern: ${opts.upload.join(', ')}`,
           );
         }
+        // Interactive confirmation is not possible in machine-readable mode;
+        // fail fast with recovery guidance instead of blocking on stdin.
+        const uniqueFileCount = new Set(allFiles.map((f) => f.path)).size;
+        if (json && !opts.yes && uniqueFileCount > 1) {
+          throw new Error(
+            `Uploading ${uniqueFileCount} files requires confirmation, which is not available with --json or in agent mode. Re-run with -y/--yes to skip the prompt.`,
+          );
+        }
       }
 
       // Initialize authenticated Mux client
@@ -392,9 +402,11 @@ export const createCommand = new Command()
       if (opts.url) {
         result = await createFromUrl(mux, opts.url, opts);
 
-        if (opts.json) {
+        // With --wait, JSON mode prints only the final asset state below so
+        // stdout stays a single JSON document.
+        if (json && !(opts.wait && result.id)) {
           console.log(JSON.stringify(result, null, 2));
-        } else {
+        } else if (!json) {
           console.log(`Asset created: ${result.id}`);
           console.log(`  Status: ${result.status}`);
           if (result.playback_ids && result.playback_ids.length > 0) {
@@ -406,7 +418,7 @@ export const createCommand = new Command()
       } else if (opts.upload) {
         result = await createFromUploads(mux, opts.upload, opts);
 
-        if (opts.json) {
+        if (json) {
           console.log(JSON.stringify(result, null, 2));
         } else {
           console.log(`\n${result.length} file(s) uploaded successfully`);
@@ -417,9 +429,11 @@ export const createCommand = new Command()
       } else if (opts.file) {
         result = await createFromConfig(mux, opts.file, opts);
 
-        if (opts.json) {
+        // With --wait, JSON mode prints only the final asset state below so
+        // stdout stays a single JSON document.
+        if (json && !(opts.wait && result.id)) {
           console.log(JSON.stringify(result, null, 2));
-        } else {
+        } else if (!json) {
           console.log(`Asset created: ${result.id}`);
           console.log(`  Status: ${result.status}`);
           if (result.playback_ids && result.playback_ids.length > 0) {
@@ -435,7 +449,7 @@ export const createCommand = new Command()
 
       // Wait for asset processing if requested
       if (opts.wait && !Array.isArray(result) && result.id) {
-        if (!opts.json) {
+        if (!json) {
           console.log('\nWaiting for asset to be ready...');
         }
 
@@ -448,17 +462,17 @@ export const createCommand = new Command()
           asset = await mux.video.assets.retrieve(result.id);
           attempts++;
 
-          if (!opts.json) {
+          if (!json) {
             process.stdout.write('.');
           }
         }
 
-        if (!opts.json) {
+        if (!json) {
           console.log();
         }
 
         if (asset.status === 'ready') {
-          if (!opts.json) {
+          if (!json) {
             console.log('Asset is ready!');
           }
         } else if (asset.status === 'errored') {
@@ -466,14 +480,14 @@ export const createCommand = new Command()
             `Asset processing failed: ${asset.errors?.messages?.join(', ') || 'Unknown error'}`,
           );
         } else {
-          if (!opts.json) {
+          if (!json) {
             console.log(
               `WARNING: Asset is still processing. Run 'mux assets get ${asset.id}' to check status.`,
             );
           }
         }
 
-        if (opts.json) {
+        if (json) {
           console.log(JSON.stringify(asset, null, 2));
         }
       }

@@ -1,6 +1,7 @@
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment } from '@/lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
 import { listEvents } from '@/lib/events-store.ts';
+import { resolveActiveEnvironment } from '@/lib/mux.ts';
 
 interface ListOptions {
   limit?: number;
@@ -15,16 +16,11 @@ export const listCommand = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: ListOptions) => {
     try {
-      const env = await getCurrentEnvironment();
-      if (!env) {
-        console.error("Not logged in. Please run 'mux login' to authenticate.");
-        process.exit(1);
-      }
-      const environmentId = env.environment.environmentId ?? env.name;
-      const events = listEvents(environmentId, options.limit);
+      const active = await resolveActiveEnvironment();
+      const events = listEvents(active.environmentId, options.limit);
 
       if (events.length === 0) {
-        if (options.json) {
+        if (wantsJson(options)) {
           console.log(JSON.stringify([], null, 2));
         } else {
           console.log(
@@ -34,7 +30,7 @@ export const listCommand = new Command()
         return;
       }
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(events, null, 2));
         return;
       }
@@ -46,7 +42,7 @@ export const listCommand = new Command()
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      if (options.json) {
+      if (wantsJson(options)) {
         console.error(JSON.stringify({ error: errorMessage }, null, 2));
       } else {
         console.error(`Error: ${errorMessage}`);

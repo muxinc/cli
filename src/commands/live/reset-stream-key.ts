@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatLiveStream } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -21,9 +22,9 @@ export const resetStreamKeyCommand = new Command()
       const mux = await createAuthenticatedMuxClient();
 
       if (!options.force) {
-        if (options.json) {
+        if (wantsJson(options)) {
           throw new Error(
-            'Resetting stream key requires --force flag when using --json output',
+            'Resetting stream key requires the --force flag with --json or in agent mode',
           );
         }
 
@@ -40,7 +41,7 @@ export const resetStreamKeyCommand = new Command()
 
       const stream = await mux.video.liveStreams.resetStreamKey(streamId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(stream, null, 2));
       } else {
         console.log('Stream key reset successfully.\n');

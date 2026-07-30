@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -37,7 +38,7 @@ export const createCommand = new Command()
 
       const annotation = await mux.data.annotations.create(body as never);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(annotation, null, 2));
       } else {
         console.log(`Annotation ID: ${annotation.id}`);

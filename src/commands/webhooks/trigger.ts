@@ -1,11 +1,12 @@
 import { colors } from '@cliffy/ansi/colors';
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment } from '@/lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
 import {
   generateExampleWebhook,
   WEBHOOK_EVENT_TYPES,
   type WebhookEventType,
 } from '@/lib/example-webhooks.ts';
+import { resolveActiveEnvironment } from '@/lib/mux.ts';
 import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
 interface TriggerOptions {
@@ -35,20 +36,19 @@ export const triggerCommand = new Command()
         process.exit(1);
       }
 
-      const env = await getCurrentEnvironment();
-      if (!env) {
-        console.error("Not logged in. Please run 'mux login' to authenticate.");
-        process.exit(1);
-      }
+      const active = await resolveActiveEnvironment();
+      const envLabel = active.stored?.name ?? active.environmentId;
+      const tokenId =
+        active.stored?.environment.tokenId ?? process.env.MUX_TOKEN_ID ?? '';
 
       const payload = generateExampleWebhook(
         eventType as WebhookEventType,
-        env.name,
-        env.environment.tokenId.slice(0, 6),
+        envLabel,
+        tokenId.slice(0, 6),
       );
 
       const body = JSON.stringify(payload);
-      const signingSecret = await getSigningSecret(env.name);
+      const signingSecret = await getSigningSecret(envLabel);
 
       const response = await fetch(options.forwardTo, {
         method: 'POST',
@@ -58,7 +58,7 @@ export const triggerCommand = new Command()
 
       const status = response.status;
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify({ status, eventType, payload }, null, 2));
       } else if (status >= 200 && status < 300) {
         console.log(
@@ -72,7 +72,7 @@ export const triggerCommand = new Command()
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      if (options.json) {
+      if (wantsJson(options)) {
         console.error(JSON.stringify({ error: errorMessage }, null, 2));
       } else {
         console.error(`Error: ${errorMessage}`);

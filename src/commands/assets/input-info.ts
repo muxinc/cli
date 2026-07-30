@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -16,7 +17,7 @@ export const inputInfoCommand = new Command()
 
       const inputInfo = await mux.video.assets.retrieveInputInfo(assetId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(inputInfo, null, 2));
       } else {
         if (inputInfo.length === 0) {

@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
-import { getCurrentEnvironment, updateEnvironment } from '@/lib/config.ts';
+import { updateEnvironment } from '@/lib/config.ts';
+import { resolveActiveEnvironment } from '@/lib/mux.ts';
 
 export const browseCommand = new Command()
   .description('Interactively browse, filter, and replay stored webhook events')
@@ -17,23 +18,21 @@ export const browseCommand = new Command()
         process.exit(1);
       }
 
-      const env = await getCurrentEnvironment();
-      if (!env) {
-        console.error("Not logged in. Please run 'mux login' to authenticate.");
-        process.exit(1);
-      }
-
-      const environmentId = env.environment.environmentId ?? env.name;
+      const active = await resolveActiveEnvironment();
+      const environmentId = active.environmentId;
 
       // Use provided --forward-to, or fall back to the saved URL
-      const forwardTo = options.forwardTo ?? env.environment.forwardUrl;
+      const forwardTo =
+        options.forwardTo ?? active.stored?.environment.forwardUrl;
 
-      // Save the forward URL if a new one was provided
+      // Save the forward URL if a new one was provided. Only persisted when
+      // the stored environment matches the active credentials.
       if (
         options.forwardTo &&
-        options.forwardTo !== env.environment.forwardUrl
+        active.stored &&
+        options.forwardTo !== active.stored.environment.forwardUrl
       ) {
-        await updateEnvironment(env.name, {
+        await updateEnvironment(active.stored.name, {
           forwardUrl: options.forwardTo,
         });
       }
@@ -49,6 +48,7 @@ export const browseCommand = new Command()
       root.render(
         React.createElement(EventsBrowserApp, {
           environmentId,
+          signingSecretKey: active.stored?.name ?? active.environmentId,
           forwardTo,
         }),
       );

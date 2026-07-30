@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatAsset, formatLiveStream } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -26,7 +27,7 @@ export const playbackIdsCommand = new Command()
           const asset = await mux.video.assets.retrieve(
             playbackIdInfo.object.id,
           );
-          if (options.json) {
+          if (wantsJson(options)) {
             console.log(JSON.stringify(asset, null, 2));
           } else {
             formatAsset(asset);
@@ -35,7 +36,7 @@ export const playbackIdsCommand = new Command()
           const stream = await mux.video.liveStreams.retrieve(
             playbackIdInfo.object.id,
           );
-          if (options.json) {
+          if (wantsJson(options)) {
             console.log(JSON.stringify(stream, null, 2));
           } else {
             formatLiveStream(stream);
@@ -47,7 +48,7 @@ export const playbackIdsCommand = new Command()
         }
       } else {
         // Just return the playback ID info
-        if (options.json) {
+        if (wantsJson(options)) {
           console.log(JSON.stringify(playbackIdInfo, null, 2));
         } else {
           console.log(`Playback ID: ${playbackIdInfo.id}`);

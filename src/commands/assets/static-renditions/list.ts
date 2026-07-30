@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type { Asset } from '@mux/mux-node/resources/video/assets';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -23,7 +24,7 @@ export const listCommand = new Command()
       const staticRenditions = asset.static_renditions;
       const files = staticRenditions?.files ?? [];
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(
           JSON.stringify(
             files.map((file) => formatFileForJson(file)),

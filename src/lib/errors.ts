@@ -1,4 +1,5 @@
 import { AuthenticationError, NotFoundError } from '@mux/mux-node';
+import { wantsJson } from '@/lib/context.ts';
 import { getAuthContext } from './mux.ts';
 
 /**
@@ -74,11 +75,13 @@ export async function handleCommandError(
   _action: string,
   options: { json?: boolean },
 ): Promise<never> {
+  const json = wantsJson(options);
+
   // 401: invalid/expired credentials
   if (error instanceof AuthenticationError) {
     const message =
       "Authentication failed. Please run 'mux login' to re-authenticate.";
-    if (options.json) {
+    if (json) {
       console.error(JSON.stringify({ error: message }, null, 2));
     } else {
       console.error(`Error: ${message}`);
@@ -96,7 +99,7 @@ export async function handleCommandError(
         tokenInfo.tokenName,
         error.error,
       );
-      if (options.json) {
+      if (json) {
         console.error(
           JSON.stringify(
             {
@@ -119,7 +122,7 @@ export async function handleCommandError(
   // Default: generic error formatting
   const errorMessage = error instanceof Error ? error.message : String(error);
 
-  if (options.json) {
+  if (json) {
     console.error(JSON.stringify({ error: errorMessage }, null, 2));
   } else {
     console.error(`Error: ${errorMessage}`);

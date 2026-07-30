@@ -89,32 +89,36 @@ export function assertJobCompleted(job: AnyRobotsJob): void {
   throw new Error(`Job ${job.id} ended with status "${job.status}"${details}`);
 }
 
+export interface PollOptions {
+  json: boolean;
+  pollIntervalMs?: number;
+}
+
 export async function pollForRobotsJob(
   mux: Mux,
   workflow: RobotsWorkflow,
   jobId: string,
-  jsonOutput: boolean,
+  { json, pollIntervalMs = 3000 }: PollOptions,
 ): Promise<AnyRobotsJob> {
-  const POLL_INTERVAL_MS = 3000;
   const MAX_POLL_TIME_MS = 15 * 60 * 1000;
   const start = Date.now();
 
-  if (!jsonOutput) {
+  if (!json) {
     process.stderr.write('Waiting for job to complete');
   }
 
   while (Date.now() - start < MAX_POLL_TIME_MS) {
     const job = await retrieveRobotsJob(mux, workflow, jobId);
     if (isTerminalStatus(job.status)) {
-      if (!jsonOutput) {
+      if (!json) {
         process.stderr.write(` ${job.status}!\n`);
       }
       return job;
     }
-    if (!jsonOutput) {
+    if (!json) {
       process.stderr.write('.');
     }
-    await sleep(POLL_INTERVAL_MS);
+    await sleep(pollIntervalMs);
   }
 
   throw new Error(`Timed out waiting for job ${jobId} to complete`);

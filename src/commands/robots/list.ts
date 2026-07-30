@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type { JobListParams } from '@mux/mux-node/resources/robots-preview/jobs';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatCreatedAt } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -46,7 +47,7 @@ export const listCommand = new Command()
       const response = await mux.robotsPreview.jobs.list(params);
       const data = response.data ?? [];
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify({ data }, null, 2));
         return;
       }

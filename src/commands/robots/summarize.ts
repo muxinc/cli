@@ -3,6 +3,7 @@ import type {
   SummarizeCreateParams,
   SummarizeJobParameters,
 } from '@mux/mux-node/resources/robots-preview/jobs';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import {
@@ -149,22 +150,19 @@ export const summarizeCommand: Command<any> = new Command()
       const mux = await createAuthenticatedMuxClient();
       let job = await mux.robotsPreview.jobs.summarize.create(body);
 
-      if (!options.json) {
+      if (!wantsJson(options)) {
         console.log('Summarize job created');
         console.log(`  Job ID: ${job.id}`);
         console.log(`  Status: ${job.status}`);
       }
 
       if (options.wait) {
-        job = (await pollForRobotsJob(
-          mux,
-          'summarize',
-          job.id,
-          Boolean(options.json),
-        )) as typeof job;
+        job = (await pollForRobotsJob(mux, 'summarize', job.id, {
+          json: wantsJson(options),
+        })) as typeof job;
       }
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(job, null, 2));
       } else if (options.wait && job.outputs) {
         console.log('Outputs:');

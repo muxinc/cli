@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type { LiveStream } from '@mux/mux-node/resources/video/live-streams';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import {
   formatCreatedAt,
@@ -43,7 +44,7 @@ export const listCommand = new Command()
       // Fetch live streams
       const response = await mux.video.liveStreams.list(params);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(response, null, 2));
       } else if (options.compact) {
         // Compact output - one line per stream, grep-friendly

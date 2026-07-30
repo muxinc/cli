@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import { readConfig, setEnvironment } from '@/lib/config.ts';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { confirmPrompt } from '@/lib/prompt.ts';
@@ -32,7 +33,7 @@ export const deleteCommand = new Command()
       }
 
       // Show warning if key is in use
-      if (affectedEnvironments.length > 0 && !options.json) {
+      if (affectedEnvironments.length > 0 && !wantsJson(options)) {
         console.log(
           `WARNING: This signing key is currently configured in environment${affectedEnvironments.length > 1 ? 's' : ''}: ${affectedEnvironments.join(', ')}`,
         );
@@ -45,9 +46,9 @@ export const deleteCommand = new Command()
       // Confirm deletion unless --force flag is provided
       if (!options.force) {
         // For JSON mode, require explicit --force flag for safety
-        if (options.json) {
+        if (wantsJson(options)) {
           throw new Error(
-            'Deletion requires --force flag when using --json output',
+            'Deletion requires the --force flag with --json or in agent mode',
           );
         }
 
@@ -57,7 +58,7 @@ export const deleteCommand = new Command()
         });
 
         if (!confirmed) {
-          if (options.json) {
+          if (wantsJson(options)) {
             console.log(JSON.stringify({ cancelled: true }, null, 2));
           } else {
             console.log('Deletion cancelled.');
@@ -81,7 +82,7 @@ export const deleteCommand = new Command()
         }
       }
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(
           JSON.stringify(
             {

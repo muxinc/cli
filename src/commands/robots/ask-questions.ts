@@ -3,6 +3,7 @@ import type {
   AskQuestionCreateParams,
   AskQuestionsJobParameters,
 } from '@mux/mux-node/resources/robots-preview/jobs';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import {
@@ -119,22 +120,19 @@ export const askQuestionsCommand: Command<any> = new Command()
       const mux = await createAuthenticatedMuxClient();
       let job = await mux.robotsPreview.jobs.askQuestions.create(body);
 
-      if (!options.json) {
+      if (!wantsJson(options)) {
         console.log('Ask questions job created');
         console.log(`  Job ID: ${job.id}`);
         console.log(`  Status: ${job.status}`);
       }
 
       if (options.wait) {
-        job = (await pollForRobotsJob(
-          mux,
-          'ask-questions',
-          job.id,
-          Boolean(options.json),
-        )) as typeof job;
+        job = (await pollForRobotsJob(mux, 'ask-questions', job.id, {
+          json: wantsJson(options),
+        })) as typeof job;
       }
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(job, null, 2));
       } else if (options.wait && job.outputs) {
         console.log('Outputs:');

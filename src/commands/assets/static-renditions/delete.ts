@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 import { confirmPrompt } from '@/lib/prompt.ts';
@@ -19,9 +20,9 @@ export const deleteCommand = new Command()
         const mux = await createAuthenticatedMuxClient();
 
         if (!options.force) {
-          if (options.json) {
+          if (wantsJson(options)) {
             throw new Error(
-              'Deletion requires --force flag when using --json output',
+              'Deletion requires the --force flag with --json or in agent mode',
             );
           }
 
@@ -38,7 +39,7 @@ export const deleteCommand = new Command()
 
         await mux.video.assets.deleteStaticRendition(assetId, renditionId);
 
-        if (options.json) {
+        if (wantsJson(options)) {
           console.log(
             JSON.stringify(
               {

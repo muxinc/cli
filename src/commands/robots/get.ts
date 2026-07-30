@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatCreatedAt } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -42,7 +43,7 @@ export const getCommand = new Command()
       const mux = await createAuthenticatedMuxClient();
       const job = await retrieveRobotsJob(mux, workflow, jobId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(job, null, 2));
         return;
       }

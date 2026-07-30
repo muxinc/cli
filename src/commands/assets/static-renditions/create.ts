@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/mux-node';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -79,11 +80,11 @@ export const createCommand = new Command()
           mux,
           assetId,
           rendition.id as string,
-          options.json,
+          wantsJson(options),
         );
-        outputRendition(finalRendition, options.json, false);
+        outputRendition(finalRendition, wantsJson(options), false);
       } else {
-        outputRendition(rendition, options.json, !options.wait);
+        outputRendition(rendition, wantsJson(options), !options.wait);
       }
     } catch (error) {
       await handleCommandError(error, 'assets', 'create', options);

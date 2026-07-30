@@ -14,15 +14,14 @@ import {
   SelectList,
   type SelectListItem,
 } from '@/lib/tui/index.ts';
-import {
-  buildSignedHeaders,
-  getSigningSecretForCurrentEnv,
-} from '@/lib/webhook-signing.ts';
+import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
 type View = 'list' | 'detail' | 'filter-type' | 'message';
 
 interface EventsBrowserAppProps {
   environmentId: string;
+  /** Key for the local webhook signing secret (environment name or id). */
+  signingSecretKey: string;
   forwardTo?: string;
 }
 
@@ -35,6 +34,7 @@ function formatEventLabel(event: StoredEvent): string {
 
 export function EventsBrowserApp({
   environmentId,
+  signingSecretKey,
   forwardTo,
 }: EventsBrowserAppProps) {
   const renderer = useRenderer();
@@ -73,7 +73,7 @@ export function EventsBrowserApp({
     async (event: StoredEvent) => {
       if (!forwardTo) return;
       try {
-        const signingSecret = await getSigningSecretForCurrentEnv();
+        const signingSecret = await getSigningSecret(signingSecretKey);
         const body = JSON.stringify(event.payload);
         const response = await fetch(forwardTo, {
           method: 'POST',
@@ -97,7 +97,7 @@ export function EventsBrowserApp({
         );
       }
     },
-    [forwardTo, showMessage],
+    [forwardTo, signingSecretKey, showMessage],
   );
 
   useKeyboard((key) => {

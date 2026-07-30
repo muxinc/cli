@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
@@ -15,7 +16,7 @@ export const cancelCommand = new Command()
       const mux = await createAuthenticatedMuxClient();
       const job = await mux.robotsPreview.jobs.cancel(jobId);
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(job, null, 2));
         return;
       }

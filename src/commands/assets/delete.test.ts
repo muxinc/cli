@@ -7,6 +7,7 @@ import {
   spyOn,
   test,
 } from 'bun:test';
+import { setAgentMode } from '@/lib/context.ts';
 import { deleteCommand } from './delete.ts';
 
 // Note: These tests focus on CLI flag parsing and command structure
@@ -40,6 +41,34 @@ describe('mux assets delete command', () => {
       const args = deleteCommand.getArguments();
       expect(args.length).toBeGreaterThan(0);
       expect(args[0].name).toBe('asset-id');
+    });
+  });
+
+  describe('Force guard', () => {
+    test('agent mode without --force fails with guidance that names agent mode', async () => {
+      const originalTokenId = process.env.MUX_TOKEN_ID;
+      const originalTokenSecret = process.env.MUX_TOKEN_SECRET;
+      process.env.MUX_TOKEN_ID = 'env_id';
+      process.env.MUX_TOKEN_SECRET = 'env_secret';
+      setAgentMode(true);
+
+      try {
+        await deleteCommand.parse(['asset-123']);
+      } catch (_error) {
+        // Expected to throw via mocked process.exit
+      } finally {
+        setAgentMode(false);
+        if (originalTokenId === undefined) delete process.env.MUX_TOKEN_ID;
+        else process.env.MUX_TOKEN_ID = originalTokenId;
+        if (originalTokenSecret === undefined)
+          delete process.env.MUX_TOKEN_SECRET;
+        else process.env.MUX_TOKEN_SECRET = originalTokenSecret;
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const parsed = JSON.parse(String(consoleErrorSpy.mock.calls[0][0]));
+      expect(parsed.error).toContain('--force');
+      expect(parsed.error).toContain('agent mode');
     });
   });
 

@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatAsset } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -35,7 +36,7 @@ export const updateMasterAccessCommand = new Command()
         master_access: options.masterAccess as 'temporary' | 'none',
       });
 
-      if (options.json) {
+      if (wantsJson(options)) {
         console.log(JSON.stringify(asset, null, 2));
       } else {
         console.log('Master access updated successfully.\n');

@@ -1,4 +1,5 @@
 import { Command } from '@cliffy/command';
+import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatLiveStream } from '@/lib/formatters.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -70,7 +71,7 @@ export const updateGeneratedSubtitlesCommand = new Command()
           { generated_subtitles: generatedSubtitles as never },
         );
 
-        if (options.json) {
+        if (wantsJson(options)) {
           console.log(JSON.stringify(stream, null, 2));
         } else {
           if (options.clear) {
