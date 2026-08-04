@@ -1,6 +1,7 @@
 import { Command } from '@cliffy/command';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
+import { formatJson } from '@/lib/json-output.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface ListOptions {
@@ -58,7 +59,7 @@ export const listCommand = new Command()
       const response = await mux.data.annotations.list(params as never);
 
       if (wantsJson(options)) {
-        console.log(JSON.stringify(response, null, 2));
+        console.log(formatJson(response));
         return;
       }
 
