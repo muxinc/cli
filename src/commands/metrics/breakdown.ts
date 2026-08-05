@@ -2,6 +2,7 @@ import { Command } from '@cliffy/command';
 import { wantsJson } from '@/lib/context.ts';
 import { buildDataFilterParams } from '@/lib/data-filters.ts';
 import { handleCommandError } from '@/lib/errors.ts';
+import { formatJson } from '@/lib/json-output.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface BreakdownOptions {
@@ -102,7 +103,7 @@ export const breakdownCommand = new Command()
       );
 
       if (wantsJson(options)) {
-        console.log(JSON.stringify(response, null, 2));
+        console.log(formatJson(response));
         return;
       }
 

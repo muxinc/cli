@@ -7,6 +7,7 @@ import {
   formatCreatedAt,
   formatDuration,
 } from '@/lib/formatters.ts';
+import { formatJson } from '@/lib/json-output.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
 
 interface ListOptions {
@@ -61,7 +62,7 @@ export const listCommand = new Command()
       const response = await mux.video.assets.list(params);
 
       if (wantsJson(options)) {
-        console.log(JSON.stringify(response, null, 2));
+        console.log(formatJson(response));
       } else if (options.compact) {
         // Compact output - one line per asset, grep-friendly
         if (!response.data || response.data.length === 0) {
