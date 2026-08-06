@@ -7,6 +7,7 @@ import { assetsCommand } from './commands/assets/index.ts';
 import { completionsInstallCommand } from './commands/completions-install.ts';
 import { deliveryUsageCommand } from './commands/delivery-usage/index.ts';
 import { dimensionsCommand } from './commands/dimensions/index.ts';
+import { docsCommand } from './commands/docs/index.ts';
 import { drmConfigurationsCommand } from './commands/drm-configurations/index.ts';
 import { envCommand } from './commands/env/index.ts';
 import { errorsCommand } from './commands/errors/index.ts';
@@ -22,6 +23,7 @@ import { playbackRestrictionsCommand } from './commands/playback-restrictions/in
 import { robotsCommand } from './commands/robots/index.ts';
 import { signCommand } from './commands/sign.ts';
 import { signingKeysCommand } from './commands/signing-keys/index.ts';
+import { skillsCommand } from './commands/skills/index.ts';
 import { transcriptionVocabulariesCommand } from './commands/transcription-vocabularies/index.ts';
 import { uploadsCommand } from './commands/uploads/index.ts';
 import { videoViewsCommand } from './commands/video-views/index.ts';
@@ -36,7 +38,9 @@ const VERSION = pkg.version;
 const cli = new Command()
   .name('mux')
   .version(VERSION)
-  .description('Official Mux CLI for interacting with Mux APIs')
+  .description(
+    'Official Mux CLI for interacting with Mux APIs\n\nAgent support:\n  Run `mux skills path --json` to locate the embedded agent skills, or\n  `mux skills install` to install them into ~/.claude/skills for Claude Code.\n  `mux docs find "<topic>" --json` searches the live Mux docs index.',
+  )
   .globalOption(
     '--agent',
     'Agent mode: uses JSON output and identifies as an agent in User-Agent header.',
@@ -48,6 +52,8 @@ const cli = new Command()
   .command('login', loginCommand)
   .command('logout', logoutCommand)
   .command('env', envCommand)
+  .command('docs', docsCommand)
+  .command('skills', skillsCommand)
   .command('assets', assetsCommand)
   .command('live', liveCommand)
   .command('playback-ids', playbackIdsCommand)
