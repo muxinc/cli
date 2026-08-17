@@ -116,30 +116,63 @@ After saving the file, restart your shell or source it (e.g. `source ~/.zshrc`) 
 
 ### Authentication
 
-Before using the Mux CLI, you need to authenticate with your Mux API credentials. You can obtain these from the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens).
+The CLI supports two ways to sign in, and both are fully supported:
+
+- **Browser sign-in (default).** `mux login` opens the Mux Dashboard, where you pick an organization and environment. The CLI receives the result on a local loopback address and manages token refresh for you. Best for local development.
+- **Mux API access token.** A Token ID and Secret from the [Mux Dashboard](https://dashboard.mux.com/settings/access-tokens). Best for CI, service accounts, and scripting, where no browser is available.
 
 ```bash
-# Interactive login (prompts for Token ID and Secret)
+# Browser sign-in: pick an organization and environment in the dashboard
 mux login
 
-# Login with .env file (expects MUX_TOKEN_ID and MUX_TOKEN_SECRET)
+# Sign in to more environments by running it again — each one is saved separately
+mux login
+
+# Mux API access token, entered manually
+mux login --interactive
+
+# Access token from a .env file (expects MUX_TOKEN_ID and MUX_TOKEN_SECRET)
 mux login --env-file .env
+
+# Save the MUX_TOKEN_ID / MUX_TOKEN_SECRET already set in this shell
+mux login --from-env
 
 # Named environments for multi-environment workflows
 mux login --name production
 mux login --name staging --env-file .env.staging
 ```
 
-The first environment you add becomes the default. See [Authentication & Environment Management](#authentication--environment-management) for more details.
+> [!IMPORTANT]
+> When `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` are set in your shell, `mux login` with no
+> flags stops and asks which method you meant, rather than silently saving them. Those
+> variables already work on their own — no login needed — and they take precedence over
+> any saved login, so a config entry written from them has no effect until they are unset.
+> Pass `--from-env` to save them deliberately, or `--oauth` for a browser sign-in.
+
+Browser sign-in names each environment after the organization and environment you selected (for example `acme-inc-production`); pass `--name` to choose your own. Signing in again to the *same* environment refreshes its credentials in place and keeps its signing keys and forward URL; signing in to a *different* environment adds a new entry and never overwrites an existing one.
+
+The first environment you add becomes the default, and a new browser sign-in becomes the active environment unless you pass `--keep-current`. Run `mux auth status` at any time to see every credential the CLI can find and which one is active. See [Authentication & Environment Management](#authentication--environment-management) for more details.
 
 #### Credential sources and precedence
 
 The CLI resolves credentials from two sources, in order:
 
 1. **Environment variables** — `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET`. Used only when both are set and non-empty; a lone variable is ignored.
-2. **Stored login** — the environment saved by `mux login`.
+2. **Stored login** — the active environment saved by `mux login`, whether it holds a browser sign-in or an access token pair.
 
-Environment variables take precedence over the stored login, matching the convention of tools like the GitHub, Stripe, and Vercel CLIs. When they shadow a stored login, the CLI prints a one-line notice on stderr (suppressed in agent mode).
+Environment variables take precedence over the stored login, matching the convention of tools like the GitHub, Stripe, and Vercel CLIs. When they shadow a stored login, the CLI prints a one-line notice on stderr naming the shadowed environment (suppressed in agent mode). `mux auth status` lays out every source and marks the active one.
+
+Because environment variables win, `mux login` with `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` already set refuses to guess: it prints the four explicit methods and exits without writing anything. Pass `--from-env` to save the shell credentials, or `--oauth` for a browser sign-in. If a login is saved while those variables are set, the CLI says so — the saved login will not take effect until they are unset.
+
+#### One environment, two ways in
+
+A single environment can hold both credential kinds at once: an access token pair saved for CI and a browser sign-in saved by `mux login`. Both are kept, and **OAuth is preferred when present** — OAuth credentials go stale unless they are exercised and refreshed, so the CLI does not quietly live on the token pair.
+
+If an OAuth login stops working for good (its refresh token was revoked or expired), the CLI records the failure on that credential, surfaces it in `mux auth status` and `mux env list`, and falls back to the access token pair on the same environment if there is one. Nothing is deleted automatically: run `mux login` to replace the dead login, or `mux logout <name>` to remove the environment entirely.
+
+The CLI discovers the authorization server's endpoints at runtime (RFC 8414 / OIDC discovery, cached for a day in `~/.cache/mux/`), so Mux can move them without breaking installed versions. Discovery is never required: if it is unreachable the CLI falls back to built-in defaults, and `MUX_OAUTH_AUTHORIZE_URL` / `MUX_OAUTH_TOKEN_URL` / `MUX_OAUTH_REVOKE_URL` always win when set. It is consulted only on login and refresh, never on ordinary commands.
+
+Requests carry `Authorization: Basic` for access token credentials and `Authorization: Bearer` for browser sign-ins. Access tokens for a browser sign-in are refreshed automatically: shortly before they expire, and once on an unexpected `401` before the request is retried. Concurrent `mux` processes coordinate through a lock file so a refresh token is never spent twice. When a refresh token is finally rejected, the CLI names the environment and tells you to run `mux login` again.
 
 All values in a credential bundle come from the same source — the CLI never mixes sources:
 
@@ -1051,41 +1084,98 @@ mux exports list                                       # list video view export 
 
 #### `mux login`
 
-Authenticate with Mux and save credentials.
+Sign in to Mux and save credentials. With no flags, opens your browser to select an organization and environment; the CLI then manages token refresh for you.
+
+The four authentication methods are mutually exclusive; passing more than one is an error.
 
 **Options:**
+- `--oauth` - Sign in with a browser (the default when no shell credentials are set)
+- `--interactive` - Enter a Mux API access token (Token ID and Secret) manually
 - `-f, --env-file <path>` - Path to .env file containing `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET`, and optionally `MUX_SIGNING_KEY` and `MUX_PRIVATE_KEY` (saved for `mux sign` when both are present)
-- `-n, --name <name>` - Name for this environment (default: `default`)
+- `--from-env` - Save the `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` already set in this shell
+- `-n, --name <name>` - Name for this environment (default: derived from the organization and environment for browser sign-in, or `default` otherwise)
+- `--print-url` - Print the authorization URL instead of opening a browser
+- `--port <port>` - Local port to receive the login redirect on
+- `--keep-current` - Save the login without making it the active environment
 
 ```bash
-mux login                                        # interactive
+mux login                                         # browser sign-in
+mux login --interactive                           # prompts for Token ID and Secret
 mux login --env-file .env                         # from .env file
+mux login --from-env                              # save this shell's credentials
 mux login --name production --env-file .env.prod  # named environment
+mux login --print-url                             # no browser available
 ```
 
-#### `mux logout <name>`
+`--oauth` and `--interactive` both need a real terminal: they fail immediately with instructions under `--json`, in agent mode, or when stdin is not a TTY (CI, piped input), rather than hanging. Use `--env-file`, `--from-env`, or the environment variables for automation.
 
-Remove credentials for a specific environment. When you remove the default environment, the CLI automatically selects another as the new default.
+**Signing in from a remote or SSH session:** the redirect goes to a loopback address on the machine running the CLI, which your browser cannot reach from elsewhere. Either forward the port (`ssh -L 51372:127.0.0.1:51372 …`, then `mux login --port 51372`) or use `mux login --interactive`.
+
+#### `mux auth status`
+
+Show every credential source the CLI can find, which one is active, and how to change it. Reads only local state — no network calls — and never prints token material.
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
+
+```bash
+mux auth status
+```
+
+```
+Active: MUX_TOKEN_ID / MUX_TOKEN_SECRET (environment variables)
+  Environment variables take precedence over the stored login "acme-inc-production".
+  Unset them to use the stored selection below.
+
+Stored logins (2): currently shadowed
+* acme-inc-production  oauth  Acme Inc / Production   expires in 47m
+  ci-token             token  env_01H9...
+
+* = selected stored environment. Change it with 'mux env switch <name>'.
+```
+
+`mux auth login` and `mux auth logout` are aliases of the top-level commands.
+
+#### `mux logout [name]`
+
+Remove credentials for a specific environment. When you remove the default environment, the CLI automatically selects another as the new default. For a browser sign-in, the refresh token is also revoked server-side; if that call fails, the local credentials are still removed and a warning is printed.
+
+**Options:**
+- `--all` - Remove stored credentials for every environment
 
 ```bash
 mux logout default
 mux logout staging
+mux logout --all
 ```
 
 #### `mux env list`
 
-Display all configured environments.
+Display all configured environments, with the credential kind, the organization and environment they point at, and access token expiry for browser sign-ins.
+
+**Options:**
+- `--json` - Output JSON instead of pretty format
 
 ```bash
 mux env list
 ```
 
-#### `mux env switch <name>`
+```
+Configured environments:
 
-Change the default environment.
+* acme-inc-production (current)  oauth  Acme Inc / Production  expires in 47m
+  ci-token                       token  env_01H9...
+
+2 environments total
+```
+
+#### `mux env switch [name]`
+
+Change the default environment. Works for both credential kinds. Run it without a name in an interactive terminal to pick from a list.
 
 ```bash
 mux env switch staging
+mux env switch            # interactive picker
 ```
 
 </details>
@@ -1094,23 +1184,39 @@ mux env switch staging
 
 Credentials are stored securely in `~/.config/mux/config.json` with restrictive file permissions (readable/writable only by the owner).
 
-The configuration file structure:
+Each environment holds its identity and settings, plus one or both credential blocks. Entries written by earlier versions are flat (`tokenId` / `tokenSecret` at the top level) and are read as a `token` block automatically — there is no migration step and no config version to track.
 
 ```json
 {
   "environments": {
-    "production": {
-      "tokenId": "your_token_id",
-      "tokenSecret": "your_token_secret"
+    "acme-inc-production": {
+      "environmentId": "env_…",
+      "environmentName": "Production",
+      "organizationId": "org_…",
+      "organizationName": "Acme Inc",
+      "oauth": {
+        "accessToken": "…",
+        "refreshToken": "…",
+        "expiresAt": 1799999999,
+        "scope": "video:read video:write"
+      },
+      "token": {
+        "tokenId": "your_token_id",
+        "tokenSecret": "your_token_secret"
+      }
     },
     "staging": {
       "tokenId": "your_staging_token_id",
       "tokenSecret": "your_staging_token_secret"
     }
   },
-  "defaultEnvironment": "production"
+  "defaultEnvironment": "acme-inc-production"
 }
 ```
+
+`acme-inc-production` above is reachable both ways; requests use the `oauth` block. `staging` is a flat entry from an older version, read as an access token login. A credential that has failed terminally gains a `lastError` field, which is what `mux auth status` reports.
+
+Writes are atomic (written to a temporary file in the same directory, then renamed), so a config read during a token refresh never sees a partial file.
 
 ## Development
 

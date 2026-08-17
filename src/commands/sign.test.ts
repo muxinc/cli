@@ -212,8 +212,7 @@ describe('mux sign command', () => {
 
     test('error mentions env vars when signing keys are not configured anywhere', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
 
       try {
@@ -243,8 +242,7 @@ describe('mux sign command', () => {
 
     test('env var signing keys take precedence over stored config keys', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         signingKeyId: 'key_from_config',
         signingPrivateKey: privateKeyBase64,
       });
@@ -259,8 +257,7 @@ describe('mux sign command', () => {
 
     test('still signs with stored config keys when env vars are absent', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         signingKeyId: 'key_from_config',
         signingPrivateKey: privateKeyBase64,
       });
@@ -273,8 +270,7 @@ describe('mux sign command', () => {
 
     test('uses stored signing keys when env credentials match the stored environment', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_same_123',
         signingKeyId: 'key_from_config',
         signingPrivateKey: privateKeyBase64,
@@ -301,8 +297,7 @@ describe('mux sign command', () => {
 
     test('refuses stored signing keys when env credentials point at a different environment', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
         signingKeyId: 'key_from_config',
         signingPrivateKey: privateKeyBase64,
@@ -332,8 +327,7 @@ describe('mux sign command', () => {
 
     test('errors when MUX_SIGNING_KEY is set without MUX_PRIVATE_KEY', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         signingKeyId: 'key_from_config',
         signingPrivateKey: privateKeyBase64,
       });
@@ -353,8 +347,7 @@ describe('mux sign command', () => {
 
     test('errors when MUX_PRIVATE_KEY is set without MUX_SIGNING_KEY', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         signingKeyId: 'key_from_config',
         signingPrivateKey: privateKeyBase64,
       });
@@ -374,8 +367,7 @@ describe('mux sign command', () => {
 
     test('signs offline when env credentials byte-match the stored environment', async () => {
       await setEnvironment('default', {
-        tokenId: 'same_id',
-        tokenSecret: 'same_secret',
+        token: { tokenId: 'same_id', tokenSecret: 'same_secret' },
         environmentId: 'env_same_123',
         signingKeyId: 'key_from_config',
         signingPrivateKey: privateKeyBase64,

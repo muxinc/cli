@@ -4,7 +4,8 @@ import { Command } from '@cliffy/command';
 import {
   getEnvironment,
   listEnvironments,
-  setEnvironment,
+  removeEnvironment,
+  setCredential,
 } from '../lib/config.ts';
 import { wantsJson } from '../lib/context.ts';
 import { handleCommandError } from '../lib/errors.ts';
@@ -13,8 +14,10 @@ import {
   getMuxBaseUrl,
   validateCredentials,
 } from '../lib/mux.ts';
+import { performOAuthLogin } from '../lib/oauth-login.ts';
 import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
 import { getConfigPath } from '../lib/xdg.ts';
+import { resolveLoginMode } from './login-mode.ts';
 
 export interface EnvVars {
   MUX_TOKEN_ID?: string;
@@ -98,22 +101,145 @@ export function credentialsFromEnv(
   };
 }
 
+/**
+ * Both interactive login methods need a real terminal: one to prompt on, one to
+ * print an authorization URL to and wait. Fail fast rather than hanging on a
+ * pipe or a CI runner.
+ */
+function requireInteractiveTerminal(flag: string): void {
+  if (process.stdin.isTTY) return;
+
+  throw new Error(
+    `${flag} needs an interactive terminal, and this shell is not one. ` +
+      'Use `mux login --env-file <path>`, or set MUX_TOKEN_ID and MUX_TOKEN_SECRET and run `mux login --from-env`.',
+  );
+}
+
+/**
+ * Notice printed after a successful login when shell credentials are set. The
+ * saved login has no effect until they are unset, and silently saving something
+ * inert is exactly the confusion this is meant to prevent.
+ */
+function noticeSavedLoginIsShadowed(json: boolean): void {
+  if (json || !credentialsFromEnv()) return;
+
+  console.log(
+    '\nSaved. Note: MUX_TOKEN_ID/MUX_TOKEN_SECRET are set in this shell and take precedence over the saved login. Unset them to use this login.',
+  );
+}
+
+/**
+ * Run the browser-based OAuth login and report the result. Organization and
+ * environment selection happens in the dashboard, so the CLI only reports what
+ * came back.
+ */
+async function runOAuthLogin(options: {
+  name?: string;
+  port?: number;
+  printUrl?: boolean;
+  keepCurrent?: boolean;
+  json?: boolean;
+}): Promise<void> {
+  const json = wantsJson(options);
+
+  // Interactive by definition: there is no browser to drive and no terminal to
+  // print an authorization URL to in machine-readable mode.
+  if (json) {
+    throw new Error(
+      "Interactive login is not available with --json or in agent mode. Set MUX_TOKEN_ID and MUX_TOKEN_SECRET, run 'mux login --env-file <path>', or run 'mux login' in an interactive terminal.",
+    );
+  }
+  requireInteractiveTerminal('Browser sign-in');
+
+  const result = await performOAuthLogin(
+    {
+      ...(options.name && { name: options.name }),
+      ...(options.port !== undefined && { port: options.port }),
+      noBrowser: options.printUrl === true,
+      activate: options.keepCurrent !== true,
+    },
+    {
+      onAuthorizationUrl: (url, opened) => {
+        if (opened) {
+          console.log('Opened your browser to continue signing in.');
+        } else {
+          console.log(
+            'Open this URL in your browser to continue signing in:\n',
+          );
+          console.log(`  ${url}\n`);
+        }
+        console.log('Waiting for authorization (press Ctrl+C to cancel)...');
+      },
+    },
+  );
+
+  const { identity } = result;
+  const org = identity.organizationName ?? identity.organizationId ?? 'unknown';
+  const env = identity.environmentName ?? identity.environmentId ?? 'unknown';
+
+  console.log(`\n✅ Signed in to ${org} / ${env}`);
+  if (identity.environmentId) {
+    console.log(`   Environment ID: ${identity.environmentId}`);
+  }
+  console.log(
+    `✅ ${result.replacedExisting ? 'Updated' : 'Saved as'} environment "${result.name}" in ${getConfigPath()}`,
+  );
+  if (result.activated) {
+    console.log('✅ Set as the active environment');
+  } else {
+    console.log(`   Run 'mux env switch ${result.name}' to use it.`);
+  }
+  noticeSavedLoginIsShadowed(json);
+}
+
+// Explicitly annotated: Cliffy's builder type cannot be named across this many
+// chained options without leaking an internal module path into the .d.ts.
 export const loginCommand = new Command()
   .description(
-    'Authenticate with Mux API credentials (Token ID and Secret from dashboard.mux.com)',
+    'Sign in to Mux. Opens your browser to select an organization and environment; use --interactive, --env-file, or --from-env for a Mux API access token instead.',
   )
   .option(
     '-f, --env-file <path:string>',
-    'Path to .env file containing MUX_TOKEN_ID, MUX_TOKEN_SECRET, and optionally MUX_SIGNING_KEY and MUX_PRIVATE_KEY for signed URLs',
+    'Save credentials from a .env file containing MUX_TOKEN_ID, MUX_TOKEN_SECRET, and optionally MUX_SIGNING_KEY and MUX_PRIVATE_KEY for signed URLs',
   )
   .option(
     '-n, --name <name:string>',
-    "Name for this environment (default: 'default')",
+    "Name for this environment (default: derived from the organization and environment for OAuth, or 'default' otherwise)",
+  )
+  .option(
+    '--from-env',
+    'Save the MUX_TOKEN_ID and MUX_TOKEN_SECRET already set in this shell',
+  )
+  .option(
+    '--interactive',
+    'Enter a Mux API access token (Token ID and Secret) manually',
+  )
+  .option('--oauth', 'Sign in with a browser (the default)')
+  // Named without a `--no-` prefix deliberately: Cliffy's negatable options
+  // generate a type that cannot be named under this project's declaration
+  // settings, and these read just as clearly as flags to opt into.
+  .option(
+    '--print-url',
+    'Print the authorization URL instead of opening a browser',
+  )
+  .option('--port <port:number>', 'Local port to receive the login redirect on')
+  .option(
+    '--keep-current',
+    'Save the login without making it the active environment',
   )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options) => {
     const json = wantsJson(options);
     try {
+      // Throws with guidance when the flags conflict, when --from-env has
+      // nothing to read, or when shell credentials make the intent ambiguous.
+      const mode = resolveLoginMode(options);
+
+      if (mode === 'oauth') {
+        await runOAuthLogin(options);
+        return;
+      }
+
       let tokenId: string;
       let tokenSecret: string;
       let source: 'env-file' | 'env' | 'interactive';
@@ -131,7 +257,6 @@ export const loginCommand = new Command()
       }
 
       let baseUrl: string;
-      const envCredentials = credentialsFromEnv();
 
       if (options.envFile) {
         // Read from .env file
@@ -162,10 +287,11 @@ export const loginCommand = new Command()
           };
         }
         source = 'env-file';
-      } else if (
-        envCredentials?.MUX_TOKEN_ID &&
-        envCredentials.MUX_TOKEN_SECRET
-      ) {
+      } else if (mode === 'from-env') {
+        // resolveLoginMode already established that both variables are set.
+        const envCredentials = credentialsFromEnv() as NonNullable<
+          ReturnType<typeof credentialsFromEnv>
+        >;
         // Read from environment variables
         if (!json) {
           console.log(
@@ -173,8 +299,8 @@ export const loginCommand = new Command()
           );
         }
 
-        tokenId = envCredentials.MUX_TOKEN_ID;
-        tokenSecret = envCredentials.MUX_TOKEN_SECRET;
+        tokenId = envCredentials.MUX_TOKEN_ID as string;
+        tokenSecret = envCredentials.MUX_TOKEN_SECRET as string;
         baseUrl = getMuxBaseUrl({
           environment: { baseUrl: envCredentials.MUX_BASE_URL },
         });
@@ -186,13 +312,15 @@ export const loginCommand = new Command()
         }
         source = 'env';
       } else {
-        // Interactive prompts are not possible in machine-readable mode;
-        // fail fast with recovery guidance instead of blocking on stdin.
+        // Interactive prompts are not possible in machine-readable mode, nor
+        // with no terminal to prompt on; fail fast with recovery guidance
+        // instead of blocking on stdin.
         if (json) {
           throw new Error(
             'No credentials provided. Set MUX_TOKEN_ID and MUX_TOKEN_SECRET environment variables, or pass --env-file <path>. Interactive login is not available with --json or in agent mode.',
           );
         }
+        requireInteractiveTerminal('--interactive');
 
         console.log('Enter your Mux API credentials.');
         console.log(
@@ -226,34 +354,31 @@ export const loginCommand = new Command()
         throw new Error(validation.error || 'Invalid credentials');
       }
 
-      // Refreshing credentials must not destroy environment-bound state
-      // (signing keys, forward URL). Preserve those fields only when the
-      // new credentials verifiably belong to the same environment; carrying
-      // them across an environment change would desync the config.
+      // Saving credentials must not destroy environment-bound state (signing
+      // keys, forward URL) or a separate OAuth login for the same environment.
+      // When the new credentials belong to a *different* environment, that state
+      // no longer applies and is dropped rather than silently carried over.
       const existing = await getEnvironment(envName);
-      const preserved =
+      const sameEnvironment =
         existing?.environmentId &&
-        existing.environmentId === validation.environmentId
-          ? {
-              ...(existing.signingKeyId && {
-                signingKeyId: existing.signingKeyId,
-              }),
-              ...(existing.signingPrivateKey && {
-                signingPrivateKey: existing.signingPrivateKey,
-              }),
-              ...(existing.forwardUrl && { forwardUrl: existing.forwardUrl }),
-            }
-          : {};
+        existing.environmentId === validation.environmentId;
 
-      // Save to config
-      await setEnvironment(envName, {
-        ...preserved,
-        tokenId: tokenId.trim(),
-        tokenSecret: tokenSecret.trim(),
-        environmentId: validation.environmentId,
-        ...(baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
-        ...signingKeys,
-      });
+      if (existing && !sameEnvironment) {
+        // Entry is being repointed at another environment: clear it first so no
+        // stale signing keys, forward URL, or OAuth login survive.
+        await removeEnvironment(envName);
+      }
+
+      await setCredential(
+        envName,
+        'token',
+        { tokenId: tokenId.trim(), tokenSecret: tokenSecret.trim() },
+        {
+          environmentId: validation.environmentId,
+          ...(baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
+          ...signingKeys,
+        },
+      );
 
       if (json) {
         console.log(
@@ -280,6 +405,8 @@ export const loginCommand = new Command()
       if (existingEnvs.length === 0) {
         console.log(`✅ Set as default environment`);
       }
+
+      noticeSavedLoginIsShadowed(json);
     } catch (error) {
       await handleCommandError(error, 'login', 'login', options);
     }

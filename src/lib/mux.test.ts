@@ -10,7 +10,11 @@ import {
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getCurrentEnvironment, setEnvironment } from './config.ts';
+import {
+  type Environment,
+  getCurrentEnvironment,
+  setEnvironment,
+} from './config.ts';
 import { setAgentMode, setJsonFlag } from './context.ts';
 import {
   createAuthenticatedMuxClient,
@@ -56,8 +60,7 @@ describe('getMuxBaseUrl', () => {
   it('should prefer MUX_BASE_URL env var over everything', async () => {
     process.env.MUX_BASE_URL = 'https://env-var.example.com';
     await setEnvironment('default', {
-      tokenId: 'id',
-      tokenSecret: 'secret',
+      token: { tokenId: 'id', tokenSecret: 'secret' },
       baseUrl: 'https://config.example.com',
     });
 
@@ -67,8 +70,7 @@ describe('getMuxBaseUrl', () => {
 
   it('should use config baseUrl when no env var is set', async () => {
     await setEnvironment('default', {
-      tokenId: 'id',
-      tokenSecret: 'secret',
+      token: { tokenId: 'id', tokenSecret: 'secret' },
       baseUrl: 'https://config.example.com',
     });
 
@@ -78,8 +80,7 @@ describe('getMuxBaseUrl', () => {
 
   it('should fall back to default when config has no baseUrl', async () => {
     await setEnvironment('default', {
-      tokenId: 'id',
-      tokenSecret: 'secret',
+      token: { tokenId: 'id', tokenSecret: 'secret' },
     });
 
     const env = await getCurrentEnvironment();
@@ -138,8 +139,7 @@ describe('auth fallback to environment variables', () => {
 
     it('prefers env vars over stored config (consistent with MUX_BASE_URL)', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
       process.env.MUX_TOKEN_SECRET = 'env_token_secret';
@@ -152,8 +152,7 @@ describe('auth fallback to environment variables', () => {
 
     it('uses stored config when env vars are absent', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
 
       const { headers } = await getAuthContext();
@@ -164,8 +163,7 @@ describe('auth fallback to environment variables', () => {
 
     it('prints a one-time stderr notice when env vars shadow a stored login', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
       process.env.MUX_TOKEN_SECRET = 'env_token_secret';
@@ -188,8 +186,7 @@ describe('auth fallback to environment variables', () => {
 
     it('suppresses the notice in agent mode', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
       process.env.MUX_TOKEN_SECRET = 'env_token_secret';
@@ -209,8 +206,7 @@ describe('auth fallback to environment variables', () => {
 
     it('suppresses the notice when --json was passed', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
       process.env.MUX_TOKEN_SECRET = 'env_token_secret';
@@ -246,8 +242,7 @@ describe('auth fallback to environment variables', () => {
 
     it('does not inherit the stored config baseUrl when credentials come from env vars', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         baseUrl: 'https://stored.example.com',
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
@@ -259,8 +254,7 @@ describe('auth fallback to environment variables', () => {
 
     it('uses the stored config baseUrl when credentials come from config', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         baseUrl: 'https://stored.example.com',
       });
 
@@ -321,8 +315,7 @@ describe('auth fallback to environment variables', () => {
 
     it('uses the stored environment without calling the API when env vars are absent', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
       });
       fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => {
@@ -339,8 +332,7 @@ describe('auth fallback to environment variables', () => {
 
     it('falls back to the environment name when stored config has no environmentId', async () => {
       await setEnvironment('legacy', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
 
       const active = await resolveActiveEnvironment();
@@ -364,8 +356,7 @@ describe('auth fallback to environment variables', () => {
 
     it('returns the stored environment when env var credentials match it', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_same_123',
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
@@ -381,13 +372,11 @@ describe('auth fallback to environment variables', () => {
 
     it('matches env var credentials against non-default stored environments', async () => {
       await setEnvironment('production', {
-        tokenId: 'prod_id',
-        tokenSecret: 'prod_secret',
+        token: { tokenId: 'prod_id', tokenSecret: 'prod_secret' },
         environmentId: 'env_prod_123',
       });
       await setEnvironment('staging', {
-        tokenId: 'staging_id',
-        tokenSecret: 'staging_secret',
+        token: { tokenId: 'staging_id', tokenSecret: 'staging_secret' },
         environmentId: 'env_staging_456',
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
@@ -403,13 +392,11 @@ describe('auth fallback to environment variables', () => {
 
     it('prefers the current environment when multiple stored environments match', async () => {
       await setEnvironment('prod-copy', {
-        tokenId: 'a_id',
-        tokenSecret: 'a_secret',
+        token: { tokenId: 'a_id', tokenSecret: 'a_secret' },
         environmentId: 'env_same_123',
       });
       await setEnvironment('prod', {
-        tokenId: 'b_id',
-        tokenSecret: 'b_secret',
+        token: { tokenId: 'b_id', tokenSecret: 'b_secret' },
         environmentId: 'env_same_123',
       });
       // prod-copy was added first, so it is the default/current environment
@@ -424,8 +411,7 @@ describe('auth fallback to environment variables', () => {
 
     it('drops the stored environment when env var credentials point elsewhere', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
@@ -441,8 +427,7 @@ describe('auth fallback to environment variables', () => {
 
     it('drops the stored environment when it has no environmentId to compare', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
       process.env.MUX_TOKEN_SECRET = 'env_token_secret';
@@ -455,8 +440,7 @@ describe('auth fallback to environment variables', () => {
 
     it('prints the shadow notice when env vars redirect away from a stored login', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
       });
       process.env.MUX_TOKEN_ID = 'env_token_id';
@@ -496,8 +480,7 @@ describe('auth fallback to environment variables', () => {
 
     it('resolves the base URL from the credential source, not the stored config', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
         baseUrl: 'https://stored.example.com',
       });
@@ -514,8 +497,7 @@ describe('auth fallback to environment variables', () => {
 
     it('returns the stored baseUrl when credentials come from config', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
         baseUrl: 'https://stored.example.com',
       });
@@ -527,8 +509,7 @@ describe('auth fallback to environment variables', () => {
 
     it('skips whoami when env credentials byte-match a stored environment', async () => {
       await setEnvironment('default', {
-        tokenId: 'same_id',
-        tokenSecret: 'same_secret',
+        token: { tokenId: 'same_id', tokenSecret: 'same_secret' },
         environmentId: 'env_same_123',
       });
       process.env.MUX_TOKEN_ID = 'same_id';
@@ -547,13 +528,11 @@ describe('auth fallback to environment variables', () => {
 
     it('skips whoami when env credentials byte-match a non-default stored environment', async () => {
       await setEnvironment('production', {
-        tokenId: 'prod_id',
-        tokenSecret: 'prod_secret',
+        token: { tokenId: 'prod_id', tokenSecret: 'prod_secret' },
         environmentId: 'env_prod_123',
       });
       await setEnvironment('staging', {
-        tokenId: 'staging_id',
-        tokenSecret: 'staging_secret',
+        token: { tokenId: 'staging_id', tokenSecret: 'staging_secret' },
         environmentId: 'env_staging_456',
       });
       process.env.MUX_TOKEN_ID = 'staging_id';
@@ -571,8 +550,7 @@ describe('auth fallback to environment variables', () => {
 
     it('verifies a legacy byte-matching environment via whoami and still binds it', async () => {
       await setEnvironment('legacy', {
-        tokenId: 'same_id',
-        tokenSecret: 'same_secret',
+        token: { tokenId: 'same_id', tokenSecret: 'same_secret' },
       });
       process.env.MUX_TOKEN_ID = 'same_id';
       process.env.MUX_TOKEN_SECRET = 'same_secret';
@@ -622,6 +600,275 @@ describe('auth fallback to environment variables', () => {
 
     it('throws when no credentials are available anywhere', async () => {
       expect(resolveActiveEnvironment()).rejects.toThrow(/MUX_TOKEN_ID/);
+    });
+  });
+});
+
+describe('OAuth credentials', () => {
+  let testConfigDir: string;
+  let originalXdgConfigHome: string | undefined;
+  let savedEnv: Record<string, string | undefined>;
+  let fetchSpy: Mock<typeof fetch> | undefined;
+
+  const TOUCHED_ENV = [
+    'MUX_TOKEN_ID',
+    'MUX_TOKEN_SECRET',
+    'MUX_BASE_URL',
+    'MUX_AUTHORIZATION_TOKEN',
+    'MUX_OAUTH_CLIENT_ID',
+    'MUX_OAUTH_TOKEN_URL',
+  ] as const;
+
+  function nowSeconds(): number {
+    return Math.floor(Date.now() / 1000);
+  }
+
+  /** Store an OAuth login; overrides apply to the entry, not just the token. */
+  async function storeOAuthEnvironment(overrides: Partial<Environment> = {}) {
+    const { oauth, ...environmentFields } = overrides;
+    await setEnvironment('acme-production', {
+      oauth: {
+        accessToken: 'access_1',
+        refreshToken: 'refresh_1',
+        expiresAt: nowSeconds() + 3600,
+        tokenType: 'Bearer',
+        ...oauth,
+      },
+      environmentId: 'env_123',
+      environmentName: 'Production',
+      organizationId: 'org_123',
+      organizationName: 'Acme Inc',
+      ...environmentFields,
+    });
+  }
+
+  beforeEach(async () => {
+    testConfigDir = await mkdtemp(join(tmpdir(), 'mux-cli-oauth-mux-'));
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = testConfigDir;
+
+    savedEnv = {};
+    for (const key of TOUCHED_ENV) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+    process.env.MUX_OAUTH_CLIENT_ID = 'test_client';
+    process.env.MUX_OAUTH_TOKEN_URL = 'https://api.test/oauth/token';
+    // Keep discovery's cache out of the real ~/.cache/mux.
+    process.env.XDG_CACHE_HOME = testConfigDir;
+
+    resetEnvCredentialNotice();
+    setAgentMode(false);
+    setJsonFlag(false);
+  });
+
+  afterEach(async () => {
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+    }
+    for (const key of TOUCHED_ENV) {
+      if (savedEnv[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = savedEnv[key];
+      }
+    }
+    fetchSpy?.mockRestore();
+    fetchSpy = undefined;
+    resetEnvCredentialNotice();
+    setAgentMode(false);
+    setJsonFlag(false);
+    await rm(testConfigDir, { recursive: true, force: true });
+  });
+
+  describe('getAuthContext', () => {
+    it('sends the access token as a bearer credential', async () => {
+      await storeOAuthEnvironment();
+
+      const { headers } = await getAuthContext();
+
+      expect(headers.Authorization).toBe('Bearer access_1');
+    });
+
+    it('still sends Basic auth for access token environments', async () => {
+      await setEnvironment('ci-token', {
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+      });
+
+      const { headers } = await getAuthContext();
+
+      expect(headers.Authorization).toBe(
+        `Basic ${btoa('stored_id:stored_secret')}`,
+      );
+    });
+
+    it('uses the stored base URL of an OAuth environment', async () => {
+      await storeOAuthEnvironment({ baseUrl: 'https://api.staging.test' });
+
+      expect((await getAuthContext()).baseUrl).toBe('https://api.staging.test');
+    });
+
+    it('lets MUX_TOKEN_ID/MUX_TOKEN_SECRET shadow an OAuth login', async () => {
+      await storeOAuthEnvironment();
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+
+      const { headers } = await getAuthContext();
+
+      expect(headers.Authorization).toBe(
+        `Basic ${btoa('env_token_id:env_token_secret')}`,
+      );
+    });
+
+    it('names the shadowed OAuth login once on stderr', async () => {
+      await storeOAuthEnvironment();
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+      const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await getAuthContext();
+        await getAuthContext();
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        const message = String(errorSpy.mock.calls[0]?.[0]);
+        expect(message).toContain('acme-production');
+        expect(message).toContain('mux auth status');
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('suppresses the shadowing notice in agent mode', async () => {
+      await storeOAuthEnvironment();
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+      setAgentMode(true);
+      const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await getAuthContext();
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('refreshes an expiring access token before issuing the request', async () => {
+      await storeOAuthEnvironment({
+        oauth: { expiresAt: nowSeconds() + 30 } as never,
+      });
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
+        input: string,
+      ) => {
+        // Discovery 404s, so endpoint resolution falls back to the configured
+        // defaults and the only other request is the refresh grant itself.
+        if (String(input).includes('/.well-known/')) {
+          return new Response('not found', { status: 404 });
+        }
+        return new Response(
+          JSON.stringify({
+            access_token: 'access_2',
+            refresh_token: 'refresh_2',
+            expires_in: 3600,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }) as unknown as typeof fetch);
+
+      const { headers } = await getAuthContext();
+
+      expect(headers.Authorization).toBe('Bearer access_2');
+      const grantCalls = (fetchSpy?.mock.calls ?? []).filter(
+        (call) => !String(call[0]).includes('/.well-known/'),
+      );
+      expect(grantCalls).toHaveLength(1);
+    });
+
+    it('does not refresh a token that is still fresh', async () => {
+      await storeOAuthEnvironment({
+        oauth: { expiresAt: nowSeconds() + 3600 } as never,
+      });
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+        (async () =>
+          new Response('{}', { status: 200 })) as unknown as typeof fetch,
+      );
+
+      await getAuthContext();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createAuthenticatedMuxClient', () => {
+    it('passes the access token as the SDK authorization token', async () => {
+      await storeOAuthEnvironment();
+
+      const client = await createAuthenticatedMuxClient();
+
+      expect(client.authorizationToken).toBe('access_1');
+      expect(client.tokenId).toBeNull();
+      expect(client.tokenSecret).toBeNull();
+    });
+
+    it('never passes both credential kinds to one client', async () => {
+      await setEnvironment('ci-token', {
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+      });
+
+      const client = await createAuthenticatedMuxClient();
+
+      expect(client.tokenId).toBe('stored_id');
+      expect(client.tokenSecret).toBe('stored_secret');
+      // Left unset, the SDK would fall back to MUX_AUTHORIZATION_TOKEN and its
+      // bearer header would override the Basic credentials above.
+      expect(client.authorizationToken).toBeNull();
+    });
+
+    it('ignores an ambient MUX_AUTHORIZATION_TOKEN for a token pair login', async () => {
+      process.env.MUX_AUTHORIZATION_TOKEN = 'ambient_bearer';
+      await setEnvironment('ci-token', {
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+      });
+
+      const client = await createAuthenticatedMuxClient();
+
+      expect(client.authorizationToken).toBeNull();
+      expect((await getAuthContext()).headers.Authorization).toBe(
+        `Basic ${btoa('stored_id:stored_secret')}`,
+      );
+    });
+  });
+
+  describe('resolveActiveEnvironment', () => {
+    it('resolves an OAuth environment without any network call', async () => {
+      await storeOAuthEnvironment();
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => {
+        throw new Error('network should not be reached');
+      }) as unknown as typeof fetch);
+
+      const active = await resolveActiveEnvironment();
+
+      expect(active.environmentId).toBe('env_123');
+      expect(active.source).toBe('config');
+      expect(active.kind).toBe('oauth');
+      expect(active.stored?.name).toBe('acme-production');
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('reports the token kind for access token environments', async () => {
+      await setEnvironment('ci-token', {
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+        environmentId: 'env_456',
+      });
+
+      const active = await resolveActiveEnvironment();
+
+      expect(active.kind).toBe('token');
+      expect(active.environmentId).toBe('env_456');
     });
   });
 });

@@ -1,15 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { readdirSync, statSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   type Config,
   type Environment,
+  findEnvironmentByEnvironmentId,
+  flagCredential,
   getCurrentEnvironment,
   getEnvironment,
+  getEnvironmentAuthType,
+  isOAuthEnvironment,
   listEnvironments,
   readConfig,
+  removeCredential,
   removeEnvironment,
+  setCredential,
   setCurrentEnvironment,
   setEnvironment,
   writeConfig,
@@ -51,8 +58,7 @@ describe('Config manager', () => {
       const testConfig: Config = {
         environments: {
           test: {
-            tokenId: 'test_id',
-            tokenSecret: 'test_secret',
+            token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
           },
         },
         defaultEnvironment: 'test',
@@ -77,8 +83,7 @@ describe('Config manager', () => {
       const testConfig: Config = {
         environments: {
           test: {
-            tokenId: 'test_id',
-            tokenSecret: 'test_secret',
+            token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
           },
         },
       };
@@ -93,8 +98,7 @@ describe('Config manager', () => {
       const testConfig: Config = {
         environments: {
           test: {
-            tokenId: 'test_id',
-            tokenSecret: 'test_secret',
+            token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
           },
         },
         defaultEnvironment: 'test',
@@ -121,8 +125,7 @@ describe('Config manager', () => {
       await writeConfig({
         environments: {
           other: {
-            tokenId: 'other_id',
-            tokenSecret: 'other_secret',
+            token: { tokenId: 'other_id', tokenSecret: 'other_secret' },
           },
         },
       });
@@ -133,8 +136,7 @@ describe('Config manager', () => {
 
     it('should return environment when it exists', async () => {
       const testEnv: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
       };
 
       await writeConfig({
@@ -151,8 +153,7 @@ describe('Config manager', () => {
   describe('setEnvironment', () => {
     it('should create new config with single environment', async () => {
       const testEnv: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
       };
 
       await setEnvironment('test', testEnv);
@@ -168,8 +169,7 @@ describe('Config manager', () => {
 
     it('should set first environment as default', async () => {
       const testEnv: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
       };
 
       await setEnvironment('production', testEnv);
@@ -180,12 +180,10 @@ describe('Config manager', () => {
 
     it('should add environment to existing config', async () => {
       const firstEnv: Environment = {
-        tokenId: 'first_id',
-        tokenSecret: 'first_secret',
+        token: { tokenId: 'first_id', tokenSecret: 'first_secret' },
       };
       const secondEnv: Environment = {
-        tokenId: 'second_id',
-        tokenSecret: 'second_secret',
+        token: { tokenId: 'second_id', tokenSecret: 'second_secret' },
       };
 
       await setEnvironment('first', firstEnv);
@@ -200,12 +198,10 @@ describe('Config manager', () => {
 
     it('should update existing environment', async () => {
       const originalEnv: Environment = {
-        tokenId: 'original_id',
-        tokenSecret: 'original_secret',
+        token: { tokenId: 'original_id', tokenSecret: 'original_secret' },
       };
       const updatedEnv: Environment = {
-        tokenId: 'updated_id',
-        tokenSecret: 'updated_secret',
+        token: { tokenId: 'updated_id', tokenSecret: 'updated_secret' },
       };
 
       await setEnvironment('test', originalEnv);
@@ -230,8 +226,7 @@ describe('Config manager', () => {
 
     it('should return the only environment when only one exists', async () => {
       const testEnv: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
       };
 
       await setEnvironment('test', testEnv);
@@ -245,12 +240,10 @@ describe('Config manager', () => {
 
     it('should return the default environment when multiple exist', async () => {
       const firstEnv: Environment = {
-        tokenId: 'first_id',
-        tokenSecret: 'first_secret',
+        token: { tokenId: 'first_id', tokenSecret: 'first_secret' },
       };
       const secondEnv: Environment = {
-        tokenId: 'second_id',
-        tokenSecret: 'second_secret',
+        token: { tokenId: 'second_id', tokenSecret: 'second_secret' },
       };
 
       await setEnvironment('first', firstEnv);
@@ -277,8 +270,7 @@ describe('Config manager', () => {
       await writeConfig({
         environments: {
           other: {
-            tokenId: 'other_id',
-            tokenSecret: 'other_secret',
+            token: { tokenId: 'other_id', tokenSecret: 'other_secret' },
           },
         },
       });
@@ -290,12 +282,10 @@ describe('Config manager', () => {
 
     it('should set default environment', async () => {
       const firstEnv: Environment = {
-        tokenId: 'first_id',
-        tokenSecret: 'first_secret',
+        token: { tokenId: 'first_id', tokenSecret: 'first_secret' },
       };
       const secondEnv: Environment = {
-        tokenId: 'second_id',
-        tokenSecret: 'second_secret',
+        token: { tokenId: 'second_id', tokenSecret: 'second_secret' },
       };
 
       await setEnvironment('first', firstEnv);
@@ -315,16 +305,13 @@ describe('Config manager', () => {
 
     it('should return array of environment names', async () => {
       await setEnvironment('first', {
-        tokenId: 'first_id',
-        tokenSecret: 'first_secret',
+        token: { tokenId: 'first_id', tokenSecret: 'first_secret' },
       });
       await setEnvironment('second', {
-        tokenId: 'second_id',
-        tokenSecret: 'second_secret',
+        token: { tokenId: 'second_id', tokenSecret: 'second_secret' },
       });
       await setEnvironment('third', {
-        tokenId: 'third_id',
-        tokenSecret: 'third_secret',
+        token: { tokenId: 'third_id', tokenSecret: 'third_secret' },
       });
 
       const result = await listEnvironments();
@@ -346,8 +333,7 @@ describe('Config manager', () => {
       await writeConfig({
         environments: {
           other: {
-            tokenId: 'other_id',
-            tokenSecret: 'other_secret',
+            token: { tokenId: 'other_id', tokenSecret: 'other_secret' },
           },
         },
       });
@@ -359,12 +345,10 @@ describe('Config manager', () => {
 
     it('should remove environment from config', async () => {
       await setEnvironment('first', {
-        tokenId: 'first_id',
-        tokenSecret: 'first_secret',
+        token: { tokenId: 'first_id', tokenSecret: 'first_secret' },
       });
       await setEnvironment('second', {
-        tokenId: 'second_id',
-        tokenSecret: 'second_secret',
+        token: { tokenId: 'second_id', tokenSecret: 'second_secret' },
       });
 
       await removeEnvironment('first');
@@ -376,12 +360,10 @@ describe('Config manager', () => {
 
     it('should set new default when removing default environment', async () => {
       await setEnvironment('first', {
-        tokenId: 'first_id',
-        tokenSecret: 'first_secret',
+        token: { tokenId: 'first_id', tokenSecret: 'first_secret' },
       });
       await setEnvironment('second', {
-        tokenId: 'second_id',
-        tokenSecret: 'second_secret',
+        token: { tokenId: 'second_id', tokenSecret: 'second_secret' },
       });
 
       // first is the default
@@ -398,8 +380,7 @@ describe('Config manager', () => {
 
     it('should set default to undefined when removing last environment', async () => {
       await setEnvironment('only', {
-        tokenId: 'only_id',
-        tokenSecret: 'only_secret',
+        token: { tokenId: 'only_id', tokenSecret: 'only_secret' },
       });
 
       await removeEnvironment('only');
@@ -411,12 +392,10 @@ describe('Config manager', () => {
 
     it('should not change default when removing non-default environment', async () => {
       await setEnvironment('first', {
-        tokenId: 'first_id',
-        tokenSecret: 'first_secret',
+        token: { tokenId: 'first_id', tokenSecret: 'first_secret' },
       });
       await setEnvironment('second', {
-        tokenId: 'second_id',
-        tokenSecret: 'second_secret',
+        token: { tokenId: 'second_id', tokenSecret: 'second_secret' },
       });
 
       // first is the default
@@ -435,8 +414,7 @@ describe('Config manager', () => {
   describe('Environment with signing keys', () => {
     it('should store and retrieve environment with signing keys', async () => {
       const envWithSigningKeys: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
         signingKeyId: 'signing_key_id',
         signingPrivateKey:
           '-----BEGIN RSA PRIVATE KEY-----\ntest_key\n-----END RSA PRIVATE KEY-----',
@@ -452,8 +430,7 @@ describe('Config manager', () => {
 
     it('should support environments without signing keys', async () => {
       const envWithoutSigningKeys: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
       };
 
       await setEnvironment('dev', envWithoutSigningKeys);
@@ -468,8 +445,7 @@ describe('Config manager', () => {
       const legacyConfig: Config = {
         environments: {
           legacy: {
-            tokenId: 'legacy_id',
-            tokenSecret: 'legacy_secret',
+            token: { tokenId: 'legacy_id', tokenSecret: 'legacy_secret' },
           },
         },
         defaultEnvironment: 'legacy',
@@ -477,24 +453,22 @@ describe('Config manager', () => {
 
       await writeConfig(legacyConfig);
       const config = await readConfig();
-      const env = await getEnvironment('legacy');
+      const env = (await getEnvironment('legacy')) as Environment;
 
       expect(config).toEqual(legacyConfig);
-      expect(env?.tokenId).toBe('legacy_id');
+      expect(env?.token?.tokenId).toBe('legacy_id');
       expect(env?.signingKeyId).toBeUndefined();
     });
 
     it('should update environment to add signing keys', async () => {
       const envWithoutKeys: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
       };
 
       await setEnvironment('test', envWithoutKeys);
 
       const envWithKeys: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
         signingKeyId: 'new_signing_key',
         signingPrivateKey:
           '-----BEGIN RSA PRIVATE KEY-----\nkey_data\n-----END RSA PRIVATE KEY-----',
@@ -509,8 +483,7 @@ describe('Config manager', () => {
 
     it('should allow removing signing keys from environment', async () => {
       const envWithKeys: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
         signingKeyId: 'signing_key',
         signingPrivateKey:
           '-----BEGIN RSA PRIVATE KEY-----\nkey\n-----END RSA PRIVATE KEY-----',
@@ -519,8 +492,7 @@ describe('Config manager', () => {
       await setEnvironment('test', envWithKeys);
 
       const envWithoutKeys: Environment = {
-        tokenId: 'test_id',
-        tokenSecret: 'test_secret',
+        token: { tokenId: 'test_id', tokenSecret: 'test_secret' },
       };
 
       await setEnvironment('test', envWithoutKeys);
@@ -528,6 +500,268 @@ describe('Config manager', () => {
 
       expect(env?.signingKeyId).toBeUndefined();
       expect(env?.signingPrivateKey).toBeUndefined();
+    });
+  });
+});
+
+describe('Config manager - credential blocks', () => {
+  let testConfigDir: string;
+  let originalXdgConfigHome: string | undefined;
+
+  const oauthCredential = {
+    accessToken: 'access_1',
+    refreshToken: 'refresh_1',
+    expiresAt: 1_800_000_000,
+    scope: 'video:read',
+    tokenType: 'Bearer' as const,
+  };
+  const tokenCredential = { tokenId: 'id_1', tokenSecret: 'secret_1' };
+
+  beforeEach(async () => {
+    testConfigDir = await mkdtemp(join(tmpdir(), 'mux-cli-oauth-config-'));
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = testConfigDir;
+  });
+
+  afterEach(async () => {
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+    }
+    await rm(testConfigDir, { recursive: true, force: true });
+  });
+
+  describe('reading historical entry shapes', () => {
+    it('reads a pre-OAuth flat entry as a token block', async () => {
+      // Written by a released version of the CLI: no discriminator, no nesting.
+      await Bun.write(
+        getConfigPath(),
+        JSON.stringify({
+          environments: {
+            production: {
+              tokenId: 'legacy_id',
+              tokenSecret: 'legacy_secret',
+              environmentId: 'env_legacy',
+              signingKeyId: 'key_legacy',
+            },
+          },
+          defaultEnvironment: 'production',
+        }),
+      );
+
+      const env = await getEnvironment('production');
+
+      expect(env?.token).toEqual({
+        tokenId: 'legacy_id',
+        tokenSecret: 'legacy_secret',
+      });
+      expect(env?.environmentId).toBe('env_legacy');
+      expect(env?.signingKeyId).toBe('key_legacy');
+      expect(getEnvironmentAuthType(env as Environment)).toBe('token');
+    });
+
+    it('reads a flat type: oauth entry as an oauth block', async () => {
+      await Bun.write(
+        getConfigPath(),
+        JSON.stringify({
+          environments: {
+            'acme-production': {
+              type: 'oauth',
+              accessToken: 'access_1',
+              refreshToken: 'refresh_1',
+              expiresAt: 1_800_000_000,
+              environmentId: 'env_123',
+              organizationName: 'Acme Inc',
+            },
+          },
+        }),
+      );
+
+      const env = await getEnvironment('acme-production');
+
+      expect(env?.oauth?.accessToken).toBe('access_1');
+      expect(env?.organizationName).toBe('Acme Inc');
+      expect(isOAuthEnvironment(env as Environment)).toBe(true);
+    });
+  });
+
+  describe('setCredential', () => {
+    it('stores a credential block and environment fields together', async () => {
+      await setCredential('acme-production', 'oauth', oauthCredential, {
+        environmentId: 'env_123',
+        organizationName: 'Acme Inc',
+      });
+
+      const env = await getEnvironment('acme-production');
+      expect(env?.oauth).toEqual(oauthCredential);
+      expect(env?.environmentId).toBe('env_123');
+      expect(env?.organizationName).toBe('Acme Inc');
+    });
+
+    it('lets one environment hold both credential kinds', async () => {
+      await setCredential('acme-production', 'token', tokenCredential, {
+        environmentId: 'env_123',
+      });
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      const env = await getEnvironment('acme-production');
+      expect(env?.token).toEqual(tokenCredential);
+      expect(env?.oauth).toEqual(oauthCredential);
+      // OAuth is preferred when both are present.
+      expect(getEnvironmentAuthType(env as Environment)).toBe('oauth');
+    });
+
+    it('does not disturb environment-bound state when adding a credential', async () => {
+      await setCredential('acme-production', 'token', tokenCredential, {
+        signingKeyId: 'key_1',
+        signingPrivateKey: 'private_1',
+        forwardUrl: 'http://localhost:3000/webhooks',
+      });
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      const env = await getEnvironment('acme-production');
+      expect(env?.signingKeyId).toBe('key_1');
+      expect(env?.signingPrivateKey).toBe('private_1');
+      expect(env?.forwardUrl).toBe('http://localhost:3000/webhooks');
+    });
+
+    it('replaces the same block rather than merging into it', async () => {
+      await setCredential('acme-production', 'oauth', oauthCredential);
+      await setCredential('acme-production', 'oauth', {
+        accessToken: 'access_2',
+        refreshToken: 'refresh_2',
+        expiresAt: 1_900_000_000,
+      });
+
+      const env = await getEnvironment('acme-production');
+      expect(env?.oauth?.accessToken).toBe('access_2');
+      // The old scope must not survive onto a differently-scoped grant.
+      expect(env?.oauth?.scope).toBeUndefined();
+    });
+
+    it('sets the first environment as the default', async () => {
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      expect((await readConfig())?.defaultEnvironment).toBe('acme-production');
+    });
+
+    it('keeps the restrictive file mode for token material', async () => {
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      expect(statSync(getConfigPath()).mode & 0o777).toBe(0o600);
+    });
+  });
+
+  describe('flagCredential', () => {
+    it('records a failure on one block without touching the other', async () => {
+      await setCredential('acme-production', 'token', tokenCredential);
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      await flagCredential('acme-production', 'oauth', {
+        code: 'invalid_grant',
+        at: '2026-08-14T00:00:00Z',
+      });
+
+      const env = await getEnvironment('acme-production');
+      expect(env?.oauth?.lastError?.code).toBe('invalid_grant');
+      expect(env?.token?.lastError).toBeUndefined();
+      // Flagging is not deleting: the credential is still there to inspect.
+      expect(env?.oauth?.refreshToken).toBe('refresh_1');
+      // And the healthy token pair becomes the preferred credential.
+      expect(getEnvironmentAuthType(env as Environment)).toBe('token');
+    });
+
+    it('clears a previous failure when passed null', async () => {
+      await setCredential('acme-production', 'oauth', oauthCredential);
+      await flagCredential('acme-production', 'oauth', {
+        code: 'invalid_grant',
+        at: 'now',
+      });
+
+      await flagCredential('acme-production', 'oauth', null);
+
+      expect(
+        (await getEnvironment('acme-production'))?.oauth?.lastError,
+      ).toBeUndefined();
+    });
+
+    it('is a no-op for an unknown environment', async () => {
+      await flagCredential('absent', 'oauth', { code: 'x', at: 'now' });
+
+      expect(await readConfig()).toBeNull();
+    });
+  });
+
+  describe('removeCredential', () => {
+    it('removes one block and keeps the environment and its other credential', async () => {
+      await setCredential('acme-production', 'token', tokenCredential, {
+        environmentId: 'env_123',
+      });
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      expect(await removeCredential('acme-production', 'oauth')).toBe(true);
+
+      const env = await getEnvironment('acme-production');
+      expect(env?.oauth).toBeUndefined();
+      expect(env?.token).toEqual(tokenCredential);
+      expect(env?.environmentId).toBe('env_123');
+    });
+
+    it('reports false when the block is not there', async () => {
+      await setCredential('acme-production', 'token', tokenCredential);
+
+      expect(await removeCredential('acme-production', 'oauth')).toBe(false);
+    });
+  });
+
+  describe('findEnvironmentByEnvironmentId', () => {
+    it('finds an entry by Mux environment id regardless of its name', async () => {
+      await setCredential('some-name', 'oauth', oauthCredential, {
+        environmentId: 'env_123',
+      });
+
+      expect((await findEnvironmentByEnvironmentId('env_123'))?.name).toBe(
+        'some-name',
+      );
+    });
+
+    it('returns null when no entry matches', async () => {
+      await setCredential('some-name', 'oauth', oauthCredential, {
+        environmentId: 'env_123',
+      });
+
+      expect(await findEnvironmentByEnvironmentId('env_absent')).toBeNull();
+    });
+
+    it('returns null when no config exists', async () => {
+      expect(await findEnvironmentByEnvironmentId('env_123')).toBeNull();
+    });
+  });
+
+  describe('atomic writes', () => {
+    it('never leaves a partially written config behind', async () => {
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      await Promise.all(
+        Array.from({ length: 12 }, (_, i) =>
+          setCredential(`env-${i}`, 'token', {
+            tokenId: `id_${i}`,
+            tokenSecret: `secret_${i}`,
+          }),
+        ),
+      );
+
+      // A torn write would surface as invalid JSON here.
+      const config = await readConfig();
+      expect(config).not.toBeNull();
+      expect(config?.environments['acme-production']).toBeDefined();
+    });
+
+    it('leaves no temporary files in the config directory', async () => {
+      await setCredential('acme-production', 'oauth', oauthCredential);
+
+      expect(readdirSync(`${testConfigDir}/mux`)).toEqual(['config.json']);
     });
   });
 });

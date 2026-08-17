@@ -10,7 +10,12 @@ import {
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getEnvironment, setEnvironment } from '../lib/config.ts';
+import {
+  type Environment,
+  getEnvironment,
+  listEnvironments,
+  setEnvironment,
+} from '../lib/config.ts';
 import { setAgentMode } from '../lib/context.ts';
 import { credentialsFromEnv, loginCommand, parseEnvFile } from './login.ts';
 
@@ -363,11 +368,11 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'env_id';
     process.env.MUX_TOKEN_SECRET = 'env_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('env_id');
-    expect(saved?.tokenSecret).toBe('env_secret');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('env_id');
+    expect(saved?.token?.tokenSecret).toBe('env_secret');
   });
 
   it('prefers --env-file over environment variables', async () => {
@@ -381,16 +386,16 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('file_id');
-    expect(saved?.tokenSecret).toBe('file_secret');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('file_id');
+    expect(saved?.token?.tokenSecret).toBe('file_secret');
   });
 
   it('outputs machine-readable JSON with --json', async () => {
     process.env.MUX_TOKEN_ID = 'env_id';
     process.env.MUX_TOKEN_SECRET = 'env_secret';
 
-    await loginCommand.parse(['--json']);
+    await loginCommand.parse(['--json', '--from-env']);
 
     const output = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
     const parsed = JSON.parse(output);
@@ -404,7 +409,7 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_SECRET = 'env_secret';
     setAgentMode(true);
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
     const output = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
     expect(JSON.parse(output).success).toBe(true);
@@ -448,7 +453,7 @@ describe('Login command - action', () => {
     );
 
     try {
-      await loginCommand.parse([]);
+      await loginCommand.parse(['--from-env']);
     } catch (_error) {
       // handleCommandError exits; the mocked process.exit throws to halt parse
     }
@@ -456,6 +461,96 @@ describe('Login command - action', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
     expect(parsed.error).toBeDefined();
+  });
+
+  it('refuses to guess when shell credentials are set, and says why', async () => {
+    process.env.MUX_TOKEN_ID = 'env_id';
+    process.env.MUX_TOKEN_SECRET = 'env_secret';
+
+    try {
+      await loginCommand.parse([]);
+    } catch (_error) {
+      // handleCommandError exits; the mocked process.exit throws to halt parse
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const message = String(errorSpy.mock.calls[0][0]);
+    expect(message).toContain('MUX_TOKEN_ID and MUX_TOKEN_SECRET detected');
+    expect(message).toContain('--from-env');
+    expect(message).toContain('--env-file');
+    expect(message).toContain('--interactive');
+    expect(message).toContain('--oauth');
+  });
+
+  it('writes nothing to the config when it refuses to guess', async () => {
+    process.env.MUX_TOKEN_ID = 'env_id';
+    process.env.MUX_TOKEN_SECRET = 'env_secret';
+
+    try {
+      await loginCommand.parse([]);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(await listEnvironments()).toEqual([]);
+  });
+
+  it('rejects two login methods at once', async () => {
+    try {
+      await loginCommand.parse(['--oauth', '--interactive']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(/only one/i);
+  });
+
+  it('rejects --from-env when the shell has no credentials', async () => {
+    try {
+      await loginCommand.parse(['--from-env']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(
+      /MUX_TOKEN_ID and MUX_TOKEN_SECRET are not set/,
+    );
+  });
+
+  it('warns that a login saved with shell credentials set is shadowed', async () => {
+    process.env.MUX_TOKEN_ID = 'env_id';
+    process.env.MUX_TOKEN_SECRET = 'env_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('take precedence over the saved login');
+    expect(printed).toMatch(/Unset them/);
+  });
+
+  it('refuses browser sign-in with no terminal to drive it', async () => {
+    // Tests run without a TTY, which is exactly the CI / piped-stdin case.
+    try {
+      await loginCommand.parse(['--oauth']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(/interactive terminal/i);
+  });
+
+  it('refuses --interactive with no terminal to prompt on', async () => {
+    try {
+      await loginCommand.parse(['--interactive']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(/interactive terminal/i);
   });
 
   it('keeps human-readable errors when not in JSON or agent mode', async () => {
@@ -477,10 +572,10 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'env_id';
     process.env.MUX_TOKEN_SECRET = 'env_secret';
 
-    await loginCommand.parse(['--name', 'staging']);
+    await loginCommand.parse(['--name', 'staging', '--from-env']);
 
-    const saved = await getEnvironment('staging');
-    expect(saved?.tokenId).toBe('env_id');
+    const saved = (await getEnvironment('staging')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('env_id');
   });
 
   it('saves signing keys from the env file when both are present', async () => {
@@ -492,7 +587,7 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBe('key_abc');
     expect(saved?.signingPrivateKey).toBe('private_base64');
   });
@@ -513,7 +608,7 @@ describe('Login command - action', () => {
       else process.env.MUX_BASE_URL = originalBaseUrl;
     }
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.baseUrl).toBe('https://file.example.com');
     const validationUrl = String(fetchSpy.mock.calls[0][0]);
     expect(validationUrl.startsWith('https://file.example.com')).toBe(true);
@@ -535,7 +630,7 @@ describe('Login command - action', () => {
       else process.env.MUX_BASE_URL = originalBaseUrl;
     }
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.baseUrl).toBe('https://shell.example.com');
   });
 
@@ -546,13 +641,13 @@ describe('Login command - action', () => {
     process.env.MUX_PRIVATE_KEY = 'private_env';
 
     try {
-      await loginCommand.parse([]);
+      await loginCommand.parse(['--from-env']);
     } finally {
       delete process.env.MUX_SIGNING_KEY;
       delete process.env.MUX_PRIVATE_KEY;
     }
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBe('key_env');
     expect(saved?.signingPrivateKey).toBe('private_env');
   });
@@ -561,8 +656,7 @@ describe('Login command - action', () => {
     // The mocked /whoami returns env_mock_123, so this entry matches the
     // environment the new credentials belong to.
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       environmentId: 'env_mock_123',
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
@@ -571,10 +665,10 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'new_id';
     process.env.MUX_TOKEN_SECRET = 'new_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('new_id');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('new_id');
     expect(saved?.signingKeyId).toBe('key_saved');
     expect(saved?.signingPrivateKey).toBe('private_saved');
     expect(saved?.forwardUrl).toBe('http://localhost:3000/webhooks');
@@ -582,8 +676,7 @@ describe('Login command - action', () => {
 
   it('does not carry signing keys over when the new credentials belong to a different environment', async () => {
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       environmentId: 'env_different_999',
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
@@ -592,10 +685,10 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'new_id';
     process.env.MUX_TOKEN_SECRET = 'new_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('new_id');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('new_id');
     expect(saved?.signingKeyId).toBeUndefined();
     expect(saved?.signingPrivateKey).toBeUndefined();
     expect(saved?.forwardUrl).toBeUndefined();
@@ -603,24 +696,22 @@ describe('Login command - action', () => {
 
   it('does not preserve fields from a legacy entry with no environmentId', async () => {
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
     });
     process.env.MUX_TOKEN_ID = 'new_id';
     process.env.MUX_TOKEN_SECRET = 'new_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBeUndefined();
   });
 
   it('prefers newly provided signing keys over preserved ones', async () => {
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       environmentId: 'env_mock_123',
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
@@ -633,7 +724,7 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBe('key_new');
     expect(saved?.signingPrivateKey).toBe('private_new');
   });
@@ -647,7 +738,7 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBeUndefined();
     expect(saved?.signingPrivateKey).toBeUndefined();
   });

@@ -4,6 +4,7 @@ import { CompletionsCommand } from '@cliffy/command/completions';
 import pkg from '../package.json';
 import { annotationsCommand } from './commands/annotations/index.ts';
 import { assetsCommand } from './commands/assets/index.ts';
+import { authCommand } from './commands/auth/index.ts';
 import { completionsInstallCommand } from './commands/completions-install.ts';
 import { deliveryUsageCommand } from './commands/delivery-usage/index.ts';
 import { dimensionsCommand } from './commands/dimensions/index.ts';
@@ -47,6 +48,7 @@ const cli = new Command()
   .allowEmpty(true)
   .command('login', loginCommand)
   .command('logout', logoutCommand)
+  .command('auth', authCommand)
   .command('env', envCommand)
   .command('assets', assetsCommand)
   .command('live', liveCommand)
