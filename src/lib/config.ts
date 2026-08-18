@@ -43,7 +43,7 @@ export function getEnvironmentAuthType(
   environment: Environment,
 ): CredentialKind {
   // An entry with no credentials at all still has to render as something;
-  // 'token' matches how a type-less legacy entry has always been read.
+  // 'token' matches how an entry with no explicit kind has always been read.
   return getPreferredCredential(environment)?.kind ?? 'token';
 }
 
@@ -66,8 +66,11 @@ export async function readConfig(): Promise<Config | null> {
   }
 
   // Normalize on read so the rest of the CLI only ever sees the nested
-  // credential shape. Older flat entries keep working untouched on disk until
-  // something writes them back.
+  // credential layout. Files written by earlier versions stay as they are on
+  // disk until something writes them back — and note that any write persists
+  // every entry in the current layout, including ones the command never
+  // touched, so an older CLI will read them as having no credentials. The
+  // credentials themselves are untouched, just relocated within the file.
   const environments: Record<string, Environment> = {};
   for (const [name, environment] of Object.entries(parsed.environments ?? {})) {
     environments[name] = normalizeEnvironment(environment);

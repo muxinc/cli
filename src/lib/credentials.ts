@@ -83,12 +83,17 @@ export function hasTokenPair(environment: Environment): boolean {
 }
 
 /**
- * Read any historical entry shape into the nested form.
+ * Read either stored layout into the nested form.
  *
- * Three shapes exist in the wild: pre-OAuth flat entries with `tokenId` /
- * `tokenSecret` and no discriminator, flat entries tagged `type: 'token'` or
- * `type: 'oauth'`, and the current nested form. Normalizing on read means there
- * is no migration step and no config version to track.
+ * Released versions wrote credentials flat (`tokenId` / `tokenSecret` at the top
+ * level); this version nests them under `token` so an environment can also hold
+ * an OAuth login. Normalizing on read means there is no migration step and no
+ * config version to track, and an access token pair keeps working either way —
+ * only where it sits in the file changed.
+ *
+ * The `type` discriminator and flat OAuth fields handled below never appeared in
+ * a released build; they are tolerated so that anyone running an intermediate
+ * build of this branch is not stranded.
  */
 export function normalizeEnvironment(raw: unknown): Environment {
   const entry = (raw ?? {}) as Record<string, unknown>;

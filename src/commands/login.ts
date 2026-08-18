@@ -129,6 +129,33 @@ function noticeSavedLoginIsShadowed(json: boolean): void {
 }
 
 /**
+ * What to print once the authorization URL is known.
+ *
+ * The URL is always shown, even when the browser reported success: `open` and
+ * `xdg-open` exit 0 whether or not a window actually appeared — wrong default
+ * browser, a background profile, a browser still launching — and without the URL
+ * on screen the only recovery is Ctrl+C and a second run with --print-url.
+ *
+ * Returned as lines rather than printed so this stays testable; the command
+ * layer owns the writing.
+ */
+export function formatAuthorizationNotice(
+  url: string,
+  opened: boolean,
+): string[] {
+  return [
+    opened
+      ? 'Opened your browser to continue signing in.'
+      : 'Open this URL in your browser to continue signing in:',
+    '',
+    `  ${url}`,
+    '',
+    ...(opened ? ["If your browser didn't open, use the URL above."] : []),
+    'Waiting for authorization (press Ctrl+C to cancel)...',
+  ];
+}
+
+/**
  * Run the browser-based OAuth login and report the result. Organization and
  * environment selection happens in the dashboard, so the CLI only reports what
  * came back.
@@ -160,15 +187,9 @@ async function runOAuthLogin(options: {
     },
     {
       onAuthorizationUrl: (url, opened) => {
-        if (opened) {
-          console.log('Opened your browser to continue signing in.');
-        } else {
-          console.log(
-            'Open this URL in your browser to continue signing in:\n',
-          );
-          console.log(`  ${url}\n`);
+        for (const line of formatAuthorizationNotice(url, opened)) {
+          console.log(line);
         }
-        console.log('Waiting for authorization (press Ctrl+C to cancel)...');
       },
     },
   );

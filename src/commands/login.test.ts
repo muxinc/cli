@@ -17,7 +17,12 @@ import {
   setEnvironment,
 } from '../lib/config.ts';
 import { setAgentMode } from '../lib/context.ts';
-import { credentialsFromEnv, loginCommand, parseEnvFile } from './login.ts';
+import {
+  credentialsFromEnv,
+  formatAuthorizationNotice,
+  loginCommand,
+  parseEnvFile,
+} from './login.ts';
 
 describe('Login command - parseEnvFile', () => {
   let testDir: string;
@@ -304,6 +309,44 @@ describe('Login command - credentialsFromEnv', () => {
       if (originalSecret === undefined) delete process.env.MUX_TOKEN_SECRET;
       else process.env.MUX_TOKEN_SECRET = originalSecret;
     }
+  });
+});
+
+describe('formatAuthorizationNotice', () => {
+  const url =
+    'https://api.mux.com/ui/v1/oauth/authorize?response_type=code&state=abc';
+
+  it('shows the URL even when the browser reported success', () => {
+    // open/xdg-open exit 0 whether or not a window actually appeared, so the
+    // URL is the only reliable recovery path.
+    const lines = formatAuthorizationNotice(url, true);
+
+    expect(lines.join('\n')).toContain(url);
+    expect(lines.join('\n')).toContain('Opened your browser');
+    expect(lines.join('\n')).toMatch(/didn't open/);
+  });
+
+  it('asks the user to open the URL when no browser was launched', () => {
+    const lines = formatAuthorizationNotice(url, false);
+
+    expect(lines.join('\n')).toContain(url);
+    expect(lines.join('\n')).toContain('Open this URL');
+    expect(lines.join('\n')).not.toMatch(/didn't open/);
+  });
+
+  it('always ends by saying it is waiting, and how to cancel', () => {
+    for (const opened of [true, false]) {
+      const lines = formatAuthorizationNotice(url, opened);
+      expect(lines.at(-1)).toContain('Waiting for authorization');
+      expect(lines.at(-1)).toContain('Ctrl+C');
+    }
+  });
+
+  it('puts the URL on its own line so it can be copied cleanly', () => {
+    const lines = formatAuthorizationNotice(url, true);
+    const urlLine = lines.find((line) => line.includes(url)) as string;
+
+    expect(urlLine.trim()).toBe(url);
   });
 });
 

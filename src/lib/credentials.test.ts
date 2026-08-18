@@ -17,8 +17,8 @@ const OAUTH = {
 const PAIR = { tokenId: 'id_1', tokenSecret: 'secret_1' };
 
 describe('normalizeEnvironment', () => {
-  it('reads a pre-OAuth flat entry as a token block', () => {
-    // Configs written before any OAuth support: no discriminator at all.
+  it('reads a flat entry as a token block', () => {
+    // The layout every released version wrote: credentials at the top level.
     const normalized = normalizeEnvironment({
       tokenId: 'id_1',
       tokenSecret: 'secret_1',
@@ -75,7 +75,7 @@ describe('normalizeEnvironment', () => {
     expect(normalizeEnvironment(entry)).toEqual(entry);
   });
 
-  it('drops the legacy discriminator and flat credential fields', () => {
+  it('drops the discriminator and flat credential fields once nested', () => {
     const normalized = normalizeEnvironment({
       type: 'oauth',
       accessToken: 'access_1',

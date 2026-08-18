@@ -1,5 +1,15 @@
 import { timingSafeEqual } from 'node:crypto';
 import { OAuthError } from './oauth.ts';
+// Imported as text, so the page lives in a real .html file and gets inlined at
+// build time — including into the compiled binary, which has no filesystem to
+// read from. Bun's types declare every .html import as its full-stack
+// HTMLBundle, ignoring the `type: 'text'` attribute, so the string this actually
+// evaluates to has to be asserted.
+import callbackTemplateModule from './oauth-callback.html' with {
+  type: 'text',
+};
+
+const callbackTemplate = callbackTemplateModule as unknown as string;
 
 /**
  * Loopback redirect receiver for the OAuth authorization code flow (RFC 8252).
@@ -55,12 +65,23 @@ export interface StartLoopbackOptions {
   timeoutMs?: number;
 }
 
-function page(title: string, body: string, status = 200): Response {
-  // Self-contained: no external requests, no scripts, no token material.
-  return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,-apple-system,sans-serif;max-width:32rem;margin:6rem auto;padding:0 1.5rem;color:#111}h1{font-size:1.25rem}p{color:#444;line-height:1.5}</style></head><body><h1>${title}</h1><p>${body}</p></body></html>`,
-    { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-  );
+/**
+ * Render the browser-facing page from the template in oauth-callback.html.
+ *
+ * Only literal strings defined in this file are substituted — never anything
+ * from the redirect — so there is nothing to escape and no way for a provider
+ * response to reach the markup. Keep it that way: if a caller ever needs to show
+ * provider text, escape it here first.
+ */
+function page(title: string, message: string, status = 200): Response {
+  const html = callbackTemplate
+    .replaceAll('{{title}}', title)
+    .replaceAll('{{message}}', message);
+
+  return new Response(html, {
+    status,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
 }
 
 /** Compare state values without leaking length or content through timing. */

@@ -10,17 +10,71 @@
 import { discoverEndpoints } from './oauth-discovery.ts';
 
 /**
- * Fallbacks used when discovery is unavailable and nothing is overridden.
+ * Every OAuth endpoint is on the Mux API host, so all three are derived from a
+ * single base: pointing `MUX_BASE_URL` at another environment moves the API
+ * calls, discovery, and the whole OAuth flow together, and the token endpoint
+ * can never end up on a different host than the authorization endpoint.
  *
- * TODO: confirm against the Mux authorization server before release. Tracked as
- * the endpoint table in OAUTH_LOGIN_SPEC.md section 8. Once the discovery
- * document is deployed these matter only offline, or if it ever stops resolving.
+ * The paths are not a common prefix, though. Authorization is a browser-facing
+ * route served by the dashboard UI layer (`/ui/v1/oauth`), while the
+ * back-channel grants are served by the auth service (`/auth/v1/oauth`).
+ *
+ * Individual `MUX_OAUTH_*_URL` overrides remain for the case where one endpoint
+ * moves on its own.
  */
 const DEFAULT_API_BASE_URL = 'https://api.mux.com';
+
+/** Browser-facing consent page: the only endpoint the user's browser opens. */
+const AUTHORIZE_PATH = '/ui/v1/oauth/authorize';
+
+/**
+ * Back-channel endpoints, called by the CLI itself.
+ *
+ * The auth service also exposes `/auth/v1/oauth/introspect` and
+ * `/auth/v1/openid/userinfo`. Neither is used: the CLI does not need to
+ * introspect a token it just received, and identity comes from
+ * `/system/v1/whoami` rather than the OIDC userinfo endpoint.
+ */
+const TOKEN_PATH = '/auth/v1/oauth/token';
+const REVOKE_PATH = '/auth/v1/oauth/revoke';
+
 const DEFAULT_CLIENT_ID = 'mux-cli';
-const DEFAULT_AUTHORIZATION_URL = 'https://dashboard.mux.com/oauth/authorize';
-const DEFAULT_TOKEN_URL = 'https://api.mux.com/oauth/token';
-const DEFAULT_REVOCATION_URL = 'https://api.mux.com/oauth/revoke';
+
+/** The API host every OAuth endpoint is derived from. */
+function getApiBaseUrl(): string {
+  return (process.env.MUX_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+}
+
+/**
+ * Scopes requested at authorization, and the source of truth for what this CLI
+ * asks a user to consent to. The server rejects a request with no `scope`.
+ *
+ * One login serves every command, so this is the union of what the CLI can do:
+ *
+ * - `video:*`   assets, live streams, uploads, playback IDs and restrictions,
+ *               DRM configurations, transcription vocabularies
+ * - `data:*`    metrics, monitoring, dimensions, errors, exports, video views,
+ *               incidents, annotations, delivery usage
+ * - `robots:*`  the robots commands
+ * - `system:*`  `whoami`, the webhook event stream, and signing key create and
+ *               delete (`mux.system.signingKeys`)
+ *
+ * `openid`, `profile`, and `email` are deliberately not requested: the CLI does
+ * not consume an `id_token`, and identity comes from `/system/v1/whoami`, which
+ * reports what the access token can actually do rather than who the subject is.
+ *
+ * Overridable with `MUX_OAUTH_SCOPES` for a narrower login.
+ */
+const DEFAULT_SCOPES = [
+  'video:read',
+  'video:write',
+  'data:read',
+  'data:write',
+  'robots:read',
+  'robots:write',
+  'system:read',
+  'system:write',
+];
 
 /**
  * Applied when a token response omits `expires_in`. A finite default is safer
@@ -101,13 +155,15 @@ export class OAuthError extends Error {
 export function getOAuthEndpoints(): OAuthEndpoints {
   const scopes = process.env.MUX_OAUTH_SCOPES?.trim();
 
+  const base = getApiBaseUrl();
+
   return {
     clientId: process.env.MUX_OAUTH_CLIENT_ID || DEFAULT_CLIENT_ID,
     authorizationUrl:
-      process.env.MUX_OAUTH_AUTHORIZE_URL || DEFAULT_AUTHORIZATION_URL,
-    tokenUrl: process.env.MUX_OAUTH_TOKEN_URL || DEFAULT_TOKEN_URL,
-    revocationUrl: process.env.MUX_OAUTH_REVOKE_URL || DEFAULT_REVOCATION_URL,
-    scopes: scopes ? scopes.split(/[\s,]+/).filter(Boolean) : [],
+      process.env.MUX_OAUTH_AUTHORIZE_URL || `${base}${AUTHORIZE_PATH}`,
+    tokenUrl: process.env.MUX_OAUTH_TOKEN_URL || `${base}${TOKEN_PATH}`,
+    revocationUrl: process.env.MUX_OAUTH_REVOKE_URL || `${base}${REVOKE_PATH}`,
+    scopes: scopes ? scopes.split(/[\s,]+/).filter(Boolean) : DEFAULT_SCOPES,
   };
 }
 
@@ -140,8 +196,7 @@ export async function resolveOAuthEndpoints(
   apiBaseUrl?: string,
 ): Promise<OAuthEndpoints> {
   const defaults = getOAuthEndpoints();
-  const baseUrl =
-    apiBaseUrl || process.env.MUX_BASE_URL || DEFAULT_API_BASE_URL;
+  const baseUrl = apiBaseUrl || getApiBaseUrl();
 
   const discovered = await discoverEndpoints(baseUrl);
   if (!discovered) {
@@ -210,8 +265,50 @@ interface TokenResponseBody {
   expires_in?: number;
   token_type?: string;
   scope?: string;
-  error?: string;
+  /**
+   * A string under RFC 6749, but the Mux API wraps errors in an object
+   * (`{ type, messages }`), and these endpoints can return either depending on
+   * which layer rejected the request.
+   */
+  error?: unknown;
   error_description?: string;
+}
+
+/** The Mux API's error envelope, as returned by non-OAuth-aware layers. */
+interface MuxErrorEnvelope {
+  type?: string;
+  messages?: string[];
+}
+
+/**
+ * Turn whatever the endpoint returned into a code and a human-readable detail.
+ *
+ * Three shapes show up in practice: the RFC 6749 flat form, the Mux API
+ * envelope, and something unrecognized (an HTML error page from a proxy, or a
+ * 404 from a path that is not the token endpoint at all). The last case still
+ * has to say something useful, or the failure is undiagnosable.
+ */
+function describeFailure(
+  body: TokenResponseBody,
+  raw: string,
+): { code?: string; detail?: string } {
+  if (typeof body.error === 'string') {
+    return { code: body.error, detail: body.error_description ?? body.error };
+  }
+
+  if (body.error && typeof body.error === 'object') {
+    const envelope = body.error as MuxErrorEnvelope;
+    const messages = Array.isArray(envelope.messages)
+      ? envelope.messages.filter((m) => typeof m === 'string').join('; ')
+      : undefined;
+    return {
+      ...(typeof envelope.type === 'string' && { code: envelope.type }),
+      detail: messages || envelope.type,
+    };
+  }
+
+  const snippet = raw.trim().replace(/\s+/g, ' ').slice(0, 200);
+  return { detail: snippet || undefined };
 }
 
 function nowSeconds(): number {
@@ -263,19 +360,22 @@ async function postForm(
 function failureFrom(
   status: number,
   body: TokenResponseBody,
+  raw: string,
+  url: string,
   fallbackContext: string,
 ): OAuthError {
-  const code = body.error;
-  const detail = body.error_description || body.error;
+  const { code, detail } = describeFailure(body, raw);
   // 5xx and 429 are transport-adjacent: the credential may still be good.
   const retryableStatus = status >= 500 || status === 429;
   const terminal = code
     ? TERMINAL_ERROR_CODES.has(code) && !retryableStatus
     : !retryableStatus;
 
+  // Naming the URL matters most for exactly the confusing case: a 404 from a
+  // misconfigured endpoint looks identical to a rejected credential otherwise.
   const message = detail
-    ? `${fallbackContext}: ${detail} (HTTP ${status})`
-    : `${fallbackContext}: HTTP ${status}`;
+    ? `${fallbackContext}: ${detail} (HTTP ${status} from ${url})`
+    : `${fallbackContext}: HTTP ${status} from ${url}`;
 
   return new OAuthError(message, { code, status, terminal });
 }
@@ -321,7 +421,7 @@ export async function exchangeCodeForTokens(params: {
 }): Promise<OAuthTokens> {
   const endpoints = params.endpoints ?? (await resolveOAuthEndpoints());
 
-  const { status, body } = await postForm(endpoints.tokenUrl, {
+  const { status, body, raw } = await postForm(endpoints.tokenUrl, {
     grant_type: 'authorization_code',
     code: params.code,
     code_verifier: params.codeVerifier,
@@ -330,7 +430,13 @@ export async function exchangeCodeForTokens(params: {
   });
 
   if (status < 200 || status >= 300) {
-    throw failureFrom(status, body, 'Could not complete the login');
+    throw failureFrom(
+      status,
+      body,
+      raw,
+      endpoints.tokenUrl,
+      'Could not complete the login',
+    );
   }
 
   return tokensFrom(body);
@@ -349,14 +455,20 @@ export async function refreshAccessToken(
   // after any endpoint compiled into this binary could have moved.
   const endpoints = endpointOverrides ?? (await resolveOAuthEndpoints());
 
-  const { status, body } = await postForm(endpoints.tokenUrl, {
+  const { status, body, raw } = await postForm(endpoints.tokenUrl, {
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
     client_id: endpoints.clientId,
   });
 
   if (status < 200 || status >= 300) {
-    throw failureFrom(status, body, 'Could not refresh the access token');
+    throw failureFrom(
+      status,
+      body,
+      raw,
+      endpoints.tokenUrl,
+      'Could not refresh the access token',
+    );
   }
 
   return tokensFrom(body, refreshToken);
@@ -373,13 +485,19 @@ export async function revokeRefreshToken(
 ): Promise<void> {
   const endpoints = endpointOverrides ?? (await resolveOAuthEndpoints());
 
-  const { status, body } = await postForm(endpoints.revocationUrl, {
+  const { status, body, raw } = await postForm(endpoints.revocationUrl, {
     token: refreshToken,
     token_type_hint: 'refresh_token',
     client_id: endpoints.clientId,
   });
 
   if (status < 200 || status >= 300) {
-    throw failureFrom(status, body, 'Could not revoke the refresh token');
+    throw failureFrom(
+      status,
+      body,
+      raw,
+      endpoints.revocationUrl,
+      'Could not revoke the refresh token',
+    );
   }
 }

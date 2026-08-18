@@ -101,8 +101,31 @@ export interface OAuthLoginResult {
  * refresh. Silence here means discovery was unavailable — nothing is asserted
  * about a server we could not ask.
  */
-function assertServerSupportsFlow(): void {
-  const { codeChallengeMethods, grantTypes } = getServerCapabilities();
+function assertServerSupportsFlow(requestedScopes: string[]): void {
+  const { codeChallengeMethods, grantTypes, scopes } = getServerCapabilities();
+
+  if (requestedScopes.length === 0) {
+    throw new OAuthError(
+      'No OAuth scopes are configured, and the Mux authorization server requires at least one. Set MUX_OAUTH_SCOPES, or report this as a bug in the CLI.',
+      { terminal: true, code: 'no_scopes' },
+    );
+  }
+
+  if (scopes) {
+    // A scope the server does not offer is either a typo or drift between the
+    // CLI and the server. Warn rather than fail: the server decides what to
+    // grant, and refusing to log in over an extra scope would be worse.
+    const unsupported = requestedScopes.filter(
+      (scope) => !scopes.includes(scope),
+    );
+    if (unsupported.length > 0) {
+      console.error(
+        `Warning: requesting ${unsupported.join(
+          ', ',
+        )}, which the Mux authorization server does not list as supported. The login may be rejected, or granted fewer permissions than expected.`,
+      );
+    }
+  }
 
   if (codeChallengeMethods && !codeChallengeMethods.includes('S256')) {
     throw new OAuthError(
@@ -184,7 +207,7 @@ export async function performOAuthLogin(
     // token exchange must agree, and the server may have moved an endpoint.
     const endpoints =
       deps.endpoints ?? (await resolveOAuthEndpoints(options.baseUrl));
-    assertServerSupportsFlow();
+    assertServerSupportsFlow(endpoints.scopes);
 
     const authorizationUrl = buildAuthorizationUrl({
       codeChallenge,

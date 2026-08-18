@@ -83,6 +83,25 @@ describe('startLoopbackServer', () => {
     }
   });
 
+  it('renders the page template with no placeholders left behind', async () => {
+    // Guards against a renamed placeholder silently shipping `{{title}}` to a
+    // user's browser.
+    const server = await startTestServer();
+    try {
+      const waiting = server.waitForCode();
+      const body = await (
+        await callback(server.port, `code=c&state=${STATE}`)
+      ).text();
+      await waiting;
+
+      expect(body).toContain('Login complete');
+      expect(body).toContain('Return to your terminal');
+      expect(body).not.toContain('{{');
+    } finally {
+      server.stop();
+    }
+  });
+
   it('rejects without resolving a code when state does not match', async () => {
     const server = await startTestServer();
     try {

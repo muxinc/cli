@@ -1216,6 +1216,15 @@ Each environment holds its identity and settings, plus one or both credential bl
 
 `acme-inc-production` above is reachable both ways; requests use the `oauth` block. `staging` is a flat entry from an older version, read as an access token login. A credential that has failed terminally gains a `lastError` field, which is what `mux auth status` reports.
 
+### Upgrading from 2.x
+
+Nothing to do beyond signing in again. Two things are worth knowing:
+
+- **Run `mux login` after upgrading.** The first command that writes the config converts every entry to the layout above, including entries it wasn't asked about. Version 2.x looks for `tokenId` at the top level, so if you go back to it afterwards it will report that you are not logged in.
+- **Your access token secret is not lost.** It is still in `~/.config/mux/config.json`, just nested under `token`. Mux only displays a token secret once, at creation, so don't mint a replacement — signing in again, or moving the two fields back up a level, restores it.
+
+In CI, `mux login` now fails when `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` are set, because those variables already work without a login and take precedence over anything saved. Use `mux login --from-env` if you specifically want them written to the config.
+
 Writes are atomic (written to a temporary file in the same directory, then renamed), so a config read during a token refresh never sees a partial file.
 
 ## Development

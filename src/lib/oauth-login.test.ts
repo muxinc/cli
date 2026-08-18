@@ -59,7 +59,7 @@ function fakeDeps(overrides: Partial<OAuthLoginDeps> = {}): OAuthLoginDeps {
       authorizationUrl: 'https://dash.test/oauth/authorize',
       tokenUrl: 'https://api.test/oauth/token',
       revocationUrl: 'https://api.test/oauth/revoke',
-      scopes: [],
+      scopes: ['video:read', 'system:read'],
     },
     exchange: async () => TOKENS,
     validate: async () => ({
@@ -141,6 +141,41 @@ describe('performOAuthLogin', () => {
     expect(stored.environmentId).toBe('env_123');
     expect(stored.organizationName).toBe('Acme Inc');
     expect(stored.environmentName).toBe('Production');
+  });
+
+  it('sends the requested scopes on the authorization request', async () => {
+    // The Mux server rejects an authorization request with no scope parameter.
+    let authorizationUrl = '';
+
+    await performOAuthLogin(
+      {},
+      fakeDeps({
+        openBrowser: async (url: string) => {
+          authorizationUrl = url;
+          return true;
+        },
+      }),
+    );
+
+    expect(new URL(authorizationUrl).searchParams.get('scope')).toBe(
+      'video:read system:read',
+    );
+  });
+
+  it('refuses to start a login with no scopes rather than being rejected', async () => {
+    const noScopes = fakeDeps({
+      endpoints: {
+        clientId: 'test_client',
+        authorizationUrl: 'https://dash.test/oauth/authorize',
+        tokenUrl: 'https://api.test/oauth/token',
+        revocationUrl: 'https://api.test/oauth/revoke',
+        scopes: [],
+      },
+    });
+
+    await expect(performOAuthLogin({}, noScopes)).rejects.toThrow(
+      /no oauth scopes/i,
+    );
   });
 
   it('sends a PKCE S256 challenge and the loopback redirect URI', async () => {
