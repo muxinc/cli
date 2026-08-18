@@ -271,6 +271,11 @@ export async function performOAuthLogin(
       ...(existing.environment.forwardUrl && {
         forwardUrl: existing.environment.forwardUrl,
       }),
+      // The host binding is environment-bound too: dropping it would silently
+      // revert a staging or self-hosted environment to the default API host.
+      ...(existing.environment.baseUrl && {
+        baseUrl: existing.environment.baseUrl,
+      }),
       ...(existing.environment.token && { token: existing.environment.token }),
     });
     await removeEnvironment(existing.name);

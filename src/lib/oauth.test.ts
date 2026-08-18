@@ -174,6 +174,19 @@ describe('exchangeCodeForTokens', () => {
     expect(body.get('client_secret')).toBeNull();
   });
 
+  it('bounds the request so a half-open connection cannot hang a login', async () => {
+    mockJsonResponse({
+      access_token: 'at',
+      refresh_token: 'rt',
+      expires_in: 3600,
+    });
+
+    await exchangeCodeForTokens(params);
+
+    const init = fetchSpy?.mock.calls[0]?.[1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('converts expires_in into an absolute expiry', async () => {
     mockJsonResponse({
       access_token: 'at',

@@ -13,17 +13,30 @@ import { getConfigDir } from './xdg.ts';
  * left holding a dead credential.
  */
 
-/** A lock older than this is assumed abandoned (crash, SIGKILL). */
+/**
+ * A lock older than this is assumed abandoned (crash, SIGKILL).
+ *
+ * A holder's critical section is a config read, one token request bounded by the
+ * timeout in oauth.ts, and a config write — comfortably inside this window.
+ */
 const STALE_AFTER_MS = 30_000;
 
-/** How long to wait for another process before breaking the lock. */
-const ACQUIRE_TIMEOUT_MS = 15_000;
+/**
+ * How long to wait before giving up. Deliberately longer than STALE_AFTER_MS so
+ * that an abandoned lock is always broken by the staleness check first: a waiter
+ * must never delete the lock of a holder that is alive and making progress,
+ * because that would put two processes on the same rotating refresh token — the
+ * exact thing this lock exists to prevent.
+ */
+const ACQUIRE_TIMEOUT_MS = 60_000;
 
 const POLL_INTERVAL_MS = 25;
 
 interface LockContents {
   pid: number;
   acquiredAt: number;
+  /** Distinguishes this acquisition from any other, including same-pid retries. */
+  owner: string;
 }
 
 export function getRefreshLockPath(): string {
@@ -66,26 +79,34 @@ async function isBreakable(path: string): Promise<boolean> {
   return !processAlive(contents.pid);
 }
 
-async function acquire(path: string): Promise<void> {
+export interface RefreshLockOptions {
+  /** Override how long to wait for another holder. Intended for tests. */
+  timeoutMs?: number;
+}
+
+/** Acquire the lock, returning the owner token that proves this acquisition. */
+async function acquire(path: string, timeoutMs: number): Promise<string> {
   await mkdir(getConfigDir(), { recursive: true, mode: 0o700 });
 
-  const deadline = Date.now() + ACQUIRE_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   const stagingPath = `${path}.${process.pid}.${randomBytes(4).toString('hex')}`;
 
   while (true) {
+    const owner = randomBytes(8).toString('hex');
+
     // Stage the full contents first, then link it into place. `link` fails when
     // the target exists, which makes acquisition atomic, and the lock file is
     // never observable in a half-written state — a competitor that read an
     // empty lock file would mistake a live holder for a crashed one.
     await writeFile(
       stagingPath,
-      JSON.stringify({ pid: process.pid, acquiredAt: Date.now() }),
+      JSON.stringify({ pid: process.pid, acquiredAt: Date.now(), owner }),
       { mode: 0o600 },
     );
 
     try {
       await link(stagingPath, path);
-      return;
+      return owner;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         throw error;
@@ -100,14 +121,34 @@ async function acquire(path: string): Promise<void> {
     }
 
     if (Date.now() > deadline) {
-      // The holder is alive but stuck. Breaking in is better than failing every
-      // command from here on; the holder's own write is atomic either way.
-      await unlink(path).catch(() => {});
-      continue;
+      // The holder is alive and still working: a lock this young cannot be
+      // abandoned, since STALE_AFTER_MS would have broken it first. Failing is
+      // the safe outcome — deleting a live holder's lock would put two
+      // processes on the same rotating refresh token.
+      throw new Error(
+        `Timed out after ${Math.round(
+          timeoutMs / 1000,
+        )}s waiting for another mux process to finish refreshing credentials. If no other mux command is running, delete ${path} and try again.`,
+      );
     }
 
     await Bun.sleep(POLL_INTERVAL_MS);
   }
+}
+
+/** Release only if this acquisition still owns the lock. */
+async function release(path: string, owner: string): Promise<void> {
+  try {
+    const contents = JSON.parse(await readFile(path, 'utf-8')) as LockContents;
+    // Someone else's lock: ours was already broken as stale, and unlinking now
+    // would cascade the problem onto whoever holds it.
+    if (contents.owner !== owner) return;
+  } catch {
+    // Missing or unreadable: nothing of ours to release.
+    return;
+  }
+
+  await unlink(path).catch(() => {});
 }
 
 /**
@@ -116,13 +157,14 @@ async function acquire(path: string): Promise<void> {
  */
 export async function withRefreshLock<T>(
   critical: () => Promise<T>,
+  options: RefreshLockOptions = {},
 ): Promise<T> {
   const path = getRefreshLockPath();
-  await acquire(path);
+  const owner = await acquire(path, options.timeoutMs ?? ACQUIRE_TIMEOUT_MS);
 
   try {
     return await critical();
   } finally {
-    await unlink(path).catch(() => {});
+    await release(path, owner);
   }
 }

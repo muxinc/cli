@@ -21,6 +21,7 @@ import {
   DEFAULT_BASE_URL,
   getAuthContext,
   getMuxBaseUrl,
+  refreshActiveOAuthCredentials,
   resetEnvCredentialNotice,
   resolveActiveEnvironment,
 } from './mux.ts';
@@ -839,6 +840,66 @@ describe('OAuth credentials', () => {
       expect(client.authorizationToken).toBeNull();
       expect((await getAuthContext()).headers.Authorization).toBe(
         `Basic ${btoa('stored_id:stored_secret')}`,
+      );
+    });
+  });
+
+  describe('refreshActiveOAuthCredentials', () => {
+    // This is what `webhooks listen` calls on a mid-stream 401 before deciding
+    // whether to reconnect or fail.
+    it('refreshes the active OAuth login and reports that it did', async () => {
+      await storeOAuthEnvironment();
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
+        input: string,
+      ) => {
+        if (String(input).includes('/.well-known/')) {
+          return new Response('not found', { status: 404 });
+        }
+        return new Response(
+          JSON.stringify({ access_token: 'access_2', expires_in: 3600 }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }) as unknown as typeof fetch);
+
+      expect(await refreshActiveOAuthCredentials()).toBe(true);
+      expect((await getAuthContext()).headers.Authorization).toBe(
+        'Bearer access_2',
+      );
+    });
+
+    it('reports false for an access token environment, so the caller stops', async () => {
+      await setEnvironment('ci-token', {
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+      });
+
+      expect(await refreshActiveOAuthCredentials()).toBe(false);
+    });
+
+    it('reports false when env var credentials are in play', async () => {
+      // Nothing stored is being used, so there is nothing to refresh.
+      await storeOAuthEnvironment();
+      process.env.MUX_TOKEN_ID = 'env_token_id';
+      process.env.MUX_TOKEN_SECRET = 'env_token_secret';
+
+      expect(await refreshActiveOAuthCredentials()).toBe(false);
+    });
+
+    it('propagates a terminal refresh failure instead of reporting success', async () => {
+      await storeOAuthEnvironment();
+      fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
+        input: string,
+      ) => {
+        if (String(input).includes('/.well-known/')) {
+          return new Response('not found', { status: 404 });
+        }
+        return new Response(JSON.stringify({ error: 'invalid_grant' }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      }) as unknown as typeof fetch);
+
+      await expect(refreshActiveOAuthCredentials()).rejects.toThrow(
+        /no longer valid/i,
       );
     });
   });

@@ -52,20 +52,32 @@ export const switchCommand = new Command()
   .arguments('[name:string]')
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: { json?: boolean }, name?: string) => {
+    const json = wantsJson(options);
+
+    /** Report a failure in whichever format the caller asked for, then exit. */
+    const fail = (error: string, hint: string): never => {
+      if (json) {
+        console.error(JSON.stringify({ error }, null, 2));
+      } else {
+        console.error(`❌ ${error}`);
+        console.log(`\n${hint}`);
+      }
+      process.exit(1);
+    };
+
     let target = name;
 
     if (!target) {
       const names = await listEnvironments();
       if (names.length === 0) {
-        console.error('❌ No environments configured.');
-        console.log("\nRun 'mux login' to add one.");
-        process.exit(1);
+        fail('No environments configured.', "Run 'mux login' to add one.");
       }
 
-      if (wantsJson(options) || isAgentMode() || !process.stdin.isTTY) {
-        console.error('❌ Specify an environment name.');
-        console.log("\nRun 'mux env list' to see available environments.");
-        process.exit(1);
+      if (json || isAgentMode() || !process.stdin.isTTY) {
+        fail(
+          'Specify an environment name.',
+          "Run 'mux env list' to see available environments.",
+        );
       }
 
       target = await promptForEnvironment();
@@ -75,16 +87,39 @@ export const switchCommand = new Command()
     const env = await getEnvironment(target);
 
     if (!env) {
-      console.error(`❌ Environment "${target}" does not exist.`);
-      console.log("\nRun 'mux env list' to see available environments.");
-      process.exit(1);
+      fail(
+        `Environment "${target}" does not exist.`,
+        "Run 'mux env list' to see available environments.",
+      );
     }
 
     // Set as default
     await setCurrentEnvironment(target);
+
+    const shadowed = Boolean(
+      process.env.MUX_TOKEN_ID && process.env.MUX_TOKEN_SECRET,
+    );
+
+    if (json) {
+      console.log(
+        JSON.stringify(
+          {
+            success: true,
+            environment: target,
+            // Env var credentials outrank this selection, so a machine caller
+            // needs to know the switch will not change which account is used.
+            shadowed_by_environment_variables: shadowed,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
     console.log(`✅ Switched default environment to: ${target}`);
 
-    if (process.env.MUX_TOKEN_ID && process.env.MUX_TOKEN_SECRET) {
+    if (shadowed) {
       console.log(
         "\nNote: MUX_TOKEN_ID/MUX_TOKEN_SECRET are set and take precedence over this selection. Run 'mux auth status' for details.",
       );

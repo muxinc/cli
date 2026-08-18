@@ -312,6 +312,55 @@ describe('ensureFreshAccessToken', () => {
 });
 
 describe('refreshEnvironmentTokens', () => {
+  it('adopts a token another caller already refreshed instead of spending again', async () => {
+    // The 401 came from `stale`, but the config already holds a replacement:
+    // spending the refresh token again would rotate for nothing.
+    await setCredential(
+      NAME,
+      'oauth',
+      credential({ accessToken: 'access_new' }),
+    );
+    mockTokenEndpoint({ access_token: 'should_not_be_used', expires_in: 3600 });
+
+    const result = await refreshEnvironmentTokens(
+      NAME,
+      credential({ accessToken: 'stale' }),
+    );
+
+    expect(result.accessToken).toBe('access_new');
+    expect(tokenCalls()).toBe(0);
+  });
+
+  it('still refreshes when the stored token is the one that failed', async () => {
+    await setCredential(NAME, 'oauth', credential({ accessToken: 'same' }));
+    mockTokenEndpoint({ access_token: 'access_forced', expires_in: 3600 });
+
+    const result = await refreshEnvironmentTokens(
+      NAME,
+      credential({ accessToken: 'same' }),
+    );
+
+    expect(result.accessToken).toBe('access_forced');
+    expect(tokenCalls()).toBe(1);
+  });
+
+  it('refreshes when the stored replacement is itself expiring', async () => {
+    await setCredential(
+      NAME,
+      'oauth',
+      credential({ accessToken: 'access_new', expiresAt: 1 }),
+    );
+    mockTokenEndpoint({ access_token: 'access_forced', expires_in: 3600 });
+
+    const result = await refreshEnvironmentTokens(
+      NAME,
+      credential({ accessToken: 'stale' }),
+    );
+
+    expect(result.accessToken).toBe('access_forced');
+    expect(tokenCalls()).toBe(1);
+  });
+
   it('refreshes regardless of expiry, for the post-401 retry path', async () => {
     const oauth = credential({ expiresAt: nowSeconds() + 3600 });
     await setCredential(NAME, 'oauth', oauth);

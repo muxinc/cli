@@ -100,6 +100,20 @@ export async function refreshEnvironmentTokens(
 ): Promise<OAuthCredentials> {
   return withRefreshLock(async () => {
     const stored = await readStoredOAuth(name);
+
+    // Another process (or another in-flight request) may have refreshed while
+    // this one waited for the lock. A stored token that differs from the one
+    // that just got a 401 is that replacement — use it rather than spending the
+    // refresh token again, which under a burst of 401s would rotate N times for
+    // no benefit.
+    if (
+      stored &&
+      stored.accessToken !== oauth.accessToken &&
+      !isAccessTokenExpiring(stored)
+    ) {
+      return stored;
+    }
+
     return refreshAndPersist(name, stored ?? oauth);
   });
 }

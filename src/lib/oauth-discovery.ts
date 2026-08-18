@@ -132,10 +132,13 @@ async function writeCache(
   endpoints: DiscoveredEndpoints,
 ): Promise<void> {
   try {
-    await mkdir(getCacheDir(), { recursive: true });
+    // Endpoint URLs are not secret, but this stays consistent with how the rest
+    // of the CLI's state is written rather than inheriting the umask.
+    await mkdir(getCacheDir(), { recursive: true, mode: 0o700 });
     await writeFile(
       getDiscoveryCachePath(),
       JSON.stringify({ fetchedAt: Date.now(), baseUrl, endpoints }, null, 2),
+      { mode: 0o600 },
     );
   } catch {
     // A cache we cannot write is not a reason to fail a login.

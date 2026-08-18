@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getRefreshLockPath, withRefreshLock } from './refresh-lock.ts';
@@ -103,5 +103,68 @@ describe('withRefreshLock', () => {
     await Bun.write(getRefreshLockPath(), 'not json');
 
     expect(await withRefreshLock(async () => 'recovered')).toBe('recovered');
+  });
+
+  it('refuses to break the lock of a live holder', async () => {
+    // A young lock held by a running process cannot be abandoned. Deleting it
+    // would put two processes on the same rotating refresh token, so acquiring
+    // must fail instead — and it must fail rather than hang forever.
+    await Bun.write(
+      getRefreshLockPath(),
+      JSON.stringify({
+        pid: process.pid,
+        acquiredAt: Date.now(),
+        owner: 'someone-else',
+      }),
+    );
+
+    await expect(
+      withRefreshLock(async () => 'should not run', { timeoutMs: 150 }),
+    ).rejects.toThrow(/another mux process/i);
+
+    // The other holder's lock survives untouched.
+    const contents = JSON.parse(await readFile(getRefreshLockPath(), 'utf-8'));
+    expect(contents.owner).toBe('someone-else');
+  });
+
+  it('does not release a lock it no longer owns', async () => {
+    // Simulates this process's lock having been broken as stale and re-taken by
+    // another process while the critical section was still running: releasing
+    // must not delete the new holder's lock.
+    await withRefreshLock(async () => {
+      await Bun.write(
+        getRefreshLockPath(),
+        JSON.stringify({
+          pid: process.pid,
+          acquiredAt: Date.now(),
+          owner: 'new-holder',
+        }),
+      );
+    });
+
+    expect(existsSync(getRefreshLockPath())).toBe(true);
+    const contents = JSON.parse(await readFile(getRefreshLockPath(), 'utf-8'));
+    expect(contents.owner).toBe('new-holder');
+  });
+
+  it('waits for a live holder that finishes in time', async () => {
+    // The waiter polls rather than failing immediately: a holder doing normal
+    // work should be waited out, not interrupted.
+    const path = getRefreshLockPath();
+    await Bun.write(
+      path,
+      JSON.stringify({
+        pid: process.pid,
+        acquiredAt: Date.now(),
+        owner: 'brief-holder',
+      }),
+    );
+    setTimeout(() => {
+      void unlink(path).catch(() => {});
+    }, 60);
+
+    expect(
+      await withRefreshLock(async () => 'acquired', { timeoutMs: 5000 }),
+    ).toBe('acquired');
   });
 });

@@ -275,6 +275,22 @@ describe('performOAuthLogin', () => {
     expect(await getEnvironment('old-name')).toBeNull();
   });
 
+  it('carries a custom base URL across when --name moves the entry', async () => {
+    // Otherwise a staging or self-hosted environment silently reverts to the
+    // default API host on rename.
+    await setEnvironment('old-name', {
+      token: { tokenId: 'id', tokenSecret: 'secret' },
+      environmentId: 'env_123',
+      baseUrl: 'https://api.staging.example.com',
+    });
+
+    await performOAuthLogin({ name: 'new-name' }, fakeDeps());
+
+    expect((await getEnvironment('new-name'))?.baseUrl).toBe(
+      'https://api.staging.example.com',
+    );
+  });
+
   it('reports the authorization URL when no browser could be opened', async () => {
     let reported: { url: string; opened: boolean } | undefined;
 

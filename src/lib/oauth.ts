@@ -30,6 +30,12 @@ const DEFAULT_REVOCATION_URL = 'https://api.mux.com/oauth/revoke';
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 3600;
 
 /**
+ * Timeout for token endpoint requests. Must stay well under the refresh lock's
+ * staleness window (refresh-lock.ts) so a holder cannot outlive its own lock.
+ */
+const GRANT_TIMEOUT_MS = 10_000;
+
+/**
  * OAuth error codes that no amount of retrying will fix. Everything else —
  * transport failures, 5xx, throttling — is reported as retryable so callers can
  * distinguish "try again" from "log in again".
@@ -229,6 +235,9 @@ async function postForm(
         Accept: 'application/json',
       },
       body: new URLSearchParams(form).toString(),
+      // Bounded so a half-open connection cannot hang a login, and so a refresh
+      // always finishes well inside the lock's staleness window.
+      signal: AbortSignal.timeout(GRANT_TIMEOUT_MS),
     });
   } catch (error) {
     throw new OAuthError(
