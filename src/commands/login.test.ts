@@ -515,7 +515,7 @@ describe('Login command - action', () => {
     // nothing re-supplies baseUrl — it has to survive from the existing entry.
     await setEnvironment('default', {
       environmentId: 'env_mock_123',
-      baseUrl: 'https://mux-proxy.internal.example',
+      baseUrl: 'https://api.custom.example',
       token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
     });
     process.env.MUX_TOKEN_ID = 'new_id';
@@ -524,7 +524,7 @@ describe('Login command - action', () => {
     await loginCommand.parse(['--from-env']);
 
     expect((await getEnvironment('default'))?.baseUrl).toBe(
-      'https://mux-proxy.internal.example',
+      'https://api.custom.example',
     );
   });
 

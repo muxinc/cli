@@ -78,28 +78,28 @@ describe('getOAuthEndpoints', () => {
     // A single MUX_BASE_URL moves the whole flow, so the token endpoint can
     // never end up on a different host than the authorization endpoint.
     for (const key of ENV_KEYS) delete process.env[key];
-    process.env.MUX_BASE_URL = 'https://api.staging.mux.com';
+    process.env.MUX_BASE_URL = 'https://api.example.com';
 
     const endpoints = getOAuthEndpoints();
 
     // Authorization is a UI-layer route; the grants are on the auth service.
     expect(endpoints.authorizationUrl).toBe(
-      'https://api.staging.mux.com/ui/v1/oauth/authorize',
+      'https://api.example.com/ui/v1/oauth/authorize',
     );
     expect(endpoints.tokenUrl).toBe(
-      'https://api.staging.mux.com/auth/v1/oauth/token',
+      'https://api.example.com/auth/v1/oauth/token',
     );
     expect(endpoints.revocationUrl).toBe(
-      'https://api.staging.mux.com/auth/v1/oauth/revoke',
+      'https://api.example.com/auth/v1/oauth/revoke',
     );
   });
 
   it('does not double the slash on a base URL that ends in one', () => {
     for (const key of ENV_KEYS) delete process.env[key];
-    process.env.MUX_BASE_URL = 'https://api.staging.mux.com/';
+    process.env.MUX_BASE_URL = 'https://api.example.com/';
 
     expect(getOAuthEndpoints().tokenUrl).toBe(
-      'https://api.staging.mux.com/auth/v1/oauth/token',
+      'https://api.example.com/auth/v1/oauth/token',
     );
   });
 

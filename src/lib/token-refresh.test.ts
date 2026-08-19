@@ -188,7 +188,7 @@ describe('ensureFreshAccessToken', () => {
         signingKeyId: 'key_1',
         signingPrivateKey: 'private_1',
         forwardUrl: 'http://localhost:3000/webhooks',
-        baseUrl: 'https://api.staging.test',
+        baseUrl: 'https://api.custom.test',
       },
     );
     await setCredential(NAME, 'oauth', oauth);
@@ -200,7 +200,7 @@ describe('ensureFreshAccessToken', () => {
     expect(stored?.signingKeyId).toBe('key_1');
     expect(stored?.signingPrivateKey).toBe('private_1');
     expect(stored?.forwardUrl).toBe('http://localhost:3000/webhooks');
-    expect(stored?.baseUrl).toBe('https://api.staging.test');
+    expect(stored?.baseUrl).toBe('https://api.custom.test');
     expect(stored?.environmentId).toBe('env_123');
     expect(stored?.organizationName).toBe('Acme Inc');
     // A refresh must not disturb the other way into this environment.

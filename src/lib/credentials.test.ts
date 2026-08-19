@@ -123,7 +123,7 @@ describe('environmentSettings', () => {
       signingKeyId: 'key_1',
       signingPrivateKey: 'private_1',
       forwardUrl: 'http://localhost:3000/webhooks',
-      baseUrl: 'https://api.staging.example',
+      baseUrl: 'https://api.custom.example',
       // Identity and credentials are not settings: they come from the grant or
       // the credential itself.
       environmentId: 'env_123',
@@ -136,14 +136,14 @@ describe('environmentSettings', () => {
       signingKeyId: 'key_1',
       signingPrivateKey: 'private_1',
       forwardUrl: 'http://localhost:3000/webhooks',
-      baseUrl: 'https://api.staging.example',
+      baseUrl: 'https://api.custom.example',
     });
   });
 
   it('includes the bound API host, which a re-login must not silently reset', () => {
     expect(
-      environmentSettings({ baseUrl: 'https://mux-proxy.internal.example' }),
-    ).toEqual({ baseUrl: 'https://mux-proxy.internal.example' });
+      environmentSettings({ baseUrl: 'https://api.custom.example' }),
+    ).toEqual({ baseUrl: 'https://api.custom.example' });
   });
 
   it('omits absent fields rather than writing undefined', () => {

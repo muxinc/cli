@@ -414,13 +414,13 @@ describe('performOAuthLogin', () => {
     await setEnvironment('old-name', {
       token: { tokenId: 'id', tokenSecret: 'secret' },
       environmentId: 'env_123',
-      baseUrl: 'https://api.staging.example.com',
+      baseUrl: 'https://api.custom.example',
     });
 
     await performOAuthLogin({ name: 'new-name' }, fakeDeps());
 
     expect((await getEnvironment('new-name'))?.baseUrl).toBe(
-      'https://api.staging.example.com',
+      'https://api.custom.example',
     );
   });
 

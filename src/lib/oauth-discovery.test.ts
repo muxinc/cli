@@ -291,20 +291,20 @@ describe('discoverEndpoints', () => {
       expect(spy.mock.calls.length).toBeGreaterThan(callsAfterFirst);
     });
 
-    it('keys the cache by base URL, so staging does not serve production', async () => {
+    it('keys the cache by base URL, so one host does not serve another', async () => {
       mockDiscovery({ '/.well-known/oauth-authorization-server': OAUTH_DOC });
       await discoverEndpoints('https://api.mux.com');
 
       const spy = mockDiscovery({
         '/.well-known/oauth-authorization-server': {
           ...OAUTH_DOC,
-          token_endpoint: 'https://api.staging.mux.com/oauth/token',
+          token_endpoint: 'https://api.example.com/oauth/token',
         },
       });
-      const result = await discoverEndpoints('https://api.staging.mux.com');
+      const result = await discoverEndpoints('https://api.example.com');
 
       expect(spy.mock.calls.length).toBeGreaterThan(0);
-      expect(result?.tokenUrl).toBe('https://api.staging.mux.com/oauth/token');
+      expect(result?.tokenUrl).toBe('https://api.example.com/oauth/token');
     });
 
     it('ignores an unreadable cache and refetches', async () => {

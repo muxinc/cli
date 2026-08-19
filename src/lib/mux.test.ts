@@ -706,9 +706,9 @@ describe('OAuth credentials', () => {
     });
 
     it('uses the stored base URL of an OAuth environment', async () => {
-      await storeOAuthEnvironment({ baseUrl: 'https://api.staging.test' });
+      await storeOAuthEnvironment({ baseUrl: 'https://api.custom.test' });
 
-      expect((await getAuthContext()).baseUrl).toBe('https://api.staging.test');
+      expect((await getAuthContext()).baseUrl).toBe('https://api.custom.test');
     });
 
     it('lets MUX_TOKEN_ID/MUX_TOKEN_SECRET shadow an OAuth login', async () => {
