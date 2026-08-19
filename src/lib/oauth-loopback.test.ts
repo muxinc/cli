@@ -84,7 +84,7 @@ describe('startLoopbackServer', () => {
   });
 
   it('renders the page template with no placeholders left behind', async () => {
-    // Guards against a renamed placeholder silently shipping `{{title}}` to a
+    // Guards against a renamed marker silently shipping `__MUX_TITLE__` to a
     // user's browser.
     const server = await startTestServer();
     try {
@@ -96,7 +96,7 @@ describe('startLoopbackServer', () => {
 
       expect(body).toContain('Login complete');
       expect(body).toContain('Return to your terminal');
-      expect(body).not.toContain('{{');
+      expect(body).not.toContain('__MUX_');
     } finally {
       server.stop();
     }

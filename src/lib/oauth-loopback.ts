@@ -74,9 +74,11 @@ export interface StartLoopbackOptions {
  * provider text, escape it here first.
  */
 function page(title: string, message: string, status = 200): Response {
+  // Plain-text markers rather than `{{ }}`: Biome parses this file as HTML, and
+  // rejects mustache-style interpolation as a syntax error.
   const html = callbackTemplate
-    .replaceAll('{{title}}', title)
-    .replaceAll('{{message}}', message);
+    .replaceAll('__MUX_TITLE__', title)
+    .replaceAll('__MUX_MESSAGE__', message);
 
   return new Response(html, {
     status,
