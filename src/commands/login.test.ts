@@ -509,6 +509,46 @@ describe('Login command - action', () => {
     expect(parsed.error).toBeDefined();
   });
 
+  it('keeps a stored custom API host when re-logging into the same environment', async () => {
+    // The whole entry is rewritten on save, so a field missing from the carried
+    // list is silently lost. Here the login resolves to the default host, so
+    // nothing re-supplies baseUrl — it has to survive from the existing entry.
+    await setEnvironment('default', {
+      environmentId: 'env_mock_123',
+      baseUrl: 'https://mux-proxy.internal.example',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    expect((await getEnvironment('default'))?.baseUrl).toBe(
+      'https://mux-proxy.internal.example',
+    );
+  });
+
+  it('lets an explicit host override the stored one', async () => {
+    await setEnvironment('default', {
+      environmentId: 'env_mock_123',
+      baseUrl: 'https://old-host.example',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+    process.env.MUX_BASE_URL = 'https://new-host.example';
+
+    try {
+      await loginCommand.parse(['--from-env']);
+
+      expect((await getEnvironment('default'))?.baseUrl).toBe(
+        'https://new-host.example',
+      );
+    } finally {
+      delete process.env.MUX_BASE_URL;
+    }
+  });
+
   it('keeps the active environment active when re-logging into it', async () => {
     // Regression: the entry used to be removed and recreated, and removing the
     // current environment reassigns defaultEnvironment — so re-logging into the

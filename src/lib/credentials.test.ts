@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   type Environment,
+  environmentSettings,
   flagCredential,
   getPreferredCredential,
   hasOAuth,
@@ -113,6 +114,40 @@ describe('normalizeEnvironment', () => {
   it('ignores a partial token pair', () => {
     // Half a pair cannot authenticate anything, so it is not a credential.
     expect(normalizeEnvironment({ tokenId: 'id_1' }).token).toBeUndefined();
+  });
+});
+
+describe('environmentSettings', () => {
+  it('carries every setting that belongs to the environment', () => {
+    const settings = environmentSettings({
+      signingKeyId: 'key_1',
+      signingPrivateKey: 'private_1',
+      forwardUrl: 'http://localhost:3000/webhooks',
+      baseUrl: 'https://api.staging.example',
+      // Identity and credentials are not settings: they come from the grant or
+      // the credential itself.
+      environmentId: 'env_123',
+      organizationName: 'Acme Inc',
+      oauth: OAUTH,
+      token: PAIR,
+    });
+
+    expect(settings).toEqual({
+      signingKeyId: 'key_1',
+      signingPrivateKey: 'private_1',
+      forwardUrl: 'http://localhost:3000/webhooks',
+      baseUrl: 'https://api.staging.example',
+    });
+  });
+
+  it('includes the bound API host, which a re-login must not silently reset', () => {
+    expect(
+      environmentSettings({ baseUrl: 'https://mux-proxy.internal.example' }),
+    ).toEqual({ baseUrl: 'https://mux-proxy.internal.example' });
+  });
+
+  it('omits absent fields rather than writing undefined', () => {
+    expect(environmentSettings({ environmentId: 'env_123' })).toEqual({});
   });
 });
 

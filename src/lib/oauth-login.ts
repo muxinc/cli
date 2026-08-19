@@ -10,6 +10,7 @@ import {
   setCurrentEnvironment,
   setEnvironment,
 } from './config.ts';
+import { environmentSettings } from './credentials.ts';
 import {
   type CredentialIdentity,
   validateAccessToken as defaultValidateAccessToken,
@@ -151,19 +152,13 @@ function assertServerSupportsFlow(requestedScopes: string[]): void {
 }
 
 /**
- * The parts of an entry that describe the *environment* rather than a credential:
- * they survive re-login, but only onto the same environment.
+ * Environment settings plus the access token pair: everything that should follow
+ * an environment across a re-login or a rename, but never follow a *name* onto a
+ * different environment.
  */
 function environmentBoundState(environment: Environment) {
   return {
-    ...(environment.signingKeyId && {
-      signingKeyId: environment.signingKeyId,
-    }),
-    ...(environment.signingPrivateKey && {
-      signingPrivateKey: environment.signingPrivateKey,
-    }),
-    ...(environment.forwardUrl && { forwardUrl: environment.forwardUrl }),
-    ...(environment.baseUrl && { baseUrl: environment.baseUrl }),
+    ...environmentSettings(environment),
     ...(environment.token && { token: environment.token }),
   };
 }

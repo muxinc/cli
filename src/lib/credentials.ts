@@ -148,6 +148,27 @@ export function normalizeEnvironment(raw: unknown): Environment {
 }
 
 /**
+ * The settings that describe an *environment* rather than a credential: they
+ * survive re-login onto the same environment, and must never follow a name onto
+ * a different one.
+ *
+ * Defined once because both login paths rewrite whole entries, so a field missing
+ * from this list is silently dropped on save.
+ */
+export function environmentSettings(
+  environment: Environment,
+): Partial<Environment> {
+  return {
+    ...(environment.signingKeyId && { signingKeyId: environment.signingKeyId }),
+    ...(environment.signingPrivateKey && {
+      signingPrivateKey: environment.signingPrivateKey,
+    }),
+    ...(environment.forwardUrl && { forwardUrl: environment.forwardUrl }),
+    ...(environment.baseUrl && { baseUrl: environment.baseUrl }),
+  };
+}
+
+/**
  * The credential a request should use. OAuth wins, except when it is flagged as
  * failing and a token pair is available to fall back to. A flagged credential
  * that is the only one present is still returned: a real API error is more

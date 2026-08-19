@@ -7,6 +7,7 @@ import {
   setEnvironment,
 } from '../lib/config.ts';
 import { wantsJson } from '../lib/context.ts';
+import { environmentSettings } from '../lib/credentials.ts';
 import { handleCommandError } from '../lib/errors.ts';
 import {
   DEFAULT_BASE_URL,
@@ -403,6 +404,8 @@ export const loginCommand = new Command()
       const preserved =
         existing && sameEnvironment
           ? {
+              // Signing keys, forward URL, and the bound API host.
+              ...environmentSettings(existing),
               ...(existing.environmentName && {
                 environmentName: existing.environmentName,
               }),
@@ -412,13 +415,6 @@ export const loginCommand = new Command()
               ...(existing.organizationName && {
                 organizationName: existing.organizationName,
               }),
-              ...(existing.signingKeyId && {
-                signingKeyId: existing.signingKeyId,
-              }),
-              ...(existing.signingPrivateKey && {
-                signingPrivateKey: existing.signingPrivateKey,
-              }),
-              ...(existing.forwardUrl && { forwardUrl: existing.forwardUrl }),
               // A browser sign-in for this same environment stays usable.
               ...(existing.oauth && { oauth: existing.oauth }),
             }
