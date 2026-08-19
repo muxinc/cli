@@ -5,10 +5,10 @@ import {
   getEnvironment,
   listEnvironments,
   type OAuthCredentials,
+  readConfig,
   removeEnvironment,
-  setCredential,
   setCurrentEnvironment,
-  updateEnvironment,
+  setEnvironment,
 } from './config.ts';
 import {
   type CredentialIdentity,
@@ -91,6 +91,12 @@ export interface OAuthLoginResult {
   activated: boolean;
   /** True when an existing entry for the same environment was updated. */
   replacedExisting: boolean;
+  /**
+   * Environment-bound fields discarded because the requested name held a
+   * different Mux environment. Reported so the command layer can say so rather
+   * than dropping a signing key or token pair silently.
+   */
+  dropped: string[];
 }
 
 /**
@@ -142,6 +148,24 @@ function assertServerSupportsFlow(requestedScopes: string[]): void {
       'Warning: the Mux authorization server does not advertise the refresh_token grant. This login will stop working when its access token expires, and you will need to run `mux login` again.',
     );
   }
+}
+
+/**
+ * The parts of an entry that describe the *environment* rather than a credential:
+ * they survive re-login, but only onto the same environment.
+ */
+function environmentBoundState(environment: Environment) {
+  return {
+    ...(environment.signingKeyId && {
+      signingKeyId: environment.signingKeyId,
+    }),
+    ...(environment.signingPrivateKey && {
+      signingPrivateKey: environment.signingPrivateKey,
+    }),
+    ...(environment.forwardUrl && { forwardUrl: environment.forwardUrl }),
+    ...(environment.baseUrl && { baseUrl: environment.baseUrl }),
+    ...(environment.token && { token: environment.token }),
+  };
 }
 
 function slugify(value: string): string {
@@ -265,10 +289,30 @@ export async function performOAuthLogin(
     ...(tokens.scope && { scope: tokens.scope }),
   };
 
-  // Identity comes from the grant; the rest of the entry — signing keys, forward
-  // URL, base URL, and any access token pair saved for this same environment —
-  // is left exactly as it was. An environment can be reachable both ways.
-  await setCredential(name, 'oauth', oauth, {
+  // The entry that already represents this Mux environment, under whatever name,
+  // versus whatever currently occupies the name being written to. They are only
+  // the same thing when no explicit --name repointed it.
+  const target = await getEnvironment(name);
+  const targetIsThisEnvironment = Boolean(
+    target?.environmentId && target.environmentId === identity.environmentId,
+  );
+
+  // Signing keys, forward URL, host binding, and an access token pair belong to
+  // an *environment*, not to a name. They carry over only from an entry that
+  // provably represents the granted environment — otherwise `--name` would leave
+  // one environment's signing key and token pair attached to another's identity,
+  // which mints invalid playback tokens and silently falls back to the wrong
+  // account.
+  const source =
+    existing?.environment ?? (targetIsThisEnvironment ? target : undefined);
+  const dropped =
+    target && !targetIsThisEnvironment && target !== source
+      ? Object.keys(environmentBoundState(target))
+      : [];
+
+  // Written as one whole entry rather than merged into whatever was there.
+  await setEnvironment(name, {
+    ...(source ? environmentBoundState(source) : {}),
     ...(identity.environmentId && { environmentId: identity.environmentId }),
     ...(identity.environmentName && {
       environmentName: identity.environmentName,
@@ -278,30 +322,23 @@ export async function performOAuthLogin(
       organizationName: identity.organizationName,
     }),
     ...(options.baseUrl && { baseUrl: options.baseUrl }),
+    oauth,
   });
 
   // An explicit --name that points somewhere else would leave a second entry for
-  // the same environment behind. Move the old entry's environment-bound state
-  // and credentials across, then drop it, so one environment maps to one entry.
+  // the same environment behind, so the old one goes. Its state was already
+  // carried across above.
   if (existing && existing.name !== name) {
-    await updateEnvironment(name, {
-      ...(existing.environment.signingKeyId && {
-        signingKeyId: existing.environment.signingKeyId,
-      }),
-      ...(existing.environment.signingPrivateKey && {
-        signingPrivateKey: existing.environment.signingPrivateKey,
-      }),
-      ...(existing.environment.forwardUrl && {
-        forwardUrl: existing.environment.forwardUrl,
-      }),
-      // The host binding is environment-bound too: dropping it would silently
-      // revert a staging or self-hosted environment to the default API host.
-      ...(existing.environment.baseUrl && {
-        baseUrl: existing.environment.baseUrl,
-      }),
-      ...(existing.environment.token && { token: existing.environment.token }),
-    });
+    // Removing an entry reassigns `defaultEnvironment` when it was the active
+    // one, which would silently switch the user to an unrelated environment.
+    // A rename is the same environment under a new name, so the selection
+    // follows it.
+    const wasActive =
+      (await readConfig())?.defaultEnvironment === existing.name;
     await removeEnvironment(existing.name);
+    if (wasActive) {
+      await setCurrentEnvironment(name);
+    }
   }
 
   const environment = (await getEnvironment(name)) ?? { oauth };
@@ -314,6 +351,7 @@ export async function performOAuthLogin(
   return {
     name,
     environment,
+    dropped,
     identity,
     activated: activate,
     replacedExisting: Boolean(existing),

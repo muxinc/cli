@@ -12,8 +12,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   type Environment,
+  getCurrentEnvironment,
   getEnvironment,
   listEnvironments,
+  readConfig,
+  setCurrentEnvironment,
   setEnvironment,
 } from '../lib/config.ts';
 import { setAgentMode } from '../lib/context.ts';
@@ -504,6 +507,68 @@ describe('Login command - action', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
     expect(parsed.error).toBeDefined();
+  });
+
+  it('keeps the active environment active when re-logging into it', async () => {
+    // Regression: the entry used to be removed and recreated, and removing the
+    // current environment reassigns defaultEnvironment — so re-logging into the
+    // environment you were already using silently switched accounts.
+    await setEnvironment('default', {
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    await setEnvironment('other', {
+      token: { tokenId: 'o_id', tokenSecret: 'o_secret' },
+      environmentId: 'env_OTHER',
+    });
+    await setCurrentEnvironment('default');
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    expect((await getCurrentEnvironment())?.name).toBe('default');
+  });
+
+  it('keeps the selection when the entry has no environmentId to compare', async () => {
+    // An entry written by an older version has no environmentId, so it can never
+    // match — the path most users would have hit.
+    await setEnvironment('default', {
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    await setEnvironment('second', {
+      token: { tokenId: 's_id', tokenSecret: 's_secret' },
+    });
+    await setCurrentEnvironment('default');
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    const config = await readConfig();
+    expect(config?.defaultEnvironment).toBe('default');
+    expect(Object.keys(config?.environments ?? {}).sort()).toEqual([
+      'default',
+      'second',
+    ]);
+  });
+
+  it('keeps a browser sign-in for the same environment when saving a token pair', async () => {
+    await setEnvironment('default', {
+      environmentId: 'env_mock_123',
+      oauth: {
+        accessToken: 'access_1',
+        refreshToken: 'refresh_1',
+        expiresAt: 4_102_444_800,
+      },
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    const saved = await getEnvironment('default');
+    expect(saved?.oauth?.accessToken).toBe('access_1');
+    expect(saved?.token?.tokenId).toBe('new_id');
   });
 
   it('refuses to guess when shell credentials are set, and says why', async () => {

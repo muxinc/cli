@@ -4,8 +4,7 @@ import { Command } from '@cliffy/command';
 import {
   getEnvironment,
   listEnvironments,
-  removeEnvironment,
-  setCredential,
+  setEnvironment,
 } from '../lib/config.ts';
 import { wantsJson } from '../lib/context.ts';
 import { handleCommandError } from '../lib/errors.ts';
@@ -203,6 +202,16 @@ async function runOAuthLogin(options: {
   const id = identity.environmentId ? ` (${identity.environmentId})` : '';
   console.log(`\n✅ Signed in to ${org} / ${env}${id}`);
 
+  // Losing a signing key or an access token pair must never be silent, and an
+  // access token secret cannot be recovered from the dashboard after creation.
+  if (result.dropped.length > 0) {
+    console.log(
+      `\n⚠️  "${result.name}" previously held a different Mux environment, so its ${result.dropped.join(
+        ', ',
+      )} ${result.dropped.length === 1 ? 'was' : 'were'} discarded.`,
+    );
+  }
+
   const verb = result.replacedExisting ? 'Updated' : 'Saved as';
   if (result.activated) {
     console.log(
@@ -386,22 +395,42 @@ export const loginCommand = new Command()
         existing?.environmentId &&
         existing.environmentId === validation.environmentId;
 
-      if (existing && !sameEnvironment) {
-        // Entry is being repointed at another environment: clear it first so no
-        // stale signing keys, forward URL, or OAuth login survive.
-        await removeEnvironment(envName);
-      }
+      // Written as one whole entry rather than removing and recreating. Removing
+      // an entry reassigns `defaultEnvironment` when it happens to be the active
+      // one, so re-logging into the environment you were already using would
+      // silently switch you to a different account — and any entry without an
+      // `environmentId`, which includes older configs, took that path.
+      const preserved =
+        existing && sameEnvironment
+          ? {
+              ...(existing.environmentName && {
+                environmentName: existing.environmentName,
+              }),
+              ...(existing.organizationId && {
+                organizationId: existing.organizationId,
+              }),
+              ...(existing.organizationName && {
+                organizationName: existing.organizationName,
+              }),
+              ...(existing.signingKeyId && {
+                signingKeyId: existing.signingKeyId,
+              }),
+              ...(existing.signingPrivateKey && {
+                signingPrivateKey: existing.signingPrivateKey,
+              }),
+              ...(existing.forwardUrl && { forwardUrl: existing.forwardUrl }),
+              // A browser sign-in for this same environment stays usable.
+              ...(existing.oauth && { oauth: existing.oauth }),
+            }
+          : {};
 
-      await setCredential(
-        envName,
-        'token',
-        { tokenId: tokenId.trim(), tokenSecret: tokenSecret.trim() },
-        {
-          environmentId: validation.environmentId,
-          ...(baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
-          ...signingKeys,
-        },
-      );
+      await setEnvironment(envName, {
+        ...preserved,
+        environmentId: validation.environmentId,
+        ...(baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
+        ...signingKeys,
+        token: { tokenId: tokenId.trim(), tokenSecret: tokenSecret.trim() },
+      });
 
       if (json) {
         console.log(

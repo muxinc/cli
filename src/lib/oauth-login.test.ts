@@ -7,6 +7,7 @@ import {
   getCurrentEnvironment,
   getEnvironment,
   getEnvironmentAuthType,
+  setCurrentEnvironment,
   setEnvironment,
 } from './config.ts';
 import type { OAuthTokens } from './oauth.ts';
@@ -308,6 +309,103 @@ describe('performOAuthLogin', () => {
     expect(stored.token).toEqual({ tokenId: 'id', tokenSecret: 'secret' });
     expect(stored.signingKeyId).toBe('key_1');
     expect(await getEnvironment('old-name')).toBeNull();
+  });
+
+  it("does not attach another environment's state to the granted identity", async () => {
+    // Regression: --name merged into whatever held that name, so one
+    // environment's signing key and token pair ended up on another's identity —
+    // invalid playback tokens, and a fallback to the wrong account.
+    await setEnvironment('staging', {
+      environmentId: 'env_OTHER',
+      environmentName: 'Other',
+      organizationName: 'Org A',
+      signingKeyId: 'KEY_FOR_OTHER',
+      signingPrivateKey: 'PRIV_FOR_OTHER',
+      forwardUrl: 'http://localhost:3000/other',
+      token: { tokenId: 'TOKEN_FOR_OTHER', tokenSecret: 'SECRET_FOR_OTHER' },
+    });
+
+    const result = await performOAuthLogin({ name: 'staging' }, fakeDeps());
+
+    const stored = (await getEnvironment('staging')) as Environment;
+    expect(stored.environmentId).toBe('env_123');
+    expect(stored.signingKeyId).toBeUndefined();
+    expect(stored.signingPrivateKey).toBeUndefined();
+    expect(stored.forwardUrl).toBeUndefined();
+    expect(stored.token).toBeUndefined();
+    expect(stored.organizationName).toBe('Acme Inc');
+    // Reported rather than dropped silently: a token secret cannot be recovered.
+    expect(result.dropped).toEqual([
+      'signingKeyId',
+      'signingPrivateKey',
+      'forwardUrl',
+      'token',
+    ]);
+  });
+
+  it("carries the granted environment's own state across a --name collision", async () => {
+    // The name holds environment A; the grant is for B, already saved elsewhere.
+    // B's state should follow B, and A's should not come along.
+    await setEnvironment('staging', {
+      environmentId: 'env_OTHER',
+      signingKeyId: 'KEY_FOR_OTHER',
+      token: { tokenId: 'TOKEN_FOR_OTHER', tokenSecret: 'SECRET_FOR_OTHER' },
+    });
+    await setEnvironment('granted-elsewhere', {
+      environmentId: 'env_123',
+      forwardUrl: 'http://localhost:4000/granted',
+      signingKeyId: 'KEY_FOR_GRANTED',
+    });
+
+    await performOAuthLogin({ name: 'staging' }, fakeDeps());
+
+    const stored = (await getEnvironment('staging')) as Environment;
+    expect(stored.forwardUrl).toBe('http://localhost:4000/granted');
+    expect(stored.signingKeyId).toBe('KEY_FOR_GRANTED');
+    expect(stored.token).toBeUndefined();
+    // One environment, one entry: the duplicate under the old name is gone.
+    expect(await getEnvironment('granted-elsewhere')).toBeNull();
+  });
+
+  it('leaves unrelated environments untouched', async () => {
+    await setEnvironment('unrelated', {
+      environmentId: 'env_UNRELATED',
+      signingKeyId: 'KEY_UNRELATED',
+      token: { tokenId: 'u', tokenSecret: 'u' },
+    });
+
+    await performOAuthLogin({ name: 'fresh' }, fakeDeps());
+
+    const untouched = (await getEnvironment('unrelated')) as Environment;
+    expect(untouched.signingKeyId).toBe('KEY_UNRELATED');
+    expect(untouched.token).toEqual({ tokenId: 'u', tokenSecret: 'u' });
+  });
+
+  it('reports nothing dropped for a fresh name or the same environment', async () => {
+    const fresh = await performOAuthLogin({ name: 'brand-new' }, fakeDeps());
+    expect(fresh.dropped).toEqual([]);
+
+    const again = await performOAuthLogin({ name: 'brand-new' }, fakeDeps());
+    expect(again.dropped).toEqual([]);
+  });
+
+  it('keeps the renamed entry active when --name moves the current one', async () => {
+    // Regression: removing the old entry reassigned defaultEnvironment, so a
+    // rename of the active environment could silently select an unrelated one.
+    await setEnvironment('old-name', {
+      token: { tokenId: 'id', tokenSecret: 'secret' },
+      environmentId: 'env_123',
+    });
+    await setEnvironment('unrelated', {
+      token: { tokenId: 'u', tokenSecret: 'u' },
+      environmentId: 'env_other',
+    });
+    await setCurrentEnvironment('old-name');
+
+    // --keep-current: activation is declined, so nothing else would fix this up.
+    await performOAuthLogin({ name: 'new-name', activate: false }, fakeDeps());
+
+    expect((await getCurrentEnvironment())?.name).toBe('new-name');
   });
 
   it('carries a custom base URL across when --name moves the entry', async () => {
