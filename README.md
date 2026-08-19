@@ -170,7 +170,7 @@ A single environment can hold both credential kinds at once: an access token pai
 
 If an OAuth login stops working for good (its refresh token was revoked or expired), the CLI records the failure on that credential, surfaces it in `mux auth status` and `mux env list`, and falls back to the access token pair on the same environment if there is one. Nothing is deleted automatically: run `mux login` to replace the dead login, or `mux logout <name>` to remove the environment entirely.
 
-The CLI discovers the authorization server's endpoints at runtime (RFC 8414 / OIDC discovery, cached for a day in `~/.cache/mux/`), so Mux can move them without breaking installed versions. Discovery is never required: if it is unreachable the CLI falls back to built-in defaults, and `MUX_OAUTH_AUTHORIZE_URL` / `MUX_OAUTH_TOKEN_URL` / `MUX_OAUTH_REVOKE_URL` always win when set. It is consulted only on login and refresh, never on ordinary commands.
+All OAuth endpoints live on the Mux API host, so they are derived from one base — `MUX_BASE_URL` moves the API calls, discovery, and the sign-in flow together, and the token endpoint can never end up on a different host than the authorization endpoint. On top of that, the CLI discovers the authorization server's endpoints at runtime (RFC 8414 / OIDC discovery, cached for a day in `~/.cache/mux/`), so Mux can move them without breaking installed versions. Discovery is never required: if it is unreachable the CLI falls back to built-in defaults, and `MUX_OAUTH_AUTHORIZE_URL` / `MUX_OAUTH_TOKEN_URL` / `MUX_OAUTH_REVOKE_URL` always win when set. It is consulted only on login and refresh, never on ordinary commands.
 
 Requests carry `Authorization: Basic` for access token credentials and `Authorization: Bearer` for browser sign-ins. Access tokens for a browser sign-in are refreshed automatically: shortly before they expire, and once on an unexpected `401` before the request is retried. Concurrent `mux` processes coordinate through a lock file so a refresh token is never spent twice. When a refresh token is finally rejected, the CLI names the environment and tells you to run `mux login` again.
 
@@ -179,8 +179,11 @@ All values in a credential bundle come from the same source — the CLI never mi
 | Variable | Purpose |
 |----------|---------|
 | `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` | API credentials (both required to take effect) |
-| `MUX_BASE_URL` | API host override (applies to either source) |
+| `MUX_BASE_URL` | API host override (applies to either source). Also moves the OAuth endpoints and endpoint discovery, so one variable points the whole CLI at another environment |
 | `MUX_SIGNING_KEY` / `MUX_PRIVATE_KEY` | Signing key pair for `mux sign` (setting only one of the pair is an error; used alongside API credentials, not instead of them) |
+| `MUX_OAUTH_CLIENT_ID` | OAuth client identifier. Needed when pointing at a non-production authorization server |
+| `MUX_OAUTH_SCOPES` | Narrow the scopes requested at sign-in (space or comma separated). Defaults to what the CLI's commands need |
+| `MUX_OAUTH_AUTHORIZE_URL` / `MUX_OAUTH_TOKEN_URL` / `MUX_OAUTH_REVOKE_URL` | Override a single OAuth endpoint. Takes precedence over both discovery and `MUX_BASE_URL` |
 
 When credentials come from environment variables, the API host is `MUX_BASE_URL` or the default `https://api.mux.com` — never a stored environment's custom host. Similarly, `mux sign` only falls back to a stored environment's signing keys when that environment matches the active credentials, so tokens for one environment cannot mint tokens with another environment's key.
 
@@ -1123,16 +1126,32 @@ mux auth status
 ```
 
 ```
-Active: MUX_TOKEN_ID / MUX_TOKEN_SECRET (environment variables)
-  Environment variables take precedence over the stored login "acme-inc-production".
-  Unset them to use the stored selection below.
+Active:       acme-inc-production
+Sign-in:      browser sign-in
+Environment:  Acme Inc / Production
 
-Stored logins (2): currently shadowed
-* acme-inc-production  oauth  Acme Inc / Production   expires in 47m
-  ci-token             token  env_01H9...
+Other environments (1):
+  ci-token  access token  env_01H9
 
-* = selected stored environment. Change it with 'mux env switch <name>'.
+Switch with 'mux env switch <name>'.
 ```
+
+When `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` are set they outrank every saved login, so no saved login is active and all of them are listed — including the one that would take over if you unset the variables:
+
+```
+Active:       MUX_TOKEN_ID / MUX_TOKEN_SECRET
+Source:       environment variables
+Note:         takes precedence over the saved login acme-inc-production
+              unset both variables to use that instead
+
+Saved logins (2):
+  acme-inc-production  browser sign-in  Acme Inc / Production  (selected)
+  ci-token             access token     env_01H9
+
+Switch with 'mux env switch <name>'.
+```
+
+An environment reachable both ways reads `browser sign-in (also has access token)`, naming the one requests actually use. Access token expiry is deliberately not shown: it is refreshed automatically, so there is nothing to act on. `--json` carries `expires_at` for callers that want it.
 
 `mux auth login` and `mux auth logout` are aliases of the top-level commands.
 
@@ -1151,7 +1170,7 @@ mux logout --all
 
 #### `mux env list`
 
-Display all configured environments, with the credential kind, the organization and environment they point at, and access token expiry for browser sign-ins.
+Display all configured environments, with the credential kind and the organization and environment they point at. An environment holding both credentials shows `oauth+token`, and a credential that has failed shows a warning line beneath it.
 
 **Options:**
 - `--json` - Output JSON instead of pretty format
@@ -1163,8 +1182,8 @@ mux env list
 ```
 Configured environments:
 
-* acme-inc-production (current)  oauth  Acme Inc / Production  expires in 47m
-  ci-token                       token  env_01H9...
+* acme-inc-production (current)  oauth  Acme Inc / Production
+  ci-token                       token  env_01H9
 
 2 environments total
 ```

@@ -104,6 +104,8 @@ describe('mux env list', () => {
 
     expect(stdout()).toContain('oauth+token');
     expect(stdout()).toContain('Acme Inc / Production');
+    // Expiry is deliberately absent: it refreshes on its own.
+    expect(stdout()).not.toMatch(/expires in/i);
   });
 
   it('marks the current environment', async () => {

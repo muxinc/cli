@@ -81,16 +81,35 @@ describe('mux auth status', () => {
     expect(output()).toContain('mux login');
   });
 
-  it('lists both credential kinds with their auth type', async () => {
+  it('describes credential kinds in words rather than internal names', async () => {
     await storeBothKinds();
 
     await statusCommand.parse([]);
     const printed = output();
 
     expect(printed).toContain('acme-production');
-    expect(printed).toContain('oauth');
+    expect(printed).toContain('browser sign-in');
     expect(printed).toContain('ci-token');
-    expect(printed).toContain('token');
+    expect(printed).toContain('access token');
+  });
+
+  it('says which credential an environment with both actually uses', async () => {
+    await storeBothKinds();
+    await setEnvironment('acme-production', {
+      environmentId: 'env_123',
+      environmentName: 'Production',
+      organizationName: 'Acme Inc',
+      oauth: {
+        accessToken: 'access_1',
+        refreshToken: 'refresh_1',
+        expiresAt: nowSeconds() + 2820,
+      },
+      token: { tokenId: 'id', tokenSecret: 'secret' },
+    });
+
+    await statusCommand.parse([]);
+
+    expect(output()).toContain('browser sign-in (also has access token)');
   });
 
   it('shows the organization and environment for an OAuth login', async () => {
@@ -102,19 +121,45 @@ describe('mux auth status', () => {
     expect(output()).toContain('Production');
   });
 
-  it('marks the active stored environment', async () => {
+  it('names the active environment without needing a marker legend', async () => {
     await storeBothKinds();
 
     await statusCommand.parse([]);
-    const rows = output()
-      .split('\n')
-      .filter((line) => /^[* ] \S/.test(line));
+    const printed = output();
 
-    expect(rows).toContainEqual(expect.stringMatching(/^\* acme-production/));
-    expect(rows).toContainEqual(expect.stringMatching(/^ {2}ci-token/));
+    expect(printed).toMatch(/^Active: +acme-production$/m);
+    // The old asterisk-plus-legend format is gone.
+    expect(printed).not.toContain('* =');
+    expect(printed).not.toMatch(/^\* /m);
   });
 
-  it('reports the access token expiry without a network call', async () => {
+  it('lists the environments that are not active separately', async () => {
+    await storeBothKinds();
+
+    await statusCommand.parse([]);
+    const printed = output();
+
+    expect(printed).toContain('Other environments (1):');
+    expect(printed).toContain('ci-token');
+    expect(printed).toContain('mux env switch <name>');
+  });
+
+  it('says nothing about other environments when there is only one', async () => {
+    await setEnvironment('only-one', {
+      environmentId: 'env_1',
+      oauth: {
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: nowSeconds() + 600,
+      },
+    });
+
+    await statusCommand.parse([]);
+
+    expect(output()).not.toContain('Other environments');
+  });
+
+  it('reads everything locally, with no network call', async () => {
     await storeBothKinds();
     const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
       (async () => {
@@ -125,14 +170,16 @@ describe('mux auth status', () => {
     try {
       await statusCommand.parse([]);
 
-      expect(output()).toMatch(/expires in \d+m|expired/i);
+      expect(output()).toContain('acme-production');
       expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
     }
   });
 
-  it('says an expired token will refresh on next use', async () => {
+  it('does not mention expiry, which needs no action from the reader', async () => {
+    // An expiring access token is refreshed automatically. Saying "expired"
+    // only invites someone to re-login when nothing is wrong.
     await setEnvironment('acme-production', {
       oauth: {
         accessToken: 'access_1',
@@ -144,8 +191,7 @@ describe('mux auth status', () => {
 
     await statusCommand.parse([]);
 
-    expect(output()).toMatch(/expired/i);
-    expect(output()).toMatch(/refresh/i);
+    expect(output()).not.toMatch(/expire/i);
   });
 
   it('explains that environment variables shadow the stored selection', async () => {
@@ -157,8 +203,13 @@ describe('mux auth status', () => {
     const printed = output();
 
     expect(printed).toContain('MUX_TOKEN_ID');
-    expect(printed).toMatch(/precedence|shadow/i);
+    expect(printed).toMatch(/precedence/i);
     expect(printed).toContain('acme-production');
+    expect(printed).toMatch(/unset/i);
+    // Every saved login is listed, since none of them is active — including the
+    // one that would take over if the variables were unset.
+    expect(printed).toContain('Saved logins (2):');
+    expect(printed).toContain('(selected)');
   });
 
   it('never prints token material', async () => {

@@ -198,16 +198,18 @@ async function runOAuthLogin(options: {
   const org = identity.organizationName ?? identity.organizationId ?? 'unknown';
   const env = identity.environmentName ?? identity.environmentId ?? 'unknown';
 
-  console.log(`\n✅ Signed in to ${org} / ${env}`);
-  if (identity.environmentId) {
-    console.log(`   Environment ID: ${identity.environmentId}`);
-  }
-  console.log(
-    `✅ ${result.replacedExisting ? 'Updated' : 'Saved as'} environment "${result.name}" in ${getConfigPath()}`,
-  );
+  // No config path: where credentials live is not something a user acts on at
+  // sign-in time, and `mux auth status` answers it when they do want to know.
+  const id = identity.environmentId ? ` (${identity.environmentId})` : '';
+  console.log(`\n✅ Signed in to ${org} / ${env}${id}`);
+
+  const verb = result.replacedExisting ? 'Updated' : 'Saved as';
   if (result.activated) {
-    console.log('✅ Set as the active environment');
+    console.log(
+      `✅ ${verb} "${result.name}" and set as the active environment`,
+    );
   } else {
+    console.log(`✅ ${verb} "${result.name}"`);
     console.log(`   Run 'mux env switch ${result.name}' to use it.`);
   }
   noticeSavedLoginIsShadowed(json);
@@ -419,9 +421,7 @@ export const loginCommand = new Command()
       }
 
       console.log('✅ Credentials validated successfully');
-      console.log(
-        `✅ Credentials saved to ${getConfigPath()} for environment: ${envName}`,
-      );
+      console.log(`✅ Saved as environment "${envName}"`);
 
       if (existingEnvs.length === 0) {
         console.log(`✅ Set as default environment`);

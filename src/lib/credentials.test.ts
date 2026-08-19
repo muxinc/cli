@@ -242,18 +242,14 @@ describe('summarizeEnvironment', () => {
     ).toBe('env_123');
   });
 
-  it('reports OAuth expiry in human terms', () => {
-    const soon = Math.floor(Date.now() / 1000) + 1800;
-    expect(
-      summarizeEnvironment({ oauth: { ...OAUTH, expiresAt: soon } }).expiry,
-    ).toBe('expires in 30m');
-  });
+  it('says nothing about expiry, which the CLI handles on its own', () => {
+    // An expiring access token is refreshed automatically, so surfacing it only
+    // invites the reader to act where there is nothing to do.
+    const summary = summarizeEnvironment({
+      oauth: { ...OAUTH, expiresAt: Math.floor(Date.now() / 1000) - 10 },
+    });
 
-  it('reports an expired token as refreshing on next use', () => {
-    const past = Math.floor(Date.now() / 1000) - 10;
-    expect(
-      summarizeEnvironment({ oauth: { ...OAUTH, expiresAt: past } }).expiry,
-    ).toMatch(/expired/i);
+    expect(JSON.stringify(summary)).not.toMatch(/expire/i);
   });
 
   it('surfaces a flagged failure ahead of expiry', () => {

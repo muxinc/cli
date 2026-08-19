@@ -194,20 +194,8 @@ export interface EnvironmentSummary {
   preferred: CredentialKind | null;
   /** "Organization / Environment", or the environment id, for display. */
   identity: string;
-  /** OAuth expiry in human terms, when an OAuth block is present. */
-  expiry?: string;
   /** A flagged failure worth showing the user. */
   warning?: string;
-}
-
-function describeExpiry(oauth: OAuthCredentials): string {
-  if (!oauth.expiresAt) return 'expiry unknown, refreshes on use';
-
-  const seconds = oauth.expiresAt - Math.floor(Date.now() / 1000);
-  if (seconds <= 0) return 'expired, refreshes on use';
-  if (seconds < 60) return `expires in ${seconds}s`;
-  if (seconds < 3600) return `expires in ${Math.floor(seconds / 60)}m`;
-  return `expires in ${Math.floor(seconds / 3600)}h`;
 }
 
 /** Everything `auth status` and `env list` need to render one environment. */
@@ -238,7 +226,6 @@ export function summarizeEnvironment(
     kinds,
     preferred: preferred?.kind ?? null,
     identity,
-    ...(environment.oauth && { expiry: describeExpiry(environment.oauth) }),
     ...(failure && {
       warning:
         failing === 'oauth'

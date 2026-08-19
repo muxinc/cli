@@ -87,9 +87,9 @@ export const listCommand = new Command()
       const marker = name === currentEnv ? '* ' : '  ';
       // "oauth+token" when an environment holds both; the first is preferred.
       const auth = (summary.kinds.join('+') || 'none').padEnd(authWidth);
-      const details = [summary.identity, summary.expiry]
-        .filter(Boolean)
-        .join('  ');
+      // No expiry column: the CLI refreshes on its own, so it is not something
+      // a reader can act on. `--json` still carries expires_at.
+      const details = summary.identity;
       console.log(
         `${marker}${(labels.get(name) as string).padEnd(labelWidth)}  ${auth}  ${details}`.trimEnd(),
       );
