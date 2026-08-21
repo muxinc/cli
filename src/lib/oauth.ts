@@ -38,7 +38,7 @@ const AUTHORIZE_PATH = '/ui/v1/oauth/authorize';
 const TOKEN_PATH = '/auth/v1/oauth/token';
 const REVOKE_PATH = '/auth/v1/oauth/revoke';
 
-const DEFAULT_CLIENT_ID = 'mux-cli';
+const DEFAULT_CLIENT_ID = '30b5a08e-1e48-4f70-a3fb-e4d64cf69566';
 
 /** The API host every OAuth endpoint is derived from. */
 function getApiBaseUrl(): string {
