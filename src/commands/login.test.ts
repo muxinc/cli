@@ -20,11 +20,14 @@ import {
   setEnvironment,
 } from '../lib/config.ts';
 import { setAgentMode } from '../lib/context.ts';
+import type { OAuthTokens } from '../lib/oauth.ts';
+import type { OAuthLoginDeps } from '../lib/oauth-login.ts';
 import {
   credentialsFromEnv,
   formatAuthorizationNotice,
   loginCommand,
   parseEnvFile,
+  runOAuthLogin,
 } from './login.ts';
 
 describe('Login command - parseEnvFile', () => {
@@ -353,6 +356,187 @@ describe('formatAuthorizationNotice', () => {
   });
 });
 
+describe('runOAuthLogin in machine-readable mode', () => {
+  let testConfigDir: string;
+  let originalXdgConfigHome: string | undefined;
+  let logSpy: Mock<typeof console.log>;
+  let errorSpy: Mock<typeof console.error>;
+
+  const TOKENS: OAuthTokens = {
+    accessToken: 'access_1',
+    refreshToken: 'refresh_1',
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    tokenType: 'Bearer',
+  };
+
+  /** Every external step stubbed, mirroring oauth-login.test.ts. */
+  function fakeDeps(overrides: Partial<OAuthLoginDeps> = {}): OAuthLoginDeps {
+    return {
+      startServer: async () => ({
+        port: 51372,
+        redirectUri: 'http://127.0.0.1:51372/callback',
+        waitForCode: async () => 'auth_code',
+        stop: () => {},
+      }),
+      openBrowser: async () => true,
+      endpoints: {
+        clientId: 'test_client',
+        authorizationUrl: 'https://dash.test/oauth/authorize',
+        tokenUrl: 'https://api.test/oauth/token',
+        revocationUrl: 'https://api.test/oauth/revoke',
+        scopes: ['video:read', 'system:read'],
+      },
+      exchange: async () => TOKENS,
+      validate: async () => ({
+        valid: true as const,
+        identity: {
+          environmentId: 'env_123',
+          environmentName: 'Production',
+          organizationId: 'org_123',
+          organizationName: 'Acme Inc',
+          permissions: ['video'],
+        },
+      }),
+      ...overrides,
+    };
+  }
+
+  beforeEach(async () => {
+    testConfigDir = await mkdtemp(join(tmpdir(), 'mux-cli-agent-oauth-'));
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = testConfigDir;
+    logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+    }
+    logSpy?.mockRestore();
+    errorSpy?.mockRestore();
+    setAgentMode(false);
+    await rm(testConfigDir, { recursive: true, force: true });
+  });
+
+  it('completes without a TTY in agent mode and prints exactly one JSON document on stdout', async () => {
+    // Tests run without a TTY, which is exactly the coding-agent case.
+    setAgentMode(true);
+
+    await runOAuthLogin({}, fakeDeps());
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const result = JSON.parse(String(logSpy.mock.calls[0][0]));
+    expect(result.name).toBe('acme-inc-production');
+    expect(result.identity.environmentId).toBe('env_123');
+    expect(result.activated).toBe(true);
+    expect(result.replacedExisting).toBe(false);
+  });
+
+  it('emits the authorization_url event on stderr before waiting for the redirect', async () => {
+    setAgentMode(true);
+    let eventsWhenWaitStarted = -1;
+
+    await runOAuthLogin(
+      {},
+      fakeDeps({
+        startServer: async () => ({
+          port: 51372,
+          redirectUri: 'http://127.0.0.1:51372/callback',
+          waitForCode: async () => {
+            eventsWhenWaitStarted = errorSpy.mock.calls.length;
+            return 'auth_code';
+          },
+          stop: () => {},
+        }),
+      }),
+    );
+
+    // The agent can only relay the URL if it is out before the flow blocks.
+    expect(eventsWhenWaitStarted).toBeGreaterThanOrEqual(1);
+    const event = JSON.parse(String(errorSpy.mock.calls[0][0]));
+    expect(event.event).toBe('authorization_url');
+    expect(event.url).toContain('code_challenge');
+    expect(event.browserOpened).toBe(true);
+    expect(event.expiresInSeconds).toBe(300);
+  });
+
+  it('honors --json outside agent mode with the same contract', async () => {
+    await runOAuthLogin({ json: true }, fakeDeps());
+
+    const event = JSON.parse(String(errorSpy.mock.calls[0][0]));
+    expect(event.event).toBe('authorization_url');
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(logSpy.mock.calls[0][0])).name).toBe(
+      'acme-inc-production',
+    );
+  });
+
+  it('still attempts to open a browser in agent mode', async () => {
+    // Agents typically run on the user's machine, so the browser opening
+    // directly is the best UX; the URL is emitted regardless.
+    setAgentMode(true);
+    let opened = false;
+
+    await runOAuthLogin(
+      {},
+      fakeDeps({
+        openBrowser: async () => {
+          opened = true;
+          return true;
+        },
+      }),
+    );
+
+    expect(opened).toBe(true);
+  });
+
+  it('passes --timeout through to the loopback server and reports it in the event', async () => {
+    setAgentMode(true);
+    let requestedTimeoutMs: number | undefined;
+
+    await runOAuthLogin(
+      { timeout: 600 },
+      fakeDeps({
+        startServer: async (options) => {
+          requestedTimeoutMs = options.timeoutMs;
+          return {
+            port: 51372,
+            redirectUri: 'http://127.0.0.1:51372/callback',
+            waitForCode: async () => 'auth_code',
+            stop: () => {},
+          };
+        },
+      }),
+    );
+
+    expect(requestedTimeoutMs).toBe(600_000);
+    const event = JSON.parse(String(errorSpy.mock.calls[0][0]));
+    expect(event.expiresInSeconds).toBe(600);
+  });
+
+  it('rejects a non-positive --timeout', async () => {
+    setAgentMode(true);
+
+    await expect(runOAuthLogin({ timeout: 0 }, fakeDeps())).rejects.toThrow(
+      /--timeout/,
+    );
+    await expect(runOAuthLogin({ timeout: -5 }, fakeDeps())).rejects.toThrow(
+      /--timeout/,
+    );
+  });
+
+  it('still refuses the pretty flow without a terminal', async () => {
+    // Neither --json nor agent mode: a bare `mux login` in a pipe or CI runner
+    // must keep failing fast rather than blocking on a redirect.
+    await expect(runOAuthLogin({}, fakeDeps())).rejects.toThrow(
+      /interactive terminal/i,
+    );
+  });
+});
+
 describe('Login command - action', () => {
   let testConfigDir: string;
   let originalXdgConfigHome: string | undefined;
@@ -461,9 +645,9 @@ describe('Login command - action', () => {
     expect(JSON.parse(output).success).toBe(true);
   });
 
-  it('fails fast with a JSON error on --json when no credentials are available', async () => {
+  it('fails fast with a JSON error on --json --interactive, and points at the alternatives', async () => {
     try {
-      await loginCommand.parse(['--json']);
+      await loginCommand.parse(['--json', '--interactive']);
     } catch (_error) {
       // handleCommandError exits; the mocked process.exit throws to halt parse
     }
@@ -471,21 +655,71 @@ describe('Login command - action', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
     expect(parsed.error).toMatch(/MUX_TOKEN_ID and MUX_TOKEN_SECRET/);
+    // The browser flow works in machine-readable mode now, so the error must
+    // not steer callers away from it.
+    expect(parsed.error).toMatch(/--oauth/);
+    expect(parsed.error).not.toMatch(/Interactive login is not available/);
   });
 
-  it('fails fast with a JSON error in agent mode instead of prompting when no credentials are available', async () => {
+  it('fails fast with a JSON error on --interactive in agent mode instead of prompting', async () => {
     setAgentMode(true);
 
     try {
-      await loginCommand.parse([]);
+      await loginCommand.parse(['--interactive']);
     } catch (_error) {
       // handleCommandError exits; the mocked process.exit throws to halt parse
     }
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
-    expect(parsed.error).toMatch(/Interactive login is not available/);
+    expect(parsed.error).toMatch(/MUX_TOKEN_ID and MUX_TOKEN_SECRET/);
+    expect(parsed.error).toMatch(/--oauth/);
   });
+
+  it('runs the browser flow end to end in agent mode and surfaces a timeout as a JSON error', async () => {
+    // Integration: real loopback server, real timeout. Discovery goes through
+    // the mocked fetch and falls back to built-in endpoints; --print-url keeps
+    // the test from opening a real browser.
+    setAgentMode(true);
+    const originalXdgCacheHome = process.env.XDG_CACHE_HOME;
+    process.env.XDG_CACHE_HOME = testConfigDir;
+
+    try {
+      await loginCommand.parse(['--print-url', '--timeout', '1']);
+    } catch (_error) {
+      // handleCommandError exits; the mocked process.exit throws to halt parse
+    } finally {
+      if (originalXdgCacheHome === undefined) delete process.env.XDG_CACHE_HOME;
+      else process.env.XDG_CACHE_HOME = originalXdgCacheHome;
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const lines = errorSpy.mock.calls.map((c) => String(c[0]));
+    const event = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .find((parsed) => parsed?.event === 'authorization_url');
+    expect(event).toBeDefined();
+    expect(event.url).toContain('code_challenge');
+    expect(event.browserOpened).toBe(false);
+    expect(event.expiresInSeconds).toBe(1);
+
+    const failure = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .find((parsed) => typeof parsed?.error === 'string');
+    expect(failure?.error).toMatch(/timed out/i);
+  }, 15_000);
 
   it('reports credential validation failures as JSON in agent mode', async () => {
     process.env.MUX_TOKEN_ID = 'bad_id';

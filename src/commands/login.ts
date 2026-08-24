@@ -14,7 +14,8 @@ import {
   getMuxBaseUrl,
   validateCredentials,
 } from '../lib/mux.ts';
-import { performOAuthLogin } from '../lib/oauth-login.ts';
+import { type OAuthLoginDeps, performOAuthLogin } from '../lib/oauth-login.ts';
+import { DEFAULT_TIMEOUT_MS } from '../lib/oauth-loopback.ts';
 import { inputPrompt, secretPrompt } from '../lib/prompt.ts';
 import { getConfigPath } from '../lib/xdg.ts';
 import { resolveLoginMode } from './login-mode.ts';
@@ -159,40 +160,91 @@ export function formatAuthorizationNotice(
  * Run the browser-based OAuth login and report the result. Organization and
  * environment selection happens in the dashboard, so the CLI only reports what
  * came back.
+ *
+ * Works without a terminal when the caller declared machine-readable intent
+ * (--json or agent mode): the flow itself never reads stdin, and the loopback
+ * timeout bounds the wait. `deps` is injectable for tests only; the command
+ * action always uses the real flow.
  */
-async function runOAuthLogin(options: {
-  name?: string;
-  port?: number;
-  printUrl?: boolean;
-  keepCurrent?: boolean;
-  json?: boolean;
-}): Promise<void> {
+export async function runOAuthLogin(
+  options: {
+    name?: string;
+    port?: number;
+    printUrl?: boolean;
+    keepCurrent?: boolean;
+    timeout?: number;
+    json?: boolean;
+  },
+  deps: OAuthLoginDeps = {},
+): Promise<void> {
   const json = wantsJson(options);
 
-  // Interactive by definition: there is no browser to drive and no terminal to
-  // print an authorization URL to in machine-readable mode.
-  if (json) {
-    throw new Error(
-      "Interactive login is not available with --json or in agent mode. Set MUX_TOKEN_ID and MUX_TOKEN_SECRET, run 'mux login --env-file <path>', or run 'mux login' in an interactive terminal.",
-    );
+  // Machine-readable callers relay the authorization URL themselves, so only
+  // the default pretty flow insists on a terminal: a bare `mux login` in a
+  // pipe or CI runner still fails fast instead of hanging on a redirect.
+  if (!json) {
+    requireInteractiveTerminal('Browser sign-in');
   }
-  requireInteractiveTerminal('Browser sign-in');
+
+  if (
+    options.timeout !== undefined &&
+    (!Number.isFinite(options.timeout) || options.timeout <= 0)
+  ) {
+    throw new Error('--timeout must be a positive number of seconds.');
+  }
+  const timeoutMs =
+    options.timeout !== undefined ? options.timeout * 1000 : undefined;
 
   const result = await performOAuthLogin(
     {
       ...(options.name && { name: options.name }),
       ...(options.port !== undefined && { port: options.port }),
+      ...(timeoutMs !== undefined && { timeoutMs }),
       noBrowser: options.printUrl === true,
       activate: options.keepCurrent !== true,
     },
     {
+      ...deps,
       onAuthorizationUrl: (url, opened) => {
+        if (json) {
+          // Progress goes to stderr as a JSON line so stdout stays a single
+          // parseable document. Emitted the moment the URL is known, so a
+          // caller polling the stream can relay it before the flow blocks.
+          console.error(
+            JSON.stringify({
+              event: 'authorization_url',
+              url,
+              browserOpened: opened,
+              expiresInSeconds: Math.round(
+                (timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000,
+              ),
+            }),
+          );
+          return;
+        }
         for (const line of formatAuthorizationNotice(url, opened)) {
           console.log(line);
         }
       },
     },
   );
+
+  if (json) {
+    console.log(
+      JSON.stringify(
+        {
+          name: result.name,
+          identity: result.identity,
+          activated: result.activated,
+          replacedExisting: result.replacedExisting,
+          dropped: result.dropped,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
 
   const { identity } = result;
   const org = identity.organizationName ?? identity.organizationId ?? 'unknown';
@@ -229,7 +281,9 @@ async function runOAuthLogin(options: {
 // chained options without leaking an internal module path into the .d.ts.
 export const loginCommand = new Command()
   .description(
-    'Sign in to Mux. Opens your browser to select an organization and environment; use --interactive, --env-file, or --from-env for a Mux API access token instead.',
+    'Sign in to Mux. Opens your browser to select an organization and environment; use --interactive, --env-file, or --from-env for a Mux API access token instead. ' +
+      'With --json or in agent mode, the authorization URL is emitted as a JSON event on stderr and the result as JSON on stdout. ' +
+      'The browser must be able to reach this machine to complete the sign-in (see --port for SSH port forwarding).',
   )
   .option(
     '-f, --env-file <path:string>',
@@ -256,6 +310,10 @@ export const loginCommand = new Command()
     'Print the authorization URL instead of opening a browser',
   )
   .option('--port <port:number>', 'Local port to receive the login redirect on')
+  .option(
+    '--timeout <seconds:number>',
+    'How long to wait for the browser authorization before giving up (default: 300)',
+  )
   .option(
     '--keep-current',
     'Save the login without making it the active environment',
@@ -350,7 +408,7 @@ export const loginCommand = new Command()
         // instead of blocking on stdin.
         if (json) {
           throw new Error(
-            'No credentials provided. Set MUX_TOKEN_ID and MUX_TOKEN_SECRET environment variables, or pass --env-file <path>. Interactive login is not available with --json or in agent mode.',
+            'Manual credential entry needs a terminal to prompt on. Set MUX_TOKEN_ID and MUX_TOKEN_SECRET environment variables, pass --env-file <path>, or run `mux login --oauth` to sign in with a browser.',
           );
         }
         requireInteractiveTerminal('--interactive');

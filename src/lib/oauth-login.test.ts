@@ -517,6 +517,48 @@ describe('performOAuthLogin', () => {
     expect(stopped).toBeGreaterThan(before);
   });
 
+  it('passes an explicit timeout through to the loopback server', async () => {
+    let requestedTimeoutMs: number | undefined;
+
+    await performOAuthLogin(
+      { timeoutMs: 600_000 },
+      fakeDeps({
+        startServer: async (options) => {
+          requestedTimeoutMs = options.timeoutMs;
+          return {
+            port: 51372,
+            redirectUri: 'http://127.0.0.1:51372/callback',
+            waitForCode: async () => 'auth_code',
+            stop: () => {},
+          };
+        },
+      }),
+    );
+
+    expect(requestedTimeoutMs).toBe(600_000);
+  });
+
+  it('leaves the loopback timeout to its default when none is given', async () => {
+    let requestedTimeoutMs: number | undefined = -1;
+
+    await performOAuthLogin(
+      {},
+      fakeDeps({
+        startServer: async (options) => {
+          requestedTimeoutMs = options.timeoutMs;
+          return {
+            port: 51372,
+            redirectUri: 'http://127.0.0.1:51372/callback',
+            waitForCode: async () => 'auth_code',
+            stop: () => {},
+          };
+        },
+      }),
+    );
+
+    expect(requestedTimeoutMs).toBeUndefined();
+  });
+
   it('passes an explicit port through to the loopback server', async () => {
     let requestedPort: number | undefined;
 

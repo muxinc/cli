@@ -53,6 +53,8 @@ export interface OAuthLoginOptions {
   noBrowser?: boolean;
   /** Make this the active environment. Defaults to true. */
   activate?: boolean;
+  /** How long to wait for the browser redirect. Defaults to the loopback server's own timeout. */
+  timeoutMs?: number;
   /** API host for identity verification. Defaults to the resolved Mux base URL. */
   baseUrl?: string;
 }
@@ -218,6 +220,7 @@ export async function performOAuthLogin(
   const server = await startServer({
     state,
     ...(options.port !== undefined && { port: options.port }),
+    ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
   });
 
   let tokens: OAuthTokens;
