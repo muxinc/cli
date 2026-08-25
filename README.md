@@ -1099,6 +1099,7 @@ The four authentication methods are mutually exclusive; passing more than one is
 - `-n, --name <name>` - Name for this environment (default: derived from the organization and environment for browser sign-in, or `default` otherwise)
 - `--print-url` - Print the authorization URL instead of opening a browser
 - `--port <port>` - Local port to receive the login redirect on
+- `--timeout <seconds>` - How long to wait for the browser authorization before giving up (default: 300)
 - `--keep-current` - Save the login without making it the active environment
 
 ```bash
@@ -1110,7 +1111,15 @@ mux login --name production --env-file .env.prod  # named environment
 mux login --print-url                             # no browser available
 ```
 
-`--oauth` and `--interactive` both need a real terminal: they fail immediately with instructions under `--json`, in agent mode, or when stdin is not a TTY (CI, piped input), rather than hanging. Use `--env-file`, `--from-env`, or the environment variables for automation.
+`--interactive` needs a real terminal to prompt on: it fails immediately with instructions under `--json`, in agent mode, or when stdin is not a TTY (CI, piped input), rather than hanging. A bare `mux login` without a TTY and without `--json` or agent mode also fails fast. Use `--env-file`, `--from-env`, or the environment variables for unattended automation.
+
+**Browser sign-in from a coding agent:** with `--json` or in agent mode, `mux login` runs the browser flow without a terminal. The moment the authorization URL is known it is emitted as a single JSON line on **stderr**:
+
+```json
+{"event":"authorization_url","url":"https://...","browserOpened":true,"expiresInSeconds":300}
+```
+
+The command then blocks until the browser redirect arrives (bounded by `--timeout`), and prints the final result as one JSON document on **stdout** (`name`, `identity`, `activated`, `replacedExisting`, `dropped`). The CLI still attempts to open a browser directly; pass `--print-url` to suppress that. Agent harnesses that only surface output when a command exits should run `mux login` in the background and poll its output so the URL can be relayed to the user while the command waits. This works only when the agent and the user's browser share a machine (or the user forwards the port — see below).
 
 **Signing in from a remote or SSH session:** the redirect goes to a loopback address on the machine running the CLI, which your browser cannot reach from elsewhere. Either forward the port (`ssh -L 51372:127.0.0.1:51372 …`, then `mux login --port 51372`) or use `mux login --interactive`.
 
