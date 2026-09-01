@@ -22,7 +22,7 @@ export const listCommand = new Command()
   .description('List Mux Robots jobs')
   .option(
     '--workflow <workflow:string>',
-    'Filter by workflow type (summarize, moderate, generate-chapters, translate-captions, ask-questions, find-key-moments)',
+    'Filter by workflow type (e.g. summarize, moderate, generate-chapters, translate-captions, edit-captions, translate-audio, find-scenes, find-best-thumbnails)',
   )
   .option('--status <status:string>', 'Filter by job status')
   .option('--asset-id <assetId:string>', 'Filter by asset ID')

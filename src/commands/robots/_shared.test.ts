@@ -9,8 +9,12 @@ import {
   test,
 } from 'bun:test';
 import type Mux from '@mux/ts';
-import type { AnyRobotsJob } from './_shared.ts';
-import { assertJobCompleted, pollForRobotsJob } from './_shared.ts';
+import type { AnyRobotsJob, RobotsWorkflow } from './_shared.ts';
+import {
+  assertJobCompleted,
+  pollForRobotsJob,
+  retrieveRobotsJob,
+} from './_shared.ts';
 
 const baseJob = {
   id: 'rjob_xyz',
@@ -82,6 +86,39 @@ function makeMuxStub(statuses: string[]): Mux {
     },
   } as unknown as Mux;
 }
+
+describe('retrieveRobotsJob', () => {
+  const workflowResources: Array<[RobotsWorkflow, string]> = [
+    ['ask-questions', 'askQuestions'],
+    ['edit-captions', 'editCaptions'],
+    ['find-best-thumbnails', 'findBestThumbnails'],
+    ['find-key-moments', 'findKeyMoments'],
+    ['find-scenes', 'findScenes'],
+    ['generate-chapters', 'generateChapters'],
+    ['generate-engagement-insights', 'generateEngagementInsights'],
+    ['generate-premium-captions', 'generatePremiumCaptions'],
+    ['moderate', 'moderate'],
+    ['summarize', 'summarize'],
+    ['translate-audio', 'translateAudio'],
+    ['translate-captions', 'translateCaptions'],
+  ];
+
+  test.each(
+    workflowResources,
+  )('routes %s to the matching jobs resource', async (workflow, resource) => {
+    const retrieve = mock(() =>
+      Promise.resolve({ ...baseJob, workflow } as AnyRobotsJob),
+    );
+    const mux = {
+      robots: { jobs: { [resource]: { retrieve } } },
+    } as unknown as Mux;
+
+    const job = await retrieveRobotsJob(mux, workflow, 'rjob_test123');
+
+    expect(retrieve).toHaveBeenCalledWith('rjob_test123');
+    expect(job.workflow).toBe(workflow);
+  });
+});
 
 describe('pollForRobotsJob', () => {
   let stderrSpy: Mock<typeof process.stderr.write>;
