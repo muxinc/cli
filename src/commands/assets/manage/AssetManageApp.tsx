@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/react */
-import type Mux from '@mux/mux-node';
-import type { Asset } from '@mux/mux-node/resources/video/assets';
+import type Mux from '@mux/ts';
+import type { Asset } from '@mux/ts/resources/video/assets';
 import { useKeyboard, useRenderer } from '@opentui/react';
 import { useCallback, useEffect, useState } from 'react';
 import { getCurrentEnvironment } from '../../../lib/config.ts';

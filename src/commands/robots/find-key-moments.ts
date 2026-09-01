@@ -2,7 +2,7 @@ import { Command } from '@cliffy/command';
 import type {
   FindKeyMomentCreateParams,
   FindKeyMomentsJobParameters,
-} from '@mux/mux-node/resources/robots-preview/jobs';
+} from '@mux/ts/resources/robots/jobs';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -102,7 +102,7 @@ export const findKeyMomentsCommand: Command<any> = new Command()
         body.passthrough = options.passthrough;
 
       const mux = await createAuthenticatedMuxClient();
-      let job = await mux.robotsPreview.jobs.findKeyMoments.create(body);
+      let job = await mux.robots.jobs.findKeyMoments.create(body);
 
       if (!wantsJson(options)) {
         console.log('Find key moments job created');

@@ -1,4 +1,4 @@
-import { AuthenticationError, NotFoundError } from '@mux/mux-node';
+import { AuthenticationError, NotFoundError } from '@mux/ts';
 import { wantsJson } from '@/lib/context.ts';
 import { getAuthContext } from './mux.ts';
 

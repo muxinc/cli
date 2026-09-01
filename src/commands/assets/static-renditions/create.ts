@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import type Mux from '@mux/mux-node';
+import type Mux from '@mux/ts';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -96,7 +96,7 @@ async function pollForRendition(
   assetId: string,
   renditionId: string,
   jsonOutput?: boolean,
-): Promise<Mux.Video.AssetCreateStaticRenditionResponse> {
+): Promise<Mux.Video.StaticRendition> {
   const POLL_INTERVAL_MS = 2000;
   const MAX_POLL_TIME_MS = 10 * 60 * 1000; // 10 minutes
   const startTime = Date.now();
@@ -115,19 +115,19 @@ async function pollForRendition(
         if (!jsonOutput) {
           console.log(' done!');
         }
-        return rendition as Mux.Video.AssetCreateStaticRenditionResponse;
+        return rendition as Mux.Video.StaticRendition;
       }
       if (rendition.status === 'errored') {
         if (!jsonOutput) {
           console.log(' failed!');
         }
-        return rendition as Mux.Video.AssetCreateStaticRenditionResponse;
+        return rendition as Mux.Video.StaticRendition;
       }
       if (rendition.status === 'skipped') {
         if (!jsonOutput) {
           console.log(' skipped!');
         }
-        return rendition as Mux.Video.AssetCreateStaticRenditionResponse;
+        return rendition as Mux.Video.StaticRendition;
       }
     }
 
@@ -145,7 +145,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function outputRendition(
-  rendition: Mux.Video.AssetCreateStaticRenditionResponse,
+  rendition: Mux.Video.StaticRendition,
   jsonOutput?: boolean,
   showAsyncMessage?: boolean,
 ) {

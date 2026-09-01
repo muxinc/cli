@@ -2,7 +2,7 @@ import { Command } from '@cliffy/command';
 import type {
   ModerateCreateParams,
   ModerateJobParameters,
-} from '@mux/mux-node/resources/robots-preview/jobs';
+} from '@mux/ts/resources/robots/jobs';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { createAuthenticatedMuxClient } from '@/lib/mux.ts';
@@ -132,7 +132,7 @@ export const moderateCommand: Command<any> = new Command()
         body.passthrough = options.passthrough;
 
       const mux = await createAuthenticatedMuxClient();
-      let job = await mux.robotsPreview.jobs.moderate.create(body);
+      let job = await mux.robots.jobs.moderate.create(body);
 
       if (!wantsJson(options)) {
         console.log('Moderate job created');

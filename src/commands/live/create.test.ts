@@ -8,7 +8,7 @@ import {
   spyOn,
   test,
 } from 'bun:test';
-import type Mux from '@mux/mux-node';
+import type Mux from '@mux/ts';
 import * as muxModule from '@/lib/mux.ts';
 import { createCommand } from './create.ts';
 

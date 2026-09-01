@@ -1,6 +1,6 @@
 import { colors } from '@cliffy/ansi/colors';
-import type { Asset } from '@mux/mux-node/resources/video/assets';
-import type { LiveStream } from '@mux/mux-node/resources/video/live-streams';
+import type { Asset } from '@mux/ts/resources/video/assets';
+import type { LiveStream } from '@mux/ts/resources/video/live-streams';
 
 /**
  * Format created_at timestamp to short format (MM/DD HH:MM)

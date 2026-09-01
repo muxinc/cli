@@ -8,7 +8,7 @@ import {
   spyOn,
   test,
 } from 'bun:test';
-import type Mux from '@mux/mux-node';
+import type Mux from '@mux/ts';
 import type { AnyRobotsJob } from './_shared.ts';
 import { assertJobCompleted, pollForRobotsJob } from './_shared.ts';
 
@@ -77,7 +77,7 @@ function makeMuxStub(statuses: string[]): Mux {
     } as AnyRobotsJob);
   });
   return {
-    robotsPreview: {
+    robots: {
       jobs: { summarize: { retrieve } },
     },
   } as unknown as Mux;

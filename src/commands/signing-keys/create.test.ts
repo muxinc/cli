@@ -11,7 +11,7 @@ import {
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type Mux from '@mux/mux-node';
+import type Mux from '@mux/ts';
 import * as configModule from '@/lib/config.ts';
 import { getEnvironment, setEnvironment } from '@/lib/config.ts';
 import * as muxModule from '@/lib/mux.ts';
