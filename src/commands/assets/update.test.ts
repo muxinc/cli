@@ -72,6 +72,20 @@ describe('mux assets update command', () => {
       expect(option).toBeDefined();
     });
 
+    test('has --thumbnail-time flag', () => {
+      const option = updateCommand
+        .getOptions()
+        .find((opt) => opt.name === 'thumbnail-time');
+      expect(option).toBeDefined();
+    });
+
+    test('has --clear-thumbnail-time flag', () => {
+      const option = updateCommand
+        .getOptions()
+        .find((opt) => opt.name === 'clear-thumbnail-time');
+      expect(option).toBeDefined();
+    });
+
     test('has --json flag for output formatting', () => {
       const jsonOption = updateCommand
         .getOptions()
@@ -100,6 +114,23 @@ describe('mux assets update command', () => {
 
       expect(exitSpy).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    test('errors when --thumbnail-time is combined with --clear-thumbnail-time', async () => {
+      try {
+        await updateCommand.parse([
+          'some-asset-id',
+          '--thumbnail-time',
+          '5',
+          '--clear-thumbnail-time',
+        ]);
+      } catch (_error) {
+        // Expected to throw
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const msg = consoleErrorSpy.mock.calls[0]?.[0] ?? '';
+      expect(msg).toMatch(/cannot be combined/i);
     });
   });
 });

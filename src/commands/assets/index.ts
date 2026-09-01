@@ -6,6 +6,7 @@ import { inputInfoCommand } from './input-info.ts';
 import { listCommand } from './list.ts';
 import { manageCommand } from './manage/index.ts';
 import { playbackIdsCommand } from './playback-ids/index.ts';
+import { shotsCommand } from './shots/index.ts';
 import { staticRenditionsCommand } from './static-renditions/index.ts';
 import { tracksCommand } from './tracks/index.ts';
 import { updateCommand } from './update.ts';
@@ -27,5 +28,6 @@ export const assetsCommand = new Command()
   .command('update-master-access', updateMasterAccessCommand)
   .command('manage', manageCommand)
   .command('playback-ids', playbackIdsCommand)
+  .command('shots', shotsCommand)
   .command('static-renditions', staticRenditionsCommand)
   .command('tracks', tracksCommand);
