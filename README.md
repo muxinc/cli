@@ -248,6 +248,20 @@ mux webhooks trigger video.asset.created --forward-to http://localhost:3000/api/
 
 Run `mux webhooks trigger <invalid-type>` to see all supported event types.
 
+### Webhook Management
+
+Configure the webhooks that Mux delivers events to for the current environment.
+
+```bash
+mux webhooks create --address https://example.com/api/webhooks/mux
+mux webhooks list
+mux webhooks get <webhook-id>
+mux webhooks update <webhook-id> [--address <url>] [--enable | --disable]
+mux webhooks delete <webhook-id> [--force]
+```
+
+The signing secret is printed when a webhook is created; store it securely and use it to verify webhook signatures.
+
 ## Commands
 
 <details open>
@@ -350,10 +364,14 @@ Update metadata fields on a video asset. At least one field flag must be provide
 - `--creator-id <string>` - Set `meta.creator_id` (max 128 characters)
 - `--external-id <string>` - Set `meta.external_id` (max 128 characters)
 - `--passthrough <string>` - Set `passthrough` (max 255 characters)
+- `--thumbnail-time <seconds>` - Set the asset's default thumbnail time
+- `--clear-thumbnail-time` - Reset the default thumbnail time
 
 ```bash
 mux assets update abc123xyz --title "My Video" --creator-id "user-42"
 mux assets update abc123xyz --title ""  # clear a field
+mux assets update abc123xyz --thumbnail-time 12.5
+mux assets update abc123xyz --clear-thumbnail-time
 ```
 
 #### `mux assets delete <asset-id>`
@@ -413,6 +431,16 @@ mux assets static-renditions delete <asset-id> <rendition-id> [--force]
 
 **Resolution options:** `highest`, `audio-only`, `2160p`, `1440p`, `1080p`, `720p`, `540p`, `480p`, `360p`, `270p`
 
+#### Shots Management
+
+Shot detection data segments a video into its individual shots. Generated data is reused by Robots jobs.
+
+```bash
+mux assets shots get <asset-id>
+mux assets shots generate <asset-id>
+mux assets shots delete <asset-id> [--force]
+```
+
 #### Track Management
 
 Manage text and audio tracks (subtitles, captions, audio) on video assets.
@@ -432,6 +460,16 @@ Add a text or audio track to an asset.
 
 ```bash
 mux assets tracks create abc123xyz --url https://example.com/subs.vtt --type text --language-code en --text-type subtitles
+```
+
+##### `mux assets tracks update <asset-id> <track-id>`
+
+Update a track on an asset. At least one field flag must be provided.
+
+**Options:** `--name <name>`, `--language-code <code>`, `--closed-captions <true|false>`, `--passthrough <string>`
+
+```bash
+mux assets tracks update abc123xyz track456 --name "English (SDH)" --closed-captions true
 ```
 
 ##### `mux assets tracks delete <asset-id> <track-id>`
@@ -948,6 +986,104 @@ Translate captions on a video to another language.
 mux robots translate-captions abc123 --track-id track456 --to-language-code es
 ```
 
+#### `mux robots translate-audio <asset-id>`
+
+Translate a video's audio track to another language.
+
+**Options:**
+- `--to-language-code <code>` - BCP 47 code for the translated audio (required)
+- `--no-upload` - Do not upload the translated audio track to Mux
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots translate-audio abc123 --to-language-code es
+```
+
+#### `mux robots edit-captions <asset-id>`
+
+Edit a caption track with find/replace rules or automatic profanity censoring.
+
+**Options:**
+- `--track-id <id>` - Caption track ID to edit (required)
+- `--replace <find=replace>` - Find/replace rule (repeatable)
+- `--case-sensitive` - Make `--replace` rules match case-sensitively
+- `--censor-profanity` - Automatically censor profanity
+- `--censor-mode <mode>` - `blank`, `remove`, or `mask` (implies `--censor-profanity`)
+- `--delete-original-track` - Delete the original track after editing
+- `--track-name-suffix <suffix>` - Suffix appended to the edited track name
+- `--no-upload` - Do not upload the edited VTT to Mux
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots edit-captions abc123 --track-id track456 --replace "Muks=Mux" --censor-profanity
+```
+
+#### `mux robots generate-premium-captions <asset-id>`
+
+Generate high-accuracy premium captions for a video.
+
+**Options:**
+- `--language-code <code>` - BCP 47 code of the spoken audio (auto-detected when omitted)
+- `--include-speakers` - Include speaker labels
+- `--include-words` - Include word-level timing
+- `--phrase <phrase>` - Domain-specific phrase to boost recognition (repeatable)
+- `--replace-existing` - Replace an existing generated caption track in the same language
+- `--track-name <name>` - Name for the generated caption track
+- `--no-upload` - Do not upload the generated captions to Mux
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots generate-premium-captions abc123 --language-code en --include-speakers
+```
+
+#### `mux robots find-best-thumbnails <asset-id>`
+
+Find the best thumbnail candidates for a video.
+
+**Options:**
+- `--max-thumbnails <n>` - Maximum number of candidates to return
+- `--update-asset-thumbnail` - Set the asset's default thumbnail time to the top candidate
+- `--audience <text>` - Intended audience used as scoring guidance
+- `--campaign-style <text>` - Campaign/channel thumbnail style to prefer
+- `--looking-for <text>` - What to look for in candidate thumbnails
+- `--start-time <seconds>` / `--end-time <seconds>` - Execution window on the asset timeline
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots find-best-thumbnails abc123 --max-thumbnails 3 --update-asset-thumbnail
+```
+
+#### `mux robots find-scenes <asset-id>`
+
+Detect and describe the scenes in a video.
+
+**Options:**
+- `--language-code <code>` - BCP 47 code of the caption track to analyze
+- `--min-scene-duration-ms <ms>` - Minimum scene duration
+- `--min-scenes <n>` - Minimum number of scenes
+- `--audience <text>` - Intended audience used as model guidance
+- `--brand-term <term>` - Preferred brand or domain term (repeatable)
+- `--narration-detail <detail>` - `concise`, `balanced`, or `detailed`
+- `--start-time <seconds>` / `--end-time <seconds>` - Execution window on the asset timeline
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots find-scenes abc123 --min-scenes 5 --narration-detail detailed
+```
+
+#### `mux robots generate-engagement-insights <asset-id>`
+
+Analyze a video's engagement data and generate insights.
+
+**Options:**
+- `--passthrough <string>` - Arbitrary metadata (max 255 chars)
+
+```bash
+mux robots generate-engagement-insights abc123 --wait
+```
+
+All job creation commands also support `--file <path>` (JSON config with the full parameters object), `--wait` (poll until the job completes), and `--json`.
+
 </details>
 
 <details>
@@ -1030,6 +1166,18 @@ mux annotations delete <annotation-id> [--force]
 ```bash
 mux dimensions list                                    # list available dimensions
 mux dimensions values <dimension-id> [--timeframe "24:hours"]
+```
+
+#### Engagement
+
+Engagement analytics for a specific video, addressed by exactly one of `--asset-id`, `--playback-id`, or `--video-id`.
+
+```bash
+# Viewership across the video timeline
+mux engagement heatmap --asset-id <id> [--timeframe "7:days"]
+
+# Most-watched moments
+mux engagement hotspots --asset-id <id> [--limit 5] [--order-direction desc]
 ```
 
 #### Errors
