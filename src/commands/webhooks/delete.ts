@@ -10,11 +10,11 @@ interface DeleteOptions {
 }
 
 export const deleteCommand = new Command()
-  .description('Delete the shot detection data for an asset')
-  .arguments('<asset-id:string>')
+  .description('Permanently delete a webhook (cannot be undone)')
+  .arguments('<webhook-id:string>')
   .option('-f, --force', 'Skip confirmation prompt')
   .option('--json', 'Output JSON instead of pretty format')
-  .action(async (options: DeleteOptions, assetId: string) => {
+  .action(async (options: DeleteOptions, webhookId: string) => {
     try {
       if (!options.force) {
         if (wantsJson(options)) {
@@ -24,7 +24,7 @@ export const deleteCommand = new Command()
         }
 
         const confirmed = await confirmPrompt({
-          message: `Are you sure you want to delete the shots data for asset ${assetId}?`,
+          message: `Are you sure you want to delete webhook ${webhookId}?`,
           default: false,
         });
 
@@ -36,14 +36,14 @@ export const deleteCommand = new Command()
 
       const mux = await createAuthenticatedMuxClient();
 
-      await mux.video.assets.deleteShots(assetId);
+      await mux.system.webhooks.delete(webhookId);
 
       if (wantsJson(options)) {
-        console.log(JSON.stringify({ success: true, assetId }, null, 2));
+        console.log(JSON.stringify({ success: true, webhookId }, null, 2));
       } else {
-        console.log(`Shots data for asset ${assetId} deleted successfully`);
+        console.log(`Webhook ${webhookId} deleted successfully`);
       }
     } catch (error) {
-      await handleCommandError(error, 'assets', 'shots delete', options);
+      await handleCommandError(error, 'webhooks', 'delete', options);
     }
   });
