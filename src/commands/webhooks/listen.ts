@@ -4,7 +4,11 @@ import { updateEnvironment } from '@/lib/config.ts';
 import { wantsJson } from '@/lib/context.ts';
 import { checkFetchPermissionError } from '@/lib/errors.ts';
 import { appendEvent, type StoredEvent } from '@/lib/events-store.ts';
-import { getAuthHeaders, resolveActiveEnvironment } from '@/lib/mux.ts';
+import {
+  getAuthHeaders,
+  refreshActiveOAuthCredentials,
+  resolveActiveEnvironment,
+} from '@/lib/mux.ts';
 import { parseSSEStream } from '@/lib/sse.ts';
 import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
@@ -73,8 +77,13 @@ export const listenCommand = new Command()
       });
     }
 
-    const authHeaders = await getAuthHeaders();
     const url = `${active.baseUrl}/system/v1/webhook-events/stream`;
+
+    // This command holds a connection open for hours, so an OAuth access token
+    // will expire mid-run. Credentials are resolved per connection attempt
+    // (which refreshes an expiring token), and a 401 triggers one forced
+    // refresh and reconnect before being treated as fatal.
+    let refreshedAfterUnauthorized = false;
 
     let signingSecret: string | undefined;
     if (options.forwardTo) {
@@ -102,6 +111,7 @@ export const listenCommand = new Command()
 
     while (!controller.signal.aborted) {
       try {
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(url, {
           headers: {
             ...authHeaders,
@@ -109,6 +119,18 @@ export const listenCommand = new Command()
           },
           signal: controller.signal,
         });
+
+        if (response.status === 401 && !refreshedAfterUnauthorized) {
+          // The token may have been revoked or rotated server-side. Try once
+          // with a fresh one before reporting an auth failure.
+          refreshedAfterUnauthorized = true;
+          if (await refreshActiveOAuthCredentials().catch(() => false)) {
+            if (!wantsJson(options)) {
+              console.log(colors.dim('Refreshed credentials, reconnecting...'));
+            }
+            continue;
+          }
+        }
 
         if (!response.ok) {
           // Check for permission issues before entering the reconnection loop.
@@ -137,6 +159,9 @@ export const listenCommand = new Command()
         )) {
           if (sseEvent.event === 'connected') {
             backoffMs = INITIAL_BACKOFF_MS;
+            // A healthy connection re-arms the one-shot refresh, so a token
+            // revoked hours from now is still handled.
+            refreshedAfterUnauthorized = false;
             if (!wantsJson(options)) {
               console.log(colors.dim('Connected to event stream.\n'));
             }

@@ -24,7 +24,12 @@ export function hasSigningKeys(credentials: SigningCredentials): boolean {
 export async function signPlaybackId(
   playbackId: string,
   credentials: SigningCredentials,
-  apiCredentials: { tokenId: string; tokenSecret: string },
+  /**
+   * Optional. Signing is a local operation — the JWT is minted from the signing
+   * key pair without calling the API — so no API credential is required. OAuth
+   * logins have no token pair to pass.
+   */
+  apiCredentials: { tokenId?: string; tokenSecret?: string } | undefined,
   options: SigningOptions = {},
 ): Promise<string> {
   if (!hasSigningKeys(credentials)) {
@@ -35,9 +40,12 @@ export async function signPlaybackId(
     );
   }
 
+  // Explicit nulls rather than undefined: an undefined field lets the SDK read
+  // its own environment variables, and this client exists only to mint a JWT.
   const mux = new Mux({
-    tokenId: apiCredentials.tokenId,
-    tokenSecret: apiCredentials.tokenSecret,
+    tokenId: apiCredentials?.tokenId ?? null,
+    tokenSecret: apiCredentials?.tokenSecret ?? null,
+    authorizationToken: null,
   });
 
   // The SDK types params as Record<string, string> but the JWT serializer

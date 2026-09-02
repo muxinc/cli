@@ -10,9 +10,25 @@ import {
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getEnvironment, setEnvironment } from '../lib/config.ts';
+import {
+  type Environment,
+  getCurrentEnvironment,
+  getEnvironment,
+  listEnvironments,
+  readConfig,
+  setCurrentEnvironment,
+  setEnvironment,
+} from '../lib/config.ts';
 import { setAgentMode } from '../lib/context.ts';
-import { credentialsFromEnv, loginCommand, parseEnvFile } from './login.ts';
+import type { OAuthTokens } from '../lib/oauth.ts';
+import type { OAuthLoginDeps } from '../lib/oauth-login.ts';
+import {
+  credentialsFromEnv,
+  formatAuthorizationNotice,
+  loginCommand,
+  parseEnvFile,
+  runOAuthLogin,
+} from './login.ts';
 
 describe('Login command - parseEnvFile', () => {
   let testDir: string;
@@ -302,6 +318,225 @@ describe('Login command - credentialsFromEnv', () => {
   });
 });
 
+describe('formatAuthorizationNotice', () => {
+  const url =
+    'https://api.mux.com/ui/v1/oauth/authorize?response_type=code&state=abc';
+
+  it('shows the URL even when the browser reported success', () => {
+    // open/xdg-open exit 0 whether or not a window actually appeared, so the
+    // URL is the only reliable recovery path.
+    const lines = formatAuthorizationNotice(url, true);
+
+    expect(lines.join('\n')).toContain(url);
+    expect(lines.join('\n')).toContain('Opened your browser');
+    expect(lines.join('\n')).toMatch(/didn't open/);
+  });
+
+  it('asks the user to open the URL when no browser was launched', () => {
+    const lines = formatAuthorizationNotice(url, false);
+
+    expect(lines.join('\n')).toContain(url);
+    expect(lines.join('\n')).toContain('Open this URL');
+    expect(lines.join('\n')).not.toMatch(/didn't open/);
+  });
+
+  it('always ends by saying it is waiting, and how to cancel', () => {
+    for (const opened of [true, false]) {
+      const lines = formatAuthorizationNotice(url, opened);
+      expect(lines.at(-1)).toContain('Waiting for authorization');
+      expect(lines.at(-1)).toContain('Ctrl+C');
+    }
+  });
+
+  it('puts the URL on its own line so it can be copied cleanly', () => {
+    const lines = formatAuthorizationNotice(url, true);
+    const urlLine = lines.find((line) => line.includes(url)) as string;
+
+    expect(urlLine.trim()).toBe(url);
+  });
+});
+
+describe('runOAuthLogin in machine-readable mode', () => {
+  let testConfigDir: string;
+  let originalXdgConfigHome: string | undefined;
+  let logSpy: Mock<typeof console.log>;
+  let errorSpy: Mock<typeof console.error>;
+
+  const TOKENS: OAuthTokens = {
+    accessToken: 'access_1',
+    refreshToken: 'refresh_1',
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    tokenType: 'Bearer',
+  };
+
+  /** Every external step stubbed, mirroring oauth-login.test.ts. */
+  function fakeDeps(overrides: Partial<OAuthLoginDeps> = {}): OAuthLoginDeps {
+    return {
+      startServer: async () => ({
+        port: 51372,
+        redirectUri: 'http://127.0.0.1:51372/callback',
+        waitForCode: async () => 'auth_code',
+        stop: () => {},
+      }),
+      openBrowser: async () => true,
+      endpoints: {
+        clientId: 'test_client',
+        authorizationUrl: 'https://dash.test/oauth/authorize',
+        tokenUrl: 'https://api.test/oauth/token',
+        revocationUrl: 'https://api.test/oauth/revoke',
+        scopes: ['video:read', 'system:read'],
+      },
+      exchange: async () => TOKENS,
+      validate: async () => ({
+        valid: true as const,
+        identity: {
+          environmentId: 'env_123',
+          environmentName: 'Production',
+          organizationId: 'org_123',
+          organizationName: 'Acme Inc',
+          permissions: ['video'],
+        },
+      }),
+      ...overrides,
+    };
+  }
+
+  beforeEach(async () => {
+    testConfigDir = await mkdtemp(join(tmpdir(), 'mux-cli-agent-oauth-'));
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = testConfigDir;
+    logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+    }
+    logSpy?.mockRestore();
+    errorSpy?.mockRestore();
+    setAgentMode(false);
+    await rm(testConfigDir, { recursive: true, force: true });
+  });
+
+  it('completes without a TTY in agent mode and prints exactly one JSON document on stdout', async () => {
+    // Tests run without a TTY, which is exactly the coding-agent case.
+    setAgentMode(true);
+
+    await runOAuthLogin({}, fakeDeps());
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const result = JSON.parse(String(logSpy.mock.calls[0][0]));
+    expect(result.name).toBe('acme-inc-production');
+    expect(result.identity.environmentId).toBe('env_123');
+    expect(result.activated).toBe(true);
+    expect(result.replacedExisting).toBe(false);
+  });
+
+  it('emits the authorization_url event on stderr before waiting for the redirect', async () => {
+    setAgentMode(true);
+    let eventsWhenWaitStarted = -1;
+
+    await runOAuthLogin(
+      {},
+      fakeDeps({
+        startServer: async () => ({
+          port: 51372,
+          redirectUri: 'http://127.0.0.1:51372/callback',
+          waitForCode: async () => {
+            eventsWhenWaitStarted = errorSpy.mock.calls.length;
+            return 'auth_code';
+          },
+          stop: () => {},
+        }),
+      }),
+    );
+
+    // The agent can only relay the URL if it is out before the flow blocks.
+    expect(eventsWhenWaitStarted).toBeGreaterThanOrEqual(1);
+    const event = JSON.parse(String(errorSpy.mock.calls[0][0]));
+    expect(event.event).toBe('authorization_url');
+    expect(event.url).toContain('code_challenge');
+    expect(event.browserOpened).toBe(true);
+    expect(event.expiresInSeconds).toBe(300);
+  });
+
+  it('honors --json outside agent mode with the same contract', async () => {
+    await runOAuthLogin({ json: true }, fakeDeps());
+
+    const event = JSON.parse(String(errorSpy.mock.calls[0][0]));
+    expect(event.event).toBe('authorization_url');
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(logSpy.mock.calls[0][0])).name).toBe(
+      'acme-inc-production',
+    );
+  });
+
+  it('still attempts to open a browser in agent mode', async () => {
+    // Agents typically run on the user's machine, so the browser opening
+    // directly is the best UX; the URL is emitted regardless.
+    setAgentMode(true);
+    let opened = false;
+
+    await runOAuthLogin(
+      {},
+      fakeDeps({
+        openBrowser: async () => {
+          opened = true;
+          return true;
+        },
+      }),
+    );
+
+    expect(opened).toBe(true);
+  });
+
+  it('passes --timeout through to the loopback server and reports it in the event', async () => {
+    setAgentMode(true);
+    let requestedTimeoutMs: number | undefined;
+
+    await runOAuthLogin(
+      { timeout: 600 },
+      fakeDeps({
+        startServer: async (options) => {
+          requestedTimeoutMs = options.timeoutMs;
+          return {
+            port: 51372,
+            redirectUri: 'http://127.0.0.1:51372/callback',
+            waitForCode: async () => 'auth_code',
+            stop: () => {},
+          };
+        },
+      }),
+    );
+
+    expect(requestedTimeoutMs).toBe(600_000);
+    const event = JSON.parse(String(errorSpy.mock.calls[0][0]));
+    expect(event.expiresInSeconds).toBe(600);
+  });
+
+  it('rejects a non-positive --timeout', async () => {
+    setAgentMode(true);
+
+    await expect(runOAuthLogin({ timeout: 0 }, fakeDeps())).rejects.toThrow(
+      /--timeout/,
+    );
+    await expect(runOAuthLogin({ timeout: -5 }, fakeDeps())).rejects.toThrow(
+      /--timeout/,
+    );
+  });
+
+  it('still refuses the pretty flow without a terminal', async () => {
+    // Neither --json nor agent mode: a bare `mux login` in a pipe or CI runner
+    // must keep failing fast rather than blocking on a redirect.
+    await expect(runOAuthLogin({}, fakeDeps())).rejects.toThrow(
+      /interactive terminal/i,
+    );
+  });
+});
+
 describe('Login command - action', () => {
   let testConfigDir: string;
   let originalXdgConfigHome: string | undefined;
@@ -363,11 +598,11 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'env_id';
     process.env.MUX_TOKEN_SECRET = 'env_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('env_id');
-    expect(saved?.tokenSecret).toBe('env_secret');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('env_id');
+    expect(saved?.token?.tokenSecret).toBe('env_secret');
   });
 
   it('prefers --env-file over environment variables', async () => {
@@ -381,16 +616,16 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('file_id');
-    expect(saved?.tokenSecret).toBe('file_secret');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('file_id');
+    expect(saved?.token?.tokenSecret).toBe('file_secret');
   });
 
   it('outputs machine-readable JSON with --json', async () => {
     process.env.MUX_TOKEN_ID = 'env_id';
     process.env.MUX_TOKEN_SECRET = 'env_secret';
 
-    await loginCommand.parse(['--json']);
+    await loginCommand.parse(['--json', '--from-env']);
 
     const output = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
     const parsed = JSON.parse(output);
@@ -404,15 +639,15 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_SECRET = 'env_secret';
     setAgentMode(true);
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
     const output = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
     expect(JSON.parse(output).success).toBe(true);
   });
 
-  it('fails fast with a JSON error on --json when no credentials are available', async () => {
+  it('fails fast with a JSON error on --json --interactive, and points at the alternatives', async () => {
     try {
-      await loginCommand.parse(['--json']);
+      await loginCommand.parse(['--json', '--interactive']);
     } catch (_error) {
       // handleCommandError exits; the mocked process.exit throws to halt parse
     }
@@ -420,21 +655,71 @@ describe('Login command - action', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
     expect(parsed.error).toMatch(/MUX_TOKEN_ID and MUX_TOKEN_SECRET/);
+    // The browser flow works in machine-readable mode now, so the error must
+    // not steer callers away from it.
+    expect(parsed.error).toMatch(/--oauth/);
+    expect(parsed.error).not.toMatch(/Interactive login is not available/);
   });
 
-  it('fails fast with a JSON error in agent mode instead of prompting when no credentials are available', async () => {
+  it('fails fast with a JSON error on --interactive in agent mode instead of prompting', async () => {
     setAgentMode(true);
 
     try {
-      await loginCommand.parse([]);
+      await loginCommand.parse(['--interactive']);
     } catch (_error) {
       // handleCommandError exits; the mocked process.exit throws to halt parse
     }
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
-    expect(parsed.error).toMatch(/Interactive login is not available/);
+    expect(parsed.error).toMatch(/MUX_TOKEN_ID and MUX_TOKEN_SECRET/);
+    expect(parsed.error).toMatch(/--oauth/);
   });
+
+  it('runs the browser flow end to end in agent mode and surfaces a timeout as a JSON error', async () => {
+    // Integration: real loopback server, real timeout. Discovery goes through
+    // the mocked fetch and falls back to built-in endpoints; --print-url keeps
+    // the test from opening a real browser.
+    setAgentMode(true);
+    const originalXdgCacheHome = process.env.XDG_CACHE_HOME;
+    process.env.XDG_CACHE_HOME = testConfigDir;
+
+    try {
+      await loginCommand.parse(['--print-url', '--timeout', '1']);
+    } catch (_error) {
+      // handleCommandError exits; the mocked process.exit throws to halt parse
+    } finally {
+      if (originalXdgCacheHome === undefined) delete process.env.XDG_CACHE_HOME;
+      else process.env.XDG_CACHE_HOME = originalXdgCacheHome;
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const lines = errorSpy.mock.calls.map((c) => String(c[0]));
+    const event = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .find((parsed) => parsed?.event === 'authorization_url');
+    expect(event).toBeDefined();
+    expect(event.url).toContain('code_challenge');
+    expect(event.browserOpened).toBe(false);
+    expect(event.expiresInSeconds).toBe(1);
+
+    const failure = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .find((parsed) => typeof parsed?.error === 'string');
+    expect(failure?.error).toMatch(/timed out/i);
+  }, 15_000);
 
   it('reports credential validation failures as JSON in agent mode', async () => {
     process.env.MUX_TOKEN_ID = 'bad_id';
@@ -448,7 +733,7 @@ describe('Login command - action', () => {
     );
 
     try {
-      await loginCommand.parse([]);
+      await loginCommand.parse(['--from-env']);
     } catch (_error) {
       // handleCommandError exits; the mocked process.exit throws to halt parse
     }
@@ -456,6 +741,198 @@ describe('Login command - action', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
     expect(parsed.error).toBeDefined();
+  });
+
+  it('keeps a stored custom API host when re-logging into the same environment', async () => {
+    // The whole entry is rewritten on save, so a field missing from the carried
+    // list is silently lost. Here the login resolves to the default host, so
+    // nothing re-supplies baseUrl — it has to survive from the existing entry.
+    await setEnvironment('default', {
+      environmentId: 'env_mock_123',
+      baseUrl: 'https://api.custom.example',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    expect((await getEnvironment('default'))?.baseUrl).toBe(
+      'https://api.custom.example',
+    );
+  });
+
+  it('lets an explicit host override the stored one', async () => {
+    await setEnvironment('default', {
+      environmentId: 'env_mock_123',
+      baseUrl: 'https://old-host.example',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+    process.env.MUX_BASE_URL = 'https://new-host.example';
+
+    try {
+      await loginCommand.parse(['--from-env']);
+
+      expect((await getEnvironment('default'))?.baseUrl).toBe(
+        'https://new-host.example',
+      );
+    } finally {
+      delete process.env.MUX_BASE_URL;
+    }
+  });
+
+  it('keeps the active environment active when re-logging into it', async () => {
+    // Regression: the entry used to be removed and recreated, and removing the
+    // current environment reassigns defaultEnvironment — so re-logging into the
+    // environment you were already using silently switched accounts.
+    await setEnvironment('default', {
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    await setEnvironment('other', {
+      token: { tokenId: 'o_id', tokenSecret: 'o_secret' },
+      environmentId: 'env_OTHER',
+    });
+    await setCurrentEnvironment('default');
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    expect((await getCurrentEnvironment())?.name).toBe('default');
+  });
+
+  it('keeps the selection when the entry has no environmentId to compare', async () => {
+    // An entry written by an older version has no environmentId, so it can never
+    // match — the path most users would have hit.
+    await setEnvironment('default', {
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
+    });
+    await setEnvironment('second', {
+      token: { tokenId: 's_id', tokenSecret: 's_secret' },
+    });
+    await setCurrentEnvironment('default');
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    const config = await readConfig();
+    expect(config?.defaultEnvironment).toBe('default');
+    expect(Object.keys(config?.environments ?? {}).sort()).toEqual([
+      'default',
+      'second',
+    ]);
+  });
+
+  it('keeps a browser sign-in for the same environment when saving a token pair', async () => {
+    await setEnvironment('default', {
+      environmentId: 'env_mock_123',
+      oauth: {
+        accessToken: 'access_1',
+        refreshToken: 'refresh_1',
+        expiresAt: 4_102_444_800,
+      },
+    });
+    process.env.MUX_TOKEN_ID = 'new_id';
+    process.env.MUX_TOKEN_SECRET = 'new_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    const saved = await getEnvironment('default');
+    expect(saved?.oauth?.accessToken).toBe('access_1');
+    expect(saved?.token?.tokenId).toBe('new_id');
+  });
+
+  it('refuses to guess when shell credentials are set, and says why', async () => {
+    process.env.MUX_TOKEN_ID = 'env_id';
+    process.env.MUX_TOKEN_SECRET = 'env_secret';
+
+    try {
+      await loginCommand.parse([]);
+    } catch (_error) {
+      // handleCommandError exits; the mocked process.exit throws to halt parse
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const message = String(errorSpy.mock.calls[0][0]);
+    expect(message).toContain('MUX_TOKEN_ID and MUX_TOKEN_SECRET detected');
+    expect(message).toContain('--from-env');
+    expect(message).toContain('--env-file');
+    expect(message).toContain('--interactive');
+    expect(message).toContain('--oauth');
+  });
+
+  it('writes nothing to the config when it refuses to guess', async () => {
+    process.env.MUX_TOKEN_ID = 'env_id';
+    process.env.MUX_TOKEN_SECRET = 'env_secret';
+
+    try {
+      await loginCommand.parse([]);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(await listEnvironments()).toEqual([]);
+  });
+
+  it('rejects two login methods at once', async () => {
+    try {
+      await loginCommand.parse(['--oauth', '--interactive']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(/only one/i);
+  });
+
+  it('rejects --from-env when the shell has no credentials', async () => {
+    try {
+      await loginCommand.parse(['--from-env']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(
+      /MUX_TOKEN_ID and MUX_TOKEN_SECRET are not set/,
+    );
+  });
+
+  it('warns that a login saved with shell credentials set is shadowed', async () => {
+    process.env.MUX_TOKEN_ID = 'env_id';
+    process.env.MUX_TOKEN_SECRET = 'env_secret';
+
+    await loginCommand.parse(['--from-env']);
+
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('take precedence over the saved login');
+    expect(printed).toMatch(/Unset them/);
+  });
+
+  it('refuses browser sign-in with no terminal to drive it', async () => {
+    // Tests run without a TTY, which is exactly the CI / piped-stdin case.
+    try {
+      await loginCommand.parse(['--oauth']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(/interactive terminal/i);
+  });
+
+  it('refuses --interactive with no terminal to prompt on', async () => {
+    try {
+      await loginCommand.parse(['--interactive']);
+    } catch (_error) {
+      // handleCommandError exits
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(String(errorSpy.mock.calls[0][0])).toMatch(/interactive terminal/i);
   });
 
   it('keeps human-readable errors when not in JSON or agent mode', async () => {
@@ -477,10 +954,10 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'env_id';
     process.env.MUX_TOKEN_SECRET = 'env_secret';
 
-    await loginCommand.parse(['--name', 'staging']);
+    await loginCommand.parse(['--name', 'staging', '--from-env']);
 
-    const saved = await getEnvironment('staging');
-    expect(saved?.tokenId).toBe('env_id');
+    const saved = (await getEnvironment('staging')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('env_id');
   });
 
   it('saves signing keys from the env file when both are present', async () => {
@@ -492,7 +969,7 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBe('key_abc');
     expect(saved?.signingPrivateKey).toBe('private_base64');
   });
@@ -513,7 +990,7 @@ describe('Login command - action', () => {
       else process.env.MUX_BASE_URL = originalBaseUrl;
     }
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.baseUrl).toBe('https://file.example.com');
     const validationUrl = String(fetchSpy.mock.calls[0][0]);
     expect(validationUrl.startsWith('https://file.example.com')).toBe(true);
@@ -535,7 +1012,7 @@ describe('Login command - action', () => {
       else process.env.MUX_BASE_URL = originalBaseUrl;
     }
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.baseUrl).toBe('https://shell.example.com');
   });
 
@@ -546,13 +1023,13 @@ describe('Login command - action', () => {
     process.env.MUX_PRIVATE_KEY = 'private_env';
 
     try {
-      await loginCommand.parse([]);
+      await loginCommand.parse(['--from-env']);
     } finally {
       delete process.env.MUX_SIGNING_KEY;
       delete process.env.MUX_PRIVATE_KEY;
     }
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBe('key_env');
     expect(saved?.signingPrivateKey).toBe('private_env');
   });
@@ -561,8 +1038,7 @@ describe('Login command - action', () => {
     // The mocked /whoami returns env_mock_123, so this entry matches the
     // environment the new credentials belong to.
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       environmentId: 'env_mock_123',
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
@@ -571,10 +1047,10 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'new_id';
     process.env.MUX_TOKEN_SECRET = 'new_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('new_id');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('new_id');
     expect(saved?.signingKeyId).toBe('key_saved');
     expect(saved?.signingPrivateKey).toBe('private_saved');
     expect(saved?.forwardUrl).toBe('http://localhost:3000/webhooks');
@@ -582,8 +1058,7 @@ describe('Login command - action', () => {
 
   it('does not carry signing keys over when the new credentials belong to a different environment', async () => {
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       environmentId: 'env_different_999',
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
@@ -592,10 +1067,10 @@ describe('Login command - action', () => {
     process.env.MUX_TOKEN_ID = 'new_id';
     process.env.MUX_TOKEN_SECRET = 'new_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
-    expect(saved?.tokenId).toBe('new_id');
+    const saved = (await getEnvironment('default')) as Environment | null;
+    expect(saved?.token?.tokenId).toBe('new_id');
     expect(saved?.signingKeyId).toBeUndefined();
     expect(saved?.signingPrivateKey).toBeUndefined();
     expect(saved?.forwardUrl).toBeUndefined();
@@ -603,24 +1078,22 @@ describe('Login command - action', () => {
 
   it('does not preserve fields from a legacy entry with no environmentId', async () => {
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
     });
     process.env.MUX_TOKEN_ID = 'new_id';
     process.env.MUX_TOKEN_SECRET = 'new_secret';
 
-    await loginCommand.parse([]);
+    await loginCommand.parse(['--from-env']);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBeUndefined();
   });
 
   it('prefers newly provided signing keys over preserved ones', async () => {
     await setEnvironment('default', {
-      tokenId: 'old_id',
-      tokenSecret: 'old_secret',
+      token: { tokenId: 'old_id', tokenSecret: 'old_secret' },
       environmentId: 'env_mock_123',
       signingKeyId: 'key_saved',
       signingPrivateKey: 'private_saved',
@@ -633,7 +1106,7 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBe('key_new');
     expect(saved?.signingPrivateKey).toBe('private_new');
   });
@@ -647,7 +1120,7 @@ describe('Login command - action', () => {
 
     await loginCommand.parse(['--env-file', envPath]);
 
-    const saved = await getEnvironment('default');
+    const saved = (await getEnvironment('default')) as Environment | null;
     expect(saved?.signingKeyId).toBeUndefined();
     expect(saved?.signingPrivateKey).toBeUndefined();
   });

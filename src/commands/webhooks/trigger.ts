@@ -38,8 +38,13 @@ export const triggerCommand = new Command()
 
       const active = await resolveActiveEnvironment();
       const envLabel = active.stored?.name ?? active.environmentId;
+      // Only used as a short cosmetic marker in the example payload. An
+      // OAuth-only environment has no token id, so the marker falls back to the
+      // env var and then to empty.
       const tokenId =
-        active.stored?.environment.tokenId ?? process.env.MUX_TOKEN_ID ?? '';
+        active.stored?.environment.token?.tokenId ??
+        process.env.MUX_TOKEN_ID ??
+        '';
 
       const payload = generateExampleWebhook(
         eventType as WebhookEventType,
