@@ -84,9 +84,14 @@ export const hotspotsCommand = new Command()
         return;
       }
 
-      const { hotspots, total_views } = response.data;
+      // The SDK types declare { hotspots, total_views } but the live API
+      // currently omits total_views — treat every field as optional.
+      const data = response.data as Partial<EngagementHotspots>;
+      const hotspots = data.hotspots ?? [];
       console.log(`Engagement hotspots for ${target.kind} ${target.id}:`);
-      console.log(`  Total views: ${total_views}`);
+      if (data.total_views !== undefined) {
+        console.log(`  Total views: ${data.total_views}`);
+      }
 
       if (hotspots.length === 0) {
         console.log('  No hotspots found.');

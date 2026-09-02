@@ -464,7 +464,7 @@ mux assets tracks create abc123xyz --url https://example.com/subs.vtt --type tex
 
 ##### `mux assets tracks update <asset-id> <track-id>`
 
-Update a track on an asset. At least one field flag must be provided.
+Update a text track (subtitles/captions) on an asset. At least one field flag must be provided. The API rejects non-text tracks.
 
 **Options:** `--name <name>`, `--language-code <code>`, `--closed-captions <true|false>`, `--passthrough <string>`
 

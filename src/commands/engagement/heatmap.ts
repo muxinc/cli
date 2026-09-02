@@ -63,11 +63,18 @@ export const heatmapCommand = new Command()
         return;
       }
 
-      const heatmap = response.data;
+      // The SDK types declare { total_views, value } but the live API
+      // currently returns { asset_id, heatmap } — accept both shapes.
+      const heatmap = response.data as Partial<EngagementHeatmap> & {
+        heatmap?: number[];
+      };
+      const values = heatmap.value ?? heatmap.heatmap ?? [];
       console.log(`Engagement heatmap for ${target.kind} ${target.id}:`);
-      console.log(`  Total views: ${heatmap.total_views}`);
-      console.log(`  Values (${heatmap.value.length} buckets):`);
-      console.log(`  ${JSON.stringify(heatmap.value)}`);
+      if (heatmap.total_views !== undefined) {
+        console.log(`  Total views: ${heatmap.total_views}`);
+      }
+      console.log(`  Values (${values.length} buckets):`);
+      console.log(`  ${JSON.stringify(values)}`);
     } catch (error) {
       await handleCommandError(error, 'engagement', 'heatmap', options);
     }

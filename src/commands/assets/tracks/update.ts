@@ -13,7 +13,7 @@ interface UpdateOptions {
 }
 
 export const updateCommand = new Command()
-  .description('Update a track on a Mux video asset (name, language, etc.)')
+  .description('Update a text track (subtitles/captions) on a Mux video asset')
   .arguments('<asset-id:string> <track-id:string>')
   .option('--name <name:string>', 'Human-readable name for the track')
   .option(
