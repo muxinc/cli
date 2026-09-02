@@ -899,6 +899,8 @@ mux robots cancel <job-id>
 
 **List options:** `--workflow`, `--status`, `--asset-id`, `--limit`, `--page`, `--compact`
 
+**Workflow values:** `summarize`, `moderate`, `generate-chapters`, `ask-questions`, `find-key-moments`, `translate-captions`, `edit-captions`, `find-best-thumbnails`, `find-scenes`, `generate-engagement-insights`, `generate-premium-captions`, `translate-audio`
+
 #### `mux robots summarize <asset-id>`
 
 Generate a title, description, and tags for a video.
@@ -1328,9 +1330,10 @@ src/
 │   ├── incidents/                    # Mux Data: incident tracking
 │   ├── annotations/                  # Mux Data: annotation management
 │   ├── dimensions/                   # Mux Data: dimension queries
+│   ├── engagement/                   # Mux Data: engagement analytics
 │   ├── errors/                       # Mux Data: error analytics
 │   ├── exports/                      # Mux Data: export files
-│   ├── webhooks/                     # Webhook listening & replay
+│   ├── webhooks/                     # Webhook config, listening & replay
 │   │   ├── events/                  # Event storage & replay
 │   │   └── listen.ts                # Real-time SSE listener
 │   ├── env/                          # Environment management
