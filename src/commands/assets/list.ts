@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import type { Asset } from '@mux/mux-node/resources/video/assets';
+import type { Asset } from '@mux/ts/resources/video/assets';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import {

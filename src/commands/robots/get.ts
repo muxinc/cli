@@ -7,10 +7,16 @@ import { type RobotsWorkflow, retrieveRobotsJob } from './_shared.ts';
 
 const WORKFLOWS: RobotsWorkflow[] = [
   'ask-questions',
+  'edit-captions',
+  'find-best-thumbnails',
   'find-key-moments',
+  'find-scenes',
   'generate-chapters',
+  'generate-engagement-insights',
+  'generate-premium-captions',
   'moderate',
   'summarize',
+  'translate-audio',
   'translate-captions',
 ];
 
@@ -33,7 +39,7 @@ export const getCommand = new Command()
   .arguments('<job-id:string>')
   .option(
     '--workflow <workflow:string>',
-    'Workflow type (summarize, moderate, generate-chapters, translate-captions, ask-questions, find-key-moments)',
+    `Workflow type (${WORKFLOWS.join(', ')})`,
     { required: true },
   )
   .option('--json', 'Output JSON instead of pretty format')

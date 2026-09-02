@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import type Mux from '@mux/mux-node';
+import type Mux from '@mux/ts';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { expandGlobPattern, uploadFile } from '@/lib/file-upload.ts';

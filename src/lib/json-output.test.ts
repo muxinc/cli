@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { AbstractPage } from '@mux/mux-node/core/pagination';
+import { AbstractPage } from '@mux/ts/core/pagination';
 import { formatJson, unwrapPage } from './json-output.ts';
 
 /**

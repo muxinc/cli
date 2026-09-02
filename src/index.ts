@@ -8,6 +8,7 @@ import { completionsInstallCommand } from './commands/completions-install.ts';
 import { deliveryUsageCommand } from './commands/delivery-usage/index.ts';
 import { dimensionsCommand } from './commands/dimensions/index.ts';
 import { drmConfigurationsCommand } from './commands/drm-configurations/index.ts';
+import { engagementCommand } from './commands/engagement/index.ts';
 import { envCommand } from './commands/env/index.ts';
 import { errorsCommand } from './commands/errors/index.ts';
 import { exportsCommand } from './commands/exports/index.ts';
@@ -64,6 +65,7 @@ const cli = new Command()
   .command('incidents', incidentsCommand)
   .command('annotations', annotationsCommand)
   .command('dimensions', dimensionsCommand)
+  .command('engagement', engagementCommand)
   .command('errors', errorsCommand)
   .command('exports', exportsCommand)
   .command('robots', robotsCommand)

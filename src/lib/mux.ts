@@ -1,4 +1,4 @@
-import Mux from '@mux/mux-node';
+import Mux from '@mux/ts';
 import pkg from '../../package.json';
 import {
   type Environment,

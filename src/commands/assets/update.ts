@@ -9,12 +9,14 @@ interface UpdateOptions {
   creatorId?: string;
   externalId?: string;
   passthrough?: string;
+  thumbnailTime?: number;
+  clearThumbnailTime?: boolean;
   json?: boolean;
 }
 
 export const updateCommand = new Command()
   .description(
-    'Update metadata fields on a Mux video asset (title, passthrough, etc.)',
+    'Update metadata fields on a Mux video asset (title, passthrough, thumbnail time, etc.)',
   )
   .arguments('<asset-id:string>')
   .option('--title <title:string>', 'Set meta.title (max 512 characters)')
@@ -30,18 +32,36 @@ export const updateCommand = new Command()
     '--passthrough <passthrough:string>',
     'Set passthrough (max 255 characters)',
   )
+  .option(
+    '--thumbnail-time <thumbnailTime:number>',
+    "Set the asset's default thumbnail time in seconds",
+  )
+  .option(
+    '--clear-thumbnail-time',
+    "Reset the asset's default thumbnail time to the default",
+  )
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: UpdateOptions, assetId: string) => {
     try {
-      const hasField =
+      if (
+        options.thumbnailTime !== undefined &&
+        options.clearThumbnailTime !== undefined
+      ) {
+        throw new Error(
+          '--thumbnail-time and --clear-thumbnail-time cannot be combined',
+        );
+      }
+
+      const hasUpdateField =
         options.title !== undefined ||
         options.creatorId !== undefined ||
         options.externalId !== undefined ||
-        options.passthrough !== undefined;
+        options.passthrough !== undefined ||
+        options.thumbnailTime !== undefined;
 
-      if (!hasField) {
+      if (!hasUpdateField && options.clearThumbnailTime === undefined) {
         throw new Error(
-          'At least one field must be specified: --title, --creator-id, --external-id, or --passthrough',
+          'At least one field must be specified: --title, --creator-id, --external-id, --passthrough, --thumbnail-time, or --clear-thumbnail-time',
         );
       }
 
@@ -51,6 +71,10 @@ export const updateCommand = new Command()
 
       if (options.passthrough !== undefined) {
         updateParams.passthrough = options.passthrough;
+      }
+
+      if (options.thumbnailTime !== undefined) {
+        updateParams.thumbnail_time = options.thumbnailTime;
       }
 
       if (
@@ -71,7 +95,18 @@ export const updateCommand = new Command()
         updateParams.meta = meta;
       }
 
-      const asset = await mux.video.assets.update(assetId, updateParams);
+      let asset = hasUpdateField
+        ? await mux.video.assets.update(assetId, updateParams)
+        : undefined;
+
+      if (options.clearThumbnailTime) {
+        await mux.video.assets.deleteThumbnailTime(assetId);
+        asset = await mux.video.assets.retrieve(assetId);
+      }
+
+      if (!asset) {
+        throw new Error(`Failed to load asset ${assetId} after update`);
+      }
 
       if (wantsJson(options)) {
         console.log(JSON.stringify(asset, null, 2));

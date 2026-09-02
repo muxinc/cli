@@ -1,4 +1,4 @@
-import type Mux from '@mux/mux-node';
+import type Mux from '@mux/ts';
 
 export type PlaybackIdPolicy = 'public' | 'signed';
 

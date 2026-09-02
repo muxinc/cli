@@ -1,4 +1,4 @@
-import { AbstractPage } from '@mux/mux-node/core/pagination';
+import { AbstractPage } from '@mux/ts/core/pagination';
 
 /**
  * SDK page objects carry internal request state (options, response, body)

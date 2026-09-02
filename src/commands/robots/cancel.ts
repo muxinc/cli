@@ -14,7 +14,7 @@ export const cancelCommand = new Command()
   .action(async (options: CancelOptions, jobId: string) => {
     try {
       const mux = await createAuthenticatedMuxClient();
-      const job = await mux.robotsPreview.jobs.cancel(jobId);
+      const job = await mux.robots.jobs.cancel(jobId);
 
       if (wantsJson(options)) {
         console.log(JSON.stringify(job, null, 2));

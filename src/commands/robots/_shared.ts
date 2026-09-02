@@ -1,20 +1,32 @@
 import { readFile } from 'node:fs/promises';
-import type Mux from '@mux/mux-node';
+import type Mux from '@mux/ts';
 import type {
   AskQuestionsJob,
+  EditCaptionsJob,
+  FindBestThumbnailsJob,
   FindKeyMomentsJob,
+  FindScenesJob,
   GenerateChaptersJob,
+  GenerateEngagementInsightsJob,
+  GeneratePremiumCaptionsJob,
   ModerateJob,
   SummarizeJob,
+  TranslateAudioJob,
   TranslateCaptionsJob,
-} from '@mux/mux-node/resources/robots-preview/jobs';
+} from '@mux/ts/resources/robots/jobs';
 
 export type AnyRobotsJob =
   | AskQuestionsJob
+  | EditCaptionsJob
+  | FindBestThumbnailsJob
   | FindKeyMomentsJob
+  | FindScenesJob
   | GenerateChaptersJob
+  | GenerateEngagementInsightsJob
+  | GeneratePremiumCaptionsJob
   | ModerateJob
   | SummarizeJob
+  | TranslateAudioJob
   | TranslateCaptionsJob;
 
 export type RobotsWorkflow = AnyRobotsJob['workflow'];
@@ -67,17 +79,29 @@ export function retrieveRobotsJob(
 ): Promise<AnyRobotsJob> {
   switch (workflow) {
     case 'ask-questions':
-      return mux.robotsPreview.jobs.askQuestions.retrieve(jobId);
+      return mux.robots.jobs.askQuestions.retrieve(jobId);
+    case 'edit-captions':
+      return mux.robots.jobs.editCaptions.retrieve(jobId);
+    case 'find-best-thumbnails':
+      return mux.robots.jobs.findBestThumbnails.retrieve(jobId);
     case 'find-key-moments':
-      return mux.robotsPreview.jobs.findKeyMoments.retrieve(jobId);
+      return mux.robots.jobs.findKeyMoments.retrieve(jobId);
+    case 'find-scenes':
+      return mux.robots.jobs.findScenes.retrieve(jobId);
     case 'generate-chapters':
-      return mux.robotsPreview.jobs.generateChapters.retrieve(jobId);
+      return mux.robots.jobs.generateChapters.retrieve(jobId);
+    case 'generate-engagement-insights':
+      return mux.robots.jobs.generateEngagementInsights.retrieve(jobId);
+    case 'generate-premium-captions':
+      return mux.robots.jobs.generatePremiumCaptions.retrieve(jobId);
     case 'moderate':
-      return mux.robotsPreview.jobs.moderate.retrieve(jobId);
+      return mux.robots.jobs.moderate.retrieve(jobId);
     case 'summarize':
-      return mux.robotsPreview.jobs.summarize.retrieve(jobId);
+      return mux.robots.jobs.summarize.retrieve(jobId);
+    case 'translate-audio':
+      return mux.robots.jobs.translateAudio.retrieve(jobId);
     case 'translate-captions':
-      return mux.robotsPreview.jobs.translateCaptions.retrieve(jobId);
+      return mux.robots.jobs.translateCaptions.retrieve(jobId);
   }
 }
 

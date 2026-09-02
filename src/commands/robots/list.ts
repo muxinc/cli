@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import type { JobListParams } from '@mux/mux-node/resources/robots-preview/jobs';
+import type { JobListParams } from '@mux/ts/resources/robots/jobs';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { formatCreatedAt } from '@/lib/formatters.ts';
@@ -22,7 +22,7 @@ export const listCommand = new Command()
   .description('List Mux Robots jobs')
   .option(
     '--workflow <workflow:string>',
-    'Filter by workflow type (summarize, moderate, generate-chapters, translate-captions, ask-questions, find-key-moments)',
+    'Filter by workflow type (e.g. summarize, moderate, generate-chapters, translate-captions, edit-captions, translate-audio, find-scenes, find-best-thumbnails)',
   )
   .option('--status <status:string>', 'Filter by job status')
   .option('--asset-id <assetId:string>', 'Filter by asset ID')
@@ -44,7 +44,7 @@ export const listCommand = new Command()
       if (options.status) params.status = options.status as JobStatus;
       if (options.assetId) params.asset_id = options.assetId;
 
-      const response = await mux.robotsPreview.jobs.list(params);
+      const response = await mux.robots.jobs.list(params);
       const data = response.data ?? [];
 
       if (wantsJson(options)) {

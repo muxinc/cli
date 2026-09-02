@@ -1,4 +1,4 @@
-import Mux from '@mux/mux-node';
+import Mux from '@mux/ts';
 
 export interface SigningCredentials {
   signingKeyId?: string;

@@ -1,5 +1,5 @@
 import { Command } from '@cliffy/command';
-import type { LiveStream } from '@mux/mux-node/resources/video/live-streams';
+import type { LiveStream } from '@mux/ts/resources/video/live-streams';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import {
