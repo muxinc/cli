@@ -99,6 +99,12 @@ export const hotspotsCommand = new Command()
       }
 
       for (const hotspot of hotspots) {
+        // Guard against field names diverging from the SDK types, as the
+        // envelope fields above already have.
+        if (hotspot.start_ms === undefined || hotspot.end_ms === undefined) {
+          console.log(`  ${JSON.stringify(hotspot)}`);
+          continue;
+        }
         const range = `${formatMs(hotspot.start_ms)} - ${formatMs(hotspot.end_ms)}`;
         console.log(`  ${range.padEnd(16)} score: ${hotspot.score}`);
       }
