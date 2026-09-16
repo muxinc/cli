@@ -91,8 +91,9 @@ const GRANT_TIMEOUT_MS = 10_000;
 
 /**
  * OAuth error codes that no amount of retrying will fix. Everything else —
- * transport failures, 5xx, throttling — is reported as retryable so callers can
- * distinguish "try again" from "log in again".
+ * transport failures, 5xx, throttling, and any response that carries no
+ * recognized code at all — is reported as retryable so callers can distinguish
+ * "try again" from "log in again".
  */
 const TERMINAL_ERROR_CODES = new Set([
   'invalid_grant',
@@ -367,9 +368,11 @@ function failureFrom(
   const { code, detail } = describeFailure(body, raw);
   // 5xx and 429 are transport-adjacent: the credential may still be good.
   const retryableStatus = status >= 500 || status === 429;
-  const terminal = code
-    ? TERMINAL_ERROR_CODES.has(code) && !retryableStatus
-    : !retryableStatus;
+  // Only a recognized OAuth error code is proof the credential itself is bad. A
+  // response without one — a corporate proxy's 403 page, a WAF block, a captive
+  // portal — says nothing about the credential and must not condemn it.
+  const terminal =
+    code !== undefined && TERMINAL_ERROR_CODES.has(code) && !retryableStatus;
 
   // Naming the URL matters most for exactly the confusing case: a 404 from a
   // misconfigured endpoint looks identical to a rejected credential otherwise.
@@ -384,10 +387,13 @@ function tokensFrom(
   body: TokenResponseBody,
   presentedRefreshToken?: string,
 ): OAuthTokens {
+  // A 2xx whose body is not a token response means something answered in the
+  // server's place — a captive portal, a middlebox rewriting the payload. Never
+  // terminal: it is not evidence about the credential.
   if (!body.access_token) {
     throw new OAuthError(
       'The Mux authorization server did not return an access token.',
-      { terminal: true },
+      { terminal: false },
     );
   }
 
@@ -395,7 +401,7 @@ function tokensFrom(
   if (!refreshToken) {
     throw new OAuthError(
       'The Mux authorization server did not return a refresh token, so the CLI could not keep the login alive.',
-      { terminal: true },
+      { terminal: false },
     );
   }
 

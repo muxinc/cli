@@ -261,6 +261,22 @@ describe('ensureFreshAccessToken', () => {
       expect(error?.message).toContain('mux login');
     });
 
+    it('rethrows a typed error so long-running commands can stop retrying', async () => {
+      // `webhooks listen` reconnects on transport failures. Without the type it
+      // cannot tell a revoked refresh token from a network blip, and retries a
+      // hopeless refresh every 30s forever.
+      const error = await ensureFreshAccessToken(
+        NAME,
+        credential({ expiresAt: 1 }),
+      )
+        .then(() => null)
+        .catch((e: Error) => e);
+
+      expect(error).toBeInstanceOf(OAuthError);
+      expect((error as OAuthError).terminal).toBe(true);
+      expect((error as OAuthError).code).toBe('invalid_grant');
+    });
+
     it('flags the credential without deleting it', async () => {
       await ensureFreshAccessToken(NAME, credential({ expiresAt: 1 })).catch(
         () => undefined,
@@ -307,6 +323,35 @@ describe('ensureFreshAccessToken', () => {
     expect(error).toBeInstanceOf(OAuthError);
     expect((error as OAuthError).terminal).toBe(false);
     // A flaky connection is not evidence the credential is dead.
+    expect((await getEnvironment(NAME))?.oauth?.lastError).toBeUndefined();
+  });
+
+  it('does not flag the credential when a proxy rejects the refresh', async () => {
+    // A corporate proxy or WAF error page carries no OAuth error code, so it
+    // says nothing about the credential. Flagging here would be unrecoverable
+    // in practice: the flag is only cleared by a successful refresh, which a
+    // preferred token pair on the same environment prevents from ever running.
+    const oauth = credential({ expiresAt: nowSeconds() - 10 });
+    await setCredential(NAME, 'oauth', oauth);
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
+      input: string,
+    ) => {
+      if (String(input).includes('/.well-known/')) {
+        return new Response('not found', { status: 404 });
+      }
+      return new Response('<html><body>Request blocked</body></html>', {
+        status: 403,
+        headers: { 'content-type': 'text/html' },
+      });
+    }) as unknown as typeof fetch);
+
+    const error = await ensureFreshAccessToken(NAME, oauth)
+      .then(() => null)
+      .catch((e: Error) => e);
+
+    expect(error).toBeInstanceOf(OAuthError);
+    expect((error as OAuthError).terminal).toBe(false);
+    expect(error?.message).not.toContain('mux login');
     expect((await getEnvironment(NAME))?.oauth?.lastError).toBeUndefined();
   });
 });

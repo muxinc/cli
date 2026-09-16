@@ -434,6 +434,93 @@ describe('refreshAccessToken', () => {
   });
 });
 
+describe('terminal classification', () => {
+  // Flagging is asymmetric: once a credential is flagged, a token pair on the
+  // same environment becomes preferred, so the flagged OAuth block is never
+  // re-exercised and the "successful refresh clears the flag" path can never
+  // run. Only a recognized OAuth error code is proof the credential is bad.
+  function mockRawResponse(body: string, status: number) {
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(body, {
+          status,
+          headers: { 'content-type': 'text/html' },
+        })) as unknown as typeof fetch,
+    );
+    return fetchSpy;
+  }
+
+  async function refreshFailure(): Promise<OAuthError> {
+    return (await refreshAccessToken('rt1', getOAuthEndpoints()).catch(
+      (e) => e,
+    )) as OAuthError;
+  }
+
+  it('does not flag a credential when a proxy answers 403 with no OAuth code', async () => {
+    mockRawResponse('<html><body>Forbidden by policy</body></html>', 403);
+
+    expect((await refreshFailure()).terminal).toBe(false);
+  });
+
+  it('does not flag a credential when a WAF answers 400 with no OAuth code', async () => {
+    mockRawResponse('<html><body>Request blocked</body></html>', 400);
+
+    expect((await refreshFailure()).terminal).toBe(false);
+  });
+
+  it('does not flag a credential on an empty error body', async () => {
+    mockRawResponse('', 401);
+
+    expect((await refreshFailure()).terminal).toBe(false);
+  });
+
+  it('does not flag a credential on an unrecognized error code', async () => {
+    mockJsonResponse({ error: 'server_busy' }, 400);
+
+    expect((await refreshFailure()).terminal).toBe(false);
+  });
+
+  it('does not flag a credential when a captive portal answers 200 with HTML', async () => {
+    // fetch follows the portal's redirect, so this arrives as a 200 whose body
+    // parses to nothing. Signing in on airport Wi-Fi must not kill the login.
+    mockRawResponse(
+      '<html><body>Accept the terms to continue</body></html>',
+      200,
+    );
+
+    const error = await refreshFailure();
+
+    expect(error.message).toMatch(/access token/i);
+    expect(error.terminal).toBe(false);
+  });
+
+  it('does not flag a credential when a mangled 200 omits the refresh token', async () => {
+    mockJsonResponse({ access_token: 'at', expires_in: 60 });
+
+    const error = (await exchangeCodeForTokens({
+      code: 'auth_code',
+      codeVerifier: 'verifier_value',
+      redirectUri: 'http://127.0.0.1:51372/callback',
+      endpoints: getOAuthEndpoints(),
+    }).catch((e) => e)) as OAuthError;
+
+    expect(error.message).toMatch(/refresh token/i);
+    expect(error.terminal).toBe(false);
+  });
+
+  it('still flags a recognized code, which is real proof the grant is dead', async () => {
+    mockJsonResponse({ error: 'invalid_grant' }, 400);
+
+    expect((await refreshFailure()).terminal).toBe(true);
+  });
+
+  it('does not flag a recognized code delivered with a retryable status', async () => {
+    mockJsonResponse({ error: 'invalid_request' }, 503);
+
+    expect((await refreshFailure()).terminal).toBe(false);
+  });
+});
+
 describe('revokeRefreshToken', () => {
   it('posts the token to the revocation endpoint', async () => {
     mockJsonResponse({}, 200);

@@ -32,6 +32,17 @@ const ACQUIRE_TIMEOUT_MS = 60_000;
 
 const POLL_INTERVAL_MS = 25;
 
+/**
+ * Spread added to each poll. Without it every waiter wakes on the same cadence
+ * and reaches the staleness check in the same tick, which is the pile-up the
+ * break mutex below has to arbitrate.
+ */
+const POLL_JITTER_MS = 15;
+
+function nextPollInterval(): number {
+  return POLL_INTERVAL_MS + Math.floor(Math.random() * POLL_JITTER_MS);
+}
+
 interface LockContents {
   pid: number;
   acquiredAt: number;
@@ -53,15 +64,24 @@ function processAlive(pid: number): boolean {
   }
 }
 
+/** A lock file's raw contents, or null when it is missing or unreadable. */
+async function readLockFile(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Decide whether an existing lock can be broken. Unreadable or malformed lock
- * files are treated as abandoned: leaving one in place would wedge refresh for
- * every future invocation.
+ * Decide whether the acquisition described by these contents was abandoned.
+ * Malformed contents count as abandoned: leaving one in place would wedge
+ * refresh for every future invocation.
  */
-async function isBreakable(path: string): Promise<boolean> {
+function isAbandoned(raw: string): boolean {
   let contents: LockContents;
   try {
-    contents = JSON.parse(await readFile(path, 'utf-8')) as LockContents;
+    contents = JSON.parse(raw) as LockContents;
   } catch {
     return true;
   }
@@ -79,9 +99,115 @@ async function isBreakable(path: string): Promise<boolean> {
   return !processAlive(contents.pid);
 }
 
+/** Decide whether an existing lock can be broken. */
+async function isBreakable(path: string): Promise<boolean> {
+  const raw = await readLockFile(path);
+  return raw === null || isAbandoned(raw);
+}
+
+/**
+ * Unlink `path` only if it still holds the contents the caller judged.
+ *
+ * Re-reading immediately before the unlink is what stops a decision made
+ * earlier from deleting a file that has since been replaced. It narrows the
+ * window to two syscalls rather than closing it, which is the best a
+ * link-based lock can do without a rename-based compare-and-swap.
+ */
+async function unlinkIfUnchanged(
+  path: string,
+  expected: string,
+): Promise<void> {
+  if ((await readLockFile(path)) !== expected) return;
+  await unlink(path).catch(() => {});
+}
+
+/**
+ * Remove a stale lock, serialized so that only one waiter can do it.
+ *
+ * Deciding a lock is breakable and unlinking it are separate steps, and waiters
+ * that crossed the staleness threshold together all arrive here holding the same
+ * decision. Unlinking directly would let the second waiter delete the lock the
+ * first has since linked, putting both of them on the same rotating refresh
+ * token — the invariant this file exists to hold.
+ *
+ * Serializing through a second lock file leaves a window of its own, but one
+ * that spans a few syscalls rather than a network round-trip.
+ *
+ * Returns whether this call removed the lock. False means another waiter is
+ * doing it, or a live holder has taken over; either way the caller should wait
+ * rather than spin.
+ *
+ * Exported for tests: the interleaving it guards against is a few microseconds
+ * wide and cannot be reproduced through `withRefreshLock`.
+ */
+export async function breakStaleLock(path: string): Promise<boolean> {
+  const breakPath = `${path}.break`;
+  const stagingPath = `${breakPath}.${process.pid}.${randomBytes(4).toString(
+    'hex',
+  )}`;
+  // The mutex carries an owner for the same reason the lock does: every unlink
+  // below has to prove it is removing the file it decided about, or it becomes
+  // the very check-then-act hazard this function exists to arbitrate.
+  const owner = randomBytes(8).toString('hex');
+  const mutex = JSON.stringify({
+    pid: process.pid,
+    acquiredAt: Date.now(),
+    owner,
+  });
+
+  await writeFile(stagingPath, mutex, { mode: 0o600 });
+
+  try {
+    await link(stagingPath, breakPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw error;
+    }
+    // Another waiter is breaking the lock. Clear the mutex only if that waiter
+    // died mid-break, so a crash cannot wedge recovery forever, and only if the
+    // mutex is still the one just judged — a live waiter may have replaced it.
+    const held = await readLockFile(breakPath);
+    if (held !== null && isAbandoned(held)) {
+      await unlinkIfUnchanged(breakPath, held);
+    }
+    return false;
+  } finally {
+    await unlink(stagingPath).catch(() => {});
+  }
+
+  try {
+    // Re-read under the mutex. Between the caller's decision and this point a
+    // new holder may have linked a fresh lock, which must not be deleted.
+    if (!(await isBreakable(path))) {
+      return false;
+    }
+    try {
+      await unlink(path);
+    } catch (error) {
+      // Already gone is the outcome that was wanted. Anything else — a
+      // read-only volume, an immutable file — is a failure the caller has to
+      // hear about, or it will spin on a lock it can never remove.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        return false;
+      }
+    }
+    return true;
+  } finally {
+    await unlinkIfUnchanged(breakPath, mutex);
+  }
+}
+
 export interface RefreshLockOptions {
   /** Override how long to wait for another holder. Intended for tests. */
   timeoutMs?: number;
+}
+
+function acquireTimeout(path: string, timeoutMs: number): Error {
+  return new Error(
+    `Timed out after ${Math.round(
+      timeoutMs / 1000,
+    )}s waiting for another mux process to finish refreshing credentials. If no other mux command is running, delete ${path} and try again.`,
+  );
 }
 
 /** Acquire the lock, returning the owner token that proves this acquisition. */
@@ -116,7 +242,17 @@ async function acquire(path: string, timeoutMs: number): Promise<string> {
     }
 
     if (await isBreakable(path)) {
-      await unlink(path).catch(() => {});
+      // A break clears the way for the link attempt at the top of the next
+      // iteration, so retry straight away rather than waiting out a poll.
+      if (await breakStaleLock(path)) continue;
+
+      // Someone else is recovering, a live holder has taken over, or the lock
+      // cannot be removed at all. Let that settle instead of spinning on a
+      // decision that has already been overtaken.
+      await Bun.sleep(nextPollInterval());
+      if (Date.now() > deadline) {
+        throw acquireTimeout(path, timeoutMs);
+      }
       continue;
     }
 
@@ -125,14 +261,10 @@ async function acquire(path: string, timeoutMs: number): Promise<string> {
       // abandoned, since STALE_AFTER_MS would have broken it first. Failing is
       // the safe outcome — deleting a live holder's lock would put two
       // processes on the same rotating refresh token.
-      throw new Error(
-        `Timed out after ${Math.round(
-          timeoutMs / 1000,
-        )}s waiting for another mux process to finish refreshing credentials. If no other mux command is running, delete ${path} and try again.`,
-      );
+      throw acquireTimeout(path, timeoutMs);
     }
 
-    await Bun.sleep(POLL_INTERVAL_MS);
+    await Bun.sleep(nextPollInterval());
   }
 }
 

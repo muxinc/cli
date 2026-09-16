@@ -9,6 +9,7 @@ import {
   refreshActiveOAuthCredentials,
   resolveActiveEnvironment,
 } from '@/lib/mux.ts';
+import { OAuthError } from '@/lib/oauth.ts';
 import { parseSSEStream } from '@/lib/sse.ts';
 import { buildSignedHeaders, getSigningSecret } from '@/lib/webhook-signing.ts';
 
@@ -240,6 +241,19 @@ export const listenCommand = new Command()
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           return;
+        }
+
+        // A refresh that failed terminally throws before any response exists,
+        // so the 401 path below never sees it. Reconnecting would retry a
+        // hopeless refresh every backoff period and rewrite the failure flag to
+        // config on each pass, so this is where the loop ends.
+        if (error instanceof OAuthError && error.terminal) {
+          if (wantsJson(options)) {
+            console.error(JSON.stringify({ error: error.message }, null, 2));
+          } else {
+            console.error(`Error: ${error.message}`);
+          }
+          process.exit(1);
         }
 
         const errorMessage =

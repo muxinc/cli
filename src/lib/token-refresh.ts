@@ -59,10 +59,14 @@ async function refreshAndPersist(
         at: new Date().toISOString(),
         message: error.message,
       });
-      throw new Error(
+      // Rethrown as an OAuthError so a long-running command can tell "log in
+      // again" from a network blip: `webhooks listen` reconnects on the latter
+      // and must stop on the former.
+      throw new OAuthError(
         `The stored login for environment "${name}" is no longer valid (${
           error.code ?? 'refresh failed'
         }). Run 'mux login' to sign in again, or 'mux env switch <name>' to use a different environment.`,
+        { ...(error.code && { code: error.code }), terminal: true },
       );
     }
     throw error;

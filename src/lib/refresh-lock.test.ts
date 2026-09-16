@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, unlink } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { getRefreshLockPath, withRefreshLock } from './refresh-lock.ts';
+import { dirname, join } from 'node:path';
+import {
+  breakStaleLock,
+  getRefreshLockPath,
+  withRefreshLock,
+} from './refresh-lock.ts';
 
 let testConfigDir: string;
 let originalXdgConfigHome: string | undefined;
@@ -147,6 +151,75 @@ describe('withRefreshLock', () => {
     expect(contents.owner).toBe('new-holder');
   });
 
+  it('serializes waiters recovering from the same crashed holder', async () => {
+    // Recovery adds await points between deciding a lock is abandoned and
+    // acting on it, which is enough for waiters in one process to interleave:
+    // this fails with two concurrent critical sections if breaking stops being
+    // serialized, and both would be spending the same rotating refresh token.
+    await Bun.write(
+      getRefreshLockPath(),
+      JSON.stringify({
+        pid: 2 ** 30,
+        acquiredAt: Date.now(),
+        owner: 'crashed-holder',
+      }),
+    );
+
+    let active = 0;
+    let maxActive = 0;
+    const completed: number[] = [];
+
+    await Promise.all(
+      [1, 2, 3, 4, 5, 6].map((n) =>
+        withRefreshLock(
+          async () => {
+            active += 1;
+            maxActive = Math.max(maxActive, active);
+            await Bun.sleep(10);
+            active -= 1;
+            completed.push(n);
+          },
+          { timeoutMs: 10_000 },
+        ),
+      ),
+    );
+
+    expect(maxActive).toBe(1);
+    expect(completed.length).toBe(6);
+  });
+
+  it('leaves nothing behind after recovering from a crashed holder', async () => {
+    // A leaked lock, staging, or mutex file would wedge or weaken every later
+    // acquisition.
+    await Bun.write(
+      getRefreshLockPath(),
+      JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
+    );
+
+    await Promise.all(
+      [1, 2, 3, 4].map(() => withRefreshLock(async () => Bun.sleep(5))),
+    );
+
+    expect(await readdir(dirname(getRefreshLockPath()))).toEqual([]);
+  });
+
+  it('recovers when a previous break was itself interrupted', async () => {
+    // A process killed mid-break leaves its mutex behind. If that wedged
+    // breaking, every later invocation would be stuck behind a dead holder.
+    await Bun.write(
+      getRefreshLockPath(),
+      JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
+    );
+    await Bun.write(
+      `${getRefreshLockPath()}.break`,
+      JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
+    );
+
+    expect(
+      await withRefreshLock(async () => 'recovered', { timeoutMs: 5000 }),
+    ).toBe('recovered');
+  });
+
   it('waits for a live holder that finishes in time', async () => {
     // The waiter polls rather than failing immediately: a holder doing normal
     // work should be waited out, not interrupted.
@@ -166,5 +239,93 @@ describe('withRefreshLock', () => {
     expect(
       await withRefreshLock(async () => 'acquired', { timeoutMs: 5000 }),
     ).toBe('acquired');
+  });
+});
+
+describe('breakStaleLock', () => {
+  it('removes a lock left behind by a dead process', async () => {
+    const path = getRefreshLockPath();
+    await Bun.write(
+      path,
+      JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
+    );
+
+    expect(await breakStaleLock(path)).toBe(true);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it('refuses to delete a lock that stopped being stale', async () => {
+    // The interleaving the mutex exists to arbitrate: a waiter decided the lock
+    // was abandoned, and by the time it acts a new holder has linked a fresh
+    // one. Deleting that would put both processes on the same rotating refresh
+    // token, so staleness is re-checked here rather than trusted.
+    const path = getRefreshLockPath();
+    await Bun.write(
+      path,
+      JSON.stringify({
+        pid: process.pid,
+        acquiredAt: Date.now(),
+        owner: 'new-holder',
+      }),
+    );
+
+    expect(await breakStaleLock(path)).toBe(false);
+
+    const contents = JSON.parse(await readFile(path, 'utf-8'));
+    expect(contents.owner).toBe('new-holder');
+  });
+
+  it('leaves a mutex held by a live waiter alone', async () => {
+    // Clearing an abandoned mutex is itself a check-then-act step, so it has to
+    // prove the mutex it removes is the one it judged. Deleting a live waiter's
+    // mutex would let two waiters break at once, which is what this whole
+    // serialization exists to prevent.
+    const path = getRefreshLockPath();
+    await Bun.write(
+      path,
+      JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
+    );
+    const breakPath = `${path}.break`;
+    await Bun.write(
+      breakPath,
+      JSON.stringify({
+        pid: process.pid,
+        acquiredAt: Date.now(),
+        owner: 'live-breaker',
+      }),
+    );
+
+    expect(await breakStaleLock(path)).toBe(false);
+
+    const contents = JSON.parse(await readFile(breakPath, 'utf-8'));
+    expect(contents.owner).toBe('live-breaker');
+    // The lock the live waiter is working on survives too.
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it('lets only one of several waiters break the same lock', async () => {
+    const path = getRefreshLockPath();
+    await Bun.write(
+      path,
+      JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
+    );
+
+    const results = await Promise.all(
+      [1, 2, 3, 4].map(() => breakStaleLock(path)),
+    );
+
+    expect(results.filter(Boolean).length).toBe(1);
+  });
+
+  it('leaves no mutex behind for the next waiter', async () => {
+    const path = getRefreshLockPath();
+    await Bun.write(
+      path,
+      JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
+    );
+
+    await breakStaleLock(path);
+
+    expect(await readdir(dirname(path))).toEqual([]);
   });
 });
