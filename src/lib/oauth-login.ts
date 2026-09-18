@@ -10,11 +10,12 @@ import {
   setCurrentEnvironment,
   setEnvironment,
 } from './config.ts';
-import { environmentSettings } from './credentials.ts';
+import { environmentSettings, hasTokenPair } from './credentials.ts';
 import {
   type CredentialIdentity,
   validateAccessToken as defaultValidateAccessToken,
   getMuxBaseUrl,
+  validateCredentials,
 } from './mux.ts';
 import {
   buildAuthorizationUrl,
@@ -77,6 +78,16 @@ export interface OAuthLoginDeps {
     | { valid: true; identity: CredentialIdentity }
     | { valid: false; error: string }
   >;
+  /**
+   * Resolve which Mux environment an access token pair belongs to, or undefined
+   * when that cannot be established. Used only for stored entries that predate
+   * environment id recording.
+   */
+  identifyTokenPair?: (
+    tokenId: string,
+    tokenSecret: string,
+    baseUrl: string,
+  ) => Promise<string | undefined>;
   /**
    * Called once the authorization URL is known, with whether a browser was
    * opened. The command layer prints it.
@@ -165,6 +176,53 @@ function environmentBoundState(environment: Environment) {
   };
 }
 
+async function defaultIdentifyTokenPair(
+  tokenId: string,
+  tokenSecret: string,
+  baseUrl: string,
+): Promise<string | undefined> {
+  const validation = await validateCredentials(tokenId, tokenSecret, baseUrl);
+  return validation.valid ? validation.environmentId : undefined;
+}
+
+/**
+ * Find a stored entry that predates environment id recording (before v1.2.0)
+ * but provably holds the granted environment: its access token pair resolves,
+ * via /whoami, to the same environment id.
+ *
+ * Without this, the first browser login on such a config lands in a second,
+ * active entry, and the signing keys, forward URL, and token pair stay behind
+ * on the old one — `mux sign` stops working until the user switches back.
+ *
+ * Only entries with no environment id are asked about, so this costs nothing
+ * on a current config. Any failure means "not provable", and the login
+ * proceeds as it would have.
+ */
+async function findUnstampedEntryFor(
+  environmentId: string,
+  identify: NonNullable<OAuthLoginDeps['identifyTokenPair']>,
+): Promise<{ name: string; environment: Environment } | null> {
+  const config = await readConfig();
+  if (!config) return null;
+
+  for (const [name, environment] of Object.entries(config.environments)) {
+    if (environment.environmentId || !hasTokenPair(environment)) continue;
+
+    const token = environment.token as NonNullable<Environment['token']>;
+    const resolved = await identify(
+      token.tokenId,
+      token.tokenSecret,
+      getMuxBaseUrl({ environment }),
+    ).catch(() => undefined);
+
+    if (resolved === environmentId) {
+      return { name, environment };
+    }
+  }
+
+  return null;
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -212,6 +270,7 @@ export async function performOAuthLogin(
   const openBrowser = deps.openBrowser ?? defaultOpenBrowser;
   const exchange = deps.exchange ?? defaultExchange;
   const validate = deps.validate ?? defaultValidateAccessToken;
+  const identifyTokenPair = deps.identifyTokenPair ?? defaultIdentifyTokenPair;
 
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = computeCodeChallenge(codeVerifier);
@@ -266,7 +325,8 @@ export async function performOAuthLogin(
   const identity = verification.identity;
 
   const existing = identity.environmentId
-    ? await findEnvironmentByEnvironmentId(identity.environmentId)
+    ? ((await findEnvironmentByEnvironmentId(identity.environmentId)) ??
+      (await findUnstampedEntryFor(identity.environmentId, identifyTokenPair)))
     : null;
 
   const name =
@@ -291,8 +351,14 @@ export async function performOAuthLogin(
   // versus whatever currently occupies the name being written to. They are only
   // the same thing when no explicit --name repointed it.
   const target = await getEnvironment(name);
+  // Either it is the entry just matched to this environment (which, for one
+  // stored before environment ids were recorded, carries no id to compare), or
+  // its recorded id says so.
   const targetIsThisEnvironment = Boolean(
-    target?.environmentId && target.environmentId === identity.environmentId,
+    target &&
+      (existing?.name === name ||
+        (target.environmentId &&
+          target.environmentId === identity.environmentId)),
   );
 
   // Signing keys, forward URL, host binding, and an access token pair belong to

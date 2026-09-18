@@ -149,7 +149,7 @@ mux login --name staging --env-file .env.staging
 > any saved login, so a config entry written from them has no effect until they are unset.
 > Pass `--from-env` to save them deliberately, or `--oauth` for a browser sign-in.
 
-Browser sign-in names each environment after the organization and environment you selected (for example `acme-inc-production`); pass `--name` to choose your own. Signing in again to the *same* environment refreshes its credentials in place and keeps its signing keys and forward URL; signing in to a *different* environment adds a new entry and never overwrites an existing one.
+Browser sign-in names each environment after the organization and environment you selected (for example `acme-inc-production`); pass `--name` to choose your own. Signing in again to the *same* environment refreshes its credentials in place and keeps its signing keys and forward URL; signing in to a *different* environment adds a new entry and never overwrites an existing one. An entry saved by a version that did not yet record environment ids is recognized by asking Mux which environment its access token pair belongs to, so the first browser sign-in updates it in place rather than leaving its signing keys behind on a second entry.
 
 The first environment you add becomes the default, and a new browser sign-in becomes the active environment unless you pass `--keep-current`. Run `mux auth status` at any time to see every credential the CLI can find and which one is active. See [Authentication & Environment Management](#authentication--environment-management) for more details.
 

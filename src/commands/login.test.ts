@@ -387,6 +387,7 @@ describe('runOAuthLogin in machine-readable mode', () => {
         scopes: ['video:read', 'system:read'],
       },
       exchange: async () => TOKENS,
+      identifyTokenPair: async () => undefined,
       validate: async () => ({
         valid: true as const,
         identity: {

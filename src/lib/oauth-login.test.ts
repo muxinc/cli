@@ -63,6 +63,9 @@ function fakeDeps(overrides: Partial<OAuthLoginDeps> = {}): OAuthLoginDeps {
       scopes: ['video:read', 'system:read'],
     },
     exchange: async () => TOKENS,
+    // No stored token pair resolves to anything unless a test says so; the real
+    // lookup is a network call.
+    identifyTokenPair: async () => undefined,
     validate: async () => ({
       valid: true as const,
       identity: {
@@ -406,6 +409,136 @@ describe('performOAuthLogin', () => {
     await performOAuthLogin({ name: 'new-name', activate: false }, fakeDeps());
 
     expect((await getCurrentEnvironment())?.name).toBe('new-name');
+  });
+
+  describe('entries stored before environment ids were recorded', () => {
+    /** What a login from before v1.2.0 left behind: no environmentId. */
+    async function seedUnstamped(name = 'default') {
+      await setEnvironment(name, {
+        token: { tokenId: 'legacy_id', tokenSecret: 'legacy_secret' },
+        signingKeyId: 'key_1',
+        signingPrivateKey: 'private_1',
+        forwardUrl: 'http://localhost:3000/webhooks',
+      });
+    }
+
+    it('updates the entry in place when its token pair belongs to the granted environment', async () => {
+      await seedUnstamped();
+
+      const result = await performOAuthLogin(
+        {},
+        fakeDeps({ identifyTokenPair: async () => 'env_123' }),
+      );
+
+      // Otherwise the login lands in a second, active entry and the signing
+      // keys are stranded on the old one: `mux sign` stops working.
+      expect(result.name).toBe('default');
+      expect(result.replacedExisting).toBe(true);
+      expect(result.dropped).toEqual([]);
+      const stored = (await getEnvironment('default')) as Environment;
+      expect(stored.oauth?.accessToken).toBe('access_1');
+      expect(stored.environmentId).toBe('env_123');
+      expect(stored.signingKeyId).toBe('key_1');
+      expect(stored.signingPrivateKey).toBe('private_1');
+      expect(stored.forwardUrl).toBe('http://localhost:3000/webhooks');
+      expect(stored.token?.tokenId).toBe('legacy_id');
+      expect(await getEnvironment('acme-inc-production')).toBeNull();
+    });
+
+    it('asks about the pair with its own credentials and host', async () => {
+      await setEnvironment('default', {
+        token: { tokenId: 'legacy_id', tokenSecret: 'legacy_secret' },
+        baseUrl: 'https://api.custom.example',
+      });
+      const asked: string[][] = [];
+
+      await performOAuthLogin(
+        {},
+        fakeDeps({
+          identifyTokenPair: async (...args) => {
+            asked.push(args);
+            return undefined;
+          },
+        }),
+      );
+
+      expect(asked).toEqual([
+        ['legacy_id', 'legacy_secret', 'https://api.custom.example'],
+      ]);
+    });
+
+    it('leaves the entry alone when its token pair belongs to another environment', async () => {
+      await seedUnstamped();
+
+      const result = await performOAuthLogin(
+        {},
+        fakeDeps({ identifyTokenPair: async () => 'env_OTHER' }),
+      );
+
+      expect(result.name).toBe('acme-inc-production');
+      expect(result.replacedExisting).toBe(false);
+      const untouched = (await getEnvironment('default')) as Environment;
+      expect(untouched.oauth).toBeUndefined();
+      expect(untouched.signingKeyId).toBe('key_1');
+    });
+
+    it('still logs in when the pair cannot be identified', async () => {
+      await seedUnstamped();
+
+      const result = await performOAuthLogin(
+        {},
+        fakeDeps({
+          identifyTokenPair: async () => {
+            throw new Error('network down');
+          },
+        }),
+      );
+
+      expect(result.name).toBe('acme-inc-production');
+      expect((await getEnvironment('default'))?.signingKeyId).toBe('key_1');
+    });
+
+    it('does not probe entries that already record their environment', async () => {
+      await setEnvironment('stamped', {
+        environmentId: 'env_OTHER',
+        token: { tokenId: 'id', tokenSecret: 'secret' },
+      });
+      let probes = 0;
+
+      await performOAuthLogin(
+        {},
+        fakeDeps({
+          identifyTokenPair: async () => {
+            probes += 1;
+            return 'env_123';
+          },
+        }),
+      );
+
+      expect(probes).toBe(0);
+    });
+
+    it('does not probe when the environment is already stored by id', async () => {
+      await seedUnstamped('older');
+      await setEnvironment('current', {
+        environmentId: 'env_123',
+        token: { tokenId: 'id', tokenSecret: 'secret' },
+      });
+      let probes = 0;
+
+      const result = await performOAuthLogin(
+        {},
+        fakeDeps({
+          identifyTokenPair: async () => {
+            probes += 1;
+            return 'env_123';
+          },
+        }),
+      );
+
+      expect(result.name).toBe('current');
+      expect(probes).toBe(0);
+    });
   });
 
   it('carries a custom base URL across when --name moves the entry', async () => {
