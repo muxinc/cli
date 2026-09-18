@@ -110,15 +110,11 @@ export function AssetManageApp({ mux, onPrompt }: AssetManageAppProps) {
           return null;
         }
 
-        return await signPlaybackId(
-          playbackId,
-          credentials,
-          {
-            tokenId: env.environment.tokenId,
-            tokenSecret: env.environment.tokenSecret,
-          },
-          { expiration: '7d' },
-        );
+        // No API credentials: signing is local to the signing key pair, and the
+        // active environment may be an OAuth login with no token pair.
+        return await signPlaybackId(playbackId, credentials, undefined, {
+          expiration: '7d',
+        });
       } catch {
         return null;
       }

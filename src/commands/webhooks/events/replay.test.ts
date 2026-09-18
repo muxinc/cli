@@ -85,8 +85,7 @@ describe('mux webhooks events replay command', () => {
 
   test('unknown event ID is a JSON error in JSON mode', async () => {
     await setEnvironment('default', {
-      tokenId: 'stored_id',
-      tokenSecret: 'stored_secret',
+      token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       environmentId: 'env_replay_qa_isolated',
     });
 
@@ -102,8 +101,7 @@ describe('mux webhooks events replay command', () => {
 
   test('empty replay set emits JSON in JSON mode', async () => {
     await setEnvironment('default', {
-      tokenId: 'stored_id',
-      tokenSecret: 'stored_secret',
+      token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       environmentId: 'env_replay_qa_isolated',
     });
 

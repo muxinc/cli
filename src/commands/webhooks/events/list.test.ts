@@ -95,8 +95,7 @@ describe('mux webhooks events list command', () => {
 
   test('lists events for the stored environment id when logged in', async () => {
     await setEnvironment('default', {
-      tokenId: 'stored_id',
-      tokenSecret: 'stored_secret',
+      token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       environmentId: 'env_stored_123',
     });
     appendEvent(makeEvent('evt_stored', 'env_stored_123'));
@@ -110,8 +109,7 @@ describe('mux webhooks events list command', () => {
 
   test('lists events for the env var credentials environment, not the stored one', async () => {
     await setEnvironment('default', {
-      tokenId: 'stored_id',
-      tokenSecret: 'stored_secret',
+      token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
       environmentId: 'env_stored_123',
     });
     appendEvent(makeEvent('evt_stored', 'env_stored_123'));

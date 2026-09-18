@@ -132,8 +132,7 @@ describe('mux signing-keys create command', () => {
 
     test('saves the key to the stored environment when credentials come from config', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
       });
       mockApi('env_stored_123');
@@ -165,8 +164,7 @@ describe('mux signing-keys create command', () => {
 
     test('does not save to a stored environment that env var credentials do not match', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
         signingKeyId: 'key_existing',
         signingPrivateKey: 'existing_private_key',
@@ -187,13 +185,11 @@ describe('mux signing-keys create command', () => {
 
     test('saves to a non-default stored environment when env var credentials match it', async () => {
       await setEnvironment('production', {
-        tokenId: 'prod_id',
-        tokenSecret: 'prod_secret',
+        token: { tokenId: 'prod_id', tokenSecret: 'prod_secret' },
         environmentId: 'env_prod_123',
       });
       await setEnvironment('staging', {
-        tokenId: 'staging_id',
-        tokenSecret: 'staging_secret',
+        token: { tokenId: 'staging_id', tokenSecret: 'staging_secret' },
         environmentId: 'env_staging_456',
       });
       process.env.MUX_TOKEN_ID = 'env_id';
@@ -213,8 +209,7 @@ describe('mux signing-keys create command', () => {
 
     test('saves to the stored environment when env var credentials match it', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_same_123',
       });
       process.env.MUX_TOKEN_ID = 'env_id';
@@ -231,8 +226,7 @@ describe('mux signing-keys create command', () => {
 
     test('fails fast in JSON mode when a signing key exists and --force is omitted', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
         signingKeyId: 'key_existing',
         signingPrivateKey: 'existing_private_key',
@@ -256,8 +250,7 @@ describe('mux signing-keys create command', () => {
 
     test('replaces an existing signing key in JSON mode with --force', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
         signingKeyId: 'key_existing',
         signingPrivateKey: 'existing_private_key',
@@ -274,8 +267,7 @@ describe('mux signing-keys create command', () => {
 
     test('emits the private key once when saving to config fails', async () => {
       await setEnvironment('default', {
-        tokenId: 'stored_id',
-        tokenSecret: 'stored_secret',
+        token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
         environmentId: 'env_stored_123',
       });
       mockApi('env_stored_123');
