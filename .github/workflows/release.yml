@@ -61,6 +61,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # Tags with a suffix (e.g. v3.0.0-rc.1) must not become the "Latest"
+          # release, which install.sh and the README download links resolve to.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: artifacts/*
 
   publish:
