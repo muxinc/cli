@@ -7,6 +7,7 @@ import {
   readFile,
   rm,
   unlink,
+  writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -140,6 +141,29 @@ describe('withRefreshLock', () => {
     await Bun.write(getRefreshLockPath(), 'not json');
 
     expect(await withRefreshLock(async () => 'recovered')).toBe('recovered');
+  });
+
+  it('recovers a lock file it cannot read', async () => {
+    // Left by a run under another user, for example. Unreadable is not the
+    // same as released: it still blocks the link, so it has to be removed.
+    const path = getRefreshLockPath();
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, 'unreadable', { mode: 0o000 });
+
+    expect(await withRefreshLock(async () => 'ran', { timeoutMs: 2000 })).toBe(
+      'ran',
+    );
+  });
+
+  it('gives up with guidance, rather than spinning, on a lock it can neither read nor remove', async () => {
+    // A directory at the lock path: the link fails, the read fails, and the
+    // unlink fails. Every pass through the acquire loop has to be bounded.
+    const path = getRefreshLockPath();
+    await mkdir(path, { recursive: true });
+
+    await expect(
+      withRefreshLock(async () => 'ran', { timeoutMs: 300 }),
+    ).rejects.toThrow(/Timed out/);
   });
 
   it('refuses to break the lock of a live holder', async () => {

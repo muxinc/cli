@@ -64,12 +64,24 @@ function processAlive(pid: number): boolean {
   }
 }
 
-/** A lock file's raw contents, or null when it is missing or unreadable. */
+/** Stands in for the contents of a lock file that exists but cannot be read. */
+const UNREADABLE = '';
+
+/**
+ * A lock file's raw contents, or null when there is no lock file.
+ *
+ * Missing and unreadable are different answers. Missing means the holder
+ * released, and the path is free to link. Unreadable — another user's file, a
+ * directory — still blocks every link, so it is reported as contents that
+ * cannot be parsed, which `isAbandoned` treats as a lock to break.
+ */
 async function readLockFile(path: string): Promise<string | null> {
   try {
     return await readFile(path, 'utf-8');
-  } catch {
-    return null;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ? null
+      : UNREADABLE;
   }
 }
 
@@ -252,7 +264,11 @@ async function acquire(path: string, timeoutMs: number): Promise<string> {
     if (held === null) {
       // Released since the link attempt above. This is the ordinary hand-off
       // between a holder and its waiters, not a recovery: retry the link and
-      // stay out of the break path, which exists to delete things.
+      // stay out of the break path, which exists to delete things. Bounded
+      // like every other pass through this loop.
+      if (Date.now() > deadline) {
+        throw acquireTimeout(path, timeoutMs);
+      }
       continue;
     }
 
