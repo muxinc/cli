@@ -14,6 +14,7 @@ import {
   getEnvironment,
   type OAuthCredentials,
   setCredential,
+  setEnvironment,
 } from './config.ts';
 import { OAuthError } from './oauth.ts';
 import {
@@ -420,6 +421,95 @@ describe('refreshEnvironmentTokens', () => {
     expect(result.accessToken).toBe('access_forced');
     expect((await getEnvironment(NAME))?.oauth?.accessToken).toBe(
       'access_forced',
+    );
+  });
+});
+
+describe('refresh host', () => {
+  let savedBaseUrl: string | undefined;
+
+  /** Every URL requested, discovery included. */
+  function requestedUrls(): string[] {
+    return (fetchSpy?.mock.calls ?? []).map((call) => String(call[0]));
+  }
+
+  beforeEach(() => {
+    savedBaseUrl = process.env.MUX_BASE_URL;
+    delete process.env.MUX_BASE_URL;
+    // The override would pin the token endpoint and hide where it is derived from.
+    delete process.env.MUX_OAUTH_TOKEN_URL;
+  });
+
+  afterEach(() => {
+    if (savedBaseUrl === undefined) {
+      delete process.env.MUX_BASE_URL;
+    } else {
+      process.env.MUX_BASE_URL = savedBaseUrl;
+    }
+  });
+
+  it("refreshes against the environment's stored host, not the default one", async () => {
+    const oauth = credential({ expiresAt: nowSeconds() - 60 });
+    await setEnvironment(NAME, {
+      environmentId: 'env_123',
+      baseUrl: 'https://api.staging.example',
+      oauth,
+    });
+    mockTokenEndpoint({ access_token: 'access_2', expires_in: 3600 });
+
+    await ensureFreshAccessToken(NAME, oauth);
+
+    // A refresh token must only ever be presented to the host that issued it.
+    expect(requestedUrls()).toContain(
+      'https://api.staging.example/auth/v1/oauth/token',
+    );
+    expect(
+      requestedUrls().filter((url) => url.startsWith('https://api.mux.com')),
+    ).toEqual([]);
+  });
+
+  it('uses the stored host on the forced post-401 refresh too', async () => {
+    const oauth = credential();
+    await setEnvironment(NAME, {
+      environmentId: 'env_123',
+      baseUrl: 'https://api.staging.example',
+      oauth,
+    });
+    mockTokenEndpoint({ access_token: 'access_2', expires_in: 3600 });
+
+    await refreshEnvironmentTokens(NAME, oauth);
+
+    expect(requestedUrls()).toContain(
+      'https://api.staging.example/auth/v1/oauth/token',
+    );
+  });
+
+  it('lets MUX_BASE_URL win over the stored host, as it does for API calls', async () => {
+    process.env.MUX_BASE_URL = 'https://api.shell.example';
+    const oauth = credential({ expiresAt: nowSeconds() - 60 });
+    await setEnvironment(NAME, {
+      environmentId: 'env_123',
+      baseUrl: 'https://api.staging.example',
+      oauth,
+    });
+    mockTokenEndpoint({ access_token: 'access_2', expires_in: 3600 });
+
+    await ensureFreshAccessToken(NAME, oauth);
+
+    expect(requestedUrls()).toContain(
+      'https://api.shell.example/auth/v1/oauth/token',
+    );
+  });
+
+  it('uses the default host when the environment stores none', async () => {
+    const oauth = credential({ expiresAt: nowSeconds() - 60 });
+    await setCredential(NAME, 'oauth', oauth);
+    mockTokenEndpoint({ access_token: 'access_2', expires_in: 3600 });
+
+    await ensureFreshAccessToken(NAME, oauth);
+
+    expect(requestedUrls()).toContain(
+      'https://api.mux.com/auth/v1/oauth/token',
     );
   });
 });

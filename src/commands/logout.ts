@@ -6,7 +6,7 @@ import {
   removeEnvironment,
 } from '../lib/config.ts';
 import { wantsJson } from '../lib/context.ts';
-import { revokeRefreshToken } from '../lib/oauth.ts';
+import { resolveOAuthEndpoints, revokeRefreshToken } from '../lib/oauth.ts';
 
 interface LogoutOptions {
   all?: boolean;
@@ -26,7 +26,11 @@ async function revokeIfOAuth(
   if (!environment?.oauth) return null;
 
   try {
-    await revokeRefreshToken(environment.oauth.refreshToken);
+    // Revoked at the host that issued it, which is the environment's own.
+    await revokeRefreshToken(
+      environment.oauth.refreshToken,
+      await resolveOAuthEndpoints(environment.baseUrl),
+    );
     return null;
   } catch (error) {
     const warning = `Could not revoke the refresh token for "${name}" (${

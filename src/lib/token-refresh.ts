@@ -4,7 +4,11 @@ import {
   type OAuthCredentials,
   setCredential,
 } from './config.ts';
-import { OAuthError, refreshAccessToken } from './oauth.ts';
+import {
+  OAuthError,
+  refreshAccessToken,
+  resolveOAuthEndpoints,
+} from './oauth.ts';
 import { withRefreshLock } from './refresh-lock.ts';
 
 /**
@@ -48,7 +52,13 @@ async function refreshAndPersist(
 ): Promise<OAuthCredentials> {
   let tokens: Awaited<ReturnType<typeof refreshAccessToken>>;
   try {
-    tokens = await refreshAccessToken(oauth.refreshToken);
+    // Resolved against the environment's own host: a refresh token presented
+    // to a different host than the one that issued it is rejected as
+    // invalid_grant, which would flag a healthy login as dead.
+    const endpoints = await resolveOAuthEndpoints(
+      (await getEnvironment(name))?.baseUrl,
+    );
+    tokens = await refreshAccessToken(oauth.refreshToken, endpoints);
   } catch (error) {
     if (error instanceof OAuthError && error.terminal) {
       // Flag rather than delete: the credential stays for the user to inspect,

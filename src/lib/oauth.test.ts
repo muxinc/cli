@@ -103,6 +103,31 @@ describe('getOAuthEndpoints', () => {
     );
   });
 
+  it("derives endpoints from an environment's stored host when given one", () => {
+    for (const key of ENV_KEYS) delete process.env[key];
+
+    const endpoints = getOAuthEndpoints('https://api.staging.example/');
+
+    expect(endpoints.tokenUrl).toBe(
+      'https://api.staging.example/auth/v1/oauth/token',
+    );
+    expect(endpoints.revocationUrl).toBe(
+      'https://api.staging.example/auth/v1/oauth/revoke',
+    );
+    expect(endpoints.authorizationUrl).toBe(
+      'https://api.staging.example/ui/v1/oauth/authorize',
+    );
+  });
+
+  it('lets MUX_BASE_URL win over a stored host, matching API call resolution', () => {
+    for (const key of ENV_KEYS) delete process.env[key];
+    process.env.MUX_BASE_URL = 'https://api.shell.example';
+
+    expect(getOAuthEndpoints('https://api.staging.example').tokenUrl).toBe(
+      'https://api.shell.example/auth/v1/oauth/token',
+    );
+  });
+
   it('puts all three endpoints on the same host', () => {
     for (const key of ENV_KEYS) delete process.env[key];
 
@@ -595,6 +620,29 @@ describe('resolveOAuthEndpoints', () => {
       'https://dashboard.mux.com/oauth/v2/authorize',
     );
     expect(getServerCapabilities().grantTypes).toContain('refresh_token');
+  });
+
+  it("runs discovery and derives fallbacks from an environment's stored host", async () => {
+    for (const key of ENV_KEYS) delete process.env[key];
+    // Discovery is unavailable, so the built-in paths apply — on the stored
+    // host, never on the default one.
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response('not found', { status: 404 })) as unknown as typeof fetch,
+    );
+
+    const endpoints = await resolveOAuthEndpoints(
+      'https://api.staging.example',
+    );
+
+    expect(endpoints.tokenUrl).toBe(
+      'https://api.staging.example/auth/v1/oauth/token',
+    );
+    const requested = fetchSpy.mock.calls.map((call) => String(call[0]));
+    expect(requested.length).toBeGreaterThan(0);
+    expect(
+      requested.every((url) => url.startsWith('https://api.staging.example/')),
+    ).toBe(true);
   });
 
   it('lets an explicit environment override beat discovery', async () => {

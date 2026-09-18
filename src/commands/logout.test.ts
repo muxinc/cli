@@ -124,6 +124,33 @@ describe('mux logout', () => {
     expect(await listEnvironments()).toEqual(['acme-production']);
   });
 
+  it("revokes against the environment's stored host", async () => {
+    // Without the override, the revocation endpoint is derived from a base URL.
+    delete process.env.MUX_OAUTH_REVOKE_URL;
+    const savedBaseUrl = process.env.MUX_BASE_URL;
+    delete process.env.MUX_BASE_URL;
+    await setEnvironment('staging', {
+      environmentId: 'env_789',
+      baseUrl: 'https://api.staging.example',
+      oauth: {
+        accessToken: 'access_s',
+        refreshToken: 'refresh_s',
+        expiresAt: 4_102_444_800,
+      },
+    });
+    mockRevocation();
+
+    try {
+      await logoutCommand.parse(['staging']);
+    } finally {
+      if (savedBaseUrl !== undefined) process.env.MUX_BASE_URL = savedBaseUrl;
+    }
+
+    expect(revocationCalls()).toEqual([
+      'https://api.staging.example/auth/v1/oauth/revoke',
+    ]);
+  });
+
   it('revokes the refresh token for an OAuth login', async () => {
     await seed();
     mockRevocation();

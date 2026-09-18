@@ -463,6 +463,41 @@ describe('runOAuthLogin in machine-readable mode', () => {
     expect(event.expiresInSeconds).toBe(300);
   });
 
+  it('stores a non-default API host with the login, as token logins do', async () => {
+    setAgentMode(true);
+    const savedBaseUrl = process.env.MUX_BASE_URL;
+    process.env.MUX_BASE_URL = 'https://api.staging.example';
+
+    try {
+      await runOAuthLogin({}, fakeDeps());
+    } finally {
+      if (savedBaseUrl === undefined) delete process.env.MUX_BASE_URL;
+      else process.env.MUX_BASE_URL = savedBaseUrl;
+    }
+
+    // Without this the next shell, where MUX_BASE_URL is unset, would send the
+    // bearer token to the default host.
+    expect((await getEnvironment('acme-inc-production'))?.baseUrl).toBe(
+      'https://api.staging.example',
+    );
+  });
+
+  it('stores no host for a login against the default API host', async () => {
+    setAgentMode(true);
+    const savedBaseUrl = process.env.MUX_BASE_URL;
+    delete process.env.MUX_BASE_URL;
+
+    try {
+      await runOAuthLogin({}, fakeDeps());
+    } finally {
+      if (savedBaseUrl !== undefined) process.env.MUX_BASE_URL = savedBaseUrl;
+    }
+
+    expect(
+      (await getEnvironment('acme-inc-production'))?.baseUrl,
+    ).toBeUndefined();
+  });
+
   it('honors --json outside agent mode with the same contract', async () => {
     await runOAuthLogin({ json: true }, fakeDeps());
 

@@ -195,9 +195,15 @@ export async function runOAuthLogin(
   const timeoutMs =
     options.timeout !== undefined ? options.timeout * 1000 : undefined;
 
+  // Stored with the login for the same reason token logins store it: the next
+  // shell may not have MUX_BASE_URL set, and the bearer token, its refresh, and
+  // its revocation must keep going to the host that issued them.
+  const baseUrl = getMuxBaseUrl(null);
+
   const result = await performOAuthLogin(
     {
       ...(options.name && { name: options.name }),
+      ...(baseUrl !== DEFAULT_BASE_URL && { baseUrl }),
       ...(options.port !== undefined && { port: options.port }),
       ...(timeoutMs !== undefined && { timeoutMs }),
       noBrowser: options.printUrl === true,

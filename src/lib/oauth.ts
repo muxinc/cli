@@ -40,9 +40,20 @@ const REVOKE_PATH = '/auth/v1/oauth/revoke';
 
 const DEFAULT_CLIENT_ID = '30b5a08e-1e48-4f70-a3fb-e4d64cf69566';
 
-/** The API host every OAuth endpoint is derived from. */
-function getApiBaseUrl(): string {
-  return (process.env.MUX_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+/**
+ * The API host every OAuth endpoint is derived from.
+ *
+ * Same precedence as `getMuxBaseUrl` in mux.ts: MUX_BASE_URL, then the host
+ * stored with the environment, then the default. A login's refresh and
+ * revocation therefore go to the host its API calls go to — a refresh token is
+ * never presented to a host other than the one that issued it.
+ */
+function getApiBaseUrl(storedBaseUrl?: string): string {
+  return (
+    process.env.MUX_BASE_URL ||
+    storedBaseUrl ||
+    DEFAULT_API_BASE_URL
+  ).replace(/\/+$/, '');
 }
 
 /**
@@ -152,11 +163,13 @@ export class OAuthError extends Error {
 /**
  * Resolve the authorization server configuration from environment overrides and
  * built-in defaults only. This is the offline floor: no network, always works.
+ *
+ * `storedBaseUrl` is the host saved with the environment being acted on, if any.
  */
-export function getOAuthEndpoints(): OAuthEndpoints {
+export function getOAuthEndpoints(storedBaseUrl?: string): OAuthEndpoints {
   const scopes = process.env.MUX_OAUTH_SCOPES?.trim();
 
-  const base = getApiBaseUrl();
+  const base = getApiBaseUrl(storedBaseUrl);
 
   return {
     clientId: process.env.MUX_OAUTH_CLIENT_ID || DEFAULT_CLIENT_ID,
@@ -194,10 +207,12 @@ export function getServerCapabilities(): ServerCapabilities {
  * picked up without a CLI release; a discovery outage changes nothing.
  */
 export async function resolveOAuthEndpoints(
-  apiBaseUrl?: string,
+  storedBaseUrl?: string,
 ): Promise<OAuthEndpoints> {
-  const defaults = getOAuthEndpoints();
-  const baseUrl = apiBaseUrl || getApiBaseUrl();
+  // Discovery and the built-in fallbacks share one base, so a discovery outage
+  // cannot move the grant endpoints onto a different host.
+  const defaults = getOAuthEndpoints(storedBaseUrl);
+  const baseUrl = getApiBaseUrl(storedBaseUrl);
 
   const discovered = await discoverEndpoints(baseUrl);
   if (!discovered) {
