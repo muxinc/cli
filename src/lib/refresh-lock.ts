@@ -99,12 +99,6 @@ function isAbandoned(raw: string): boolean {
   return !processAlive(contents.pid);
 }
 
-/** Decide whether an existing lock can be broken. */
-async function isBreakable(path: string): Promise<boolean> {
-  const raw = await readLockFile(path);
-  return raw === null || isAbandoned(raw);
-}
-
 /**
  * Unlink `path` only if it still holds the contents the caller judged.
  *
@@ -178,7 +172,20 @@ export async function breakStaleLock(path: string): Promise<boolean> {
   try {
     // Re-read under the mutex. Between the caller's decision and this point a
     // new holder may have linked a fresh lock, which must not be deleted.
-    if (!(await isBreakable(path))) {
+    const raw = await readLockFile(path);
+    if (raw === null) {
+      // Already gone: there is nothing to break, and the caller should retry
+      // its link. Unlinking here would race every contender doing exactly
+      // that — the mutex serializes breakers, not acquirers — and delete the
+      // lock of whichever one had just linked.
+      return true;
+    }
+    if (!isAbandoned(raw)) {
+      return false;
+    }
+    // Only the file that was judged abandoned may be removed. A different one
+    // at the same path is a live acquisition.
+    if ((await readLockFile(path)) !== raw) {
       return false;
     }
     try {
@@ -241,7 +248,15 @@ async function acquire(path: string, timeoutMs: number): Promise<string> {
       await unlink(stagingPath).catch(() => {});
     }
 
-    if (await isBreakable(path)) {
+    const held = await readLockFile(path);
+    if (held === null) {
+      // Released since the link attempt above. This is the ordinary hand-off
+      // between a holder and its waiters, not a recovery: retry the link and
+      // stay out of the break path, which exists to delete things.
+      continue;
+    }
+
+    if (isAbandoned(held)) {
       // A break clears the way for the link attempt at the top of the next
       // iteration, so retry straight away rather than waiting out a poll.
       if (await breakStaleLock(path)) continue;

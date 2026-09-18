@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readdir, readFile, rm, unlink } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  unlink,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
@@ -72,6 +79,32 @@ describe('withRefreshLock', () => {
     expect(maxActive).toBe(1);
     expect(order.length).toBe(4);
   });
+
+  it('never admits two holders when many waiters contend across normal releases', async () => {
+    // A waiter that saw the lock held, then found it gone because the holder
+    // released, used to go down the break path and unlink "the" lock — which
+    // by then could be one a third contender had just linked. The window is a
+    // few syscalls wide, so this is a volume test: it cannot fail on correct
+    // code, and caught the faulty code in roughly seven runs out of ten. A
+    // failure here is real even if a rerun passes.
+    let active = 0;
+    let overlaps = 0;
+
+    for (let round = 0; round < 10; round += 1) {
+      await Promise.all(
+        Array.from({ length: 80 }, () =>
+          withRefreshLock(async () => {
+            active += 1;
+            if (active > 1) overlaps += 1;
+            await Bun.sleep(0);
+            active -= 1;
+          }),
+        ),
+      );
+    }
+
+    expect(overlaps).toBe(0);
+  }, 30_000);
 
   it('records the owning pid so stale locks can be identified', async () => {
     let contents = '';
@@ -249,6 +282,17 @@ describe('breakStaleLock', () => {
       path,
       JSON.stringify({ pid: 2 ** 30, acquiredAt: Date.now() }),
     );
+
+    expect(await breakStaleLock(path)).toBe(true);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it('has nothing to remove, and says to retry, when the lock is already gone', async () => {
+    // The holder released between the caller's decision and this call. Retrying
+    // the link is right; unlinking is not, since the path may be re-linked by
+    // a live holder at any moment.
+    const path = getRefreshLockPath();
+    await mkdir(dirname(path), { recursive: true });
 
     expect(await breakStaleLock(path)).toBe(true);
     expect(existsSync(path)).toBe(false);
