@@ -35,9 +35,10 @@ export const CALLBACK_PATH = '/callback';
 export const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
- * Grace period between accepting a callback and closing the listener, so the
- * browser receives the complete success page. Callers that finish earlier call
- * `stop()` themselves.
+ * Grace period that lets the browser receive the complete page before the
+ * listener is closed: between accepting a callback and closing on success, and
+ * between answering a failed callback and rejecting the wait (which is what
+ * makes the caller close). Callers that finish earlier call `stop()` themselves.
  */
 const CLOSE_GRACE_MS = 250;
 
@@ -115,6 +116,27 @@ export async function startLoopbackServer(
       reject(error);
     };
   });
+  // Set as soon as a callback has been answered with a final page, success or
+  // failure, so later callbacks are refused even while a failure is still
+  // waiting out its flush grace below.
+  let answered = false;
+  let pendingFailure: ReturnType<typeof setTimeout> | undefined;
+  let pendingError: Error | undefined;
+
+  /**
+   * Reject the wait once the failure page has had time to reach the browser.
+   *
+   * The caller closes the listener the moment the wait rejects, and that close
+   * is forced (see `stop`), so rejecting synchronously cut the response off and
+   * left the browser on a connection error instead of the explanation. Not
+   * unref'd: the process must stay alive for the grace period.
+   */
+  const failAfterFlush = (error: Error): void => {
+    answered = true;
+    pendingError = error;
+    pendingFailure = setTimeout(() => fail?.(error), CLOSE_GRACE_MS);
+  };
+
   // The caller may never call waitForCode() (an early failure elsewhere in
   // login, for example). Attaching a handler here keeps that from surfacing as
   // an unhandled rejection; the original promise still rejects for the caller.
@@ -123,7 +145,7 @@ export async function startLoopbackServer(
   const handle = (request: Request): Response => {
     const url = new URL(request.url);
 
-    if (done) {
+    if (done || answered) {
       // The login is already settled. A later callback — a refreshed tab, a
       // replayed URL — must not reopen it or change the accepted code.
       return page(
@@ -143,7 +165,7 @@ export async function startLoopbackServer(
 
     const state = url.searchParams.get('state') ?? '';
     if (!statesMatch(options.state, state)) {
-      fail?.(
+      failAfterFlush(
         new OAuthError(
           'The login response carried an unexpected state value and was rejected. Run `mux login` again.',
           { terminal: true, code: 'state_mismatch' },
@@ -160,7 +182,7 @@ export async function startLoopbackServer(
     if (error) {
       const description =
         url.searchParams.get('error_description') ?? undefined;
-      fail?.(
+      failAfterFlush(
         new OAuthError(
           description
             ? `Login was not completed: ${description}`
@@ -173,7 +195,7 @@ export async function startLoopbackServer(
 
     const code = url.searchParams.get('code');
     if (!code) {
-      fail?.(
+      failAfterFlush(
         new OAuthError(
           'The login response contained neither an authorization code nor an error.',
           { terminal: true },
@@ -182,6 +204,7 @@ export async function startLoopbackServer(
       return page('Login failed', 'Return to your terminal for details.');
     }
 
+    answered = true;
     settle?.(code);
     // One successful callback is all a login needs, and a lingering listener is
     // attack surface — but the success page still has to reach the browser, so
@@ -216,13 +239,17 @@ export async function startLoopbackServer(
     if (stopped) return;
     stopped = true;
     clearTimeout(timer);
+    clearTimeout(pendingFailure);
     // Force active connections closed. The success page has already flushed by
     // the time the post-callback close fires (CLOSE_GRACE_MS), and a browser
     // keep-alive connection would otherwise hold the listening socket open —
     // leaving a redirect receiver alive after the login it served.
     server.stop(true);
+    // A failure still waiting out its grace is the real reason the login
+    // ended; reporting "canceled" over it would hide what the provider said.
     fail?.(
-      new OAuthError('Login canceled.', { terminal: true, code: 'canceled' }),
+      pendingError ??
+        new OAuthError('Login canceled.', { terminal: true, code: 'canceled' }),
     );
   }
 

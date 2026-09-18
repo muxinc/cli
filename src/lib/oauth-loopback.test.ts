@@ -263,4 +263,49 @@ describe('startLoopbackServer', () => {
 
     await expect(waiting).rejects.toThrow(/cancel/i);
   });
+
+  describe('failure pages reach the browser', () => {
+    // performOAuthLogin closes the listener the moment the wait rejects. These
+    // tests do the same, because that is what used to cut the response off and
+    // leave the browser on a connection error instead of an explanation.
+    const cases: Array<[string, string, number]> = [
+      ['the user denies consent', `error=access_denied&state=${STATE}`, 200],
+      ['the state does not match', 'code=abc&state=wrong', 400],
+      ['neither a code nor an error is present', `state=${STATE}`, 200],
+    ];
+
+    for (const [name, query, status] of cases) {
+      it(`delivers the page when ${name}`, async () => {
+        const server = await startTestServer();
+        const settled = server.waitForCode().catch((error: Error) => {
+          server.stop();
+          return error;
+        });
+
+        const response = await callback(server.port, query);
+
+        expect(response.status).toBe(status);
+        expect(await response.text()).toContain('Login failed');
+        expect(await settled).toBeInstanceOf(Error);
+      });
+    }
+
+    it('refuses a second callback while the failure page is in flight', async () => {
+      const server = await startTestServer();
+      const settled = server.waitForCode().catch((error: Error) => error);
+      try {
+        await callback(server.port, `error=access_denied&state=${STATE}`);
+        // A valid-looking callback arriving afterwards must not rescue or
+        // replace the outcome already decided.
+        const second = await callback(server.port, `code=late&state=${STATE}`);
+
+        expect(second.status).toBe(410);
+        expect(((await settled) as Error).message).toContain(
+          'Login was not completed',
+        );
+      } finally {
+        server.stop();
+      }
+    });
+  });
 });
