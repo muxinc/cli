@@ -38,14 +38,22 @@ interface UploadResult {
 interface WaitedUploadResult {
   file: string;
   uploadId: string;
-  assetId: string;
-  asset: Mux.Video.Asset;
+  /** Final asset status, or `errored` when the upload or asset failed. */
+  status: string;
+  assetId?: string;
+  asset?: Mux.Video.Asset;
+  error?: string;
 }
 
 interface WaitOptions {
   sleep?: (ms: number) => Promise<void>;
   maxAttempts?: number;
   onPoll?: () => void;
+}
+
+interface WaitForUploadsOptions extends WaitOptions {
+  /** Print per-file progress and results in the human-readable format. */
+  pretty?: boolean;
 }
 
 const POLL_INTERVAL_MS = 5000;
@@ -123,6 +131,64 @@ export async function waitForAsset(
   }
 
   return current;
+}
+
+/**
+ * Wait for each direct upload to produce a processed asset. A failure is
+ * recorded on that file's entry instead of aborting, so callers still get the
+ * assets that were created successfully.
+ */
+export async function waitForUploads(
+  mux: Mux,
+  uploads: UploadResult[],
+  options: WaitForUploadsOptions = {},
+): Promise<WaitedUploadResult[]> {
+  const results: WaitedUploadResult[] = [];
+
+  for (const upload of uploads) {
+    if (options.pretty) {
+      console.log(`\nWaiting for ${upload.file} to be ready...`);
+    }
+
+    const result: WaitedUploadResult = {
+      file: upload.file,
+      uploadId: upload.uploadId,
+      status: 'errored',
+    };
+
+    try {
+      result.assetId = await waitForUploadAsset(mux, upload.uploadId, options);
+      const created = await mux.video.assets.retrieve(result.assetId);
+      // Only set once processing succeeds, so a failed entry never carries a
+      // stale `preparing` snapshot.
+      result.asset = await waitForAsset(mux, created, options);
+      result.status = result.asset.status;
+    } catch (error) {
+      result.error = error instanceof Error ? error.message : String(error);
+    }
+
+    if (options.pretty) {
+      console.log();
+      if (result.assetId) {
+        console.log(`  Asset ID: ${result.assetId}`);
+      }
+      if (result.error) {
+        console.log(`  Failed: ${result.error}`);
+      } else if (result.asset) {
+        const playbackId = result.asset.playback_ids?.[0]?.id;
+        if (playbackId) {
+          console.log(
+            `  Playback URL: https://stream.mux.com/${playbackId}.m3u8`,
+          );
+        }
+        reportWaitedAsset(result.asset);
+      }
+    }
+
+    results.push(result);
+  }
+
+  return results;
 }
 
 /**
@@ -559,43 +625,23 @@ export const createCommand = new Command()
       if (opts.wait && Array.isArray(result)) {
         // Direct uploads create their asset asynchronously once the file has
         // been received, so resolve each upload to its asset before waiting.
-        const waited: WaitedUploadResult[] = [];
-
-        for (const upload of result) {
-          if (!json) {
-            console.log(`\nWaiting for ${upload.file} to be ready...`);
-          }
-
-          const assetId = await waitForUploadAsset(mux, upload.uploadId, {
-            onPoll,
-          });
-          const asset = await waitForAsset(
-            mux,
-            await mux.video.assets.retrieve(assetId),
-            { onPoll },
-          );
-
-          if (!json) {
-            console.log();
-            console.log(`  Asset ID: ${asset.id}`);
-            if (asset.playback_ids && asset.playback_ids.length > 0) {
-              console.log(
-                `  Playback URL: https://stream.mux.com/${asset.playback_ids[0].id}.m3u8`,
-              );
-            }
-            reportWaitedAsset(asset);
-          }
-
-          waited.push({
-            file: upload.file,
-            uploadId: upload.uploadId,
-            assetId,
-            asset,
-          });
-        }
+        const waited = await waitForUploads(mux, result, {
+          onPoll,
+          pretty: !json,
+        });
 
         if (json) {
           console.log(JSON.stringify(waited, null, 2));
+        }
+
+        // Report every file first, then exit non-zero if any of them failed.
+        const failed = waited.filter((r) => r.error);
+        if (failed.length > 0) {
+          throw new Error(
+            `${failed.length} of ${waited.length} upload(s) failed: ${failed
+              .map((r) => `${r.file} (${r.error})`)
+              .join('; ')}`,
+          );
         }
       } else if (opts.wait && !Array.isArray(result) && result.id) {
         if (!json) {

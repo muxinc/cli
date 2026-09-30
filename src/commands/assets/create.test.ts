@@ -12,7 +12,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type Mux from '@mux/ts';
 import { setAgentMode } from '@/lib/context.ts';
-import { createCommand, waitForAsset, waitForUploadAsset } from './create.ts';
+import {
+  createCommand,
+  waitForAsset,
+  waitForUploadAsset,
+  waitForUploads,
+} from './create.ts';
 
 const noSleep = async () => {};
 
@@ -96,6 +101,115 @@ describe('waitForUploadAsset', () => {
       waitForUploadAsset(mux, 'up1', { sleep: noSleep, maxAttempts: 3 }),
     ).rejects.toThrow('Timed out waiting for upload up1 to create an asset');
     expect(calls.uploads).toBe(3);
+  });
+});
+
+describe('waitForUploads', () => {
+  /**
+   * Fake client keyed by ID, so each upload resolves to its own asset.
+   */
+  function fakeMuxById(
+    uploads: Record<string, Partial<Mux.Video.Upload>>,
+    assets: Record<string, Partial<Mux.Video.Asset>>,
+  ) {
+    return {
+      video: {
+        uploads: { retrieve: async (id: string) => uploads[id] },
+        assets: { retrieve: async (id: string) => assets[id] },
+      },
+    } as unknown as Mux;
+  }
+
+  const uploaded = [
+    { file: 'good.mp4', uploadId: 'up1', status: 'waiting' },
+    { file: 'bad.mp4', uploadId: 'up2', status: 'waiting' },
+    { file: 'also-good.mp4', uploadId: 'up3', status: 'waiting' },
+  ];
+
+  test('returns an entry per file with the ready asset', async () => {
+    const mux = fakeMuxById(
+      {
+        up1: { id: 'up1', status: 'asset_created', asset_id: 'a1' },
+        up3: { id: 'up3', status: 'asset_created', asset_id: 'a3' },
+      },
+      {
+        a1: { id: 'a1', status: 'ready' },
+        a3: { id: 'a3', status: 'ready' },
+      },
+    );
+
+    const results = await waitForUploads(mux, [uploaded[0], uploaded[2]], {
+      sleep: noSleep,
+    });
+
+    expect(results).toEqual([
+      {
+        file: 'good.mp4',
+        uploadId: 'up1',
+        status: 'ready',
+        assetId: 'a1',
+        asset: { id: 'a1', status: 'ready' } as Mux.Video.Asset,
+      },
+      {
+        file: 'also-good.mp4',
+        uploadId: 'up3',
+        status: 'ready',
+        assetId: 'a3',
+        asset: { id: 'a3', status: 'ready' } as Mux.Video.Asset,
+      },
+    ]);
+  });
+
+  test('keeps going after a failed file and records its error', async () => {
+    const mux = fakeMuxById(
+      {
+        up1: { id: 'up1', status: 'asset_created', asset_id: 'a1' },
+        up2: { id: 'up2', status: 'asset_created', asset_id: 'a2' },
+        up3: { id: 'up3', status: 'asset_created', asset_id: 'a3' },
+      },
+      {
+        a1: { id: 'a1', status: 'ready' },
+        a2: {
+          id: 'a2',
+          status: 'errored',
+          errors: { messages: ['Not a valid video'] },
+        },
+        a3: { id: 'a3', status: 'ready' },
+      },
+    );
+
+    const results = await waitForUploads(mux, uploaded, { sleep: noSleep });
+
+    expect(results.map((r) => [r.file, r.status])).toEqual([
+      ['good.mp4', 'ready'],
+      ['bad.mp4', 'errored'],
+      ['also-good.mp4', 'ready'],
+    ]);
+    expect(results[1].assetId).toBe('a2');
+    expect(results[1].asset).toBeUndefined();
+    expect(results[1].error).toBe('Asset processing failed: Not a valid video');
+    expect(results[0].error).toBeUndefined();
+  });
+
+  test('records an upload that never creates an asset', async () => {
+    const mux = fakeMuxById(
+      {
+        up1: {
+          id: 'up1',
+          status: 'errored',
+          error: { type: 'invalid_input', message: 'Bad file' },
+        },
+      },
+      {},
+    );
+
+    const [result] = await waitForUploads(mux, [uploaded[0]], {
+      sleep: noSleep,
+    });
+
+    expect(result.status).toBe('errored');
+    expect(result.assetId).toBeUndefined();
+    expect(result.error).toBe('Upload up1 errored: Bad file');
   });
 });
 
