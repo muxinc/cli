@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/ts';
+import { APIError } from '@mux/ts';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { expandGlobPattern, uploadFile } from '@/lib/file-upload.ts';
@@ -35,11 +36,7 @@ interface UploadResult {
   status: string;
 }
 
-interface WaitedUploadResult {
-  file: string;
-  uploadId: string;
-  /** Final asset status, or `errored` when the upload or asset failed. */
-  status: string;
+interface WaitedUploadResult extends UploadResult {
   assetId?: string;
   asset?: Mux.Video.Asset;
   error?: string;
@@ -49,11 +46,6 @@ interface WaitOptions {
   sleep?: (ms: number) => Promise<void>;
   maxAttempts?: number;
   onPoll?: () => void;
-}
-
-interface WaitForUploadsOptions extends WaitOptions {
-  /** Print per-file progress and results in the human-readable format. */
-  pretty?: boolean;
 }
 
 const POLL_INTERVAL_MS = 5000;
@@ -134,14 +126,16 @@ export async function waitForAsset(
 }
 
 /**
- * Wait for each direct upload to produce a processed asset. A failure is
- * recorded on that file's entry instead of aborting, so callers still get the
- * assets that were created successfully.
+ * Wait for each direct upload to produce a processed asset. A processing
+ * failure is recorded on that file's entry instead of aborting, so callers
+ * still get the assets that were created successfully. API errors (such as
+ * authentication or permission failures) are rethrown for the command's
+ * error handler.
  */
 export async function waitForUploads(
   mux: Mux,
   uploads: UploadResult[],
-  options: WaitForUploadsOptions = {},
+  options: WaitOptions & { pretty?: boolean } = {},
 ): Promise<WaitedUploadResult[]> {
   const results: WaitedUploadResult[] = [];
 
@@ -150,11 +144,7 @@ export async function waitForUploads(
       console.log(`\nWaiting for ${upload.file} to be ready...`);
     }
 
-    const result: WaitedUploadResult = {
-      file: upload.file,
-      uploadId: upload.uploadId,
-      status: 'errored',
-    };
+    const result: WaitedUploadResult = { ...upload, status: 'errored' };
 
     try {
       result.assetId = await waitForUploadAsset(mux, upload.uploadId, options);
@@ -164,24 +154,27 @@ export async function waitForUploads(
       result.asset = await waitForAsset(mux, created, options);
       result.status = result.asset.status;
     } catch (error) {
+      if (error instanceof APIError) throw error;
       result.error = error instanceof Error ? error.message : String(error);
     }
 
     if (options.pretty) {
       console.log();
-      if (result.assetId) {
-        console.log(`  Asset ID: ${result.assetId}`);
-      }
+      if (result.assetId) console.log(`  Asset ID: ${result.assetId}`);
       if (result.error) {
         console.log(`  Failed: ${result.error}`);
-      } else if (result.asset) {
+      } else if (result.asset?.status === 'ready') {
         const playbackId = result.asset.playback_ids?.[0]?.id;
         if (playbackId) {
           console.log(
             `  Playback URL: https://stream.mux.com/${playbackId}.m3u8`,
           );
         }
-        reportWaitedAsset(result.asset);
+        console.log('Asset is ready!');
+      } else {
+        console.log(
+          `WARNING: Asset is still processing. Run 'mux assets get ${result.assetId}' to check status.`,
+        );
       }
     }
 
@@ -189,20 +182,6 @@ export async function waitForUploads(
   }
 
   return results;
-}
-
-/**
- * Print the final state of an asset after waiting, matching the pretty output
- * of the non-JSON mode.
- */
-function reportWaitedAsset(asset: Mux.Video.Asset): void {
-  if (asset.status === 'ready') {
-    console.log('Asset is ready!');
-  } else {
-    console.log(
-      `WARNING: Asset is still processing. Run 'mux assets get ${asset.id}' to check status.`,
-    );
-  }
 }
 
 /**
@@ -588,7 +567,7 @@ export const createCommand = new Command()
       } else if (opts.upload) {
         result = await createFromUploads(mux, opts.upload, opts);
 
-        // With --wait, JSON mode prints only the final asset states below so
+        // With --wait, JSON mode prints only the final results below so
         // stdout stays a single JSON document.
         if (json && !opts.wait) {
           console.log(JSON.stringify(result, null, 2));
@@ -619,15 +598,12 @@ export const createCommand = new Command()
         throw new Error('No input method provided');
       }
 
-      // Wait for asset processing if requested
-      const onPoll = json ? undefined : () => process.stdout.write('.');
-
+      // Direct uploads create their asset asynchronously once the file has
+      // been received, so resolve each upload to its asset before waiting.
       if (opts.wait && Array.isArray(result)) {
-        // Direct uploads create their asset asynchronously once the file has
-        // been received, so resolve each upload to its asset before waiting.
         const waited = await waitForUploads(mux, result, {
-          onPoll,
           pretty: !json,
+          onPoll: json ? undefined : () => process.stdout.write('.'),
         });
 
         if (json) {
@@ -643,18 +619,50 @@ export const createCommand = new Command()
               .join('; ')}`,
           );
         }
-      } else if (opts.wait && !Array.isArray(result) && result.id) {
+      }
+
+      // Wait for asset processing if requested
+      if (opts.wait && !Array.isArray(result) && result.id) {
         if (!json) {
           console.log('\nWaiting for asset to be ready...');
         }
 
-        const asset = await waitForAsset(mux, result, { onPoll });
+        let asset = result;
+        const maxAttempts = 60; // 5 minutes with 5s intervals
+        let attempts = 0;
+
+        while (asset.status === 'preparing' && attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          asset = await mux.video.assets.retrieve(result.id);
+          attempts++;
+
+          if (!json) {
+            process.stdout.write('.');
+          }
+        }
+
+        if (!json) {
+          console.log();
+        }
+
+        if (asset.status === 'ready') {
+          if (!json) {
+            console.log('Asset is ready!');
+          }
+        } else if (asset.status === 'errored') {
+          throw new Error(
+            `Asset processing failed: ${asset.errors?.messages?.join(', ') || 'Unknown error'}`,
+          );
+        } else {
+          if (!json) {
+            console.log(
+              `WARNING: Asset is still processing. Run 'mux assets get ${asset.id}' to check status.`,
+            );
+          }
+        }
 
         if (json) {
           console.log(JSON.stringify(asset, null, 2));
-        } else {
-          console.log();
-          reportWaitedAsset(asset);
         }
       }
     } catch (error) {

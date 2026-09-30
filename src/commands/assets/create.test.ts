@@ -11,6 +11,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type Mux from '@mux/ts';
+import { APIError } from '@mux/ts';
 import { setAgentMode } from '@/lib/context.ts';
 import {
   createCommand,
@@ -210,6 +211,28 @@ describe('waitForUploads', () => {
     expect(result.status).toBe('errored');
     expect(result.assetId).toBeUndefined();
     expect(result.error).toBe('Upload up1 errored: Bad file');
+  });
+
+  test('rethrows API errors so the command error handler can report them', async () => {
+    const authError = APIError.generate(
+      401,
+      { error: { type: 'unauthorized' } },
+      'Unauthorized',
+      new Headers(),
+    );
+    const mux = {
+      video: {
+        uploads: {
+          retrieve: async () => {
+            throw authError;
+          },
+        },
+      },
+    } as unknown as Mux;
+
+    await expect(
+      waitForUploads(mux, [uploaded[0]], { sleep: noSleep }),
+    ).rejects.toBe(authError);
   });
 });
 
