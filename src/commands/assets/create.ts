@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import type Mux from '@mux/ts';
+import { APIError } from '@mux/ts';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
 import { expandGlobPattern, uploadFile } from '@/lib/file-upload.ts';
@@ -33,6 +34,154 @@ interface UploadResult {
   file: string;
   uploadId: string;
   status: string;
+}
+
+interface WaitedUploadResult extends UploadResult {
+  assetId?: string;
+  asset?: Mux.Video.Asset;
+  error?: string;
+}
+
+interface WaitOptions {
+  sleep?: (ms: number) => Promise<void>;
+  maxAttempts?: number;
+  onPoll?: () => void;
+}
+
+const POLL_INTERVAL_MS = 5000;
+const MAX_POLL_ATTEMPTS = 60; // 5 minutes with 5s intervals
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll a direct upload until Mux has created an asset from it and return the
+ * asset ID. Throws if the upload errors, is cancelled, times out, or does not
+ * produce an asset within the polling window.
+ */
+export async function waitForUploadAsset(
+  mux: Mux,
+  uploadId: string,
+  options: WaitOptions = {},
+): Promise<string> {
+  const wait = options.sleep ?? sleep;
+  const maxAttempts = options.maxAttempts ?? MAX_POLL_ATTEMPTS;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await wait(POLL_INTERVAL_MS);
+      options.onPoll?.();
+    }
+
+    const upload = await mux.video.uploads.retrieve(uploadId);
+
+    if (upload.status === 'asset_created' && upload.asset_id) {
+      return upload.asset_id;
+    }
+    if (upload.status === 'errored') {
+      throw new Error(
+        `Upload ${uploadId} errored: ${upload.error?.message || 'Unknown error'}`,
+      );
+    }
+    if (upload.status === 'cancelled' || upload.status === 'timed_out') {
+      throw new Error(`Upload ${uploadId} ${upload.status}`);
+    }
+  }
+
+  throw new Error(
+    `Timed out waiting for upload ${uploadId} to create an asset. Run 'mux uploads get ${uploadId}' to check status.`,
+  );
+}
+
+/**
+ * Poll an asset while it is preparing and return its latest state. Throws if
+ * processing fails; returns the still-preparing asset if the polling window
+ * elapses so the caller can report it.
+ */
+export async function waitForAsset(
+  mux: Mux,
+  asset: Mux.Video.Asset,
+  options: WaitOptions = {},
+): Promise<Mux.Video.Asset> {
+  const wait = options.sleep ?? sleep;
+  const maxAttempts = options.maxAttempts ?? MAX_POLL_ATTEMPTS;
+  let current = asset;
+  let attempts = 0;
+
+  while (current.status === 'preparing' && attempts < maxAttempts) {
+    await wait(POLL_INTERVAL_MS);
+    current = await mux.video.assets.retrieve(asset.id);
+    attempts++;
+    options.onPoll?.();
+  }
+
+  if (current.status === 'errored') {
+    throw new Error(
+      `Asset processing failed: ${current.errors?.messages?.join(', ') || 'Unknown error'}`,
+    );
+  }
+
+  return current;
+}
+
+/**
+ * Wait for each direct upload to produce a processed asset. A processing
+ * failure is recorded on that file's entry instead of aborting, so callers
+ * still get the assets that were created successfully. API errors (such as
+ * authentication or permission failures) are rethrown for the command's
+ * error handler.
+ */
+export async function waitForUploads(
+  mux: Mux,
+  uploads: UploadResult[],
+  options: WaitOptions & { pretty?: boolean } = {},
+): Promise<WaitedUploadResult[]> {
+  const results: WaitedUploadResult[] = [];
+
+  for (const upload of uploads) {
+    if (options.pretty) {
+      console.log(`\nWaiting for ${upload.file} to be ready...`);
+    }
+
+    const result: WaitedUploadResult = { ...upload, status: 'errored' };
+
+    try {
+      result.assetId = await waitForUploadAsset(mux, upload.uploadId, options);
+      const created = await mux.video.assets.retrieve(result.assetId);
+      // Only set once processing succeeds, so a failed entry never carries a
+      // stale `preparing` snapshot.
+      result.asset = await waitForAsset(mux, created, options);
+      result.status = result.asset.status;
+    } catch (error) {
+      if (error instanceof APIError) throw error;
+      result.error = error instanceof Error ? error.message : String(error);
+    }
+
+    if (options.pretty) {
+      console.log();
+      if (result.assetId) console.log(`  Asset ID: ${result.assetId}`);
+      if (result.error) {
+        console.log(`  Failed: ${result.error}`);
+      } else if (result.asset?.status === 'ready') {
+        const playbackId = result.asset.playback_ids?.[0]?.id;
+        if (playbackId) {
+          console.log(
+            `  Playback URL: https://stream.mux.com/${playbackId}.m3u8`,
+          );
+        }
+        console.log('Asset is ready!');
+      } else {
+        console.log(
+          `WARNING: Asset is still processing. Run 'mux assets get ${result.assetId}' to check status.`,
+        );
+      }
+    }
+
+    results.push(result);
+  }
+
+  return results;
 }
 
 /**
@@ -418,9 +567,11 @@ export const createCommand = new Command()
       } else if (opts.upload) {
         result = await createFromUploads(mux, opts.upload, opts);
 
-        if (json) {
+        // With --wait, JSON mode prints only the final results below so
+        // stdout stays a single JSON document.
+        if (json && !opts.wait) {
           console.log(JSON.stringify(result, null, 2));
-        } else {
+        } else if (!json) {
           console.log(`\n${result.length} file(s) uploaded successfully`);
           for (const upload of result) {
             console.log(`  - ${upload.file}: Upload ID ${upload.uploadId}`);
@@ -445,6 +596,29 @@ export const createCommand = new Command()
       } else {
         // This should never happen due to validation above
         throw new Error('No input method provided');
+      }
+
+      // Direct uploads create their asset asynchronously once the file has
+      // been received, so resolve each upload to its asset before waiting.
+      if (opts.wait && Array.isArray(result)) {
+        const waited = await waitForUploads(mux, result, {
+          pretty: !json,
+          onPoll: json ? undefined : () => process.stdout.write('.'),
+        });
+
+        if (json) {
+          console.log(JSON.stringify(waited, null, 2));
+        }
+
+        // Report every file first, then exit non-zero if any of them failed.
+        const failed = waited.filter((r) => r.error);
+        if (failed.length > 0) {
+          throw new Error(
+            `${failed.length} of ${waited.length} upload(s) failed: ${failed
+              .map((r) => `${r.file} (${r.error})`)
+              .join('; ')}`,
+          );
+        }
       }
 
       // Wait for asset processing if requested

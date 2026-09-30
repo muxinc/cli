@@ -333,6 +333,9 @@ mux assets create --file asset-config.json
 
 # Wait for processing to complete
 mux assets create --url https://example.com/video.mp4 --playback-policy public --wait
+
+# Upload and wait until each asset is ready (JSON output includes the asset ID and playback IDs)
+mux assets create --upload ./video.mp4 --playback-policy public --wait --json
 ```
 
 **JSON Configuration File:**
