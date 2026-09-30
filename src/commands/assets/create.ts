@@ -35,6 +35,110 @@ interface UploadResult {
   status: string;
 }
 
+interface WaitedUploadResult {
+  file: string;
+  uploadId: string;
+  assetId: string;
+  asset: Mux.Video.Asset;
+}
+
+interface WaitOptions {
+  sleep?: (ms: number) => Promise<void>;
+  maxAttempts?: number;
+  onPoll?: () => void;
+}
+
+const POLL_INTERVAL_MS = 5000;
+const MAX_POLL_ATTEMPTS = 60; // 5 minutes with 5s intervals
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll a direct upload until Mux has created an asset from it and return the
+ * asset ID. Throws if the upload errors, is cancelled, times out, or does not
+ * produce an asset within the polling window.
+ */
+export async function waitForUploadAsset(
+  mux: Mux,
+  uploadId: string,
+  options: WaitOptions = {},
+): Promise<string> {
+  const wait = options.sleep ?? sleep;
+  const maxAttempts = options.maxAttempts ?? MAX_POLL_ATTEMPTS;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await wait(POLL_INTERVAL_MS);
+      options.onPoll?.();
+    }
+
+    const upload = await mux.video.uploads.retrieve(uploadId);
+
+    if (upload.status === 'asset_created' && upload.asset_id) {
+      return upload.asset_id;
+    }
+    if (upload.status === 'errored') {
+      throw new Error(
+        `Upload ${uploadId} errored: ${upload.error?.message || 'Unknown error'}`,
+      );
+    }
+    if (upload.status === 'cancelled' || upload.status === 'timed_out') {
+      throw new Error(`Upload ${uploadId} ${upload.status}`);
+    }
+  }
+
+  throw new Error(
+    `Timed out waiting for upload ${uploadId} to create an asset. Run 'mux uploads get ${uploadId}' to check status.`,
+  );
+}
+
+/**
+ * Poll an asset while it is preparing and return its latest state. Throws if
+ * processing fails; returns the still-preparing asset if the polling window
+ * elapses so the caller can report it.
+ */
+export async function waitForAsset(
+  mux: Mux,
+  asset: Mux.Video.Asset,
+  options: WaitOptions = {},
+): Promise<Mux.Video.Asset> {
+  const wait = options.sleep ?? sleep;
+  const maxAttempts = options.maxAttempts ?? MAX_POLL_ATTEMPTS;
+  let current = asset;
+  let attempts = 0;
+
+  while (current.status === 'preparing' && attempts < maxAttempts) {
+    await wait(POLL_INTERVAL_MS);
+    current = await mux.video.assets.retrieve(asset.id);
+    attempts++;
+    options.onPoll?.();
+  }
+
+  if (current.status === 'errored') {
+    throw new Error(
+      `Asset processing failed: ${current.errors?.messages?.join(', ') || 'Unknown error'}`,
+    );
+  }
+
+  return current;
+}
+
+/**
+ * Print the final state of an asset after waiting, matching the pretty output
+ * of the non-JSON mode.
+ */
+function reportWaitedAsset(asset: Mux.Video.Asset): void {
+  if (asset.status === 'ready') {
+    console.log('Asset is ready!');
+  } else {
+    console.log(
+      `WARNING: Asset is still processing. Run 'mux assets get ${asset.id}' to check status.`,
+    );
+  }
+}
+
 /**
  * Format bytes to human-readable size
  */
@@ -418,9 +522,11 @@ export const createCommand = new Command()
       } else if (opts.upload) {
         result = await createFromUploads(mux, opts.upload, opts);
 
-        if (json) {
+        // With --wait, JSON mode prints only the final asset states below so
+        // stdout stays a single JSON document.
+        if (json && !opts.wait) {
           console.log(JSON.stringify(result, null, 2));
-        } else {
+        } else if (!json) {
           console.log(`\n${result.length} file(s) uploaded successfully`);
           for (const upload of result) {
             console.log(`  - ${upload.file}: Upload ID ${upload.uploadId}`);
@@ -448,47 +554,61 @@ export const createCommand = new Command()
       }
 
       // Wait for asset processing if requested
-      if (opts.wait && !Array.isArray(result) && result.id) {
+      const onPoll = json ? undefined : () => process.stdout.write('.');
+
+      if (opts.wait && Array.isArray(result)) {
+        // Direct uploads create their asset asynchronously once the file has
+        // been received, so resolve each upload to its asset before waiting.
+        const waited: WaitedUploadResult[] = [];
+
+        for (const upload of result) {
+          if (!json) {
+            console.log(`\nWaiting for ${upload.file} to be ready...`);
+          }
+
+          const assetId = await waitForUploadAsset(mux, upload.uploadId, {
+            onPoll,
+          });
+          const asset = await waitForAsset(
+            mux,
+            await mux.video.assets.retrieve(assetId),
+            { onPoll },
+          );
+
+          if (!json) {
+            console.log();
+            console.log(`  Asset ID: ${asset.id}`);
+            if (asset.playback_ids && asset.playback_ids.length > 0) {
+              console.log(
+                `  Playback URL: https://stream.mux.com/${asset.playback_ids[0].id}.m3u8`,
+              );
+            }
+            reportWaitedAsset(asset);
+          }
+
+          waited.push({
+            file: upload.file,
+            uploadId: upload.uploadId,
+            assetId,
+            asset,
+          });
+        }
+
+        if (json) {
+          console.log(JSON.stringify(waited, null, 2));
+        }
+      } else if (opts.wait && !Array.isArray(result) && result.id) {
         if (!json) {
           console.log('\nWaiting for asset to be ready...');
         }
 
-        let asset = result;
-        const maxAttempts = 60; // 5 minutes with 5s intervals
-        let attempts = 0;
-
-        while (asset.status === 'preparing' && attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-          asset = await mux.video.assets.retrieve(result.id);
-          attempts++;
-
-          if (!json) {
-            process.stdout.write('.');
-          }
-        }
-
-        if (!json) {
-          console.log();
-        }
-
-        if (asset.status === 'ready') {
-          if (!json) {
-            console.log('Asset is ready!');
-          }
-        } else if (asset.status === 'errored') {
-          throw new Error(
-            `Asset processing failed: ${asset.errors?.messages?.join(', ') || 'Unknown error'}`,
-          );
-        } else {
-          if (!json) {
-            console.log(
-              `WARNING: Asset is still processing. Run 'mux assets get ${asset.id}' to check status.`,
-            );
-          }
-        }
+        const asset = await waitForAsset(mux, result, { onPoll });
 
         if (json) {
           console.log(JSON.stringify(asset, null, 2));
+        } else {
+          console.log();
+          reportWaitedAsset(asset);
         }
       }
     } catch (error) {

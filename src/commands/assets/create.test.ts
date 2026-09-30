@@ -10,8 +10,162 @@ import {
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type Mux from '@mux/ts';
 import { setAgentMode } from '@/lib/context.ts';
-import { createCommand } from './create.ts';
+import { createCommand, waitForAsset, waitForUploadAsset } from './create.ts';
+
+const noSleep = async () => {};
+
+/**
+ * Build a fake Mux client whose upload/asset retrieve calls return the given
+ * responses in order, repeating the last one once the list is exhausted.
+ */
+function fakeMux({
+  uploads = [],
+  assets = [],
+}: {
+  uploads?: Partial<Mux.Video.Upload>[];
+  assets?: Partial<Mux.Video.Asset>[];
+}) {
+  const next = <T>(list: T[], calls: number) =>
+    list[Math.min(calls, list.length - 1)];
+  const calls = { uploads: 0, assets: 0 };
+
+  const mux = {
+    video: {
+      uploads: {
+        retrieve: async () => next(uploads, calls.uploads++),
+      },
+      assets: {
+        retrieve: async () => next(assets, calls.assets++),
+      },
+    },
+  } as unknown as Mux;
+
+  return { mux, calls };
+}
+
+describe('waitForUploadAsset', () => {
+  test('polls until the upload has created an asset', async () => {
+    const { mux, calls } = fakeMux({
+      uploads: [
+        { id: 'up1', status: 'waiting' },
+        { id: 'up1', status: 'waiting' },
+        { id: 'up1', status: 'asset_created', asset_id: 'asset1' },
+      ],
+    });
+
+    const assetId = await waitForUploadAsset(mux, 'up1', { sleep: noSleep });
+
+    expect(assetId).toBe('asset1');
+    expect(calls.uploads).toBe(3);
+  });
+
+  test('throws when the upload errors', async () => {
+    const { mux } = fakeMux({
+      uploads: [
+        {
+          id: 'up1',
+          status: 'errored',
+          error: { type: 'invalid_input', message: 'Bad file' },
+        },
+      ],
+    });
+
+    await expect(
+      waitForUploadAsset(mux, 'up1', { sleep: noSleep }),
+    ).rejects.toThrow('Upload up1 errored: Bad file');
+  });
+
+  test('throws when the upload is cancelled or times out', async () => {
+    for (const status of ['cancelled', 'timed_out'] as const) {
+      const { mux } = fakeMux({ uploads: [{ id: 'up1', status }] });
+
+      await expect(
+        waitForUploadAsset(mux, 'up1', { sleep: noSleep }),
+      ).rejects.toThrow(`Upload up1 ${status}`);
+    }
+  });
+
+  test('throws after the maximum number of attempts', async () => {
+    const { mux, calls } = fakeMux({
+      uploads: [{ id: 'up1', status: 'waiting' }],
+    });
+
+    await expect(
+      waitForUploadAsset(mux, 'up1', { sleep: noSleep, maxAttempts: 3 }),
+    ).rejects.toThrow('Timed out waiting for upload up1 to create an asset');
+    expect(calls.uploads).toBe(3);
+  });
+});
+
+describe('waitForAsset', () => {
+  test('polls until the asset is no longer preparing', async () => {
+    const { mux, calls } = fakeMux({
+      assets: [
+        { id: 'asset1', status: 'preparing' },
+        { id: 'asset1', status: 'ready' },
+      ],
+    });
+
+    const asset = await waitForAsset(
+      mux,
+      { id: 'asset1', status: 'preparing' } as Mux.Video.Asset,
+      { sleep: noSleep },
+    );
+
+    expect(asset.status).toBe('ready');
+    expect(calls.assets).toBe(2);
+  });
+
+  test('returns immediately when the asset is already ready', async () => {
+    const { mux, calls } = fakeMux({});
+
+    const asset = await waitForAsset(
+      mux,
+      { id: 'asset1', status: 'ready' } as Mux.Video.Asset,
+      { sleep: noSleep },
+    );
+
+    expect(asset.status).toBe('ready');
+    expect(calls.assets).toBe(0);
+  });
+
+  test('throws when the asset errors', async () => {
+    const { mux } = fakeMux({
+      assets: [
+        {
+          id: 'asset1',
+          status: 'errored',
+          errors: { messages: ['Unsupported codec'] },
+        },
+      ],
+    });
+
+    await expect(
+      waitForAsset(
+        mux,
+        { id: 'asset1', status: 'preparing' } as Mux.Video.Asset,
+        { sleep: noSleep },
+      ),
+    ).rejects.toThrow('Asset processing failed: Unsupported codec');
+  });
+
+  test('returns the still-preparing asset after the maximum number of attempts', async () => {
+    const { mux, calls } = fakeMux({
+      assets: [{ id: 'asset1', status: 'preparing' }],
+    });
+
+    const asset = await waitForAsset(
+      mux,
+      { id: 'asset1', status: 'preparing' } as Mux.Video.Asset,
+      { sleep: noSleep, maxAttempts: 3 },
+    );
+
+    expect(asset.status).toBe('preparing');
+    expect(calls.assets).toBe(3);
+  });
+});
 
 // Note: These tests focus on CLI flag parsing and input validation
 // They do NOT test the actual Mux API integration (that's tested via E2E)
