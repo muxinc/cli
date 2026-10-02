@@ -103,18 +103,33 @@ export function credentialsFromEnv(
 }
 
 /**
- * Both interactive login methods need a real terminal: one to prompt on, one to
- * print an authorization URL to and wait. Fail fast rather than hanging on a
- * pipe or a CI runner.
+ * Both interactive login methods need a real terminal by default: one to prompt
+ * on, one to print an authorization URL to and wait. Fail fast rather than
+ * hanging on a pipe or a CI runner, and say what does work from there.
  */
-function requireInteractiveTerminal(flag: string): void {
+function requireInteractiveTerminal(message: string): void {
   if (process.stdin.isTTY) return;
-
-  throw new Error(
-    `${flag} needs an interactive terminal, and this shell is not one. ` +
-      'Use `mux login --env-file <path>`, or set MUX_TOKEN_ID and MUX_TOKEN_SECRET and run `mux login --from-env`.',
-  );
+  throw new Error(message);
 }
+
+const ACCESS_TOKEN_ALTERNATIVES =
+  'To use a Mux API access token instead, run `mux login --env-file <path>`, or set MUX_TOKEN_ID and MUX_TOKEN_SECRET and run `mux login --from-env`.';
+
+/**
+ * Browser sign-in does not actually need a terminal, only someone to open the
+ * URL. Coding agents run commands from non-interactive shells, and a message
+ * offering only access-token options led them to conclude browser sign-in was
+ * impossible there.
+ */
+const BROWSER_SIGN_IN_NEEDS_TERMINAL_MESSAGE =
+  'Browser sign-in needs an interactive terminal, and this shell is not one. ' +
+  'To sign in with a browser anyway, run `mux login --json` (or `mux login --agent`): the authorization URL is emitted as a JSON event on stderr for you to open, and the command waits for the redirect. ' +
+  '`mux login --print-url` prints the URL as plain text instead. ' +
+  ACCESS_TOKEN_ALTERNATIVES;
+
+const INTERACTIVE_NEEDS_TERMINAL_MESSAGE =
+  '--interactive needs an interactive terminal, and this shell is not one. ' +
+  ACCESS_TOKEN_ALTERNATIVES;
 
 /**
  * Notice printed after a successful login when shell credentials are set. The
@@ -179,11 +194,12 @@ export async function runOAuthLogin(
 ): Promise<void> {
   const json = wantsJson(options);
 
-  // Machine-readable callers relay the authorization URL themselves, so only
-  // the default pretty flow insists on a terminal: a bare `mux login` in a
-  // pipe or CI runner still fails fast instead of hanging on a redirect.
-  if (!json) {
-    requireInteractiveTerminal('Browser sign-in');
+  // Machine-readable callers relay the authorization URL themselves, and
+  // --print-url asks for exactly that in plain text; neither reads stdin, and
+  // the loopback timeout bounds the wait. Only a bare `mux login` in a pipe or
+  // CI runner, which would try a browser nobody may see, fails fast.
+  if (!json && options.printUrl !== true) {
+    requireInteractiveTerminal(BROWSER_SIGN_IN_NEEDS_TERMINAL_MESSAGE);
   }
 
   if (
@@ -288,7 +304,7 @@ export async function runOAuthLogin(
 export const loginCommand = new Command()
   .description(
     'Sign in to Mux. Opens your browser to select an organization and environment; use --interactive, --env-file, or --from-env for a Mux API access token instead. ' +
-      'With --json or in agent mode, the authorization URL is emitted as a JSON event on stderr and the result as JSON on stdout. ' +
+      'With --json or in agent mode, the authorization URL is emitted as a JSON event on stderr and the result as JSON on stdout; this, and --print-url, also work from a non-interactive shell. ' +
       'The browser must be able to reach this machine to complete the sign-in (see --port for SSH port forwarding).',
   )
   .option(
@@ -313,7 +329,7 @@ export const loginCommand = new Command()
   // settings, and these read just as clearly as flags to opt into.
   .option(
     '--print-url',
-    'Print the authorization URL instead of opening a browser',
+    'Print the authorization URL instead of opening a browser (works without an interactive terminal)',
   )
   .option('--port <port:number>', 'Local port to receive the login redirect on')
   .option(
@@ -417,7 +433,7 @@ export const loginCommand = new Command()
             'Manual credential entry needs a terminal to prompt on. Set MUX_TOKEN_ID and MUX_TOKEN_SECRET environment variables, pass --env-file <path>, or run `mux login --oauth` to sign in with a browser.',
           );
         }
-        requireInteractiveTerminal('--interactive');
+        requireInteractiveTerminal(INTERACTIVE_NEEDS_TERMINAL_MESSAGE);
 
         console.log('Enter your Mux API credentials.');
         console.log(
