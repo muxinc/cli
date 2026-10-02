@@ -791,12 +791,20 @@ Update the user agent restriction.
 
 ```bash
 mux signing-keys create              # creates key and saves to current environment
+mux signing-keys create --env-file .env.local  # also writes it to a project env file
 mux signing-keys list                # lists keys with environment indicators
 mux signing-keys get <key-id>
 mux signing-keys delete <key-id> [--force]
 ```
 
 The private key is only returned once during creation. The CLI automatically stores it in your current environment configuration.
+
+**Options for `create`:**
+- `--env-file <path>` - Also write the key to a project env file as `MUX_SIGNING_KEY` and `MUX_PRIVATE_KEY`, the names an app's token server typically reads. The file is created if missing (readable only by you); existing values for those two variables are replaced and every other line is kept. The private key is never printed, so this is the way to hand a new key to an app without copying it out of the CLI config. If the file is inside a git repository and not ignored, the CLI warns so the key is not committed.
+- `-f, --force` - Replace an existing signing key in the current environment without confirmation
+- `--json` - Output JSON instead of pretty format
+
+The env file is checked before the key is created, so an unwritable path (for example, a missing directory) fails without creating a key you cannot use.
 
 Deleting a signing key invalidates all tokens and signed URLs created with it and removes it from any local environment configurations.
 
@@ -1250,7 +1258,7 @@ The four authentication methods are mutually exclusive; passing more than one is
 - `-f, --env-file <path>` - Path to .env file containing `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET`, and optionally `MUX_SIGNING_KEY` and `MUX_PRIVATE_KEY` (saved for `mux sign` when both are present)
 - `--from-env` - Save the `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` already set in this shell
 - `-n, --name <name>` - Name for this environment (default: derived from the organization and environment for browser sign-in, or `default` otherwise)
-- `--print-url` - Print the authorization URL instead of opening a browser
+- `--print-url` - Print the authorization URL instead of opening a browser. Works without an interactive terminal.
 - `--port <port>` - Local port to receive the login redirect on
 - `--timeout <seconds>` - How long to wait for the browser authorization before giving up (default: 300)
 - `--keep-current` - Save the login without making it the active environment
@@ -1264,7 +1272,9 @@ mux login --name production --env-file .env.prod  # named environment
 mux login --print-url                             # no browser available
 ```
 
-`--interactive` needs a real terminal to prompt on: it fails immediately with instructions under `--json`, in agent mode, or when stdin is not a TTY (CI, piped input), rather than hanging. A bare `mux login` without a TTY and without `--json` or agent mode also fails fast. Use `--env-file`, `--from-env`, or the environment variables for unattended automation.
+`--interactive` needs a real terminal to prompt on: it fails immediately with instructions under `--json`, in agent mode, or when stdin is not a TTY (CI, piped input), rather than hanging. A bare `mux login` without a TTY also fails fast, and the error names the options that do work there: browser sign-in with `--json`, `--agent`, or `--print-url`, or an access token with `--env-file` or `--from-env`. Use `--env-file`, `--from-env`, or the environment variables for unattended automation.
+
+**Browser sign-in from a non-interactive shell:** a terminal is not required to sign in with a browser, only someone to open the URL. Run `mux login --json` (or `mux login --agent`) to receive the authorization URL as a JSON event, as described below, or `mux login --print-url` to receive it as plain text on stdout. Either way the command waits for the browser redirect, bounded by `--timeout`.
 
 **Browser sign-in from a coding agent:** with `--json` or in agent mode, `mux login` runs the browser flow without a terminal. The moment the authorization URL is known it is emitted as a single JSON line on **stderr**:
 

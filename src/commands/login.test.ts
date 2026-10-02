@@ -571,6 +571,42 @@ describe('runOAuthLogin in machine-readable mode', () => {
       /interactive terminal/i,
     );
   });
+
+  it('points a non-interactive shell at the browser paths that work without a terminal', async () => {
+    // The failure message is what agents read; offering only access-token
+    // options led them to conclude browser sign-in was impossible.
+    const error = await runOAuthLogin({}, fakeDeps()).catch((e) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    const message = String(error.message);
+    expect(message).toContain('mux login --json');
+    expect(message).toContain('--agent');
+    expect(message).toContain('mux login --print-url');
+    expect(message).toContain('--env-file');
+    expect(message).toContain('--from-env');
+  });
+
+  it('runs the pretty flow without a terminal when --print-url is passed', async () => {
+    // --print-url never opens a browser or reads stdin; it prints the URL and
+    // waits for the redirect, bounded by the loopback timeout.
+    let browserOpened = false;
+
+    await runOAuthLogin(
+      { printUrl: true },
+      fakeDeps({
+        openBrowser: async () => {
+          browserOpened = true;
+          return true;
+        },
+      }),
+    );
+
+    expect(browserOpened).toBe(false);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('Open this URL in your browser');
+    expect(printed).toContain('code_challenge');
+    expect(printed).toContain('Signed in to');
+  });
 });
 
 describe('Login command - action', () => {
@@ -957,7 +993,9 @@ describe('Login command - action', () => {
     }
 
     expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(String(errorSpy.mock.calls[0][0])).toMatch(/interactive terminal/i);
+    const message = String(errorSpy.mock.calls[0][0]);
+    expect(message).toMatch(/interactive terminal/i);
+    expect(message).toContain('mux login --json');
   });
 
   it('refuses --interactive with no terminal to prompt on', async () => {
