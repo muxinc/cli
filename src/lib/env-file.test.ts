@@ -85,6 +85,18 @@ describe('upsertEnvContent', () => {
     expect(result.updated).toEqual(['MUX_PRIVATE_KEY']);
   });
 
+  test('keeps the lines after a quoted value that never closes', () => {
+    // A hand-pasted PEM often lacks its closing quote; treating the rest of
+    // the file as part of the value would delete unrelated variables.
+    const original =
+      'MUX_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMUX_TOKEN_ID=abc\nDATABASE_URL=postgres://localhost/db\n';
+    const result = upsertEnvContent(original, { MUX_PRIVATE_KEY: 'bmV3' });
+
+    expect(result.content).toBe(
+      'MUX_PRIVATE_KEY=bmV3\nMUX_TOKEN_ID=abc\nDATABASE_URL=postgres://localhost/db\n',
+    );
+  });
+
   test('updates every duplicate assignment so no stale value remains', () => {
     const original = 'MUX_SIGNING_KEY=one\nFOO=bar\nMUX_SIGNING_KEY=two\n';
     const result = upsertEnvContent(original, { MUX_SIGNING_KEY: 'new_key' });

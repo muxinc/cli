@@ -63,13 +63,15 @@ export function upsertEnvContent(
       found = true;
 
       // A value opened with a quote that does not close on the same line
-      // continues until the line that closes it.
+      // continues until the line that closes it. With no closing line the
+      // quote is a typo rather than a multi-line value, and only this line
+      // is replaced: the lines after it are other variables, not the key.
       const raw = match[2];
       const quote = raw[0];
       if ((quote === '"' || quote === "'") && !raw.slice(1).includes(quote)) {
         let end = i + 1;
         while (end < lines.length && !lines[end].includes(quote)) end++;
-        lines.splice(i + 1, Math.min(end, lines.length - 1) - i);
+        if (end < lines.length) lines.splice(i + 1, end - i);
       }
 
       lines[i] = `${match[1]}${key}=${value}`;
