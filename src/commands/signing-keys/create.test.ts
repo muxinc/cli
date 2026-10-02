@@ -8,12 +8,13 @@ import {
   spyOn,
   test,
 } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type Mux from '@mux/ts';
 import * as configModule from '@/lib/config.ts';
 import { getEnvironment, setEnvironment } from '@/lib/config.ts';
+import * as envFileModule from '@/lib/env-file.ts';
 import * as muxModule from '@/lib/mux.ts';
 import { createCommand } from './create.ts';
 
@@ -49,6 +50,9 @@ describe('mux signing-keys create command', () => {
     let exitSpy: Mock<typeof process.exit>;
     let fetchSpy: Mock<typeof fetch>;
     let muxClientSpy: Mock<typeof muxModule.createAuthenticatedMuxClient>;
+    let createKeyMock: Mock<
+      () => Promise<{ id: string; private_key: string; created_at: string }>
+    >;
 
     // The whoami probe in resolveActiveEnvironment uses fetch directly; the
     // signing key creation goes through the SDK client, which binds fetch
@@ -90,23 +94,20 @@ describe('mux signing-keys create command', () => {
       exitSpy = spyOn(process, 'exit').mockImplementation((() => {
         throw new Error('process.exit called');
       }) as never);
+      createKeyMock = mock(() =>
+        Promise.resolve({
+          id: 'key_new_123',
+          private_key: 'cHJpdmF0ZS1rZXktcGVt',
+          created_at: '1721500000',
+        }),
+      );
       muxClientSpy = spyOn(
         muxModule,
         'createAuthenticatedMuxClient',
       ).mockImplementation(
         async () =>
           ({
-            system: {
-              signingKeys: {
-                create: mock(() =>
-                  Promise.resolve({
-                    id: 'key_new_123',
-                    private_key: 'cHJpdmF0ZS1rZXktcGVt',
-                    created_at: '1721500000',
-                  }),
-                ),
-              },
-            },
+            system: { signingKeys: { create: createKeyMock } },
           }) as unknown as Mux,
       );
     });
@@ -305,6 +306,212 @@ describe('mux signing-keys create command', () => {
       expect(output).toContain('MUX_SIGNING_KEY');
       expect(output).toContain('MUX_PRIVATE_KEY');
       expect(output).toContain('not saved');
+    });
+
+    describe('--env-file', () => {
+      function allOutput(): string {
+        return [...logSpy.mock.calls, ...errorSpy.mock.calls]
+          .map((c) => String(c[0]))
+          .join('\n');
+      }
+
+      test('has an --env-file option', () => {
+        const option = createCommand
+          .getOptions()
+          .find((opt) => opt.name === 'env-file');
+        expect(option).toBeDefined();
+        expect(option?.description).toContain('MUX_SIGNING_KEY');
+        expect(option?.description).toContain('MUX_PRIVATE_KEY');
+      });
+
+      test('writes the key to the env file and still saves it to the CLI config', async () => {
+        await setEnvironment('default', {
+          token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+          environmentId: 'env_stored_123',
+        });
+        mockApi('env_stored_123');
+        const envPath = join(testConfigDir, '.env.local');
+
+        await createCommand.parse(['--json', '--env-file', envPath]);
+
+        expect(await readFile(envPath, 'utf-8')).toBe(
+          'MUX_SIGNING_KEY=key_new_123\nMUX_PRIVATE_KEY=cHJpdmF0ZS1rZXktcGVt\n',
+        );
+        const saved = await getEnvironment('default');
+        expect(saved?.signingKeyId).toBe('key_new_123');
+        expect(saved?.signingPrivateKey).toBe('cHJpdmF0ZS1rZXktcGVt');
+        const parsed = jsonOutput();
+        expect(parsed.saved).toBe(true);
+        expect(parsed.env_file).toMatchObject({
+          path: envPath,
+          created: true,
+        });
+        expect(parsed.private_key).toBeUndefined();
+        expect(allOutput()).not.toContain('cHJpdmF0ZS1rZXktcGVt');
+      });
+
+      test('updates existing variables and keeps other lines', async () => {
+        await setEnvironment('default', {
+          token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+          environmentId: 'env_stored_123',
+        });
+        mockApi('env_stored_123');
+        const envPath = join(testConfigDir, '.env.local');
+        await Bun.write(
+          envPath,
+          'MUX_TOKEN_ID=abc\nMUX_SIGNING_KEY=key_old\nMUX_PRIVATE_KEY=old_pk\n',
+        );
+
+        await createCommand.parse(['--json', '--env-file', envPath]);
+
+        expect(await readFile(envPath, 'utf-8')).toBe(
+          'MUX_TOKEN_ID=abc\nMUX_SIGNING_KEY=key_new_123\nMUX_PRIVATE_KEY=cHJpdmF0ZS1rZXktcGVt\n',
+        );
+        const parsed = jsonOutput();
+        expect(parsed.env_file).toMatchObject({
+          created: false,
+          updated: ['MUX_SIGNING_KEY', 'MUX_PRIVATE_KEY'],
+          added: [],
+        });
+      });
+
+      test('does not print the private key when no stored environment matches', async () => {
+        process.env.MUX_TOKEN_ID = 'env_id';
+        process.env.MUX_TOKEN_SECRET = 'env_secret';
+        mockApi('env_from_vars');
+        const envPath = join(testConfigDir, '.env.local');
+
+        await createCommand.parse(['--json', '--env-file', envPath]);
+
+        expect(await readFile(envPath, 'utf-8')).toContain(
+          'MUX_PRIVATE_KEY=cHJpdmF0ZS1rZXktcGVt',
+        );
+        const parsed = jsonOutput();
+        expect(parsed.saved).toBe(false);
+        expect(parsed.private_key).toBeUndefined();
+        expect(allOutput()).not.toContain('cHJpdmF0ZS1rZXktcGVt');
+      });
+
+      test('never prints the private key in pretty mode', async () => {
+        process.env.MUX_TOKEN_ID = 'env_id';
+        process.env.MUX_TOKEN_SECRET = 'env_secret';
+        mockApi('env_from_vars');
+        const envPath = join(testConfigDir, '.env.local');
+
+        await createCommand.parse(['--env-file', envPath]);
+
+        const output = allOutput();
+        expect(output).toContain('key_new_123');
+        expect(output).toContain(envPath);
+        expect(output).not.toContain('cHJpdmF0ZS1rZXktcGVt');
+      });
+
+      test('fails before creating a key when the env file cannot be written', async () => {
+        await setEnvironment('default', {
+          token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+          environmentId: 'env_stored_123',
+        });
+        mockApi('env_stored_123');
+        const envPath = join(testConfigDir, 'missing-dir', '.env.local');
+
+        try {
+          await createCommand.parse(['--json', '--env-file', envPath]);
+        } catch (_error) {
+          // Expected to throw via mocked process.exit
+        }
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(createKeyMock).not.toHaveBeenCalled();
+        const parsed = JSON.parse(String(errorSpy.mock.calls[0][0]));
+        expect(parsed.error).toMatch(/directory/i);
+      });
+
+      test('warns when the env file is not gitignored', async () => {
+        const init = Bun.spawnSync(['git', 'init', '-q', testConfigDir]);
+        if (init.exitCode !== 0) return; // git unavailable on this machine
+        process.env.MUX_TOKEN_ID = 'env_id';
+        process.env.MUX_TOKEN_SECRET = 'env_secret';
+        mockApi('env_from_vars');
+        const envPath = join(testConfigDir, '.env.local');
+
+        await createCommand.parse(['--json', '--env-file', envPath]);
+
+        const parsed = jsonOutput();
+        expect(parsed.env_file).toMatchObject({ gitignored: false });
+        expect((parsed.warnings as string[]).join('\n')).toMatch(
+          /not ignored by git/i,
+        );
+      });
+
+      test('does not warn when the env file is gitignored', async () => {
+        const init = Bun.spawnSync(['git', 'init', '-q', testConfigDir]);
+        if (init.exitCode !== 0) return; // git unavailable on this machine
+        await Bun.write(join(testConfigDir, '.gitignore'), '.env*.local\n');
+        process.env.MUX_TOKEN_ID = 'env_id';
+        process.env.MUX_TOKEN_SECRET = 'env_secret';
+        mockApi('env_from_vars');
+        const envPath = join(testConfigDir, '.env.local');
+
+        await createCommand.parse(['--json', '--env-file', envPath]);
+
+        const parsed = jsonOutput();
+        expect(parsed.env_file).toMatchObject({ gitignored: true });
+        expect(parsed.warnings).toEqual([]);
+      });
+
+      test('emits the private key once when the env file write fails and the config was not saved', async () => {
+        process.env.MUX_TOKEN_ID = 'env_id';
+        process.env.MUX_TOKEN_SECRET = 'env_secret';
+        mockApi('env_from_vars');
+        const envPath = join(testConfigDir, '.env.local');
+        const writeSpy = spyOn(
+          envFileModule,
+          'writeEnvVars',
+        ).mockImplementation(() => Promise.reject(new Error('disk full')));
+
+        try {
+          await createCommand.parse(['--json', '--env-file', envPath]);
+        } finally {
+          writeSpy.mockRestore();
+        }
+
+        expect(exitSpy).not.toHaveBeenCalled();
+        const parsed = jsonOutput();
+        expect(parsed.saved).toBe(false);
+        expect(parsed.private_key).toBe('cHJpdmF0ZS1rZXktcGVt');
+        const stderr = errorSpy.mock.calls.map((c) => String(c[0])).join('\n');
+        expect(stderr).toContain('disk full');
+      });
+
+      test('keeps the private key out of output when the env file write fails but the config was saved', async () => {
+        await setEnvironment('default', {
+          token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+          environmentId: 'env_stored_123',
+        });
+        mockApi('env_stored_123');
+        const envPath = join(testConfigDir, '.env.local');
+        const writeSpy = spyOn(
+          envFileModule,
+          'writeEnvVars',
+        ).mockImplementation(() => Promise.reject(new Error('disk full')));
+
+        try {
+          await createCommand.parse(['--json', '--env-file', envPath]);
+        } catch (_error) {
+          // Expected to throw via mocked process.exit
+        } finally {
+          writeSpy.mockRestore();
+        }
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect((await getEnvironment('default'))?.signingKeyId).toBe(
+          'key_new_123',
+        );
+        expect(allOutput()).not.toContain('cHJpdmF0ZS1rZXktcGVt');
+        const parsed = JSON.parse(String(errorSpy.mock.calls.at(-1)?.[0]));
+        expect(parsed.error).toContain('disk full');
+        expect(parsed.error).toContain('key_new_123');
+      });
     });
   });
 });
