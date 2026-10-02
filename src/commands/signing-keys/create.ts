@@ -26,6 +26,9 @@ const NOT_SAVED_NOTE =
 const ENV_FILE_NOT_SAVED_NOTE =
   'No stored environment matches the active credentials, so the key was written only to the env file, not to the CLI config. `mux sign` uses it only when MUX_SIGNING_KEY and MUX_PRIVATE_KEY are set in the shell.';
 
+const ENV_FILE_SAVE_FAILED_NOTE =
+  'Saving to the environment config failed, so the key was written only to the env file. `mux sign` uses it only when MUX_SIGNING_KEY and MUX_PRIVATE_KEY are set in the shell.';
+
 const SAVE_FAILED_NOTE =
   'Saving to the environment config failed, so the private key is shown here instead — this is the only time it is available. Set MUX_SIGNING_KEY and MUX_PRIVATE_KEY to sign URLs with it.';
 
@@ -143,7 +146,11 @@ export const createCommand = new Command()
                 `${options.envFile} is not ignored by git. Add it to .gitignore so the private key is not committed.`,
               ]
             : [];
-        const note = savedToConfig ? undefined : ENV_FILE_NOT_SAVED_NOTE;
+        const note = savedToConfig
+          ? undefined
+          : saveFailed
+            ? ENV_FILE_SAVE_FAILED_NOTE
+            : ENV_FILE_NOT_SAVED_NOTE;
 
         if (wantsJson(options)) {
           console.log(

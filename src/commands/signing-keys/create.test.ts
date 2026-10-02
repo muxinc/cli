@@ -459,6 +459,35 @@ describe('mux signing-keys create command', () => {
         expect(parsed.warnings).toEqual([]);
       });
 
+      test('explains a failed config save when the key went only to the env file', async () => {
+        await setEnvironment('default', {
+          token: { tokenId: 'stored_id', tokenSecret: 'stored_secret' },
+          environmentId: 'env_stored_123',
+        });
+        mockApi('env_stored_123');
+        const envPath = join(testConfigDir, '.env.local');
+        const updateSpy = spyOn(
+          configModule,
+          'updateEnvironment',
+        ).mockImplementation(() => Promise.reject(new Error('disk full')));
+
+        try {
+          await createCommand.parse(['--json', '--env-file', envPath]);
+        } finally {
+          updateSpy.mockRestore();
+        }
+
+        expect(exitSpy).not.toHaveBeenCalled();
+        const parsed = jsonOutput();
+        expect(parsed.saved).toBe(false);
+        expect(String(parsed.note)).toMatch(/failed/i);
+        expect(String(parsed.note)).not.toMatch(/No stored environment/);
+        expect(parsed.private_key).toBeUndefined();
+        expect(await readFile(envPath, 'utf-8')).toContain(
+          'MUX_SIGNING_KEY=key_new_123',
+        );
+      });
+
       test('emits the private key once when the env file write fails and the config was not saved', async () => {
         process.env.MUX_TOKEN_ID = 'env_id';
         process.env.MUX_TOKEN_SECRET = 'env_secret';
