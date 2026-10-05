@@ -14,6 +14,7 @@ import { buildMapping, mappingToCsv } from './export.ts';
 import { parseDuration, type Recipe, recipeHash } from './recipe.ts';
 import { summarizeStatus } from './status.ts';
 import type { ItemState, MigrationError, RunEvent } from './types.ts';
+import { verifyMigration } from './verify.ts';
 
 /** Where command output goes. JSON mode prints machine-readable lines only. */
 export interface MigrateIO {
@@ -297,4 +298,44 @@ export function executeExport(
   }
   io.out(content.trimEnd());
   return ExitCode.Success;
+}
+
+export async function executeVerify(
+  flags: { ids?: string },
+  ctx: Pick<MigrateContext, 'deps' | 'io'> & { fetch?: typeof fetch },
+): Promise<ExitCodeValue> {
+  const { io } = ctx;
+  let report: Awaited<ReturnType<typeof verifyMigration>>;
+  try {
+    report = await verifyMigration(
+      {
+        state: ctx.deps.state,
+        mux: ctx.deps.mux,
+        clock: ctx.deps.clock,
+        fetch: ctx.fetch,
+      },
+      { ids: parseIds(flags.ids) },
+    );
+  } catch (error) {
+    return handleFailure(io, error, 'mux migrate verify');
+  }
+  if (io.json) {
+    io.out(JSON.stringify(report, null, 2));
+    return report.exit_code;
+  }
+  io.out(
+    `Verified ${report.checked} item(s): ${report.passed} passed, ${report.failed.length} failed.`,
+  );
+  for (const item of report.failed) {
+    io.out(`  ${item.source_id}  ${item.asset_id ?? ''}`);
+    for (const check of item.checks)
+      io.out(`    ${check.name}: ${check.message ?? 'failed'}`);
+  }
+  for (const duplicate of report.duplicates) {
+    io.out(
+      `  Duplicate asset ${duplicate.duplicateAssetId} for ${duplicate.sourceId} (kept ${duplicate.keptAssetId}). Remove it with: mux assets delete ${duplicate.duplicateAssetId}`,
+    );
+  }
+  if (report.next_command) io.out(`Next: ${report.next_command}`);
+  return report.exit_code;
 }

@@ -22,6 +22,8 @@ export interface MappingItem {
     status: DirectiveRunSummary['status'];
   }>;
   status: ItemState;
+  /** Null until `mux migrate verify` has checked the item. */
+  verified: boolean | null;
 }
 
 export interface MappingFile {
@@ -74,6 +76,7 @@ export function buildMapping(
           status: run.status,
         })),
         status: record.state,
+        verified: record.verification?.passed ?? null,
       })),
   };
 }
@@ -105,8 +108,7 @@ export function mappingToCsv(mapping: MappingFile): string {
       item.asset_id,
       item.playback_ids[0]?.id,
       item.status,
-      // Filled in once `verify` records results.
-      undefined,
+      item.verified === null ? undefined : String(item.verified),
     ]
       .map(csvField)
       .join(','),

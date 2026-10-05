@@ -5,6 +5,7 @@ import { planCommand } from './plan.ts';
 import { retryCommand } from './retry.ts';
 import { runCommand } from './run.ts';
 import { statusCommand } from './status.ts';
+import { verifyCommand } from './verify.ts';
 
 export const migrateCommand = new Command()
   .description('Move a video library from another platform into Mux')
@@ -15,5 +16,6 @@ export const migrateCommand = new Command()
   .command('plan', planCommand)
   .command('run', runCommand)
   .command('status', statusCommand)
+  .command('verify', verifyCommand)
   .command('export', exportCommand)
   .command('retry', retryCommand);

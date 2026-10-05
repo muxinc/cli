@@ -28,7 +28,27 @@ export interface ItemRecord {
   attempts: number;
   recipeHash?: string;
   directiveRuns: DirectiveRunSummary[];
+  /** Source captions saved locally because they could not be passed to Mux by URL. */
+  captionsPending: number;
+  verification?: Verification;
   updatedAt: number;
+}
+
+export interface VerifyCheck {
+  name:
+    | 'asset_ready'
+    | 'duration'
+    | 'text_tracks'
+    | 'playback'
+    | 'directive_runs';
+  ok: boolean;
+  message?: string;
+}
+
+export interface Verification {
+  verifiedAt: number;
+  passed: boolean;
+  checks: VerifyCheck[];
 }
 
 export type ItemPatch = Partial<
@@ -59,6 +79,8 @@ interface ItemRow {
   attempts: number;
   recipe_hash: string | null;
   directive_runs_json: string;
+  captions_pending: number;
+  verification_json: string | null;
   updated_at: number;
 }
 
@@ -87,6 +109,11 @@ const COLUMNS: Record<
     column: 'directive_runs_json',
     encode: (v: DirectiveRunSummary[]) => JSON.stringify(v),
   },
+  captionsPending: { column: 'captions_pending', encode: (v: number) => v },
+  verification: {
+    column: 'verification_json',
+    encode: (v?: Verification) => (v ? JSON.stringify(v) : null),
+  },
 };
 
 function toRecord(row: ItemRow): ItemRecord {
@@ -102,6 +129,10 @@ function toRecord(row: ItemRow): ItemRecord {
     attempts: row.attempts,
     recipeHash: row.recipe_hash ?? undefined,
     directiveRuns: JSON.parse(row.directive_runs_json),
+    captionsPending: row.captions_pending,
+    verification: row.verification_json
+      ? JSON.parse(row.verification_json)
+      : undefined,
     updatedAt: row.updated_at,
   };
 }
@@ -137,6 +168,8 @@ export class MigrationState {
         attempts INTEGER NOT NULL DEFAULT 0,
         recipe_hash TEXT,
         directive_runs_json TEXT NOT NULL DEFAULT '[]',
+        captions_pending INTEGER NOT NULL DEFAULT 0,
+        verification_json TEXT,
         updated_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS items_asset_id ON items (asset_id);

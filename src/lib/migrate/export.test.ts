@@ -41,6 +41,9 @@ describe('mapping export', () => {
       ],
     });
     state.update('b', { state: 'errored', error: { code: 'X', message: 'x' } });
+    state.update('a', {
+      verification: { verifiedAt: 0, passed: true, checks: [] },
+    });
   });
 
   afterEach(async () => {
@@ -81,6 +84,7 @@ describe('mapping export', () => {
         { directive_id: 'drv_1', run_id: 'drvrun_1', status: 'completed' },
       ],
       status: 'ready',
+      verified: true,
     });
   });
 
@@ -91,7 +95,7 @@ describe('mapping export', () => {
 
     expect(csv.trimEnd().split('\n')).toEqual([
       'source_id,source_url,title,fidelity,asset_id,playback_id,status,verified',
-      'a,https://example.com/a.mp4,"Tour, part ""one""",original,asset_1,pb_1,ready,',
+      'a,https://example.com/a.mp4,"Tour, part ""one""",original,asset_1,pb_1,ready,true',
       'b,https://example.com/b.mp4,,,,,errored,',
     ]);
   });

@@ -8,6 +8,7 @@ import {
   executeRetry,
   executeRun,
   executeStatus,
+  executeVerify,
   type MigrateContext,
 } from './cli.ts';
 import { type Recipe, recipeHash } from './recipe.ts';
@@ -283,5 +284,28 @@ describe('executeExport', () => {
     executeExport({ format: 'csv' }, c.ctx);
 
     expect(c.out.join('\n')).toStartWith('source_id,source_url,title');
+  });
+});
+
+describe('executeVerify', () => {
+  test('prints the verify report and exits with its code', async () => {
+    const c = context({ ids: ['a'] });
+    await executeRun({ yes: true }, c.ctx);
+    c.out.length = 0;
+
+    const code = await executeVerify(
+      {},
+      {
+        ...c.ctx,
+        fetch: (async () => new Response('#EXTM3U')) as unknown as typeof fetch,
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(JSON.parse(c.out.join('\n'))).toMatchObject({
+      checked: 1,
+      passed: 1,
+      next_command: 'mux migrate export',
+    });
   });
 });

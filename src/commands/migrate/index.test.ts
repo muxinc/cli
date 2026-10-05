@@ -3,7 +3,7 @@ import { migrateCommand } from './index.ts';
 import { runCommand } from './run.ts';
 
 describe('mux migrate', () => {
-  test('has the delivery step 1 subcommands', () => {
+  test('has the documented subcommands', () => {
     const names = migrateCommand.getCommands().map((c) => c.getName());
     expect(names.sort()).toEqual([
       'export',
@@ -12,6 +12,7 @@ describe('mux migrate', () => {
       'retry',
       'run',
       'status',
+      'verify',
     ]);
   });
 
