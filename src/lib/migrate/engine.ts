@@ -1,6 +1,8 @@
 import { APIConnectionError } from '@mux/ts';
 import type { Asset, AssetCreateParams } from '@mux/ts/resources/video/assets';
+import { MigrationFailure } from './errors.ts';
 import { type ExitCodeValue, resolveExitCode } from './exit-codes.ts';
+import { ExternalIds } from './external-id.ts';
 import type {
   ItemPatch,
   ItemRecord,
@@ -74,7 +76,32 @@ export interface RunOptions {
     'inputs' | 'meta' | 'passthrough' | 'directives'
   >;
   recipeHash?: string;
+  /** Overrides for the run's timeouts and polling intervals. */
+  timing?: Partial<RunTiming>;
 }
+
+export interface RunTiming {
+  /** A safety reconcile in case the stream silently stops delivering events. */
+  reconcileIntervalMs: number;
+  /** How long an attached directive may take to start a run before it is reported. */
+  directiveStartTimeoutMs: number;
+  /** How long to keep retrying sources that are being prepared before leaving them for the next run. */
+  preparationTimeoutMs: number;
+  captionCleanupPollMs: number;
+  /** How long to wait for caption tracks to finish before leaving the uploads for the next run. */
+  captionCleanupTimeoutMs: number;
+}
+
+const DEFAULT_TIMING: RunTiming = {
+  reconcileIntervalMs: 60_000,
+  directiveStartTimeoutMs: 15 * 60_000,
+  preparationTimeoutMs: 30 * 60_000,
+  captionCleanupPollMs: 5_000,
+  captionCleanupTimeoutMs: 10 * 60_000,
+};
+
+/** Mux's limit for an asset's `passthrough`. */
+const MAX_PASSTHROUGH_LENGTH = 255;
 
 export interface DuplicateAsset {
   sourceId: string;
@@ -100,9 +127,6 @@ export interface RunResult {
  * still belong to it. Covers clock skew between this machine and Mux.
  */
 const ADOPTION_WINDOW_MS = 5 * 60_000;
-
-/** A safety reconcile in case the stream silently stops delivering events. */
-const RECONCILE_INTERVAL_MS = 60_000;
 
 const PENDING_STATES: ItemState[] = [
   'discovered',
@@ -188,7 +212,17 @@ export function retryErrored(state: MigrationState, ids?: string[]): number {
     .list({ states: ['errored'] })
     .filter((record) => !ids || ids.includes(record.sourceId));
   for (const record of errored) {
-    state.update(record.sourceId, { state: 'discovered', error: undefined });
+    // The previous asset failed, so the retry starts a fresh attempt. Uploaded
+    // captions stay recorded until they are cleaned up.
+    state.update(record.sourceId, {
+      state: 'discovered',
+      error: undefined,
+      assetId: undefined,
+      playbackIds: [],
+      createStartedAt: undefined,
+      directiveRuns: [],
+      pendingCaptions: [],
+    });
   }
   return errored.length;
 }
@@ -348,6 +382,20 @@ export function attachCaptionCommand(
   ].join(' ');
 }
 
+function statusOf(error: unknown): number | undefined {
+  const status = (error as { status?: unknown } | undefined)?.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+function isAuthFailure(error: unknown): boolean {
+  const status = statusOf(error);
+  return status === 401 || status === 403;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function isDefinitiveRejection(status: number): boolean {
   return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
@@ -366,7 +414,8 @@ function assetErrorMessage(asset: Record<string, unknown>): string {
 
 class MigrationRun<C> {
   private readonly state: MigrationState;
-  private readonly prefix: string;
+  private readonly externalIds: ExternalIds;
+  private readonly timing: RunTiming;
   private readonly migrationId: string;
   private readonly deadline?: number;
   private readonly controller = new AbortController();
@@ -375,6 +424,7 @@ class MigrationRun<C> {
   private readonly reportedDuplicates = new Set<string>();
   private readonly cleanups = new Map<string, Promise<void>>();
   private readonly savedCaptions = new Set<string>();
+  private readonly enrichingSince = new Map<string, number>();
   private fatal?: unknown;
   private notify?: () => void;
 
@@ -384,7 +434,11 @@ class MigrationRun<C> {
     private readonly directives: string[],
   ) {
     this.state = deps.state;
-    this.prefix = `${deps.provider.id}:`;
+    this.timing = { ...DEFAULT_TIMING, ...options.timing };
+    this.externalIds = new ExternalIds(
+      deps.provider.id,
+      deps.state.list().map((record) => record.sourceId),
+    );
     this.migrationId = deps.state.initMigration(deps.provider.id).id;
     if (options.timeBudgetMs !== undefined) {
       this.deadline = deps.clock.now() + options.timeBudgetMs;
@@ -395,8 +449,8 @@ class MigrationRun<C> {
     const stream = await this.deps.events.open(this.controller.signal);
     const consuming = this.consume(stream);
     const reconcileTimer = setInterval(() => {
-      this.reconcile().catch((error) => this.fail(error));
-    }, RECONCILE_INTERVAL_MS);
+      this.reconcileQuietly();
+    }, this.timing.reconcileIntervalMs);
 
     try {
       await this.reconcile({ resume: true });
@@ -420,16 +474,15 @@ class MigrationRun<C> {
   private finish(plan: PlanSummary): RunResult {
     for (const sourceId of this.savedCaptions) {
       const record = this.state.get(sourceId);
-      if (!record?.assetId || record.pendingCaptions.length === 0) continue;
-      this.warn({
-        code: 'CAPTIONS_PENDING',
-        message: `${record.pendingCaptions.length} caption track(s) for ${sourceId} were saved locally because the source provides caption text, not a URL. Host each file and attach it to asset ${record.assetId}.`,
-        hint: 'Set captions.host_bucket in the recipe to upload captions to a bucket you own automatically.',
-        next_command: attachCaptionCommand(
-          record.assetId,
-          record.pendingCaptions[0],
-        ),
-      });
+      if (!record?.assetId) continue;
+      for (const caption of record.pendingCaptions) {
+        this.warn({
+          code: 'CAPTIONS_PENDING',
+          message: `The ${caption.language} caption for ${sourceId} was saved to ${caption.path} because the source provides caption text, not a URL. Host the file and attach it to asset ${record.assetId}.`,
+          hint: 'Set captions.host_bucket in the recipe to upload captions to a bucket you own automatically.',
+          next_command: attachCaptionCommand(record.assetId, caption),
+        });
+      }
     }
 
     for (const record of this.state.list({ states: ['creating'] })) {
@@ -490,7 +543,10 @@ class MigrationRun<C> {
   private transition(sourceId: string, patch: ItemPatch): ItemRecord {
     const record = this.state.update(sourceId, patch);
     this.changed();
-    if (record.state === 'ready' && record.hostedCaptions.length > 0) {
+    if (
+      (record.state === 'ready' || record.state === 'errored') &&
+      record.hostedCaptions.length > 0
+    ) {
       this.scheduleCaptionCleanup(sourceId);
     }
     this.deps.emit?.({
@@ -538,8 +594,13 @@ class MigrationRun<C> {
 
     await drain(queue);
     // Sources that need preparation (such as a Cloudflare download being
-    // generated) are retried in this run rather than left for the next one.
+    // generated) are retried in this run rather than left for the next one,
+    // up to the preparation timeout.
+    const preparationDeadline =
+      performance.now() + this.timing.preparationTimeoutMs;
     while (pending.length > 0 && this.options.wait !== false) {
+      this.throwIfFailed();
+      if (performance.now() >= preparationDeadline) return;
       const waitMs = Math.min(...pending.map((p) => p.retryAfterMs));
       const remainingMs =
         this.deadline === undefined
@@ -560,11 +621,33 @@ class MigrationRun<C> {
 
   /** Returns the provider's retry delay when the source is still being prepared. */
   private async migrateItem(record: ItemRecord): Promise<number | undefined> {
-    const { sourceId } = record;
-    const resolved = await this.deps.provider.resolve(
-      this.deps.credentials,
-      record.item,
-    );
+    const { sourceId, item } = record;
+    if (
+      item.passthrough &&
+      [...item.passthrough].length > MAX_PASSTHROUGH_LENGTH
+    ) {
+      this.transition(sourceId, {
+        state: 'errored',
+        error: {
+          code: 'PASSTHROUGH_TOO_LONG',
+          message: `The passthrough for ${sourceId} is longer than Mux's limit of ${MAX_PASSTHROUGH_LENGTH} characters.`,
+          hint: 'Shorten the passthrough value in the source metadata, then run `mux migrate retry`.',
+        },
+      });
+      return;
+    }
+
+    let resolved: Awaited<ReturnType<SourceProvider<C>['resolve']>>;
+    let captionInputs: NonNullable<AssetCreateParams['inputs']> = [];
+    try {
+      resolved = await this.deps.provider.resolve(this.deps.credentials, item);
+      if (resolved.kind === 'resolved') {
+        captionInputs = await this.prepareCaptions(record, resolved.captions);
+      }
+    } catch (error) {
+      this.handleSourceFailure(sourceId, error);
+      return;
+    }
     if (resolved.kind === 'pending') {
       this.transition(sourceId, { state: 'preparing' });
       return resolved.retryAfterMs;
@@ -581,13 +664,11 @@ class MigrationRun<C> {
       fidelity: resolved.fidelity,
     });
 
-    const { item } = record;
-    const captionInputs = await this.prepareCaptions(record, resolved.captions);
     const params: AssetCreateParams = {
       ...this.options.asset,
       inputs: [{ url: resolved.url }, ...captionInputs],
       meta: {
-        external_id: `${this.prefix}${sourceId}`,
+        external_id: this.externalIds.for(sourceId),
         ...(item.title && { title: item.title.slice(0, 512) }),
       },
       ...(item.passthrough && { passthrough: item.passthrough }),
@@ -644,26 +725,50 @@ class MigrationRun<C> {
       }
       if (handler.host) {
         const key = `mux-migrate/${this.migrationId}/${record.sourceId}/${caption.language}.${caption.format}`;
-        inputs.push(
-          captionInput(await handler.host.upload(key, caption), caption),
-        );
+        // Recorded before uploading, so a crash mid-upload still leaves a
+        // record for cleanup. Deleting an object that was never written is
+        // harmless.
         hosted.push(key);
+        this.state.update(record.sourceId, {
+          hostedCaptions: [...new Set([...record.hostedCaptions, ...hosted])],
+        });
+        try {
+          inputs.push(
+            captionInput(await handler.host.upload(key, caption), caption),
+          );
+        } catch (error) {
+          throw new MigrationFailure({
+            code: 'CAPTIONS_UPLOAD_FAILED',
+            message: `Could not upload the ${caption.language} caption for ${record.sourceId} to the host bucket: ${messageOf(error)}`,
+            hint: 'Check captions.host_bucket and its credentials, then run `mux migrate retry`.',
+          });
+        }
       } else {
+        let path: string;
+        try {
+          path = await handler.saveLocal(record.sourceId, caption);
+        } catch (error) {
+          throw new MigrationFailure({
+            code: 'CAPTIONS_SAVE_FAILED',
+            message: `Could not save the ${caption.language} caption for ${record.sourceId}: ${messageOf(error)}`,
+          });
+        }
         pending.push({
           language: caption.language,
-          path: await handler.saveLocal(record.sourceId, caption),
+          path,
           ...(caption.label && { label: caption.label }),
           closedCaptions: caption.closedCaptions,
         });
       }
     }
-    if (hosted.length > 0) {
-      this.state.update(record.sourceId, {
-        hostedCaptions: [...new Set([...record.hostedCaptions, ...hosted])],
-      });
-    }
     if (pending.length > 0) {
-      this.state.update(record.sourceId, { pendingCaptions: pending });
+      const languages = new Set(pending.map((caption) => caption.language));
+      this.state.update(record.sourceId, {
+        pendingCaptions: [
+          ...record.pendingCaptions.filter((c) => !languages.has(c.language)),
+          ...pending,
+        ],
+      });
       this.savedCaptions.add(record.sourceId);
     }
     return inputs;
@@ -671,36 +776,75 @@ class MigrationRun<C> {
 
   /**
    * Deletes uploaded caption objects once Mux has finished ingesting the text
-   * tracks. Anything not yet ingested is retried by the next run.
+   * tracks, or right away when the item errored. Uploads still being ingested
+   * after the cleanup timeout are left for the next run.
    */
   private scheduleCaptionCleanup(sourceId: string): void {
     if (this.cleanups.has(sourceId) || !this.deps.captions?.host) return;
     const host = this.deps.captions.host;
     const cleanup = (async () => {
-      const record = this.state.get(sourceId);
-      if (!record?.assetId) return;
-      const asset = await this.deps.mux.retrieveAsset(record.assetId);
-      const textTracks = (asset.tracks ?? []).filter((t) => t.type === 'text');
-      if (textTracks.some((track) => track.status === 'preparing')) return;
-      const remaining: string[] = [];
-      for (const key of record.hostedCaptions) {
-        try {
-          await host.remove(key);
-        } catch (error) {
-          remaining.push(key);
-          this.warn({
-            code: 'CAPTION_CLEANUP_FAILED',
-            message: `Could not delete the uploaded caption ${key}: ${(error as Error).message}`,
-            hint: 'The next run tries again. You can also delete the object from the bucket yourself.',
-          });
+      const deadline = performance.now() + this.timing.captionCleanupTimeoutMs;
+      while (true) {
+        const record = this.state.get(sourceId);
+        if (!record || record.hostedCaptions.length === 0) return;
+        if (record.state === 'ready' && record.assetId) {
+          const asset = await this.deps.mux.retrieveAsset(record.assetId);
+          const ingesting = (asset.tracks ?? []).some(
+            (track) => track.type === 'text' && track.status === 'preparing',
+          );
+          if (ingesting) {
+            if (performance.now() >= deadline) return;
+            await new Promise((resolve) =>
+              setTimeout(resolve, this.timing.captionCleanupPollMs),
+            );
+            continue;
+          }
         }
+        const remaining: string[] = [];
+        for (const key of record.hostedCaptions) {
+          try {
+            await host.remove(key);
+          } catch (error) {
+            remaining.push(key);
+            this.warn({
+              code: 'CAPTION_CLEANUP_FAILED',
+              message: `Could not delete the uploaded caption ${key}: ${messageOf(error)}`,
+              hint: 'The next run tries again. You can also delete the object from the bucket yourself.',
+            });
+          }
+        }
+        this.state.update(sourceId, { hostedCaptions: remaining });
+        return;
       }
-      this.state.update(sourceId, { hostedCaptions: remaining });
-    })().finally(() => this.cleanups.delete(sourceId));
-    this.cleanups.set(
-      sourceId,
-      cleanup.catch((error) => this.fail(error)),
-    );
+    })()
+      .catch((error) => {
+        this.warn({
+          code: 'CAPTION_CLEANUP_FAILED',
+          message: `Could not check whether the captions for ${sourceId} were ingested: ${messageOf(error)}`,
+          hint: 'The next run tries again.',
+        });
+      })
+      .finally(() => this.cleanups.delete(sourceId));
+    this.cleanups.set(sourceId, cleanup);
+  }
+
+  /**
+   * A failure while resolving a source errors that item and the run goes on,
+   * except for authentication failures, which would fail every item.
+   */
+  private handleSourceFailure(sourceId: string, error: unknown): void {
+    if (isAuthFailure(error)) throw error;
+    this.transition(sourceId, {
+      state: 'errored',
+      error: {
+        code:
+          error instanceof MigrationFailure
+            ? error.code
+            : 'SOURCE_RESOLVE_FAILED',
+        message: messageOf(error),
+        next_command: 'mux migrate retry',
+      },
+    });
   }
 
   private handleCreateFailure(sourceId: string, error: unknown): void {
@@ -708,8 +852,17 @@ class MigrationRun<C> {
     // the asset. The item stays in `creating` until its created event arrives
     // or the next run finds the asset by external ID.
     if (error instanceof APIConnectionError) return;
-    const status = (error as { status?: unknown }).status;
-    if (typeof status !== 'number') throw error;
+    const status = statusOf(error);
+    if (status === undefined) throw error;
+    if (status === 401 || status === 403) {
+      this.transition(sourceId, { state: 'discovered' });
+      throw new MigrationFailure({
+        code: 'MUX_UNAUTHORIZED',
+        message: `Mux rejected the asset create request with HTTP ${status}: ${messageOf(error)}`,
+        hint: "Run 'mux login' again, or use a token with Mux Video write access.",
+        next_command: continueCommand(this.options),
+      });
+    }
     if (status === 429) {
       this.transition(sourceId, { state: 'discovered' });
       return;
@@ -785,6 +938,7 @@ class MigrationRun<C> {
           status: 'pending',
         },
     );
+    this.enrichingSince.set(sourceId, this.deps.clock.now());
     this.transition(sourceId, { state: 'enriching', directiveRuns: runs });
     this.completeIfEnriched(sourceId);
   }
@@ -824,7 +978,8 @@ class MigrationRun<C> {
       return;
     }
     for (const run of record.directiveRuns) {
-      if (run.status === 'completed') continue;
+      // Runs that never started were already reported.
+      if (run.status === 'completed' || !run.runId) continue;
       this.warn({
         code:
           run.status === 'partial'
@@ -838,12 +993,8 @@ class MigrationRun<C> {
   }
 
   private sourceIdFor(asset: Record<string, unknown>): string | undefined {
-    const externalId = (asset.meta as { external_id?: unknown } | undefined)
-      ?.external_id;
-    if (typeof externalId !== 'string' || !externalId.startsWith(this.prefix)) {
-      return undefined;
-    }
-    return externalId.slice(this.prefix.length);
+    const meta = asset.meta as { external_id?: unknown } | undefined;
+    return this.externalIds.sourceIdFor(meta?.external_id);
   }
 
   /** Whether an asset was created late enough to belong to this item's create request. */
@@ -862,7 +1013,7 @@ class MigrationRun<C> {
       for await (const message of stream) {
         if (this.controller.signal.aborted) break;
         if (message.kind === 'reconnected') {
-          await this.reconcile();
+          await this.reconcileQuietly();
         } else {
           this.handleEvent(message.event);
         }
@@ -934,19 +1085,74 @@ class MigrationRun<C> {
         this.markErrored(record.sourceId, asset);
     }
 
-    for (const record of this.state.list({ states: ['enriching'] })) {
-      for (const run of record.directiveRuns) {
-        if (TERMINAL_RUN_STATUSES.has(run.status)) continue;
-        for await (const found of this.deps.mux.listDirectiveRuns(
-          run.directiveId,
-        )) {
-          if (found.assetId === record.assetId) {
-            this.recordDirectiveRun(found);
-            break;
-          }
-        }
+    const enriching = this.state.list({ states: ['enriching'] });
+    const waiting = new Set(
+      enriching.flatMap((record) =>
+        record.directiveRuns
+          .filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
+          .map((run) => run.directiveId),
+      ),
+    );
+    const found = new Map<string, DirectiveRunSummary>();
+    for (const directiveId of waiting) {
+      for await (const run of this.deps.mux.listDirectiveRuns(directiveId)) {
+        found.set(`${directiveId}:${run.assetId}`, run);
       }
     }
+    for (const record of enriching) {
+      for (const run of record.directiveRuns) {
+        if (TERMINAL_RUN_STATUSES.has(run.status)) continue;
+        const latest = found.get(`${run.directiveId}:${record.assetId}`);
+        if (latest) this.recordDirectiveRun(latest);
+      }
+      this.reportUnstartedRuns(record.sourceId);
+    }
+  }
+
+  /** Background reconciles report failures instead of stopping the run. */
+  private async reconcileQuietly(): Promise<void> {
+    try {
+      await this.reconcile();
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        this.fail(error);
+        return;
+      }
+      this.warn({
+        code: 'RECONCILE_FAILED',
+        message: `Could not refresh in-flight items: ${messageOf(error)}`,
+        hint: 'The run keeps going and tries again shortly.',
+      });
+    }
+  }
+
+  /**
+   * An attached directive normally starts a run as soon as the asset is
+   * ready. One that has not started within the timeout is reported, and the
+   * item completes without it rather than holding the run open.
+   */
+  private reportUnstartedRuns(sourceId: string): void {
+    const record = this.state.get(sourceId);
+    if (!record || record.state !== 'enriching') return;
+    const now = this.deps.clock.now();
+    const since = this.enrichingSince.get(sourceId) ?? now;
+    this.enrichingSince.set(sourceId, since);
+    if (now - since < this.timing.directiveStartTimeoutMs) return;
+    const unstarted = record.directiveRuns.filter((run) => !run.runId);
+    if (unstarted.length === 0) return;
+    for (const run of unstarted) {
+      this.warn({
+        code: 'DIRECTIVE_RUN_NOT_STARTED',
+        message: `Directive ${run.directiveId} did not start a run on asset ${record.assetId}. The asset migrated without that enrichment.`,
+        hint: 'Check the directive in the Directives section of the Mux Dashboard, or start a run on the asset from there.',
+      });
+    }
+    this.state.update(sourceId, {
+      directiveRuns: record.directiveRuns.map((run) =>
+        run.runId ? run : { ...run, status: 'errored' as const },
+      ),
+    });
+    this.completeIfEnriched(sourceId);
   }
 
   /**
@@ -972,6 +1178,7 @@ class MigrationRun<C> {
       );
       const record = sourceId ? pending.get(sourceId) : undefined;
       if (!record || !this.withinAdoptionWindow(record, asset)) continue;
+      if (asset.status === 'errored') continue;
       pending.delete(record.sourceId);
       this.recordAsset(record.sourceId, asset);
       if (pending.size === 0) break;
@@ -989,7 +1196,9 @@ class MigrationRun<C> {
       if (this.deadlinePassed()) return;
       const busy =
         this.inFlight.size > 0 ||
-        this.state.list({ states: ['processing', 'enriching'] }).length > 0;
+        this.state
+          .list({ states: ['processing', 'enriching'] })
+          .some((record) => this.inScope(record.sourceId));
       if (!busy) return;
 
       const changed = new Promise<void>((resolve) => {

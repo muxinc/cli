@@ -108,6 +108,44 @@ describe('cloudflare stream provider', () => {
   });
 
   describe('list', () => {
+    const at = (time: string) => `2024-01-02T00:00:${time}.000000Z`;
+    const fullPage = (lastTwoAt: string) =>
+      Array.from({ length: 1000 }, (_, i) =>
+        video(`v${i}`, { created: i >= 998 ? lastTwoAt : at('00') }),
+      );
+
+    test('lists videos that share an upload time across a page boundary exactly once', async () => {
+      const first = fullPage(at('30'));
+      const { provider: p } = provider({
+        [`GET ${base}`]: (url) =>
+          url.searchParams.get('after')
+            ? envelope([
+                video('v998', { created: at('30') }),
+                video('v999', { created: at('30') }),
+                video('v1000', { created: at('30') }),
+              ])
+            : envelope(first),
+      });
+
+      const items = await listAll(p);
+
+      const ids = items.map((i) => i.sourceId);
+      expect(ids).toHaveLength(1001);
+      expect(new Set(ids).size).toBe(1001);
+      expect(ids.at(-1)).toBe('v1000');
+    });
+
+    test('fails with CLOUDFLARE_PAGINATION_STUCK instead of looping on a page with nothing new', async () => {
+      const first = fullPage(at('00'));
+      const { provider: p } = provider({
+        [`GET ${base}`]: () => envelope(first),
+      });
+
+      await expect(listAll(p)).rejects.toMatchObject({
+        code: 'CLOUDFLARE_PAGINATION_STUCK',
+      });
+    });
+
     test('pages by created date and maps each video', async () => {
       const first = Array.from({ length: 1000 }, (_, i) =>
         video(`a${i}`, { created: '2024-01-01T00:00:00.000000Z' }),
@@ -131,8 +169,9 @@ describe('cloudflare stream provider', () => {
       expect(requests).toHaveLength(2);
       expect(requests[0].url.searchParams.get('limit')).toBe('1000');
       expect(requests[0].url.searchParams.get('asc')).toBe('true');
+      // One second before the last upload time, so same-time videos are not skipped.
       expect(requests[1].url.searchParams.get('after')).toBe(
-        '2024-01-02T00:00:00.000000Z',
+        '2024-01-01T23:59:59.000Z',
       );
     });
 

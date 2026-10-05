@@ -1,6 +1,7 @@
 import type { Asset } from '@mux/ts/resources/video/assets';
 import type { DuplicateAsset } from './engine.ts';
 import { ExitCode, type ExitCodeValue } from './exit-codes.ts';
+import { ExternalIds } from './external-id.ts';
 import type { ItemRecord, MigrationState, VerifyCheck } from './state.ts';
 import type { Clock, MuxMigrateClient } from './types.ts';
 
@@ -132,14 +133,16 @@ async function checkItem(
 async function findDuplicates(
   deps: VerifyDeps,
   records: ItemRecord[],
-  prefix: string,
+  provider: string,
 ): Promise<DuplicateAsset[]> {
   const bySource = new Map(records.map((record) => [record.sourceId, record]));
+  const externalIds = new ExternalIds(provider, bySource.keys());
   const duplicates: DuplicateAsset[] = [];
   for await (const asset of deps.mux.listAssets()) {
-    const externalId = asset.meta?.external_id;
-    if (!externalId?.startsWith(prefix)) continue;
-    const record = bySource.get(externalId.slice(prefix.length));
+    // An errored asset from an earlier attempt is not a playable duplicate.
+    if (asset.status === 'errored') continue;
+    const sourceId = externalIds.sourceIdFor(asset.meta?.external_id);
+    const record = sourceId === undefined ? undefined : bySource.get(sourceId);
     if (record?.assetId && record.assetId !== asset.id) {
       duplicates.push({
         sourceId: record.sourceId,
@@ -191,7 +194,7 @@ export async function verifyMigration(
   }
 
   const duplicates = migration
-    ? await findDuplicates(deps, state.list(), `${migration.provider}:`)
+    ? await findDuplicates(deps, state.list(), migration.provider)
     : [];
   const ok = failed.length === 0 && duplicates.length === 0;
   return {

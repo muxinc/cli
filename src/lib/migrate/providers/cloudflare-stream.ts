@@ -1,3 +1,4 @@
+import { MigrationFailure } from '../errors.ts';
 import { createHttpClient, ProviderHttpError } from '../http.ts';
 import type {
   CaptionSource,
@@ -264,16 +265,23 @@ export function createCloudflareStreamProvider(options: {
       const last = videos.at(-1);
       let next: string | undefined;
       if (videos.length >= PAGE_SIZE && last?.created) {
-        const sameTime = videos
-          .filter((video) => video.created === last.created)
+        if (items.length === 0) {
+          throw new MigrationFailure({
+            code: 'CLOUDFLARE_PAGINATION_STUCK',
+            message: `More than ${PAGE_SIZE} videos share the upload time ${last.created}, so the library cannot be paged past it.`,
+            hint: 'Contact Mux support with this message.',
+          });
+        }
+        // The next page starts one second early, so videos that share the
+        // last upload time are not skipped whether `after` is inclusive or
+        // not. Videos already listed in that overlap are filtered out.
+        const after = new Date(Date.parse(last.created) - 1000).toISOString();
+        const overlap = videos
+          .filter(
+            (video) => Date.parse(video.created ?? '') >= Date.parse(after),
+          )
           .map((video) => video.uid);
-        next = JSON.stringify({
-          after: last.created,
-          seen:
-            last.created === position?.after
-              ? [...seen, ...sameTime]
-              : sameTime,
-        } satisfies ListCursor);
+        next = JSON.stringify({ after, seen: overlap } satisfies ListCursor);
       }
 
       return {

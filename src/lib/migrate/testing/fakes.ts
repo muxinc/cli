@@ -111,6 +111,9 @@ export class FakeMux implements MuxMigrateClient {
   runs: DirectiveRunSummary[] = [];
   autoReady = true;
   directiveOutcome: DirectiveRunStatus = 'completed';
+  /** False to simulate attached directives that never start a run. */
+  startDirectiveRuns = true;
+  textTrackStatus: 'ready' | 'preparing' = 'ready';
   /** Milliseconds each create request takes on the fake clock. */
   createDurationMs = 0;
   /** After a simulated crash, every call fails and nothing is created. */
@@ -169,11 +172,13 @@ export class FakeMux implements MuxMigrateClient {
       .map((input, i) => ({
         id: `track_${assetId}_${i}`,
         type: 'text',
-        status: 'ready',
+        status: this.textTrackStatus,
         language_code: input.language_code,
       }));
     this.emit('video.asset.ready', asset);
-    for (const { id } of asset.directives ?? []) {
+    for (const { id } of this.startDirectiveRuns
+      ? (asset.directives ?? [])
+      : []) {
       const run: DirectiveRunSummary = {
         runId: `drvrun_${nextId++}`,
         directiveId: id,

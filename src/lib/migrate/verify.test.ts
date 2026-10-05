@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Asset } from '@mux/ts/resources/video/assets';
+import { ExternalIds } from './external-id.ts';
 import { MigrationState } from './state.ts';
 import {
   FakeClock,
@@ -50,7 +51,9 @@ describe('verifyMigration', () => {
       sourceDuration?: number;
     } = {},
   ): Asset {
-    const asset = mux.injectAsset({ external_id: `manifest:${sourceId}` });
+    const asset = mux.injectAsset({
+      external_id: new ExternalIds('manifest', [sourceId]).for(sourceId),
+    });
     mux.markReady(asset.id);
     Object.assign(asset, {
       duration: options.duration ?? 60,
@@ -184,6 +187,30 @@ describe('verifyMigration', () => {
       { sourceId: 'a', keptAssetId: kept.id, duplicateAssetId: extra.id },
     ]);
     expect(report.exit_code).toBe(1);
+  });
+
+  test('does not report an errored asset left by a retry as a duplicate', async () => {
+    migrated('a');
+    const failed = mux.injectAsset({ external_id: 'manifest:a' });
+    failed.status = 'errored';
+
+    const report = await run();
+
+    expect(report.duplicates).toEqual([]);
+  });
+
+  test('finds duplicates of items whose external ID was hashed', async () => {
+    const longId = `folder/${'x'.repeat(200)}.mp4`;
+    const kept = migrated(longId);
+    const externalId = kept.meta?.external_id as string;
+    const extra = mux.injectAsset({ external_id: externalId });
+
+    const report = await run();
+
+    expect(externalId).toStartWith('manifest:sha256:');
+    expect(report.duplicates).toEqual([
+      { sourceId: longId, keptAssetId: kept.id, duplicateAssetId: extra.id },
+    ]);
   });
 
   test('--ids verifies only the listed items', async () => {

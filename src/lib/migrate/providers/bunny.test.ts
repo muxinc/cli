@@ -335,7 +335,7 @@ describe('bunny provider', () => {
       expect(requests[0].url.searchParams.get('collection')).toBe('col-1');
     });
 
-    test('signs the poster URL when the token key is set', async () => {
+    test('stores the poster URL unsigned even when the token key is set', async () => {
       const { provider: p } = provider({
         [`GET ${LIBRARY}/videos`]: () => page([video('a')], 1, 1),
         [`GET ${LIBRARY}/videos/a/play`]: () => playData('a'),
@@ -343,9 +343,7 @@ describe('bunny provider', () => {
 
       const [item] = await listAll(p, signedCreds);
 
-      expect(item.posterUrl).toBe(
-        `https://${CDN}/a/thumbnail.jpg?token=${expectedToken('token-key', '/a/thumbnail.jpg', EXPIRES)}&expires=${EXPIRES}`,
-      );
+      expect(item.posterUrl).toBe(`https://${CDN}/a/thumbnail.jpg`);
     });
   });
 

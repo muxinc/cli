@@ -307,7 +307,16 @@ export function createBucketProvider(options: {
         if (error instanceof MigrationFailure) {
           return { ok: false, warnings: [error.toJSON()] };
         }
-        throw error;
+        return {
+          ok: false,
+          warnings: [
+            {
+              code: 'BUCKET_UNREACHABLE',
+              message: `Could not reach the bucket: ${error instanceof Error ? error.message : String(error)}`,
+              hint: 'Check AWS_REGION and AWS_ENDPOINT_URL.',
+            },
+          ],
+        };
       }
     },
 

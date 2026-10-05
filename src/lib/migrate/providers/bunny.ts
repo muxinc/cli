@@ -204,6 +204,11 @@ export function createBunnyProvider(options: {
       throw error;
     });
     hosts.set(creds.libraryId, lookup);
+    // A failed lookup is retried on the next page rather than cached.
+    lookup.then(
+      (host) => host ?? hosts.delete(creds.libraryId),
+      () => hosts.delete(creds.libraryId),
+    );
     return lookup;
   }
 
@@ -238,13 +243,10 @@ export function createBunnyProvider(options: {
         `video.bunnycdn.com/play/${libraryId}/${guid}`,
         ...(host ? [`${host}/${guid}`] : []),
       ],
+      // Stored unsigned: the state file keeps no URLs derived from the token key.
       posterUrl:
         host && video.thumbnailFileName
-          ? sign(
-              creds,
-              `https://${host}/${guid}/${video.thumbnailFileName}`,
-              expiry(),
-            )
+          ? `https://${host}/${guid}/${video.thumbnailFileName}`
           : undefined,
       chapters: video.chapters?.map((chapter) => ({
         title: chapter.title,
