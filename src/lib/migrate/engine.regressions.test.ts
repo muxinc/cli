@@ -373,3 +373,37 @@ describe('runs that could wait forever', () => {
     expect(h.warnings('RECONCILE_FAILED').length).toBeGreaterThan(0);
   });
 });
+
+describe('scale', () => {
+  test('rows read from the state file grow linearly with the library size', async () => {
+    const rowsReadFor = async (n: number) => {
+      const h = harness(
+        Array.from({ length: n }, (_, i) => sourceItem(`v${i}`)),
+      );
+      const list = h.state.list.bind(h.state);
+      let rows = 0;
+      h.state.list = (filter) => {
+        const result = list(filter);
+        rows += result.length;
+        return result;
+      };
+      h.mux.autoReady = false;
+      h.mux.afterCreate = (asset) =>
+        setTimeout(() => h.mux.markReady(asset.id), 1);
+      const result = await h.run({ concurrency: 8 });
+      expect(result.exitCode).toBe(0);
+      h.state.close();
+      for (const suffix of ['', '-wal', '-shm']) {
+        await rm(join(tempDir, `state.db${suffix}`), { force: true });
+      }
+      return rows;
+    };
+
+    const small = await rowsReadFor(200);
+    const large = await rowsReadFor(800);
+
+    // Quadrupling the library may at most quadruple the reads (with slack),
+    // not multiply them by sixteen.
+    expect(large).toBeLessThan(small * 6);
+  });
+});

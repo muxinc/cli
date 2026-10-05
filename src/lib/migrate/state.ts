@@ -192,6 +192,7 @@ export class MigrationState {
         updated_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS items_asset_id ON items (asset_id);
+      CREATE INDEX IF NOT EXISTS items_state ON items (state);
     `);
     return new MigrationState(db);
   }
@@ -299,18 +300,73 @@ export class MigrationState {
     return this.get(sourceId) as ItemRecord;
   }
 
-  counts(): Record<ItemState, number> {
+  /**
+   * Item counts by state, computed in SQL. With `ids`, only those items are
+   * counted.
+   */
+  counts(ids?: string[]): Record<ItemState, number> {
     const counts = Object.fromEntries(ITEM_STATES.map((s) => [s, 0])) as Record<
       ItemState,
       number
     >;
-    const rows = this.db
-      .query<{ state: ItemState; n: number }, []>(
-        'SELECT state, COUNT(*) AS n FROM items GROUP BY state',
-      )
-      .all();
+    const rows = ids
+      ? this.db
+          .query<{ state: ItemState; n: number }, [string]>(
+            'SELECT state, COUNT(*) AS n FROM items WHERE source_id IN (SELECT value FROM json_each(?)) GROUP BY state',
+          )
+          .all(JSON.stringify(ids))
+      : this.db
+          .query<{ state: ItemState; n: number }, []>(
+            'SELECT state, COUNT(*) AS n FROM items GROUP BY state',
+          )
+          .all();
     for (const row of rows) counts[row.state] = row.n;
     return counts;
+  }
+
+  /** The number of items in any of `states`, optionally limited to `ids`. */
+  count(states: ItemState[], ids?: string[]): number {
+    const statesJson = JSON.stringify(states);
+    const row = ids
+      ? this.db
+          .query<{ n: number }, [string, string]>(
+            'SELECT COUNT(*) AS n FROM items WHERE state IN (SELECT value FROM json_each(?)) AND source_id IN (SELECT value FROM json_each(?))',
+          )
+          .get(statesJson, JSON.stringify(ids))
+      : this.db
+          .query<{ n: number }, [string]>(
+            'SELECT COUNT(*) AS n FROM items WHERE state IN (SELECT value FROM json_each(?))',
+          )
+          .get(statesJson);
+    return row?.n ?? 0;
+  }
+
+  sourceIds(): string[] {
+    return this.db
+      .query<{ source_id: string }, []>(
+        'SELECT source_id FROM items ORDER BY seq',
+      )
+      .all()
+      .map((row) => row.source_id);
+  }
+
+  /** The least recently updated items in `states`. */
+  oldest(states: ItemState[], limit: number): ItemRecord[] {
+    return this.db
+      .query<ItemRow, [string, number]>(
+        'SELECT * FROM items WHERE state IN (SELECT value FROM json_each(?)) ORDER BY updated_at, seq LIMIT ?',
+      )
+      .all(JSON.stringify(states), limit)
+      .map(toRecord);
+  }
+
+  withPendingCaptions(): ItemRecord[] {
+    return this.db
+      .query<ItemRow, []>(
+        "SELECT * FROM items WHERE pending_captions_json != '[]' ORDER BY seq",
+      )
+      .all()
+      .map(toRecord);
   }
 
   close(): void {

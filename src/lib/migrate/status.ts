@@ -57,9 +57,7 @@ export function summarizeStatus(state: MigrationState): StatusReport {
   }
 
   const inFlight = state
-    .list({ states: IN_FLIGHT_STATES })
-    .sort((a, b) => a.updatedAt - b.updatedAt)
-    .slice(0, MAX_IN_FLIGHT)
+    .oldest(IN_FLIGHT_STATES, MAX_IN_FLIGHT)
     .map((record) => ({
       source_id: record.sourceId,
       state: record.state,
@@ -86,7 +84,7 @@ export function summarizeStatus(state: MigrationState): StatusReport {
     counts,
     in_flight: inFlight,
     errored,
-    pending_captions: state.list().flatMap((record) =>
+    pending_captions: state.withPendingCaptions().flatMap((record) =>
       record.pendingCaptions.map((caption) => ({
         source_id: record.sourceId,
         asset_id: record.assetId ?? null,

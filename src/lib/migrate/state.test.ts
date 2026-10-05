@@ -98,3 +98,52 @@ describe('MigrationState', () => {
     state.close();
   });
 });
+
+describe('MigrationState queries', () => {
+  let dir: string;
+  let state: MigrationState;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'mux-cli-migrate-state-queries-'));
+    state = MigrationState.open(join(dir, 'state.db'));
+    state.initMigration('manifest');
+    state.upsertDiscovered(['a', 'b', 'c', 'd'].map((id) => sourceItem(id)));
+    state.update('a', { state: 'processing' });
+    state.update('b', { state: 'processing' });
+    state.update('c', {
+      state: 'ready',
+      pendingCaptions: [
+        { language: 'en', path: 'c.en.srt', closedCaptions: false },
+      ],
+    });
+  });
+
+  afterEach(async () => {
+    state.close();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('counts items in states, optionally limited to IDs', () => {
+    expect(state.count(['processing', 'ready'])).toBe(3);
+    expect(state.count(['processing'], ['a', 'c', 'missing'])).toBe(1);
+    expect(state.counts(['c', 'd'])).toMatchObject({
+      ready: 1,
+      discovered: 1,
+      processing: 0,
+    });
+  });
+
+  test('lists source IDs in discovery order', () => {
+    expect(state.sourceIds()).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  test('returns the oldest items in states, up to a limit', () => {
+    expect(state.oldest(['processing'], 1).map((r) => r.sourceId)).toEqual([
+      'a',
+    ]);
+  });
+
+  test('lists items with pending captions', () => {
+    expect(state.withPendingCaptions().map((r) => r.sourceId)).toEqual(['c']);
+  });
+});

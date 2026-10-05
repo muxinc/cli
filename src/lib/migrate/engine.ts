@@ -319,16 +319,12 @@ function stoppedResult<C>(
 }
 
 function tallyScope(state: MigrationState, ids?: string[]) {
-  const scope = state
-    .list()
-    .filter((record) => !ids || ids.includes(record.sourceId));
-  const count = (states: ItemState[]) =>
-    scope.filter((record) => states.includes(record.state)).length;
+  const counts = state.counts(ids);
   return {
-    ready: count(['ready']),
-    errored: count(['errored']),
-    skipped: count(['skipped']),
-    remaining: count(PENDING_STATES),
+    ready: counts.ready,
+    errored: counts.errored,
+    skipped: counts.skipped,
+    remaining: PENDING_STATES.reduce((sum, s) => sum + counts[s], 0),
   };
 }
 
@@ -415,6 +411,8 @@ function assetErrorMessage(asset: Record<string, unknown>): string {
 class MigrationRun<C> {
   private readonly state: MigrationState;
   private readonly externalIds: ExternalIds;
+  /** The `--ids` selection, or undefined for the whole library. */
+  private readonly scope?: Set<string>;
   private readonly timing: RunTiming;
   private readonly migrationId: string;
   private readonly deadline?: number;
@@ -435,9 +433,10 @@ class MigrationRun<C> {
   ) {
     this.state = deps.state;
     this.timing = { ...DEFAULT_TIMING, ...options.timing };
+    this.scope = options.ids ? new Set(options.ids) : undefined;
     this.externalIds = new ExternalIds(
       deps.provider.id,
-      deps.state.list().map((record) => record.sourceId),
+      deps.state.sourceIds(),
     );
     this.migrationId = deps.state.initMigration(deps.provider.id).id;
     if (options.timeBudgetMs !== undefined) {
@@ -516,7 +515,7 @@ class MigrationRun<C> {
   }
 
   private inScope(sourceId: string): boolean {
-    return !this.options.ids || this.options.ids.includes(sourceId);
+    return !this.scope || this.scope.has(sourceId);
   }
 
   private deadlinePassed(): boolean {
@@ -1196,9 +1195,7 @@ class MigrationRun<C> {
       if (this.deadlinePassed()) return;
       const busy =
         this.inFlight.size > 0 ||
-        this.state
-          .list({ states: ['processing', 'enriching'] })
-          .some((record) => this.inScope(record.sourceId));
+        this.state.count(['processing', 'enriching'], this.options.ids) > 0;
       if (!busy) return;
 
       const changed = new Promise<void>((resolve) => {

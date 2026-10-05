@@ -2,7 +2,12 @@ import type { Asset } from '@mux/ts/resources/video/assets';
 import type { DuplicateAsset } from './engine.ts';
 import { ExitCode, type ExitCodeValue } from './exit-codes.ts';
 import { ExternalIds } from './external-id.ts';
-import type { ItemRecord, MigrationState, VerifyCheck } from './state.ts';
+import type {
+  ItemRecord,
+  MigrationInfo,
+  MigrationState,
+  VerifyCheck,
+} from './state.ts';
 import type { Clock, MuxMigrateClient } from './types.ts';
 
 export interface VerifyDeps {
@@ -130,15 +135,24 @@ async function checkItem(
  * Lists every asset whose external ID belongs to a migrated item but which is
  * not the asset the migration recorded for it.
  */
+/** Allows for clock skew between this machine and Mux. */
+const SCAN_MARGIN_MS = 5 * 60_000;
+
+/**
+ * Assets are listed newest first, and the scan stops at those created before
+ * the migration started, since no earlier asset can belong to it.
+ */
 async function findDuplicates(
   deps: VerifyDeps,
   records: ItemRecord[],
-  provider: string,
+  migration: MigrationInfo,
 ): Promise<DuplicateAsset[]> {
+  const oldest = migration.createdAt - SCAN_MARGIN_MS;
   const bySource = new Map(records.map((record) => [record.sourceId, record]));
-  const externalIds = new ExternalIds(provider, bySource.keys());
+  const externalIds = new ExternalIds(migration.provider, bySource.keys());
   const duplicates: DuplicateAsset[] = [];
   for await (const asset of deps.mux.listAssets()) {
+    if (Number(asset.created_at) * 1000 < oldest) break;
     // An errored asset from an earlier attempt is not a playable duplicate.
     if (asset.status === 'errored') continue;
     const sourceId = externalIds.sourceIdFor(asset.meta?.external_id);
@@ -194,7 +208,7 @@ export async function verifyMigration(
   }
 
   const duplicates = migration
-    ? await findDuplicates(deps, state.list(), migration.provider)
+    ? await findDuplicates(deps, state.list(), migration)
     : [];
   const ok = failed.length === 0 && duplicates.length === 0;
   return {

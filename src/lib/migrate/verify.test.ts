@@ -24,7 +24,7 @@ describe('verifyMigration', () => {
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'mux-cli-migrate-verify-'));
     state = MigrationState.open(join(tempDir, 'state.db'));
-    clock = new FakeClock();
+    clock = new FakeClock(Date.now());
     mux = new FakeMux(clock, new FakeEventSource());
     playbackRequests = [];
     playbackStatus = 200;
@@ -211,6 +211,27 @@ describe('verifyMigration', () => {
     expect(report.duplicates).toEqual([
       { sourceId: longId, keptAssetId: kept.id, duplicateAssetId: extra.id },
     ]);
+  });
+
+  test('stops scanning for duplicates at assets created before the migration started', async () => {
+    const migrationStart = state.migration()?.createdAt as number;
+    for (let i = 0; i < 50; i++) {
+      mux.injectAsset({}, migrationStart - 60 * 60_000 - i * 1000);
+    }
+    migrated('a');
+    mux.assets.sort((x, y) => Number(y.created_at) - Number(x.created_at));
+    let listed = 0;
+    const listAssets = mux.listAssets.bind(mux);
+    mux.listAssets = async function* () {
+      for await (const asset of listAssets()) {
+        listed++;
+        yield asset;
+      }
+    };
+
+    await run();
+
+    expect(listed).toBeLessThan(10);
   });
 
   test('--ids verifies only the listed items', async () => {
