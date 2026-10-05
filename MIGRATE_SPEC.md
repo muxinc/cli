@@ -183,7 +183,7 @@ Rules:
 - Before creating any asset, `run` retrieves each directive with `client.robots.directives.retrieve(id)` and fails early with `DIRECTIVE_NOT_FOUND` or `ROBOTS_NOT_ENABLED`.
 - `plan` lists each directive's name and workflows, and the number of items it will be attached to. Robots usage is billed per workflow run; `plan` links to pricing.
 - Run status arrives on the event stream as `robots.directive_run.*` events (see [Status updates](#status-updates)) and is stored per item. Run outputs are not copied; the mapping export records the run ID and each binding's job ID, which an agent can look up with `mux robots get`.
-- `verify` reports runs that ended `partial` or `errored`, with the failed bindings.
+- `run` reports runs that ended `partial` or `errored` as `DIRECTIVE_RUN_PARTIAL` and `DIRECTIVE_RUN_ERRORED` warnings without failing, because the asset migrated and no `migrate` command can re-run a directive in v1. `verify` reports them as failures, with the failed bindings.
 - `--skip-robots` creates assets without attaching directives.
 
 ### Fast follow
@@ -247,7 +247,7 @@ If a future source uploads local files through direct uploads instead of ingesti
 | `robots.directive_run.created` | Run ID recorded for the item |
 | `robots.directive_run.completed`, `.partial`, `.errored` | Run status and each binding's job ID recorded; the item returns to `ready` once every attached run is terminal |
 
-Events for assets that are not in the state file are ignored. On disconnect, the CLI reconnects with the same backoff and credential refresh as `webhooks listen`, then reconciles in-flight items, because the stream is not known to replay missed events: assets with a `GET`, and directive runs with `client.robots.directives.runs.list(directiveId)` matched by asset ID. `run` exits when no item is left in `creating`, `processing`, or `enriching`, when `--time-budget` expires, or immediately after the last create with `--no-wait`.
+Events for assets that are not in the state file are ignored. On disconnect, the CLI reconnects with the same backoff and credential refresh as `webhooks listen`, then reconciles in-flight items, because the stream is not known to replay missed events: assets with a `GET`, and directive runs with `client.robots.directives.runs.list(directiveId)` matched by asset ID. `run` exits when no item is left in `processing` or `enriching` and no create request is in flight, when `--time-budget` expires, or immediately after the last create with `--no-wait`. An item whose create request failed without a response stays in `creating` and does not hold the run open; the next run resolves it (see [Duplicate prevention](#duplicate-prevention)), so the run exits 4.
 
 ## State file
 
@@ -355,13 +355,13 @@ Exit codes:
 
 | Code | Meaning |
 |---|---|
-| 0 | Complete: every item is `ready` or `skipped`, and every attached directive run completed |
+| 0 | Complete: every item is `ready` or `skipped`. Directive runs that ended `partial` or `errored` are warnings here and failures in `verify`. |
 | 1 | The command failed (authentication, network, unexpected error), or only errored items remain |
 | 2 | Invalid usage or configuration |
 | 3 | Confirmation required (`--yes` missing) |
 | 4 | Stopped with work remaining. Run `next_command` again. |
 
-When several apply, the first match in this order wins: 2, 3, 1 (command failed), 4, 1 (only errored items remain), 0. Errored items alone never produce 4, so an agent that re-runs on 4 cannot loop on failures. Errored items are listed in the output with `mux migrate retry` as the `next_command`.
+When several apply, the first match in this order wins: 2, 3, 1 (command failed), 4, 1 (only errored items remain), 0. Errored items alone never produce 4, so an agent that re-runs on 4 cannot loop on failures. `next_command` is always a command that makes progress: it repeats the run's `--limit` and `--time-budget`, and never includes `--no-wait`. With `--ids`, completion is judged on the listed items only. Errored items are listed in the output with `mux migrate retry` as the `next_command`.
 
 Error codes are a documented, stable list. The prompt references them by name.
 
@@ -401,6 +401,7 @@ interface SourceItem {
   posterUrl?: string;
   chapters?: Array<{ title: string; startSeconds: number }>;
   captionCount: number;
+  passthrough?: string;
   raw: unknown;
 }
 
@@ -469,7 +470,7 @@ All HTTP goes through one shared client that checks response status, honors `Ret
 
 ### Manifest
 
-- CSV or JSON. Required column: `url`. Optional: `id`, `title`, `description`, `tags`, `captions` (JSON array of `{url, language}`), `poster_url`, `passthrough`.
+- CSV or JSON. JSON is preferred for generated manifests. In CSV, `tags` is semicolon-separated and `captions` is a quoted JSON column. Required column: `url`. Optional: `id`, `title`, `description`, `tags`, `captions` (JSON array of `{url, language}`), `poster_url`, `passthrough`.
 - When `id` is missing, a stable hash of the URL is used, so re-running stays idempotent.
 - The schema is published, so customers or agents can script exports from any unsupported platform into it.
 
