@@ -59,3 +59,10 @@ export function getEventsPath(): string {
 export function getEventsDatabasePath(): string {
   return join(getDataDir(), 'events.db');
 }
+
+/**
+ * Get the directory where the embedded agent skills are written
+ */
+export function getSkillsDir(): string {
+  return join(getDataDir(), 'skills');
+}
