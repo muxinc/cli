@@ -146,3 +146,47 @@ describe('MigrationState queries', () => {
     expect(state.withPendingCaptions().map((r) => r.sourceId)).toEqual(['c']);
   });
 });
+
+describe('MigrationState duplicates and run lock', () => {
+  let dir: string;
+  let state: MigrationState;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'mux-cli-migrate-state-dupes-'));
+    state = MigrationState.open(join(dir, 'state.db'));
+    state.initMigration('manifest');
+    state.upsertDiscovered([sourceItem('a')]);
+  });
+
+  afterEach(async () => {
+    state.close();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('records each duplicate once', () => {
+    const duplicate = {
+      sourceId: 'a',
+      keptAssetId: 'asset_1',
+      duplicateAssetId: 'asset_2',
+    };
+    state.recordDuplicate(duplicate);
+    state.recordDuplicate(duplicate);
+
+    expect(state.duplicates()).toEqual([duplicate]);
+  });
+
+  test('holds the run lock for one run at a time', () => {
+    const first = state.acquireRunLock();
+    expect(first).toBeDefined();
+    expect(state.acquireRunLock()).toBeUndefined();
+
+    first?.release();
+    expect(state.acquireRunLock()).toBeDefined();
+  });
+
+  test('takes over a lock left by a process that no longer exists', () => {
+    state.acquireRunLock({ pid: 2 ** 22 + 12345 });
+
+    expect(state.acquireRunLock()).toBeDefined();
+  });
+});

@@ -1,7 +1,14 @@
 import { CREATE_LIMIT } from './client.ts';
 import { resolveExitCode } from './exit-codes.ts';
+import { ExternalIds } from './external-id.ts';
 import { MigrationRun } from './run/migration-run.ts';
-import { continueCommand, tallyScope } from './run/shared.ts';
+import {
+  ADOPTION_WINDOW_MS,
+  continueCommand,
+  isAuthFailure,
+  messageOf,
+  tallyScope,
+} from './run/shared.ts';
 import type {
   MigrationDeps,
   PlanSummary,
@@ -40,6 +47,30 @@ export async function planMigration<C>(
     warnings.push(...(page.warnings ?? []));
     cursor = page.next;
   } while (cursor);
+
+  let existing: PlanSummary['existing_assets'] = {
+    checked: 0,
+    matching: 0,
+    examples: [],
+  };
+  try {
+    existing = await findEarlierAssets(deps);
+  } catch (error) {
+    // The check is advisory, so a transient failure does not stop planning.
+    if (isAuthFailure(error)) throw error;
+    warnings.push({
+      code: 'PREVIOUS_MIGRATION_CHECK_FAILED',
+      message: `Could not check for an earlier migration of this library: ${messageOf(error)}`,
+      hint: 'Run mux migrate plan again to repeat the check.',
+    });
+  }
+  if (existing.matching > 0) {
+    warnings.push({
+      code: 'PREVIOUS_MIGRATION_FOUND',
+      message: `${existing.matching} of the ${existing.checked} most recent assets created before this migration already carry external IDs for videos in this library. Running this migration creates another asset for each of those videos.`,
+      hint: 'If an earlier run used a different state file, resume it with --state or from its folder. Otherwise confirm with the user that new assets are intended.',
+    });
+  }
 
   const records = state.list();
   const exportable = records.filter((record) => record.state !== 'skipped');
@@ -83,6 +114,7 @@ export async function planMigration<C>(
       records.filter((record) => TO_CREATE.has(record.state)).length /
         CREATE_LIMIT.perSecond,
     ),
+    existing_assets: existing,
     pricing_url: PRICING_URL,
   };
 }
@@ -121,19 +153,75 @@ export async function runMigration<C>(
     );
   }
 
-  const plan = await planMigration(deps);
-  if (!options.confirmed) {
+  const lock = deps.state.acquireRunLock();
+  if (!lock) {
     return stoppedResult(
       deps,
       options,
-      { confirmationRequired: true },
-      undefined,
-      plan,
+      { usageError: true },
+      {
+        code: 'RUN_IN_PROGRESS',
+        message: 'Another mux migrate run is using this state file.',
+        hint: 'Wait for it to finish, or use --state for a separate migration. Two runs on one state file could create the same videos twice.',
+      },
     );
   }
+  try {
+    const plan = await planMigration(deps);
+    if (!options.confirmed) {
+      return stoppedResult(
+        deps,
+        options,
+        { confirmationRequired: true },
+        undefined,
+        plan,
+      );
+    }
+    for (const warning of plan.warnings) {
+      deps.emit?.({ type: 'warning', ...warning });
+    }
+    const run = new MigrationRun(deps, options);
+    return await run.execute(plan);
+  } finally {
+    lock.release();
+  }
+}
 
-  const run = new MigrationRun(deps, options);
-  return run.execute(plan);
+/** How many of the most recent earlier assets the earlier-migration check reads. */
+const EARLIER_ASSETS_CHECKED = 1000;
+const EARLIER_ASSET_EXAMPLES = 5;
+
+/**
+ * Looks for assets created before this migration started that carry its
+ * provider's external IDs for items in this library. The asset list has no
+ * filters, so only the most recent assets are read.
+ */
+async function findEarlierAssets<C>(
+  deps: MigrationDeps<C>,
+): Promise<PlanSummary['existing_assets']> {
+  const { state, provider, mux } = deps;
+  const migration = state.migration();
+  const result: PlanSummary['existing_assets'] = {
+    checked: 0,
+    matching: 0,
+    examples: [],
+  };
+  if (!migration) return result;
+  const startedBefore = migration.createdAt - ADOPTION_WINDOW_MS;
+  const externalIds = new ExternalIds(provider.id, state.sourceIds());
+  for await (const asset of mux.listAssets()) {
+    if (Number(asset.created_at) * 1000 >= startedBefore) continue;
+    result.checked++;
+    const sourceId = externalIds.sourceIdFor(asset.meta?.external_id);
+    if (sourceId !== undefined && state.get(sourceId)) {
+      result.matching++;
+      if (result.examples.length < EARLIER_ASSET_EXAMPLES) {
+        result.examples.push({ source_id: sourceId, asset_id: asset.id });
+      }
+    }
+    if (result.checked >= EARLIER_ASSETS_CHECKED) break;
+  }
+  return result;
 }
 
 function stoppedResult<C>(

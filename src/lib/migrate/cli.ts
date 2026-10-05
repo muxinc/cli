@@ -278,6 +278,15 @@ export function executeStatus(
         if (caption.attach_command) io.out(`    ${caption.attach_command}`);
       }
     }
+    if (report.duplicates.length > 0) {
+      io.out('Duplicate assets (nothing was deleted):');
+      for (const duplicate of report.duplicates) {
+        io.out(
+          `  ${duplicate.source_id}  kept ${duplicate.kept_asset_id}, duplicate ${duplicate.duplicate_asset_id}`,
+        );
+        io.out(`    ${duplicate.delete_command}`);
+      }
+    }
     if (report.errored.length > 0) {
       io.out('Errored items:');
       for (const { source_id, error } of report.errored) {

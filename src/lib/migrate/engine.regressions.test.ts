@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { BadRequestError, PermissionDeniedError } from '@mux/ts';
 import {
   type MigrationDeps,
+  planMigration,
   type RunOptions,
   retryErrored,
   runMigration,
@@ -341,14 +342,21 @@ describe('runs that could wait forever', () => {
   test('a transient failure during a background reconcile does not stop the run', async () => {
     const h = harness([sourceItem('a')]);
     h.mux.autoReady = false;
-    let failures = 1;
+    // Fails the first listing after the asset exists, which is the
+    // background reconcile's.
+    let failNext = false;
     const list = h.mux.listAssets.bind(h.mux);
     h.mux.listAssets = () => {
-      if (failures-- > 0) throw new Error('socket hang up');
+      if (failNext) {
+        failNext = false;
+        throw new Error('socket hang up');
+      }
       return list();
     };
-    h.mux.afterCreate = (asset) =>
+    h.mux.afterCreate = (asset) => {
+      failNext = true;
       setTimeout(() => h.mux.markReady(asset.id), 30);
+    };
 
     const result = await h.run();
 
@@ -423,5 +431,71 @@ describe('scale', () => {
     // Quadrupling the library may at most quadruple the reads (with slack),
     // not multiply them by sixteen.
     expect(large).toBeLessThan(small * 6);
+  });
+});
+
+describe('an earlier migration of the same library', () => {
+  test("plan reports assets that already carry this provider's external IDs", async () => {
+    const h = harness([sourceItem('a'), sourceItem('b')]);
+    const earlier = h.mux.injectAsset(
+      { external_id: 'manifest:a' },
+      Date.now() - 2 * 24 * 60 * 60_000,
+    );
+    h.mux.injectAsset({ external_id: 'vimeo:b' }, Date.now() - 60 * 60_000);
+
+    const plan = await planMigration(h.deps);
+
+    expect(plan.warnings).toContainEqual(
+      expect.objectContaining({ code: 'PREVIOUS_MIGRATION_FOUND' }),
+    );
+    expect(plan.existing_assets).toEqual({
+      checked: 2,
+      matching: 1,
+      examples: [{ source_id: 'a', asset_id: earlier.id }],
+    });
+  });
+
+  test('plan reports nothing when no earlier assets match', async () => {
+    const h = harness([sourceItem('a')]);
+
+    const plan = await planMigration(h.deps);
+
+    expect(plan.existing_assets).toEqual({
+      checked: 0,
+      matching: 0,
+      examples: [],
+    });
+    expect(plan.warnings).toEqual([]);
+  });
+
+  test('run repeats the warning without blocking', async () => {
+    const h = harness([sourceItem('a')]);
+    h.mux.injectAsset(
+      { external_id: 'manifest:a' },
+      Date.now() - 24 * 60 * 60_000,
+    );
+
+    const result = await h.run();
+
+    expect(result.exitCode).toBe(0);
+    expect(h.warnings('PREVIOUS_MIGRATION_FOUND')).toHaveLength(1);
+  });
+});
+
+describe('concurrent runs', () => {
+  test('a second run on the same state file stops with RUN_IN_PROGRESS', async () => {
+    const h = harness([sourceItem('a')]);
+    h.mux.autoReady = false;
+    const first = h.run();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const second = await h.run();
+
+    expect(second.exitCode).toBe(2);
+    expect(second.error?.code).toBe('RUN_IN_PROGRESS');
+    expect(h.mux.createCalls).toHaveLength(1);
+
+    for (const asset of h.mux.assets) h.mux.markReady(asset.id);
+    expect((await first).exitCode).toBe(0);
   });
 });

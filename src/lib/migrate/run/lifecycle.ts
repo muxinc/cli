@@ -84,6 +84,7 @@ export class AssetLifecycle<C> {
       duplicateAssetId,
     };
     this.duplicates.push(duplicate);
+    this.ctx.state.recordDuplicate(duplicate);
     this.ctx.warn({
       code: 'DUPLICATE_ASSET',
       message: `Source ${record.sourceId} has a second asset, ${duplicateAssetId}. The migration kept ${duplicate.keptAssetId} and did not delete the duplicate.`,

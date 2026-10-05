@@ -34,6 +34,26 @@ export interface ItemRecord {
   updatedAt: number;
 }
 
+/** A second asset found for one source item. The migration keeps the first. */
+export interface DuplicateRecord {
+  sourceId: string;
+  keptAssetId: string;
+  duplicateAssetId: string;
+}
+
+export interface RunLock {
+  release(): void;
+}
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
 export interface PendingCaption {
   language: string;
   path: string;
@@ -154,6 +174,18 @@ export class MigrationState {
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA synchronous = FULL');
     db.exec(`
+      CREATE TABLE IF NOT EXISTS duplicates (
+        duplicate_asset_id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        kept_asset_id TEXT NOT NULL,
+        seq INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS run_lock (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        pid INTEGER NOT NULL,
+        token TEXT NOT NULL,
+        acquired_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS migration (
         id TEXT PRIMARY KEY,
         provider TEXT NOT NULL,
@@ -352,6 +384,67 @@ export class MigrationState {
       )
       .all()
       .map(toRecord);
+  }
+
+  recordDuplicate(duplicate: DuplicateRecord): void {
+    this.db
+      .query(
+        `INSERT INTO duplicates (duplicate_asset_id, source_id, kept_asset_id, seq)
+         VALUES (?, ?, ?, (SELECT COUNT(*) FROM duplicates))
+         ON CONFLICT (duplicate_asset_id) DO NOTHING`,
+      )
+      .run(
+        duplicate.duplicateAssetId,
+        duplicate.sourceId,
+        duplicate.keptAssetId,
+      );
+  }
+
+  duplicates(): DuplicateRecord[] {
+    return this.db
+      .query<
+        {
+          source_id: string;
+          kept_asset_id: string;
+          duplicate_asset_id: string;
+        },
+        []
+      >(
+        'SELECT source_id, kept_asset_id, duplicate_asset_id FROM duplicates ORDER BY seq',
+      )
+      .all()
+      .map((row) => ({
+        sourceId: row.source_id,
+        keptAssetId: row.kept_asset_id,
+        duplicateAssetId: row.duplicate_asset_id,
+      }));
+  }
+
+  /**
+   * Claims the state file for one run. Returns undefined while another live
+   * process holds it; a lock left by a process that has exited is taken over.
+   */
+  acquireRunLock(options: { pid?: number } = {}): RunLock | undefined {
+    const pid = options.pid ?? process.pid;
+    const token = crypto.randomUUID();
+    const acquired = this.db.transaction(() => {
+      const held = this.db
+        .query<{ pid: number }, []>('SELECT pid FROM run_lock WHERE id = 1')
+        .get();
+      if (held && processExists(held.pid)) return false;
+      this.db
+        .query(
+          'INSERT OR REPLACE INTO run_lock (id, pid, token, acquired_at) VALUES (1, ?, ?, ?)',
+        )
+        .run(pid, token, Date.now());
+      return true;
+    })();
+    if (!acquired) return undefined;
+    return {
+      release: () => {
+        this.db.query('DELETE FROM run_lock WHERE token = ?').run(token);
+      },
+    };
   }
 
   close(): void {

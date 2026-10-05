@@ -603,6 +603,7 @@ describe('duplicate prevention', () => {
       { sourceId: 'a', keptAssetId: kept as string, duplicateAssetId: twinId },
     ]);
     expect(h.mux.deleted).toHaveLength(0);
+    expect(h.state.duplicates()).toEqual(result.duplicates);
     expect(h.emitted).toContainEqual(
       expect.objectContaining({ type: 'warning', code: 'DUPLICATE_ASSET' }),
     );

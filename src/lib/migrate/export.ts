@@ -19,6 +19,8 @@ export interface MappingItem {
   status: ItemState;
   /** Null until `mux migrate verify` has checked the item. */
   verified: boolean | null;
+  /** Other assets found for this video. The migration deleted none of them. */
+  duplicate_asset_ids: string[];
 }
 
 export interface MappingFile {
@@ -40,6 +42,12 @@ export function buildMapping(
       message: 'No migration was found in this state file.',
       next_command: 'mux migrate plan',
     });
+  }
+  const duplicatesBySource = new Map<string, string[]>();
+  for (const duplicate of state.duplicates()) {
+    const ids = duplicatesBySource.get(duplicate.sourceId) ?? [];
+    ids.push(duplicate.duplicateAssetId);
+    duplicatesBySource.set(duplicate.sourceId, ids);
   }
   return {
     version: 1,
@@ -67,6 +75,7 @@ export function buildMapping(
         playback_ids: record.playbackIds,
         status: record.state,
         verified: record.verification?.passed ?? null,
+        duplicate_asset_ids: duplicatesBySource.get(record.sourceId) ?? [],
       })),
   };
 }

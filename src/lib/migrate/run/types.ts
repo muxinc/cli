@@ -42,6 +42,16 @@ export interface PlanSummary {
    * asset create per second.
    */
   create_seconds: number;
+  /**
+   * Assets created before this migration started that already carry this
+   * provider's external IDs, a sign of an earlier migration of the same
+   * library. Only the most recent assets are checked.
+   */
+  existing_assets: {
+    checked: number;
+    matching: number;
+    examples: Array<{ source_id: string; asset_id: string }>;
+  };
   warnings: MigrationError[];
   pricing_url: string;
 }

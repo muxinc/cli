@@ -23,6 +23,13 @@ export interface StatusReport {
     path: string;
     attach_command: string | null;
   }>;
+  /** Second assets found for a video. The migration kept the first and deleted nothing. */
+  duplicates: Array<{
+    source_id: string;
+    kept_asset_id: string;
+    duplicate_asset_id: string;
+    delete_command: string;
+  }>;
   exit_code: ExitCodeValue;
   next_command?: string;
 }
@@ -46,6 +53,7 @@ export function summarizeStatus(state: MigrationState): StatusReport {
       in_flight: [],
       errored: [],
       pending_captions: [],
+      duplicates: [],
       exit_code: ExitCode.Usage,
       next_command: 'mux migrate plan',
     };
@@ -90,6 +98,12 @@ export function summarizeStatus(state: MigrationState): StatusReport {
           : null,
       })),
     ),
+    duplicates: state.duplicates().map((duplicate) => ({
+      source_id: duplicate.sourceId,
+      kept_asset_id: duplicate.keptAssetId,
+      duplicate_asset_id: duplicate.duplicateAssetId,
+      delete_command: `mux assets delete ${duplicate.duplicateAssetId}`,
+    })),
     exit_code: exitCode,
     next_command: nextCommand,
   };

@@ -367,7 +367,8 @@ Mux creates at most one asset per second, so a library of 10,000 videos takes at
 - Every command accepts `--json` (or the global `--agent`). `run` prints newline-delimited JSON events ending with a `summary`; the other commands print one JSON document.
 - Every error and warning carries a stable `code`, a `hint`, and usually a `next_command`.
 - Exit codes: `0` complete, `1` failed or only errored items remain (`mux migrate retry`), `2` invalid usage or configuration, `3` confirmation required (`--yes`), `4` work remains: run `next_command` again. Re-running on `4` always makes progress and cannot loop on errors.
-- `run` never creates a duplicate asset: each asset carries `meta.external_id` set to `{provider}:{source_id}`, creation is never retried blindly, and an interrupted run finds and adopts the asset on the next run. `verify` reports any duplicate it finds without deleting it.
+- `run` never creates a duplicate asset: each asset carries `meta.external_id` set to `{provider}:{source_id}`, creation is never retried blindly, and an interrupted run finds and adopts the asset on the next run. Any duplicate that does turn up is reported, never deleted: `status --json` lists each one under `duplicates` with the command that deletes it, and the mapping export lists `duplicate_asset_ids` per video.
+- `plan` warns with `PREVIOUS_MIGRATION_FOUND` when assets from an earlier migration of the same library already exist, for example after deleting `.mux-migrate/`, and only one `run` can use a state file at a time.
 - State lives in `./.mux-migrate/state.db` (`--state` to change it). Read it with `status`, `verify`, and `export`, not directly.
 
 ## Commands

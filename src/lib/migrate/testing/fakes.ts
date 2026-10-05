@@ -274,4 +274,11 @@ export function snapshotState(statePath: string, toPath: string): void {
   } finally {
     db.close();
   }
+  // The crashed process is gone, so its run lock belongs to no live process.
+  const snapshot = new Database(toPath);
+  try {
+    snapshot.exec(`UPDATE run_lock SET pid = ${2 ** 22 + 12345}`);
+  } finally {
+    snapshot.close();
+  }
 }

@@ -167,6 +167,7 @@ describe('verifyMigration', () => {
       { sourceId: 'a', keptAssetId: kept.id, duplicateAssetId: extra.id },
     ]);
     expect(report.exit_code).toBe(1);
+    expect(state.duplicates()).toEqual(report.duplicates);
   });
 
   test('does not report an errored asset left by a retry as a duplicate', async () => {

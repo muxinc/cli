@@ -213,6 +213,12 @@ A duplicate asset costs the customer money and pollutes their library, so `run` 
 6. On the next run, an item still in `creating` had no response and no matching event, for example because the CLI was offline. The CLI lists assets newest first, stops once `created_at` is earlier than the oldest `create_started_at` minus five minutes, and matches `meta.external_id`. A match is adopted. Otherwise the item returns to `resolved` and is created again.
 7. Items in `processing` are reconciled on reconnect by listing assets newest first, 100 per request, which also catches events missed while the CLI was offline. Only assets the listing does not reach are fetched individually.
 
+Duplicates are reported, never deleted, so the agent or user decides what to do with them:
+
+- Every duplicate `run` or `verify` finds is saved in the state file. `status --json` lists them under `duplicates` with a `delete_command` for each, and the mapping export lists `duplicate_asset_ids` per item.
+- `plan` checks the 1,000 most recent assets created before the migration started for this provider's external IDs. Matches mean an earlier migration of the same library, usually run with a different state file, and starting again would create every video a second time. `plan` reports them as `existing_assets` with examples and a `PREVIOUS_MIGRATION_FOUND` warning, and `run` repeats the warning. Neither blocks.
+- `run` holds a lock on the state file. A second run on the same file stops with `RUN_IN_PROGRESS`, so two runs cannot create the same videos. A lock left by a process that has exited is taken over.
+
 If a future source uploads local files through direct uploads instead of ingesting by URL, it follows the same rule: create one upload per item, store its upload ID before sending media, and on retry fetch that upload with `GET /video/v1/uploads/{upload_id}` instead of creating a new one.
 
 ## Status updates

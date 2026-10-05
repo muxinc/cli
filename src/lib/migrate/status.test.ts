@@ -104,6 +104,28 @@ describe('summarizeStatus', () => {
     ]);
   });
 
+  test('lists recorded duplicates with the command that deletes each one', () => {
+    seed(['a']);
+    state.update('a', { state: 'ready', assetId: 'asset_1' });
+    state.recordDuplicate({
+      sourceId: 'a',
+      keptAssetId: 'asset_1',
+      duplicateAssetId: 'asset_2',
+    });
+
+    const report = summarizeStatus(state);
+
+    expect(report.duplicates).toEqual([
+      {
+        source_id: 'a',
+        kept_asset_id: 'asset_1',
+        duplicate_asset_id: 'asset_2',
+        delete_command: 'mux assets delete asset_2',
+      },
+    ]);
+    expect(report.exit_code).toBe(0);
+  });
+
   test('lists at most ten in-flight items, oldest first', () => {
     const ids = Array.from({ length: 12 }, (_, i) => `item-${i}`);
     seed(ids);

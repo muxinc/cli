@@ -36,6 +36,11 @@ describe('mapping export', () => {
     state.update('a', {
       verification: { verifiedAt: 0, passed: true, checks: [] },
     });
+    state.recordDuplicate({
+      sourceId: 'a',
+      keptAssetId: 'asset_1',
+      duplicateAssetId: 'asset_9',
+    });
   });
 
   afterEach(async () => {
@@ -74,6 +79,7 @@ describe('mapping export', () => {
       playback_ids: [{ id: 'pb_1', policy: 'public' }],
       status: 'ready',
       verified: true,
+      duplicate_asset_ids: ['asset_9'],
     });
   });
 

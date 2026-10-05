@@ -170,6 +170,7 @@ export async function verifyMigration(
   const { assets, duplicates } = migration
     ? await scanAssets(deps, state.list(), migration)
     : { assets: new Map<string, Asset>(), duplicates: [] };
+  for (const duplicate of duplicates) state.recordDuplicate(duplicate);
 
   const failed: VerifyItemResult[] = [];
   let reset = 0;
