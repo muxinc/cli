@@ -27,7 +27,6 @@ export class RunContext<C> {
   constructor(
     readonly deps: MigrationDeps<C>,
     readonly options: RunOptions,
-    readonly directives: string[],
   ) {
     this.state = deps.state;
     this.timing = { ...DEFAULT_TIMING, ...options.timing };

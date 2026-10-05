@@ -326,7 +326,7 @@ mux migrate export --format json --output mapping.json
 | `mux migrate plan [provider]` | Inventory the source: counts, duration, fidelity, captions, warnings |
 | `mux migrate run [provider]` | Create Mux assets. Requires `--yes`; without it, prints the plan and exits 3 |
 | `mux migrate status` | Progress, in-flight and errored items, and captions waiting to be attached |
-| `mux migrate verify` | Check each asset's status, duration, captions, playback, and directive runs, and find duplicate assets |
+| `mux migrate verify` | Check each asset's status, duration, captions, and playback, and find duplicate assets |
 | `mux migrate export` | Write the source-to-Mux mapping as JSON or CSV |
 | `mux migrate retry` | Re-queue errored items for the next run |
 
@@ -354,12 +354,10 @@ Mux credentials come from `mux login` or the environment, as for every other com
   "provider": "vimeo",
   "source": { "folders": ["Marketing"], "include_live_archives": false, "include_private": true },
   "asset": { "playback_policy": ["public"], "video_quality": "basic" },
-  "captions": { "import": true, "host_bucket": null },
-  "directives": ["drv_abc123"]
+  "captions": { "import": true, "host_bucket": null }
 }
 ```
 
-- **Robots directives:** create a [directive](https://www.mux.com/docs/guides/robots-directives) in the Mux Dashboard and list its ID under `directives` (or pass `--directive <id>`). It is attached to every asset and runs automatically once the asset is ready, for example to generate chapters or premium captions. `--skip-robots` turns this off for a run.
 - **Captions:** providers that return caption files by URL pass them straight to Mux. When a provider returns caption text instead (Wistia, Cloudflare Stream), set `captions.host_bucket` to a bucket you own and the CLI uploads each file, passes a short-lived URL to Mux, and deletes it once the track is ingested. Without a host bucket, the files are saved under `.mux-migrate/captions/` and `mux migrate status` prints the `mux assets tracks create` command that attaches each one.
 
 ### Running it with an agent

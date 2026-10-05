@@ -1,11 +1,10 @@
 import type { AssetCreateParams } from '@mux/ts/resources/video/assets';
 import type { MigrationState, PendingCaption } from '../state.ts';
-import type { CaptionSource, DirectiveRunStatus, ItemState } from '../types.ts';
+import type { CaptionSource, ItemState } from '../types.ts';
 import type { RunOptions, RunTiming } from './types.ts';
 
 export const DEFAULT_TIMING: RunTiming = {
   reconcileIntervalMs: 60_000,
-  directiveStartTimeoutMs: 15 * 60_000,
   preparationTimeoutMs: 30 * 60_000,
   captionCleanupPollMs: 5_000,
   captionCleanupTimeoutMs: 10 * 60_000,
@@ -26,14 +25,7 @@ export const PENDING_STATES: ItemState[] = [
   'resolved',
   'creating',
   'processing',
-  'enriching',
 ];
-
-export const TERMINAL_RUN_STATUSES = new Set<DirectiveRunStatus>([
-  'completed',
-  'partial',
-  'errored',
-]);
 
 export function tallyScope(state: MigrationState, ids?: string[]) {
   const counts = state.counts(ids);

@@ -1,7 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import {
   continueCommand,
-  loadDirectives,
   type MigrationDeps,
   type PlanSummary,
   planMigration,
@@ -38,8 +37,6 @@ export interface RunFlags {
   concurrency?: number;
   /** False with --no-wait. */
   wait?: boolean;
-  directive?: string[];
-  skipRobots?: boolean;
   playbackPolicy?: Array<'public' | 'signed' | 'drm'>;
   videoQuality?: 'basic' | 'plus' | 'premium';
   maxResolutionTier?: '1080p' | '1440p' | '2160p';
@@ -159,11 +156,6 @@ function printPlan(io: MigrateIO, plan: PlanSummary): void {
     ([lang, n]) => `${lang} (${n})`,
   );
   if (captions.length > 0) io.out(`  Captions: ${captions.join(', ')}`);
-  for (const directive of plan.directives) {
-    io.out(
-      `  Directive ${directive.name} (${directive.id}): ${directive.workflows.join(', ')} on ${directive.items} item(s)`,
-    );
-  }
   for (const warning of plan.warnings) {
     io.err(`Warning [${warning.code}]: ${warning.message}`);
     if (warning.hint) io.err(`Hint: ${warning.hint}`);
@@ -179,12 +171,7 @@ export async function executePlan(ctx: MigrateContext): Promise<ExitCodeValue> {
       printError(io, verified.warnings[0]);
       return ExitCode.Usage;
     }
-    const loaded = await loadDirectives(deps.mux, ctx.recipe?.directives ?? []);
-    if ('error' in loaded) {
-      printError(io, loaded.error);
-      return ExitCode.Usage;
-    }
-    const plan = await planMigration(deps, { directives: loaded.directives });
+    const plan = await planMigration(deps);
     plan.warnings.unshift(...verified.warnings);
     if (io.json) {
       io.out(JSON.stringify(plan, null, 2));
@@ -220,8 +207,6 @@ export async function executeRun(
     timeBudgetMs,
     concurrency: flags.concurrency,
     wait: flags.wait,
-    directives: flags.directive?.length ? flags.directive : recipe?.directives,
-    skipRobots: flags.skipRobots,
     asset: assetSettings(flags, recipe),
     recipeHash: recipe ? recipeHash(recipe) : undefined,
   };

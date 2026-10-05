@@ -2,9 +2,6 @@ import { Database } from 'bun:sqlite';
 import type { Asset, AssetCreateParams } from '@mux/ts/resources/video/assets';
 import type {
   Clock,
-  DirectiveRunStatus,
-  DirectiveRunSummary,
-  DirectiveSummary,
   MigrationError,
   MigrationEventSource,
   MuxEvent,
@@ -13,6 +10,7 @@ import type {
   SourceItem,
   SourceProvider,
   StreamMessage,
+  VerifyResult,
 } from '../types.ts';
 
 export class FakeClock implements Clock {
@@ -107,12 +105,7 @@ export class FakeMux implements MuxMigrateClient {
   assets: Asset[] = [];
   deleted: string[] = [];
   createCalls: AssetCreateParams[] = [];
-  directives = new Map<string, DirectiveSummary>();
-  runs: DirectiveRunSummary[] = [];
   autoReady = true;
-  directiveOutcome: DirectiveRunStatus = 'completed';
-  /** False to simulate attached directives that never start a run. */
-  startDirectiveRuns = true;
   textTrackStatus: 'ready' | 'preparing' = 'ready';
   /** Milliseconds each create request takes on the fake clock. */
   createDurationMs = 0;
@@ -176,20 +169,6 @@ export class FakeMux implements MuxMigrateClient {
         language_code: input.language_code,
       }));
     this.emit('video.asset.ready', asset);
-    for (const { id } of this.startDirectiveRuns
-      ? (asset.directives ?? [])
-      : []) {
-      const run: DirectiveRunSummary = {
-        runId: `drvrun_${nextId++}`,
-        directiveId: id,
-        assetId,
-        status: 'pending',
-      };
-      this.runs.push(run);
-      this.emitRun('robots.directive_run.created', run);
-      run.status = this.directiveOutcome;
-      this.emitRun(`robots.directive_run.${this.directiveOutcome}`, run);
-    }
   }
 
   async retrieveAsset(assetId: string): Promise<Asset> {
@@ -200,23 +179,6 @@ export class FakeMux implements MuxMigrateClient {
   async *listAssets(): AsyncIterable<Asset> {
     if (this.dead) throw new SimulatedCrash();
     for (const asset of [...this.assets]) yield structuredClone(asset);
-  }
-
-  async retrieveDirective(directiveId: string): Promise<DirectiveSummary> {
-    if (this.dead) throw new SimulatedCrash();
-    const directive = this.directives.get(directiveId);
-    if (!directive) {
-      throw Object.assign(new Error('Not found'), { status: 404 });
-    }
-    return directive;
-  }
-
-  async *listDirectiveRuns(
-    directiveId: string,
-  ): AsyncIterable<DirectiveRunSummary> {
-    for (const run of this.runs) {
-      if (run.directiveId === directiveId) yield { ...run };
-    }
   }
 
   assetsWithExternalId(externalId: string): Asset[] {
@@ -237,7 +199,6 @@ export class FakeMux implements MuxMigrateClient {
       created_at: String(Math.floor(createdAtMs / 1000)),
       meta: params.meta,
       passthrough: params.passthrough,
-      directives: params.directives,
       playback_ids: [{ id: `pb_${id}`, policy: 'public' }],
     } as unknown as Asset;
   }
@@ -248,23 +209,6 @@ export class FakeMux implements MuxMigrateClient {
       id: `evt_${nextId++}`,
       type,
       data: structuredClone(asset) as unknown as Record<string, unknown>,
-    });
-  }
-
-  private emitRun(type: string, run: DirectiveRunSummary): void {
-    if (this.dead) return;
-    this.stream.deliver({
-      id: `evt_${nextId++}`,
-      type,
-      data: {
-        directive_run: {
-          id: run.runId,
-          directive_id: run.directiveId,
-          asset_id: run.assetId,
-          status: run.status,
-          node_states: [],
-        },
-      },
     });
   }
 }
@@ -296,7 +240,7 @@ export class FakeProvider implements SourceProvider<void> {
 
   constructor(public items: SourceItem[]) {}
 
-  async verify() {
+  async verify(): Promise<VerifyResult> {
     return { ok: true, warnings: [] };
   }
 

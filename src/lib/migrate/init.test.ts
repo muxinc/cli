@@ -24,7 +24,6 @@ describe('initMigration', () => {
     expect(await loadRecipe(undefined, dir)).toMatchObject({
       provider: 'manifest',
       source: { manifest: expect.any(String) },
-      directives: [],
     });
   });
 

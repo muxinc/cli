@@ -8,11 +8,7 @@ import type {
   RunResult,
 } from './run/types.ts';
 import type { MigrationState } from './state.ts';
-import type {
-  DirectiveSummary,
-  MigrationError,
-  MuxMigrateClient,
-} from './types.ts';
+import type { MigrationError } from './types.ts';
 
 export { attachCaptionCommand, continueCommand } from './run/shared.ts';
 export type {
@@ -29,7 +25,6 @@ export const PRICING_URL = 'https://www.mux.com/pricing';
 /** Inventories the source into the state file. Free and idempotent. */
 export async function planMigration<C>(
   deps: MigrationDeps<C>,
-  options: { directives?: DirectiveSummary[] } = {},
 ): Promise<PlanSummary> {
   const { state, provider, credentials } = deps;
   state.initMigration(provider.id);
@@ -80,10 +75,6 @@ export async function planMigration<C>(
         .length,
     },
     captions: tally(items.flatMap((item) => item.captionLanguages ?? [])),
-    directives: (options.directives ?? []).map((directive) => ({
-      ...directive,
-      items: exportable.length,
-    })),
     warnings,
     pricing_url: PRICING_URL,
   };
@@ -103,7 +94,6 @@ export function retryErrored(state: MigrationState, ids?: string[]): number {
       assetId: undefined,
       playbackIds: [],
       createStartedAt: undefined,
-      directiveRuns: [],
       pendingCaptions: [],
     });
   }
@@ -124,12 +114,7 @@ export async function runMigration<C>(
     );
   }
 
-  const directives = options.skipRobots ? [] : (options.directives ?? []);
-  const loaded = await loadDirectives(deps.mux, directives);
-  if ('error' in loaded) {
-    return stoppedResult(deps, options, { usageError: true }, loaded.error);
-  }
-  const plan = await planMigration(deps, { directives: loaded.directives });
+  const plan = await planMigration(deps);
   if (!options.confirmed) {
     return stoppedResult(
       deps,
@@ -140,43 +125,8 @@ export async function runMigration<C>(
     );
   }
 
-  const run = new MigrationRun(deps, options, directives);
+  const run = new MigrationRun(deps, options);
   return run.execute(plan);
-}
-
-/** Retrieves each directive, or the first error that makes the run invalid. */
-export async function loadDirectives(
-  mux: MuxMigrateClient,
-  ids: string[],
-): Promise<{ directives: DirectiveSummary[] } | { error: MigrationError }> {
-  const directives: DirectiveSummary[] = [];
-  for (const id of ids) {
-    try {
-      directives.push(await mux.retrieveDirective(id));
-    } catch (error) {
-      const status = (error as { status?: number }).status;
-      if (status === 404) {
-        return {
-          error: {
-            code: 'DIRECTIVE_NOT_FOUND',
-            message: `Directive ${id} was not found in this environment.`,
-            hint: 'Check the directive ID in the Directives section of the Mux Dashboard.',
-          },
-        };
-      }
-      if (status === 401 || status === 403) {
-        return {
-          error: {
-            code: 'ROBOTS_NOT_ENABLED',
-            message: `Directive ${id} could not be read with the current credentials.`,
-            hint: 'Make sure Mux Robots is enabled for this environment and the token has Robots permissions.',
-          },
-        };
-      }
-      throw error;
-    }
-  }
-  return { directives };
 }
 
 function stoppedResult<C>(

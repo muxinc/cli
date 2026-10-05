@@ -14,7 +14,7 @@ export interface Outcome {
   commandFailed?: boolean;
   /** Items that a further `run` would still make progress on. */
   remaining: number;
-  /** Errored items. Incomplete directive runs are warnings, reported by `verify`. */
+  /** Errored items. */
   errored: number;
 }
 

@@ -2,7 +2,6 @@ import { Database } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type {
-  DirectiveRunSummary,
   ItemState,
   MigrationError,
   ProviderId,
@@ -27,7 +26,6 @@ export interface ItemRecord {
   error?: MigrationError;
   attempts: number;
   recipeHash?: string;
-  directiveRuns: DirectiveRunSummary[];
   /** Source captions saved locally because they could not be passed to Mux by URL. */
   pendingCaptions: PendingCaption[];
   /** Caption objects uploaded to the customer's bucket, deleted once Mux has the track. */
@@ -44,12 +42,7 @@ export interface PendingCaption {
 }
 
 export interface VerifyCheck {
-  name:
-    | 'asset_ready'
-    | 'duration'
-    | 'text_tracks'
-    | 'playback'
-    | 'directive_runs';
+  name: 'asset_ready' | 'duration' | 'text_tracks' | 'playback';
   ok: boolean;
   message?: string;
 }
@@ -70,7 +63,6 @@ const ITEM_STATES: ItemState[] = [
   'resolved',
   'creating',
   'processing',
-  'enriching',
   'ready',
   'skipped',
   'errored',
@@ -87,7 +79,6 @@ interface ItemRow {
   error_json: string | null;
   attempts: number;
   recipe_hash: string | null;
-  directive_runs_json: string;
   pending_captions_json: string;
   hosted_captions_json: string;
   verification_json: string | null;
@@ -115,10 +106,6 @@ const COLUMNS: Record<
   },
   attempts: { column: 'attempts', encode: (v: number) => v },
   recipeHash: { column: 'recipe_hash', encode: (v?: string) => v ?? null },
-  directiveRuns: {
-    column: 'directive_runs_json',
-    encode: (v: DirectiveRunSummary[]) => JSON.stringify(v),
-  },
   pendingCaptions: {
     column: 'pending_captions_json',
     encode: (v: PendingCaption[]) => JSON.stringify(v),
@@ -145,7 +132,6 @@ function toRecord(row: ItemRow): ItemRecord {
     error: row.error_json ? JSON.parse(row.error_json) : undefined,
     attempts: row.attempts,
     recipeHash: row.recipe_hash ?? undefined,
-    directiveRuns: JSON.parse(row.directive_runs_json),
     pendingCaptions: JSON.parse(row.pending_captions_json),
     hostedCaptions: JSON.parse(row.hosted_captions_json),
     verification: row.verification_json
@@ -185,7 +171,6 @@ export class MigrationState {
         error_json TEXT,
         attempts INTEGER NOT NULL DEFAULT 0,
         recipe_hash TEXT,
-        directive_runs_json TEXT NOT NULL DEFAULT '[]',
         pending_captions_json TEXT NOT NULL DEFAULT '[]',
         hosted_captions_json TEXT NOT NULL DEFAULT '[]',
         verification_json TEXT,

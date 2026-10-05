@@ -136,11 +136,7 @@ describe('plan', () => {
       },
     ];
 
-    const plan = await planMigration(h.deps, {
-      directives: [
-        { id: 'drv_1', name: 'Chapters', workflows: ['generate-chapters'] },
-      ],
-    });
+    const plan = await planMigration(h.deps);
 
     expect(h.provider.resolveCalls).toEqual([]);
     expect(plan).toMatchObject({
@@ -153,14 +149,6 @@ describe('plan', () => {
       size_bytes: 1000,
       fidelity: { original: 1, rendition: 1, unknown: 1 },
       captions: { en: 2, es: 1 },
-      directives: [
-        {
-          id: 'drv_1',
-          name: 'Chapters',
-          workflows: ['generate-chapters'],
-          items: 3,
-        },
-      ],
       warnings: [
         expect.objectContaining({ code: 'CLOUDFLARE_RENDITION_ONLY' }),
       ],
@@ -847,94 +835,6 @@ describe('inline captions', () => {
         next_command: expect.stringContaining('mux assets tracks create'),
       }),
     );
-    expect(result.exitCode).toBe(0);
-  });
-});
-
-describe('Robots directives', () => {
-  function withDirective(h: ReturnType<typeof harness>) {
-    h.mux.directives.set('drv_1', {
-      id: 'drv_1',
-      name: 'Chapters and summary',
-      workflows: ['generate-chapters', 'summarize'],
-    });
-  }
-
-  test('attaches configured directives on create and records each run', async () => {
-    const h = harness([sourceItem('a')]);
-    withDirective(h);
-
-    const result = await h.run({ directives: ['drv_1'] });
-
-    expect(h.mux.createCalls[0].directives).toEqual([{ id: 'drv_1' }]);
-    expect(statesFor(h.emitted, 'a')).toEqual([
-      'resolved',
-      'creating',
-      'processing',
-      'enriching',
-      'ready',
-    ]);
-    expect(h.state.get('a')?.directiveRuns).toEqual([
-      expect.objectContaining({ directiveId: 'drv_1', status: 'completed' }),
-    ]);
-    expect(result.exitCode).toBe(0);
-  });
-
-  test('--skip-robots creates assets without directives', async () => {
-    const h = harness([sourceItem('a')]);
-    withDirective(h);
-
-    await h.run({ directives: ['drv_1'], skipRobots: true });
-
-    expect(h.mux.createCalls[0].directives).toBeUndefined();
-    expect(h.state.get('a')?.state).toBe('ready');
-  });
-
-  test('an unknown directive fails with DIRECTIVE_NOT_FOUND before any asset is created', async () => {
-    const h = harness([sourceItem('a')]);
-
-    const result = await h.run({ directives: ['drv_missing'] });
-
-    expect(result.error?.code).toBe('DIRECTIVE_NOT_FOUND');
-    expect(result.exitCode).toBe(2);
-    expect(h.mux.createCalls).toHaveLength(0);
-  });
-
-  test('a partial directive run keeps the asset, warns, and does not fail the migration', async () => {
-    const h = harness([sourceItem('a')]);
-    withDirective(h);
-    h.mux.directiveOutcome = 'partial';
-
-    const result = await h.run({ directives: ['drv_1'] });
-
-    expect(h.state.get('a')).toMatchObject({
-      state: 'ready',
-      directiveRuns: [expect.objectContaining({ status: 'partial' })],
-    });
-    expect(result.exitCode).toBe(0);
-    expect(h.emitted).toContainEqual(
-      expect.objectContaining({
-        type: 'warning',
-        code: 'DIRECTIVE_RUN_PARTIAL',
-      }),
-    );
-  });
-
-  test('directive run results missed while offline are recovered after reconnect', async () => {
-    const h = harness([sourceItem('a')]);
-    withDirective(h);
-    h.mux.autoReady = false;
-    h.mux.afterCreate = (asset) => {
-      h.stream.goOffline();
-      h.mux.markReady(asset.id);
-      setTimeout(() => h.stream.reconnect(), 5);
-    };
-
-    const result = await h.run({ directives: ['drv_1'] });
-
-    expect(h.state.get('a')?.directiveRuns).toEqual([
-      expect.objectContaining({ status: 'completed' }),
-    ]);
     expect(result.exitCode).toBe(0);
   });
 });

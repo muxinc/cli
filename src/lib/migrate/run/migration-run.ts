@@ -21,12 +21,8 @@ export class MigrationRun<C> {
   private readonly reconciler: Reconciler<C>;
   private readonly controller = new AbortController();
 
-  constructor(
-    deps: MigrationDeps<C>,
-    options: RunOptions,
-    directives: string[],
-  ) {
-    this.ctx = new RunContext(deps, options, directives);
+  constructor(deps: MigrationDeps<C>, options: RunOptions) {
+    this.ctx = new RunContext(deps, options);
     this.lifecycle = new AssetLifecycle(this.ctx);
     this.captions = new CaptionStage(this.ctx);
     this.creator = new AssetCreator(this.ctx, this.lifecycle, this.captions);
@@ -68,7 +64,7 @@ export class MigrationRun<C> {
       if (ctx.deadlinePassed()) return;
       const busy =
         ctx.inFlight.size > 0 ||
-        ctx.state.count(['processing', 'enriching'], ctx.options.ids) > 0;
+        ctx.state.count(['processing'], ctx.options.ids) > 0;
       if (!busy) return;
 
       const waits: Promise<void>[] = [ctx.nextChange()];

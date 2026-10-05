@@ -135,9 +135,6 @@ export class AssetCreator<C> {
         ...(item.title && { title: item.title.slice(0, 512) }),
       },
       ...(item.passthrough && { passthrough: item.passthrough }),
-      ...(ctx.directives.length > 0 && {
-        directives: ctx.directives.map((id) => ({ id })),
-      }),
     };
 
     ctx.transition(sourceId, {

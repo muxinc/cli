@@ -99,16 +99,24 @@ describe('executeRun', () => {
   test('prints a configuration error with its code and hint, and exits 2', async () => {
     const c = context();
 
-    const code = await executeRun(
-      { yes: true, directive: ['drv_missing'] },
-      c.ctx,
-    );
+    c.provider.verify = async () => ({
+      ok: false,
+      warnings: [
+        {
+          code: 'MANIFEST_NOT_FOUND',
+          message: 'Manifest file not found: videos.json',
+          hint: 'Pass the path to a .json or .csv manifest.',
+        },
+      ],
+    });
+
+    const code = await executeRun({ yes: true }, c.ctx);
 
     expect(code).toBe(2);
     expect(c.json()).toContainEqual(
       expect.objectContaining({
         type: 'error',
-        code: 'DIRECTIVE_NOT_FOUND',
+        code: 'MANIFEST_NOT_FOUND',
         message: expect.any(String),
         hint: expect.any(String),
       }),
@@ -148,12 +156,8 @@ describe('executeRun', () => {
     const recipe: Recipe = {
       provider: 'manifest',
       asset: { playback_policy: ['signed'], video_quality: 'basic' },
-      directives: ['drv_recipe'],
     };
     const c = context({ recipe });
-    for (const id of ['drv_recipe', 'drv_flag']) {
-      c.mux.directives.set(id, { id, name: id, workflows: [] });
-    }
 
     await executeRun(
       { yes: true, concurrency: 1, videoQuality: 'plus', test: true },
@@ -165,22 +169,8 @@ describe('executeRun', () => {
       playback_policies: ['signed'],
       video_quality: 'plus',
       test: true,
-      directives: [{ id: 'drv_recipe' }],
     });
     expect(c.state.get('a')?.recipeHash).toBe(recipeHash(recipe));
-  });
-
-  test('--directive replaces the recipe directives', async () => {
-    const c = context({ recipe: { directives: ['drv_recipe'] }, ids: ['a'] });
-    c.mux.directives.set('drv_flag', {
-      id: 'drv_flag',
-      name: 'flag',
-      workflows: [],
-    });
-
-    await executeRun({ yes: true, directive: ['drv_flag'] }, c.ctx);
-
-    expect(c.mux.createCalls[0].directives).toEqual([{ id: 'drv_flag' }]);
   });
 
   test('--ids accepts a comma-separated list', async () => {

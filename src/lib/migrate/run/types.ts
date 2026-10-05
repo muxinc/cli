@@ -4,7 +4,6 @@ import type { MigrationState } from '../state.ts';
 import type {
   CaptionHandler,
   Clock,
-  DirectiveSummary,
   MigrationError,
   MigrationEventSource,
   MuxMigrateClient,
@@ -38,7 +37,6 @@ export interface PlanSummary {
   fidelity: { original: number; rendition: number; unknown: number };
   /** Source caption tracks by language. */
   captions: Record<string, number>;
-  directives: Array<DirectiveSummary & { items: number }>;
   warnings: MigrationError[];
   pricing_url: string;
 }
@@ -52,8 +50,6 @@ export interface RunOptions {
   concurrency?: number;
   /** False with `--no-wait`. Defaults to true. */
   wait?: boolean;
-  directives?: string[];
-  skipRobots?: boolean;
   /** Playback and quality settings from the recipe and flags. */
   asset?: Omit<
     AssetCreateParams,
@@ -67,8 +63,6 @@ export interface RunOptions {
 export interface RunTiming {
   /** A safety reconcile in case the stream silently stops delivering events. */
   reconcileIntervalMs: number;
-  /** How long an attached directive may take to start a run before it is reported. */
-  directiveStartTimeoutMs: number;
   /** How long to keep retrying sources that are being prepared before leaving them for the next run. */
   preparationTimeoutMs: number;
   captionCleanupPollMs: number;

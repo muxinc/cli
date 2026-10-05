@@ -1,10 +1,5 @@
 import type { Asset } from '@mux/ts/resources/video/assets';
-import type {
-  DirectiveRunStatus,
-  DirectiveRunSummary,
-  MuxEvent,
-  StreamMessage,
-} from '../types.ts';
+import type { MuxEvent, StreamMessage } from '../types.ts';
 import type { CaptionStage } from './captions.ts';
 import type { RunContext } from './context.ts';
 import type { AssetLifecycle } from './lifecycle.ts';
@@ -13,7 +8,6 @@ import {
   assetCreatedAtMs,
   isAuthFailure,
   messageOf,
-  TERMINAL_RUN_STATUSES,
 } from './shared.ts';
 
 /**
@@ -47,20 +41,6 @@ export class Reconciler<C> {
 
   private handleEvent(event: MuxEvent): void {
     const lifecycle = this.lifecycle;
-    if (event.type.startsWith('robots.directive_run.')) {
-      const payload = (event.data.directive_run ??
-        (event.data[event.type] as { directive_run?: unknown } | undefined)
-          ?.directive_run) as Record<string, unknown> | undefined;
-      if (!payload) return;
-      lifecycle.recordDirectiveRun({
-        runId: String(payload.id ?? payload.run_id ?? ''),
-        directiveId: String(payload.directive_id ?? ''),
-        assetId: String(payload.asset_id ?? payload.subject_id ?? ''),
-        status: payload.status as DirectiveRunStatus,
-      });
-      return;
-    }
-
     if (!event.type.startsWith('video.asset.')) return;
     const sourceId = lifecycle.sourceIdFor(event.data);
     if (!sourceId) return;
@@ -110,29 +90,6 @@ export class Reconciler<C> {
       else if (asset.status === 'errored') {
         lifecycle.markErrored(record.sourceId, asset);
       }
-    }
-
-    const enriching = state.list({ states: ['enriching'] });
-    const waiting = new Set(
-      enriching.flatMap((record) =>
-        record.directiveRuns
-          .filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
-          .map((run) => run.directiveId),
-      ),
-    );
-    const found = new Map<string, DirectiveRunSummary>();
-    for (const directiveId of waiting) {
-      for await (const run of deps.mux.listDirectiveRuns(directiveId)) {
-        found.set(`${directiveId}:${run.assetId}`, run);
-      }
-    }
-    for (const record of enriching) {
-      for (const run of record.directiveRuns) {
-        if (TERMINAL_RUN_STATUSES.has(run.status)) continue;
-        const latest = found.get(`${run.directiveId}:${record.assetId}`);
-        if (latest) lifecycle.recordDirectiveRun(latest);
-      }
-      lifecycle.reportUnstartedRuns(record.sourceId);
     }
   }
 

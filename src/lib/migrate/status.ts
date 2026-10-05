@@ -27,12 +27,7 @@ export interface StatusReport {
   next_command?: string;
 }
 
-const IN_FLIGHT_STATES: ItemState[] = [
-  'preparing',
-  'creating',
-  'processing',
-  'enriching',
-];
+const IN_FLIGHT_STATES: ItemState[] = ['preparing', 'creating', 'processing'];
 const REMAINING_STATES: ItemState[] = [
   'discovered',
   'resolved',

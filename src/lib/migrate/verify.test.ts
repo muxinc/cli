@@ -156,26 +156,6 @@ describe('verifyMigration', () => {
     });
   });
 
-  test('fails items whose directive run did not complete', async () => {
-    migrated('a');
-    state.update('a', {
-      directiveRuns: [
-        {
-          directiveId: 'drv_1',
-          runId: 'drvrun_1',
-          assetId: 'x',
-          status: 'partial',
-        },
-      ],
-    });
-
-    const report = await run();
-
-    expect(report.failed[0].checks).toContainEqual(
-      expect.objectContaining({ name: 'directive_runs', ok: false }),
-    );
-  });
-
   test('reports assets that share an item external ID but are not the recorded asset', async () => {
     const kept = migrated('a');
     const extra = mux.injectAsset({ external_id: 'manifest:a' });

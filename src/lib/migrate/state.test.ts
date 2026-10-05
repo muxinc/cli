@@ -43,7 +43,6 @@ describe('MigrationState', () => {
       item: { title: 'Product tour' },
       attempts: 0,
       playbackIds: [],
-      directiveRuns: [],
     });
     reopened.close();
   });

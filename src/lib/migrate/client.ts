@@ -46,25 +46,5 @@ export function createMuxMigrateClient(mux: Mux): MuxMigrateClient {
     async *listAssets() {
       yield* mux.video.assets.list({ limit: 100 });
     },
-
-    async retrieveDirective(directiveId) {
-      const directive = await mux.robots.directives.retrieve(directiveId);
-      return {
-        id: directive.id,
-        name: directive.name,
-        workflows: directive.workflows.map((binding) => binding.workflow),
-      };
-    },
-
-    async *listDirectiveRuns(directiveId) {
-      for await (const run of mux.robots.directives.runs.list(directiveId)) {
-        yield {
-          runId: run.run_id,
-          directiveId,
-          assetId: run.subject_id,
-          status: run.status,
-        };
-      }
-    },
   };
 }

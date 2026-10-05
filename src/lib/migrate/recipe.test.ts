@@ -8,12 +8,12 @@ describe('recipeHash', () => {
   const recipe = {
     provider: 'vimeo',
     asset: { playback_policy: ['public'], video_quality: 'basic' },
-    directives: ['drv_1'],
+    captions: { import: true },
   };
 
   test('is stable regardless of key order', () => {
     const reordered = {
-      directives: ['drv_1'],
+      captions: { import: true },
       asset: { video_quality: 'basic', playback_policy: ['public'] },
       provider: 'vimeo',
     };
@@ -29,8 +29,10 @@ describe('recipeHash', () => {
   });
 
   test('treats array order as significant', () => {
-    expect(recipeHash({ directives: ['a', 'b'] })).not.toBe(
-      recipeHash({ directives: ['b', 'a'] }),
+    expect(
+      recipeHash({ asset: { playback_policy: ['public', 'signed'] } }),
+    ).not.toBe(
+      recipeHash({ asset: { playback_policy: ['signed', 'public'] } }),
     );
   });
 });
@@ -55,11 +57,14 @@ describe('loadRecipe', () => {
     await withDir(async (dir) => {
       await writeFile(
         join(dir, 'mux-migrate.json'),
-        JSON.stringify({ provider: 'manifest', directives: ['drv_1'] }),
+        JSON.stringify({
+          provider: 'manifest',
+          source: { manifest: 'v.json' },
+        }),
       );
       expect(await loadRecipe(undefined, dir)).toMatchObject({
         provider: 'manifest',
-        directives: ['drv_1'],
+        source: { manifest: 'v.json' },
       });
     });
   });
@@ -77,7 +82,10 @@ describe('loadRecipe', () => {
   test.each([
     ['invalid JSON', '{'],
     ['a non-object', '[]'],
-    ['directives that are not strings', JSON.stringify({ directives: [1] })],
+    [
+      'Robots directives, which are not supported yet',
+      JSON.stringify({ directives: ['drv_1'] }),
+    ],
     ['an unknown provider', JSON.stringify({ provider: 'youtube' })],
   ])('fails with RECIPE_INVALID for %s', async (_name, content) => {
     await withDir(async (dir) => {

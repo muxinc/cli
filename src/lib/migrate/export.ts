@@ -1,6 +1,6 @@
 import { MigrationFailure } from './errors.ts';
 import type { MigrationState } from './state.ts';
-import type { DirectiveRunSummary, ItemState } from './types.ts';
+import type { ItemState } from './types.ts';
 
 export interface MappingItem {
   source_id: string;
@@ -16,11 +16,6 @@ export interface MappingItem {
   fidelity: 'original' | 'rendition' | null;
   asset_id: string | null;
   playback_ids: Array<{ id: string; policy: string }>;
-  directive_runs: Array<{
-    directive_id: string;
-    run_id: string;
-    status: DirectiveRunSummary['status'];
-  }>;
   status: ItemState;
   /** Null until `mux migrate verify` has checked the item. */
   verified: boolean | null;
@@ -70,11 +65,6 @@ export function buildMapping(
         fidelity: record.fidelity ?? null,
         asset_id: record.assetId ?? null,
         playback_ids: record.playbackIds,
-        directive_runs: record.directiveRuns.map((run) => ({
-          directive_id: run.directiveId,
-          run_id: run.runId,
-          status: run.status,
-        })),
         status: record.state,
         verified: record.verification?.passed ?? null,
       })),

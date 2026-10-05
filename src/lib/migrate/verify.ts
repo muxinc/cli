@@ -110,24 +110,6 @@ async function checkItem(
     });
   }
 
-  const incomplete = record.directiveRuns.filter(
-    (run) => run.status !== 'completed',
-  );
-  if (record.directiveRuns.length > 0) {
-    checks.push({
-      name: 'directive_runs',
-      ok: incomplete.length === 0,
-      ...(incomplete.length > 0 && {
-        message: incomplete
-          .map(
-            (run) =>
-              `Directive ${run.directiveId} run ${run.runId || '(not started)'} is ${run.status}.`,
-          )
-          .join(' '),
-      }),
-    });
-  }
-
   return { checks, missing: false };
 }
 

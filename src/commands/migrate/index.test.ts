@@ -25,8 +25,6 @@ describe('mux migrate', () => {
       'time-budget',
       'concurrency',
       'no-wait',
-      'directive',
-      'skip-robots',
       'playback-policy',
       'video-quality',
       'max-resolution-tier',

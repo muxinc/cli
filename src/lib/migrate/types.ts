@@ -14,7 +14,6 @@ export type ItemState =
   | 'resolved'
   | 'creating'
   | 'processing'
-  | 'enriching'
   | 'ready'
   | 'skipped'
   | 'errored';
@@ -135,30 +134,6 @@ export interface MuxMigrateClient {
   retrieveAsset(assetId: string): Promise<Asset>;
   /** All assets, newest first. Callers stop iterating when they have enough. */
   listAssets(): AsyncIterable<Asset>;
-  retrieveDirective(directiveId: string): Promise<DirectiveSummary>;
-  listDirectiveRuns(directiveId: string): AsyncIterable<DirectiveRunSummary>;
-}
-
-export interface DirectiveSummary {
-  id: string;
-  name: string;
-  workflows: string[];
-}
-
-export type DirectiveRunStatus =
-  | 'pending'
-  | 'dispatching'
-  | 'running'
-  | 'waiting'
-  | 'completed'
-  | 'partial'
-  | 'errored';
-
-export interface DirectiveRunSummary {
-  runId: string;
-  directiveId: string;
-  assetId: string;
-  status: DirectiveRunStatus;
 }
 
 /** A webhook event as delivered by the event stream. */

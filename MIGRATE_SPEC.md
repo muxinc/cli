@@ -9,7 +9,7 @@ Companion: the "Migrate to Mux" prompt in the docs prompt library (`mux.com`, br
 - Move a video library from another platform into Mux with one resumable command.
 - Be safe to run unattended by a coding agent: nothing costs money without an explicit confirmation, every run can be resumed, and every failure says what to do next.
 - Produce a mapping from source video IDs to Mux asset and playback IDs that an agent can use to update application code and data.
-- Optionally enrich migrated assets with Mux Robots workflows (captions, chapters, summaries, thumbnails, moderation).
+- Enrich migrated assets with Mux Robots workflows in a later release, once Robots Directives are stable (see [Robots enrichment](#robots-enrichment)).
 
 ## Non-goals
 
@@ -66,7 +66,6 @@ Lists the full source library, resolves nothing that costs money or expires, and
 - Total duration and total size, where the provider reports them
 - Fidelity breakdown: originals vs renditions
 - Caption tracks found, by language
-- Configured directives, their workflows, and the number of items each will be attached to
 - Warnings, each with a code and a fix (for example `VIMEO_SCOPE_MISSING`)
 - Nothing is billed. Pricing is linked, not computed.
 
@@ -83,8 +82,6 @@ Lists the full source library, resolves nothing that costs money or expires, and
 | `--concurrency <n>` | provider default | Parallel asset creations, capped by the provider rate limit |
 | `--test` | off | Create Mux test assets (watermarked, 10 seconds, deleted after 24 hours) |
 | `--no-wait` | off | Exit once every asset is created, without waiting on the event stream for `ready` |
-| `--directive <id>` | from recipe | Attach a Robots directive to every asset created. Repeatable. |
-| `--skip-robots` | off | Do not attach directives on this run |
 
 Asset settings (`--playback-policy`, `--video-quality`, `--max-resolution-tier`, `--generated-subtitles <lang>`) override the recipe.
 
@@ -102,7 +99,6 @@ For each `ready` item:
 - Duration is within one second of the source duration, when known
 - The number of text tracks matches the source caption count, minus any marked `captions_pending`
 - `https://stream.mux.com/{playback_id}.m3u8` responds (public playback IDs only; signed IDs are checked with a short-lived token when a signing key is configured)
-- Each attached directive's run reached `completed` (`partial` and `errored` are reported with the bindings that failed)
 
 Writes results to the state file and prints failures with fixes. Exit code 0 means every item passed.
 
@@ -161,8 +157,7 @@ An optional, declarative description of a migration. It is safe to commit (it ho
   "captions": {
     "import": true,
     "host_bucket": null
-  },
-  "directives": ["drv_abc123"]
+  }
 }
 ```
 
@@ -170,29 +165,15 @@ Command-line flags override recipe values for a single run. The state file recor
 
 ## Robots enrichment
 
-A migration is the one moment every asset in a library passes through Mux, which makes it the cheapest point to fill gaps the source platform left: missing captions, chapters, summaries, or posters.
+On hold. The Robots Directives API is changing, so v1 does not attach directives or track directive runs, and a recipe with a `directives` field is rejected with a message saying so. Customers can attach directives to migrated assets from the Mux Dashboard in the meantime.
 
-v1 relies on [Robots Directives](https://www.mux.com/docs/guides/robots-directives) as Mux ships them, and adds no orchestration of its own:
+Once Directives are stable, the planned design is:
 
-- The customer creates one or more directives in the Mux Dashboard (or with the API), choosing workflows, parameters, and caption dependencies there.
-- The recipe's `directives` array, or `--directive <id>` (repeatable), lists their IDs.
-- `run` passes them on asset creation as `directives: [{ "id": "<id>" }]`. Mux starts each attached directive once the asset is ready. Attaching is idempotent, so the CLI never starts runs or reconciles them.
+- `run` attaches directives listed in the recipe on asset creation, and records each directive run from the `robots.directive_run.*` events.
+- `mux robots directives` commands manage directives without the Dashboard.
+- A recipe `robots` array declares workflows inline, with per-item conditions (for example, generate chapters only when the source has none).
 
-Rules:
-
-- Before creating any asset, `run` retrieves each directive with `client.robots.directives.retrieve(id)` and fails early with `DIRECTIVE_NOT_FOUND` or `ROBOTS_NOT_ENABLED`.
-- `plan` lists each directive's name and workflows, and the number of items it will be attached to. Robots usage is billed per workflow run; `plan` links to pricing.
-- Run status arrives on the event stream as `robots.directive_run.*` events (see [Status updates](#status-updates)) and is stored per item. Run outputs are not copied; the mapping export records the run ID and each binding's job ID, which an agent can look up with `mux robots get`.
-- `run` reports runs that ended `partial` or `errored` as `DIRECTIVE_RUN_PARTIAL` and `DIRECTIVE_RUN_ERRORED` warnings without failing, because the asset migrated and no `migrate` command can re-run a directive in v1. `verify` reports them as failures, with the failed bindings.
-- `--skip-robots` creates assets without attaching directives.
-
-### Fast follow
-
-Not in v1, pinned for the release after it:
-
-- `mux robots directives create|list|get|delete` and `mux robots directives runs create|list|get`, so directives can be managed without the Dashboard.
-- A recipe `robots` array that declares workflows inline, with per-item `when` conditions (for example, generate chapters only when the source has none). The CLI would create the directives itself, one per distinct workflow set.
-- Built-in guidance that maps migration gaps to workflows:
+Gaps a migration commonly leaves, and the workflow that fills each:
 
 | Problem | Workflow |
 |---|---|
@@ -210,7 +191,6 @@ discovered → preparing → resolved → creating → processing → ready
                 │            │          │           │
                 └────────────┴──────────┴───────────┴──→ errored  (retryable)
 discovered → skipped   (filtered out, not exportable, or unsupported type)
-ready → enriching → ready   (attached directive runs, started by Mux)
 ```
 
 - `preparing`: the provider needs asynchronous work before a URL exists (Cloudflare download generation, Brightcove master feeds).
@@ -241,13 +221,11 @@ If a future source uploads local files through direct uploads instead of ingesti
 
 | Event | Effect |
 |---|---|
-| `video.asset.ready` | Item moves to `ready`, or to `enriching` when directives are attached |
+| `video.asset.ready` | Item moves to `ready` |
 | `video.asset.errored` | Item moves to `errored` with the asset's error messages |
 | `video.asset.track.ready`, `video.asset.track.errored` | Caption track state updates |
-| `robots.directive_run.created` | Run ID recorded for the item |
-| `robots.directive_run.completed`, `.partial`, `.errored` | Run status and each binding's job ID recorded; the item returns to `ready` once every attached run is terminal |
 
-Events for assets that are not in the state file are ignored. On disconnect, the CLI reconnects with the same backoff and credential refresh as `webhooks listen`, then reconciles in-flight items, because the stream is not known to replay missed events: assets with a `GET`, and directive runs with `client.robots.directives.runs.list(directiveId)` matched by asset ID. `run` exits when no item is left in `processing` or `enriching` and no create request is in flight, when `--time-budget` expires, or immediately after the last create with `--no-wait`. An item whose create request failed without a response stays in `creating` and does not hold the run open; the next run resolves it (see [Duplicate prevention](#duplicate-prevention)), so the run exits 4.
+Events for assets that are not in the state file are ignored. On disconnect, the CLI reconnects with the same backoff and credential refresh as `webhooks listen`, then reconciles in-flight items, because the stream is not known to replay missed events, with a `GET` per asset. `run` exits when no item is left in `processing` and no create request is in flight, when `--time-budget` expires, or immediately after the last create with `--no-wait`. An item whose create request failed without a response stays in `creating` and does not hold the run open; the next run resolves it (see [Duplicate prevention](#duplicate-prevention)), so the run exits 4.
 
 ## State file
 
@@ -255,7 +233,7 @@ SQLite via `bun:sqlite` at `./.mux-migrate/state.db`. SQLite gives atomic per-it
 
 Agents and humans read state through `status`, `verify`, and `export`, not the database directly.
 
-Tables: `migration` (one row: run IDs, provider, recipe hash, created time), `items` (source ID, state, source metadata JSON, resolved fidelity, asset ID, playback IDs, `create_started_at`, error code and message, attempts, timestamps), `tracks` (per caption: language, kind, state). Each item's directive runs (directive ID, run ID, status) are stored as JSON on the item row, indexed by asset ID for event lookups.
+Tables: `migration` (one row: run IDs, provider, recipe hash, created time), `items` (source ID, state, source metadata JSON, resolved fidelity, asset ID, playback IDs, `create_started_at`, error code and message, attempts, timestamps), `tracks` (per caption: language, kind, state).
 
 `.mux-migrate/` should be added to `.gitignore` by `init`.
 
@@ -268,7 +246,6 @@ Tables: `migration` (one row: run IDs, provider, recipe hash, created time), `it
 | `meta.external_id` | `{provider}:{source_id}` (128 code points max). Used for duplicate detection and rollback. |
 | `meta.title` | Source title, truncated to 512 characters |
 | `passthrough` | Not set, except from the manifest `passthrough` column. Left for the customer's own use. |
-| `directives` | `[{ "id": "<id>" }]` for each configured directive, unless `--skip-robots` |
 | Playback and quality settings | From the recipe or flags |
 
 ## Captions
@@ -312,14 +289,6 @@ Recommendation to the Mux API team: accept text track content by direct upload, 
       "asset_id": "abc123",
       "playback_ids": [{ "id": "xyz789", "policy": "public" }],
       "text_tracks": [{ "language": "en", "kind": "subtitles", "state": "ready" }],
-      "directive_runs": [
-        {
-          "directive_id": "drv_abc123",
-          "run_id": "drvrun_xyz789",
-          "status": "completed",
-          "bindings": [{ "reference_id": "chapters", "workflow": "generate-chapters", "job_id": "rjob_1" }]
-        }
-      ],
       "status": "ready",
       "verified": true
     }
@@ -355,7 +324,7 @@ Exit codes:
 
 | Code | Meaning |
 |---|---|
-| 0 | Complete: every item is `ready` or `skipped`. Directive runs that ended `partial` or `errored` are warnings here and failures in `verify`. |
+| 0 | Complete: every item is `ready` or `skipped` |
 | 1 | The command failed (authentication, network, unexpected error), or only errored items remain |
 | 2 | Invalid usage or configuration |
 | 3 | Confirmation required (`--yes` missing) |
@@ -484,24 +453,23 @@ Tests are written first and reviewed before implementation, per the project guid
 - **Lifecycle tests:** crash and resume at every transition, idempotency (no duplicate assets), `--time-budget`, `--limit`, retry of errored items.
 - **Provider tests:** recorded API responses for each provider covering pagination, private, processing, live archive, no original, expiring URLs, captions, and rate-limit responses. CI never calls real provider APIs.
 - **Duplicate prevention tests:** a create that times out is never retried and is adopted from its `video.asset.created` event; a crash before the state write is adopted by the time-window scan, which stops at the right page; a second asset with the same `external_id` is reported as `DUPLICATE_ASSET` and not deleted; assets from an earlier migration of the same source are not matched.
-- **Event stream tests:** a recorded stream drives items through `ready`, `errored`, and `enriching`; disconnects trigger reconnection and reconciliation; events for unknown assets are ignored.
-- **Robots tests:** directives are attached on create and omitted with `--skip-robots`; `DIRECTIVE_NOT_FOUND` and `ROBOTS_NOT_ENABLED` fail before any asset is created; run events update `directive_runs`; `verify` reports `partial` and `errored` runs.
+- **Event stream tests:** a recorded stream drives items through `ready` and `errored`; disconnects trigger reconnection and reconciliation; events for unknown assets are ignored.
 - **Team QA:** a seeded test account per provider containing the edge cases above, a QA checklist per provider, and agent runs of the companion prompt against sample applications.
 
 ## Delivery order
 
 1. Command shell, state file, lifecycle engine, output contract, `manifest` provider (exercises everything without third-party APIs)
 2. `vimeo`
-3. `plan` and `verify` complete, directive attachment
+3. `plan` and `verify` complete
 4. `cloudflare-stream`, `bunny`, `wistia`, `bucket`
-5. Fast follow: `mux robots directives` commands and inline recipe workflows (see [Fast follow](#fast-follow))
+5. Fast follow, once Robots Directives are stable: directive attachment, `mux robots directives` commands, and inline recipe workflows (see [Robots enrichment](#robots-enrichment))
 6. v1.1: `rollback`, `scan`, the next provider tier
 
 ## Open questions
 
 1. Does the webhook event stream support `Last-Event-ID` to replay events missed during a disconnect? If not, reconciliation on reconnect stays as specified.
 2. What are the Mux ingest and API rate limits per account? These set the `--concurrency` default and the shared limiter for Mux calls.
-3. Directives are `/robots/v0`. Is the API stable enough to depend on in v1, or should attachment wait for the fast follow too?
+3. Resolved: directive attachment waits for the Directives API changes (see [Robots enrichment](#robots-enrichment)).
 4. End-to-end testing: is a paid Vimeo account available, or do provider tests rely on recorded responses only?
 5. Bunny: one library per migration, or allow several in one recipe?
 6. Should `plan` estimate Mux cost from duration and the published price list, or only link to pricing?

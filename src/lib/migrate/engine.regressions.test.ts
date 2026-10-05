@@ -32,7 +32,6 @@ afterEach(async () => {
 
 const fast: RunOptions['timing'] = {
   reconcileIntervalMs: 5,
-  directiveStartTimeoutMs: 0,
   preparationTimeoutMs: 30,
   captionCleanupPollMs: 5,
   captionCleanupTimeoutMs: 1000,
@@ -316,22 +315,6 @@ describe('hosted caption cleanup', () => {
 });
 
 describe('runs that could wait forever', () => {
-  test('a directive that never starts a run is reported and does not hold the run open', async () => {
-    const h = harness([sourceItem('a')]);
-    h.mux.directives.set('drv_1', {
-      id: 'drv_1',
-      name: 'Chapters',
-      workflows: [],
-    });
-    h.mux.startDirectiveRuns = false;
-
-    const result = await h.run({ directives: ['drv_1'] });
-
-    expect(h.state.get('a')?.state).toBe('ready');
-    expect(h.warnings('DIRECTIVE_RUN_NOT_STARTED')).toHaveLength(1);
-    expect(result.exitCode).toBe(0);
-  });
-
   test('a source that stays pending stops being retried and exits 4', async () => {
     const h = harness([sourceItem('a')]);
     h.provider.resolveOverride = () => ({ kind: 'pending', retryAfterMs: 5 });

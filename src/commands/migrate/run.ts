@@ -31,14 +31,6 @@ export const runCommand: Command<any> = new Command()
     '--no-wait',
     'Exit once every asset is created, without waiting for ready',
   )
-  .option(
-    '--directive <id:string>',
-    'Attach a Robots directive to every asset. Repeatable.',
-    {
-      collect: true,
-    },
-  )
-  .option('--skip-robots', 'Do not attach directives on this run')
   .option('--playback-policy <policy:policy>', 'Playback policy. Repeatable.', {
     collect: true,
   })

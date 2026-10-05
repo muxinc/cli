@@ -31,14 +31,6 @@ describe('mapping export', () => {
       fidelity: 'original',
       assetId: 'asset_1',
       playbackIds: [{ id: 'pb_1', policy: 'public' }],
-      directiveRuns: [
-        {
-          directiveId: 'drv_1',
-          runId: 'drvrun_1',
-          assetId: 'asset_1',
-          status: 'completed',
-        },
-      ],
     });
     state.update('b', { state: 'errored', error: { code: 'X', message: 'x' } });
     state.update('a', {
@@ -80,9 +72,6 @@ describe('mapping export', () => {
       fidelity: 'original',
       asset_id: 'asset_1',
       playback_ids: [{ id: 'pb_1', policy: 'public' }],
-      directive_runs: [
-        { directive_id: 'drv_1', run_id: 'drvrun_1', status: 'completed' },
-      ],
       status: 'ready',
       verified: true,
     });

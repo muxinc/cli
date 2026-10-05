@@ -12,7 +12,6 @@ function starterRecipe(provider: string): Recipe {
     source: starterSource(provider),
     asset: { playback_policy: ['public'], video_quality: 'basic' },
     captions: { import: true, host_bucket: null },
-    directives: [],
   };
 }
 

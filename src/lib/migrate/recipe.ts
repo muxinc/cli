@@ -45,7 +45,6 @@ export interface Recipe {
     max_resolution_tier?: '1080p' | '1440p' | '2160p';
   };
   captions?: { import?: boolean; host_bucket?: string | null };
-  directives?: string[];
 }
 
 export const DEFAULT_RECIPE_PATH = 'mux-migrate.json';
@@ -87,20 +86,16 @@ export async function loadRecipe(
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) {
     throw invalid('expected a JSON object.');
   }
-  const { provider, directives } = recipe as Recipe;
+  const { provider } = recipe as Recipe;
   if (provider !== undefined && !PROVIDERS.includes(provider as ProviderId)) {
     throw invalid(
       `unknown provider "${provider}". Supported providers: ${PROVIDERS.join(', ')}.`,
     );
   }
-  if (
-    directives !== undefined &&
-    !(
-      Array.isArray(directives) &&
-      directives.every((d) => typeof d === 'string')
-    )
-  ) {
-    throw invalid('"directives" must be an array of directive IDs.');
+  if ('directives' in recipe) {
+    throw invalid(
+      'Robots directives are not supported by mux migrate yet. Remove the "directives" field, and attach directives to the migrated assets from the Mux Dashboard instead.',
+    );
   }
   return recipe as Recipe;
 }
