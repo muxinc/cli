@@ -85,8 +85,15 @@ export interface VerifyResult {
   warnings: MigrationError[];
 }
 
+export interface CredentialSpec<Credentials> {
+  variables: Array<{ name: string; required: boolean; description: string }>;
+  /** Reads credentials from environment variables, or throws `{PROVIDER}_CREDENTIALS_MISSING`. */
+  read(env: Record<string, string | undefined>): Credentials;
+}
+
 export interface SourceProvider<Credentials = void> {
   id: ProviderId;
+  credentials: CredentialSpec<Credentials>;
   defaultConcurrency: number;
   verify(creds: Credentials): Promise<VerifyResult>;
   list(creds: Credentials, cursor?: string): Promise<ListPage>;

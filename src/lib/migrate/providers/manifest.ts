@@ -195,6 +195,7 @@ export function createManifestProvider(path: string): SourceProvider<void> {
 
   return {
     id: 'manifest',
+    credentials: { variables: [], read: () => undefined },
     defaultConcurrency: 4,
 
     async verify() {

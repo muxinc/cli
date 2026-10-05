@@ -273,6 +273,7 @@ export function sourceItem(
 /** A provider backed by a fixed list, paged two items at a time. */
 export class FakeProvider implements SourceProvider<void> {
   id = 'manifest' as const;
+  credentials = { variables: [], read: () => undefined };
   defaultConcurrency = 1;
   resolveCalls: string[] = [];
   resolveOverride?: (item: SourceItem) => ResolveResult;
