@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { MigrationFailure } from '../errors.ts';
 import type { Recipe } from '../recipe.ts';
 import type { ProviderId, SourceProvider } from '../types.ts';
+import { type BucketSourceOptions, createBucketProvider } from './bucket.ts';
 import { type BunnySourceOptions, createBunnyProvider } from './bunny.ts';
 import {
   type CloudflareStreamSourceOptions,
@@ -62,7 +63,14 @@ const PROVIDERS: Record<ProviderId, ProviderEntry | undefined> = {
         source: recipe.source as WistiaSourceOptions,
       }) as SourceProvider<unknown>,
   },
-  bucket: undefined,
+  bucket: {
+    name: 'S3-compatible bucket',
+    starterSource: { bucket: '', prefix: '' },
+    create: ({ recipe }) =>
+      createBucketProvider({
+        source: recipe.source as unknown as BucketSourceOptions,
+      }) as SourceProvider<unknown>,
+  },
   manifest: {
     name: 'Manifest file',
     starterSource: { manifest: './videos.json' },
@@ -121,15 +129,10 @@ export function starterSource(id: string): Record<string, unknown> {
   return entry(id).starterSource;
 }
 
-/**
- * Reads a provider's credentials from the environment. Each `--credential
- * NAME=value` flag overrides the environment variable of the same name.
- */
-export function providerCredentials(
-  provider: SourceProvider<unknown>,
-  env: Record<string, string | undefined>,
+/** Parses `--credential NAME=value` flags into environment variable overrides. */
+export function credentialOverrides(
   flags: string[] = [],
-): unknown {
+): Record<string, string> {
   const overrides: Record<string, string> = {};
   for (const flag of flags) {
     const separator = flag.indexOf('=');
@@ -141,5 +144,17 @@ export function providerCredentials(
     }
     overrides[flag.slice(0, separator)] = flag.slice(separator + 1);
   }
-  return provider.credentials.read({ ...env, ...overrides });
+  return overrides;
+}
+
+/**
+ * Reads a provider's credentials from the environment. Each `--credential
+ * NAME=value` flag overrides the environment variable of the same name.
+ */
+export function providerCredentials(
+  provider: SourceProvider<unknown>,
+  env: Record<string, string | undefined>,
+  flags: string[] = [],
+): unknown {
+  return provider.credentials.read({ ...env, ...credentialOverrides(flags) });
 }
