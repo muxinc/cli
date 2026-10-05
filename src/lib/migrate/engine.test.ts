@@ -775,16 +775,18 @@ describe('inline captions', () => {
     const saved: string[] = [];
     const uploads: string[] = [];
     const removed: string[] = [];
-    h.deps.captions = {
-      saveLocal: async (sourceId, caption) => {
-        const path = `/state/captions/${sourceId}.${caption.language}.${caption.format}`;
-        saved.push(path);
-        return path;
-      },
+    const saveLocal: NonNullable<typeof h.deps.captions>['saveLocal'] = async (
+      sourceId,
+      caption,
+    ) => {
+      const path = `/state/captions/${sourceId}.${caption.language}.${caption.format}`;
+      saved.push(path);
+      return path;
     };
+    h.deps.captions = { saveLocal };
     const enableHost = () => {
       h.deps.captions = {
-        ...h.deps.captions!,
+        saveLocal,
         host: {
           upload: async (key) => {
             uploads.push(key);

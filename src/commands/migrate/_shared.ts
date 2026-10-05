@@ -1,12 +1,17 @@
 import { dirname, resolve } from 'node:path';
 import { wantsJson } from '@/lib/context.ts';
-import { createLocalCaptionStore } from '@/lib/migrate/captions.ts';
+import {
+  createBucketCaptionHost,
+  createLocalCaptionStore,
+  hostBucketConfig,
+} from '@/lib/migrate/captions.ts';
 import type { MigrateContext, MigrateIO } from '@/lib/migrate/cli.ts';
 import { createMuxMigrateClient } from '@/lib/migrate/client.ts';
 import { MigrationFailure } from '@/lib/migrate/errors.ts';
 import { ExitCode } from '@/lib/migrate/exit-codes.ts';
 import {
   createProvider,
+  credentialOverrides,
   providerCredentials,
 } from '@/lib/migrate/providers/index.ts';
 import { loadRecipe } from '@/lib/migrate/recipe.ts';
@@ -109,13 +114,19 @@ export async function createMigrateContext(
     process.env,
     options.credential,
   );
+  const captions = createLocalCaptionStore(dirname(statePath(options)));
+  const hostBucket = recipe.captions?.host_bucket;
+  if (hostBucket) {
+    const env = { ...process.env, ...credentialOverrides(options.credential) };
+    captions.host = createBucketCaptionHost(hostBucketConfig(hostBucket, env));
+  }
 
   return {
     deps: {
       state,
       provider,
       credentials,
-      captions: createLocalCaptionStore(dirname(statePath(options))),
+      captions,
       ...(await muxDeps()),
     },
     recipe,

@@ -273,9 +273,9 @@ Tables: `migration` (one row: run IDs, provider, recipe hash, created time), `it
 
 ## Captions
 
-Mux adds text tracks from a URL. Providers that return a caption URL (Vimeo, Cloudflare Stream, Bunny, api.video, JW Player, Brightcove) are passed through, resolved just in time like media URLs.
+Mux adds text tracks from a URL. Providers that return a public caption URL (Vimeo, Bunny, bucket sidecars, api.video, JW Player, Brightcove) are passed through, resolved just in time like media URLs.
 
-Providers that return caption text inline (Wistia) cannot be passed by URL. In v1:
+Providers that return caption text inline (Wistia), or whose caption URLs require the provider's credentials (Cloudflare Stream), cannot be passed by URL. In v1:
 
 1. If `captions.host_bucket` is set (an S3-compatible bucket the customer owns), the CLI uploads the file, passes a presigned URL to Mux, and deletes the object once the track is ready.
 2. Otherwise the file is saved under `.mux-migrate/captions/`, the track is recorded as `captions_pending`, and `status` prints the command to attach it once hosting is available. A recipe can fall back to `generate-premium-captions` instead.
@@ -443,7 +443,8 @@ All HTTP goes through one shared client that checks response status, honors `Ret
 ### Cloudflare Stream
 
 - Cloudflare does not retain originals. Every item is `rendition` fidelity, and `plan` warns about it (`CLOUDFLARE_RENDITION_ONLY`).
-- Downloads require Stream Write and are billed as delivered minutes by Cloudflare. `plan` states this.
+- Downloads require Stream Write and are billed as delivered minutes by Cloudflare. `plan` states this (`CLOUDFLARE_DOWNLOADS_BILLED`).
+- Caption files require the API token, so they are downloaded and handled as caption text (see [Captions](#captions)).
 - `resolve` creates the download and returns `pending` until `status` is `ready`.
 - Signed-URL videos need a token with `downloadable: true`.
 - Account-wide limit of 1,200 requests per five minutes. Exceeding it blocks the account for five minutes, so the limiter is conservative by default.
@@ -454,12 +455,12 @@ All HTTP goes through one shared client that checks response status, honors `Ret
 - One library per run. Multiple libraries mean multiple migrations or multiple recipe entries (open question).
 - Resolve via `GET /library/{id}/videos/{guid}/play`, which returns `originalUrl` and the fallback MP4.
 - `original` fidelity only when `hasOriginal` is true. Otherwise use the highest available MP4 fallback, or mark unavailable (`BUNNY_NO_ORIGINAL_OR_MP4`).
-- Sign URLs when CDN token authentication is enabled. Referrer or direct-access blocking returns 403 to Mux (`BUNNY_DIRECT_ACCESS_BLOCKED`), detected by a HEAD request during `verify`.
+- Sign URLs when CDN token authentication is enabled, using Bunny's current HMAC-SHA256 token scheme (`HS256-` prefix, `token` and `expires` query parameters). Referrer or direct-access blocking returns 403 to Mux (`BUNNY_DIRECT_ACCESS_BLOCKED`), detected by a HEAD request during `verify`.
 - Migrate status `4` (finished) only.
 
 ### Wistia
 
-- `GET /medias?type=Video&per_page=100`, with the `X-Wistia-Api-Version` header pinned.
+- `GET /medias?type=Video&per_page=100`, with the `X-Wistia-API-Version` header pinned. The recipe can limit the migration to `source.folders` (Wistia renamed projects to folders in 2026).
 - Use the `OriginalFile` asset. Guard against an empty `assets` array (a crash in Truckload).
 - Captions are returned as inline SRT text. See [Captions](#captions).
 

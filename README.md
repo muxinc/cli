@@ -9,6 +9,7 @@ A command-line interface for interacting with the Mux API, designed to provide a
 - [Getting Started](#getting-started)
 - [Common Options](#common-options)
 - [Webhook Forwarding](#webhook-forwarding)
+- [Migrating a Video Library](#migrating-a-video-library)
 - [Commands](#commands)
   - [Assets](#assets)
   - [Live Streams](#live-streams)
@@ -297,6 +298,77 @@ mux webhooks delete <webhook-id> [--force]
 ```
 
 The signing secret is printed when a webhook is created; store it securely and use it to verify webhook signatures.
+
+## Migrating a Video Library
+
+`mux migrate` moves a video library from another platform into Mux. It is resumable, safe to run unattended by a coding agent, and produces a mapping from source video IDs to Mux asset and playback IDs.
+
+```bash
+# 1. Write a recipe (mux-migrate.json) and see which credentials the provider needs
+mux migrate init vimeo
+export VIMEO_ACCESS_TOKEN=...
+
+# 2. Inventory the source library. Free: nothing is created or billed.
+mux migrate plan
+
+# 3. Pilot a few items with watermarked test assets, then run the whole library
+mux migrate run --yes --limit 5 --test
+mux migrate run --yes --time-budget 8m   # run again until it exits 0
+
+# 4. Check every migrated asset, then write the mapping
+mux migrate verify
+mux migrate export --format json --output mapping.json
+```
+
+| Command | Purpose |
+|---------|---------|
+| `mux migrate init <provider>` | Write a starter recipe and add `.mux-migrate/` to `.gitignore` |
+| `mux migrate plan [provider]` | Inventory the source: counts, duration, fidelity, captions, warnings |
+| `mux migrate run [provider]` | Create Mux assets. Requires `--yes`; without it, prints the plan and exits 3 |
+| `mux migrate status` | Progress, in-flight and errored items, and captions waiting to be attached |
+| `mux migrate verify` | Check each asset's status, duration, captions, playback, and directive runs, and find duplicate assets |
+| `mux migrate export` | Write the source-to-Mux mapping as JSON or CSV |
+| `mux migrate retry` | Re-queue errored items for the next run |
+
+### Providers and credentials
+
+Credentials are read from environment variables, so an agent can supply them. `--credential NAME=value` overrides a variable for one command. Secrets are never written to the state file, the recipe, or any output.
+
+| Provider | Environment variables | Notes |
+|----------|----------------------|-------|
+| `vimeo` | `VIMEO_ACCESS_TOKEN` | Needs the `public private video_files` scopes and a plan with downloads |
+| `cloudflare-stream` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Originals are not retained, so every item is a rendition. Generating downloads is billed by Cloudflare. |
+| `bunny` | `BUNNY_STREAM_LIBRARY_ID`, `BUNNY_STREAM_API_KEY`, optional `BUNNY_CDN_TOKEN_KEY` | One library per migration. The token key is needed only with CDN token authentication. |
+| `wistia` | `WISTIA_API_TOKEN` | A read-only token is sufficient |
+| `bucket` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, optional `AWS_SESSION_TOKEN`, `AWS_ENDPOINT_URL` | S3, R2, GCS interoperability, or MinIO |
+| `manifest` | none | A CSV or JSON list of URLs (`--manifest <path>`), for any other platform |
+
+Mux credentials come from `mux login` or the environment, as for every other command.
+
+### The recipe
+
+`mux-migrate.json` describes a migration declaratively. It holds no secrets and is safe to commit. Command-line flags override it for a single run.
+
+```json
+{
+  "provider": "vimeo",
+  "source": { "folders": ["Marketing"], "include_live_archives": false, "include_private": true },
+  "asset": { "playback_policy": ["public"], "video_quality": "basic" },
+  "captions": { "import": true, "host_bucket": null },
+  "directives": ["drv_abc123"]
+}
+```
+
+- **Robots directives:** create a [directive](https://www.mux.com/docs/guides/robots-directives) in the Mux Dashboard and list its ID under `directives` (or pass `--directive <id>`). It is attached to every asset and runs automatically once the asset is ready, for example to generate chapters or premium captions. `--skip-robots` turns this off for a run.
+- **Captions:** providers that return caption files by URL pass them straight to Mux. When a provider returns caption text instead (Wistia, Cloudflare Stream), set `captions.host_bucket` to a bucket you own and the CLI uploads each file, passes a short-lived URL to Mux, and deletes it once the track is ingested. Without a host bucket, the files are saved under `.mux-migrate/captions/` and `mux migrate status` prints the `mux assets tracks create` command that attaches each one.
+
+### Running it with an agent
+
+- Every command accepts `--json` (or the global `--agent`). `run` prints newline-delimited JSON events ending with a `summary`; the other commands print one JSON document.
+- Every error and warning carries a stable `code`, a `hint`, and usually a `next_command`.
+- Exit codes: `0` complete, `1` failed or only errored items remain (`mux migrate retry`), `2` invalid usage or configuration, `3` confirmation required (`--yes`), `4` work remains: run `next_command` again. Re-running on `4` always makes progress and cannot loop on errors.
+- `run` never creates a duplicate asset: each asset carries `meta.external_id` set to `{provider}:{source_id}`, creation is never retried blindly, and an interrupted run finds and adopts the asset on the next run. `verify` reports any duplicate it finds without deleting it.
+- State lives in `./.mux-migrate/state.db` (`--state` to change it). Read it with `status`, `verify`, and `export`, not directly.
 
 ## Commands
 
