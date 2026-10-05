@@ -18,6 +18,7 @@ import { liveCommand } from './commands/live/index.ts';
 import { loginCommand } from './commands/login.ts';
 import { logoutCommand } from './commands/logout.ts';
 import { metricsCommand } from './commands/metrics/index.ts';
+import { migrateCommand } from './commands/migrate/index.ts';
 import { monitoringCommand } from './commands/monitoring/index.ts';
 import { playbackIdsCommand } from './commands/playback-ids/index.ts';
 import { playbackRestrictionsCommand } from './commands/playback-restrictions/index.ts';
@@ -71,6 +72,7 @@ const cli = new Command()
   .command('errors', errorsCommand)
   .command('exports', exportsCommand)
   .command('robots', robotsCommand)
+  .command('migrate', migrateCommand)
   .command('webhooks', webhooksCommand)
   .command('whoami', whoamiCommand)
   .command(
