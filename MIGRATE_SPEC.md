@@ -470,6 +470,7 @@ All HTTP goes through one shared client that checks response status, honors `Ret
 
 ### Manifest
 
+- The manifest path comes from `--manifest <path>` or the recipe's `source.manifest`.
 - CSV or JSON. JSON is preferred for generated manifests. In CSV, `tags` is semicolon-separated and `captions` is a quoted JSON column. Required column: `url`. Optional: `id`, `title`, `description`, `tags`, `captions` (JSON array of `{url, language}`), `poster_url`, `passthrough`.
 - When `id` is missing, a stable hash of the URL is used, so re-running stays idempotent.
 - The schema is published, so customers or agents can script exports from any unsupported platform into it.

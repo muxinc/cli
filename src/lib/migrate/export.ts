@@ -1,3 +1,4 @@
+import { MigrationFailure } from './errors.ts';
 import type { MigrationState } from './state.ts';
 import type { DirectiveRunSummary, ItemState } from './types.ts';
 
@@ -32,13 +33,83 @@ export interface MappingFile {
 }
 
 export function buildMapping(
-  _state: MigrationState,
-  _options: { include: ItemState[]; now: Date },
+  state: MigrationState,
+  options: { include: ItemState[]; now: Date },
 ): MappingFile {
-  throw new Error('Not implemented');
+  const migration = state.migration();
+  if (!migration) {
+    throw new MigrationFailure({
+      code: 'MIGRATION_NOT_FOUND',
+      message: 'No migration was found in this state file.',
+      next_command: 'mux migrate plan',
+    });
+  }
+  return {
+    version: 1,
+    migration_id: migration.id,
+    provider: migration.provider,
+    exported_at: options.now.toISOString(),
+    items: state
+      .list({ states: options.include })
+      .map(({ item, ...record }) => ({
+        source_id: record.sourceId,
+        source_url: item.sourceUrl ?? null,
+        source_embed_patterns: item.embedPatterns,
+        title: item.title ?? null,
+        description: item.description ?? null,
+        tags: item.tags ?? [],
+        folder: item.folder ?? null,
+        duration_seconds: item.durationSeconds ?? null,
+        source_poster_url: item.posterUrl ?? null,
+        source_chapters: (item.chapters ?? []).map((chapter) => ({
+          title: chapter.title,
+          start_seconds: chapter.startSeconds,
+        })),
+        fidelity: record.fidelity ?? null,
+        asset_id: record.assetId ?? null,
+        playback_ids: record.playbackIds,
+        directive_runs: record.directiveRuns.map((run) => ({
+          directive_id: run.directiveId,
+          run_id: run.runId,
+          status: run.status,
+        })),
+        status: record.state,
+      })),
+  };
+}
+
+const CSV_COLUMNS = [
+  'source_id',
+  'source_url',
+  'title',
+  'fidelity',
+  'asset_id',
+  'playback_id',
+  'status',
+  'verified',
+] as const;
+
+function csvField(value: string | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 }
 
 /** The scalar columns only, as documented in MIGRATE_SPEC.md "Mapping file". */
-export function mappingToCsv(_mapping: MappingFile): string {
-  throw new Error('Not implemented');
+export function mappingToCsv(mapping: MappingFile): string {
+  const rows = mapping.items.map((item) =>
+    [
+      item.source_id,
+      item.source_url,
+      item.title,
+      item.fidelity,
+      item.asset_id,
+      item.playback_ids[0]?.id,
+      item.status,
+      // Filled in once `verify` records results.
+      undefined,
+    ]
+      .map(csvField)
+      .join(','),
+  );
+  return `${[CSV_COLUMNS.join(','), ...rows].join('\n')}\n`;
 }

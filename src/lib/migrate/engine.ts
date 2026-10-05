@@ -210,7 +210,7 @@ function stoppedResult<C>(
   const tally = tallyScope(deps.state, options.ids);
   const exitCode = resolveExitCode({ ...outcome, ...tally });
   const nextCommand = outcome.confirmationRequired
-    ? runCommand(options)
+    ? continueCommand(options)
     : error?.next_command;
   return {
     exitCode,
@@ -247,7 +247,7 @@ function formatDuration(ms: number): string {
  * batching flags and never includes --no-wait, so running it always makes
  * progress.
  */
-function runCommand(options: RunOptions): string {
+export function continueCommand(options: RunOptions): string {
   const parts = ['mux migrate run --yes'];
   if (options.ids?.length) parts.push(`--ids ${options.ids.join(',')}`);
   if (options.limit !== undefined) parts.push(`--limit ${options.limit}`);
@@ -327,14 +327,14 @@ class MigrationRun<C> {
       this.warn({
         code: 'CREATE_OUTCOME_UNKNOWN',
         message: `The create request for ${record.sourceId} got no response. The next run checks whether the asset exists before creating it again.`,
-        next_command: runCommand(this.options),
+        next_command: continueCommand(this.options),
       });
     }
 
     const tally = tallyScope(this.state, this.options.ids);
     const exitCode = resolveExitCode(tally);
     let nextCommand: string | undefined;
-    if (tally.remaining > 0) nextCommand = runCommand(this.options);
+    if (tally.remaining > 0) nextCommand = continueCommand(this.options);
     else if (tally.errored > 0) nextCommand = 'mux migrate retry';
 
     this.deps.emit?.({
