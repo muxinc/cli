@@ -37,6 +37,11 @@ export interface PlanSummary {
   fidelity: { original: number; rendition: number; unknown: number };
   /** Source caption tracks by language. */
   captions: Record<string, number>;
+  /**
+   * The least time creating the remaining assets can take: Mux allows one
+   * asset create per second.
+   */
+  create_seconds: number;
   warnings: MigrationError[];
   pricing_url: string;
 }

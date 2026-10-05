@@ -1,3 +1,4 @@
+import { CREATE_LIMIT } from './client.ts';
 import { resolveExitCode } from './exit-codes.ts';
 import { MigrationRun } from './run/migration-run.ts';
 import { continueCommand, tallyScope } from './run/shared.ts';
@@ -8,7 +9,7 @@ import type {
   RunResult,
 } from './run/types.ts';
 import type { MigrationState } from './state.ts';
-import type { MigrationError } from './types.ts';
+import type { ItemState, MigrationError } from './types.ts';
 
 export { attachCaptionCommand, continueCommand } from './run/shared.ts';
 export type {
@@ -21,6 +22,8 @@ export type {
 } from './run/types.ts';
 
 export const PRICING_URL = 'https://www.mux.com/pricing';
+
+const TO_CREATE = new Set<ItemState>(['discovered', 'preparing', 'resolved']);
 
 /** Inventories the source into the state file. Free and idempotent. */
 export async function planMigration<C>(
@@ -76,6 +79,10 @@ export async function planMigration<C>(
     },
     captions: tally(items.flatMap((item) => item.captionLanguages ?? [])),
     warnings,
+    create_seconds: Math.ceil(
+      records.filter((record) => TO_CREATE.has(record.state)).length /
+        CREATE_LIMIT.perSecond,
+    ),
     pricing_url: PRICING_URL,
   };
 }

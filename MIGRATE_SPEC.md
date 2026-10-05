@@ -79,7 +79,7 @@ Lists the full source library, resolves nothing that costs money or expires, and
 | `--limit <n>` | none | Process at most n items, for a pilot run |
 | `--ids <a,b,c>` | none | Process only these source IDs |
 | `--time-budget <duration>` | none | Stop cleanly after this long (for example `8m`), leaving the state consistent |
-| `--concurrency <n>` | provider default | Parallel asset creations, capped by the provider rate limit |
+| `--concurrency <n>` | provider default | Items resolved in parallel. Asset creation is still paced at one per second (see [Mux rate limits](#mux-rate-limits)). |
 | `--test` | off | Create Mux test assets (watermarked, 10 seconds, deleted after 24 hours) |
 | `--no-wait` | off | Exit once every asset is created, without waiting on the event stream for `ready` |
 
@@ -211,7 +211,7 @@ A duplicate asset costs the customer money and pollutes their library, so `run` 
    - An item in `creating` adopts the asset and moves to `processing`. This resolves step 3 without a second request.
    - An item that already has a different asset ID has a duplicate. The CLI keeps the asset it recorded first, does not delete the other, and reports `DUPLICATE_ASSET` with both IDs and the command to remove the extra one. `status` and `verify` list unresolved duplicates.
 6. On the next run, an item still in `creating` had no response and no matching event, for example because the CLI was offline. The CLI lists assets newest first, stops once `created_at` is earlier than the oldest `create_started_at` minus five minutes, and matches `meta.external_id`. A match is adopted. Otherwise the item returns to `resolved` and is created again.
-7. Items in `processing` are reconciled on reconnect with a `GET` per asset, which also catches events missed while the CLI was offline.
+7. Items in `processing` are reconciled on reconnect by listing assets newest first, 100 per request, which also catches events missed while the CLI was offline. Only assets the listing does not reach are fetched individually.
 
 If a future source uploads local files through direct uploads instead of ingesting by URL, it follows the same rule: create one upload per item, store its upload ID before sending media, and on retry fetch that upload with `GET /video/v1/uploads/{upload_id}` instead of creating a new one.
 
@@ -225,7 +225,21 @@ If a future source uploads local files through direct uploads instead of ingesti
 | `video.asset.errored` | Item moves to `errored` with the asset's error messages |
 | `video.asset.track.ready`, `video.asset.track.errored` | Caption track state updates |
 
-Events for assets that are not in the state file are ignored. On disconnect, the CLI reconnects with the same backoff and credential refresh as `webhooks listen`, then reconciles in-flight items, because the stream is not known to replay missed events, with a `GET` per asset. `run` exits when no item is left in `processing` and no create request is in flight, when `--time-budget` expires, or immediately after the last create with `--no-wait`. An item whose create request failed without a response stays in `creating` and does not hold the run open; the next run resolves it (see [Duplicate prevention](#duplicate-prevention)), so the run exits 4.
+Events for assets that are not in the state file are ignored. On disconnect, the CLI reconnects with the same backoff and credential refresh as `webhooks listen`, then reconciles in-flight items, because the stream is not known to replay missed events, by listing assets 100 per request. `run` exits when no item is left in `processing` and no create request is in flight, when `--time-budget` expires, or immediately after the last create with `--no-wait`. An item whose create request failed without a response stays in `creating` and does not hold the run open; the next run resolves it (see [Duplicate prevention](#duplicate-prevention)), so the run exits 4.
+
+## Mux rate limits
+
+Mux limits the Video API per environment with [token buckets](https://www.mux.com/docs/core/make-api-requests#api-rate-limits). A request made with an empty bucket gets a `429` and is not processed.
+
+| Requests | High-priority token | Low-priority token |
+|---|---|---|
+| `POST` (asset creation) | 20-request bucket, refilled at 1 per second | 4-request bucket, refilled at 1 per second |
+| Other methods | 100-request bucket, refilled at 5 per second | 20-request bucket, refilled at 1 per second |
+
+- The client paces itself to the low-priority limits, which every token satisfies: creates use a bucket of 4 at one per second, and reads a bucket of 20 at one per second. A `429` is still retried, because Mux did not process the request.
+- Asset creation is one per second for every token, so a library of N items takes at least N seconds to create. `plan` reports this as `create_seconds`, and `--concurrency` speeds up resolving source URLs, not creation.
+- Reads are batched: reconciliation and `verify` list assets 100 per request instead of fetching each one.
+- Mux recommends low-priority tokens for scripts and agents. Low-priority requests use their own buckets, so a migration run with a low-priority token cannot use up the create budget a production application relies on.
 
 ## State file
 
@@ -468,7 +482,7 @@ Tests are written first and reviewed before implementation, per the project guid
 ## Open questions
 
 1. Does the webhook event stream support `Last-Event-ID` to replay events missed during a disconnect? If not, reconciliation on reconnect stays as specified.
-2. What are the Mux ingest and API rate limits per account? These set the `--concurrency` default and the shared limiter for Mux calls.
+2. Resolved: Mux rate limits are documented; see [Mux rate limits](#mux-rate-limits).
 3. Resolved: directive attachment waits for the Directives API changes (see [Robots enrichment](#robots-enrichment)).
 4. End-to-end testing: is a paid Vimeo account available, or do provider tests rely on recorded responses only?
 5. Bunny: one library per migration, or allow several in one recipe?

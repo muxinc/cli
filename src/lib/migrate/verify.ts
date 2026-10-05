@@ -49,10 +49,11 @@ async function retrieve(
 async function checkItem(
   deps: VerifyDeps,
   record: ItemRecord,
+  listed: Asset | undefined,
 ): Promise<{ checks: VerifyCheck[]; missing: boolean }> {
-  const asset = record.assetId
-    ? await retrieve(deps.mux, record.assetId)
-    : undefined;
+  const asset =
+    listed ??
+    (record.assetId ? await retrieve(deps.mux, record.assetId) : undefined);
   if (!asset || asset.status !== 'ready') {
     return {
       missing: !asset,
@@ -121,25 +122,30 @@ async function checkItem(
 const SCAN_MARGIN_MS = 5 * 60_000;
 
 /**
- * Assets are listed newest first, and the scan stops at those created before
- * the migration started, since no earlier asset can belong to it.
+ * Lists the environment's assets once, newest first, stopping at those created
+ * before the migration started, since no earlier asset can belong to it. The
+ * result holds each recorded asset, so items are checked without a request
+ * each, and every other asset that shares an item's external ID.
  */
-async function findDuplicates(
+async function scanAssets(
   deps: VerifyDeps,
   records: ItemRecord[],
   migration: MigrationInfo,
-): Promise<DuplicateAsset[]> {
+): Promise<{ assets: Map<string, Asset>; duplicates: DuplicateAsset[] }> {
   const oldest = migration.createdAt - SCAN_MARGIN_MS;
   const bySource = new Map(records.map((record) => [record.sourceId, record]));
   const externalIds = new ExternalIds(migration.provider, bySource.keys());
+  const assets = new Map<string, Asset>();
   const duplicates: DuplicateAsset[] = [];
   for await (const asset of deps.mux.listAssets()) {
     if (Number(asset.created_at) * 1000 < oldest) break;
-    // An errored asset from an earlier attempt is not a playable duplicate.
-    if (asset.status === 'errored') continue;
     const sourceId = externalIds.sourceIdFor(asset.meta?.external_id);
     const record = sourceId === undefined ? undefined : bySource.get(sourceId);
-    if (record?.assetId && record.assetId !== asset.id) {
+    if (!record?.assetId) continue;
+    if (record.assetId === asset.id) {
+      assets.set(asset.id, asset);
+    } else if (asset.status !== 'errored') {
+      // An errored asset from an earlier attempt is not a playable duplicate.
       duplicates.push({
         sourceId: record.sourceId,
         keptAssetId: record.assetId,
@@ -147,7 +153,7 @@ async function findDuplicates(
       });
     }
   }
-  return duplicates;
+  return { assets, duplicates };
 }
 
 /** Checks every ready item against its source and records the results. */
@@ -161,10 +167,15 @@ export async function verifyMigration(
     .list({ states: ['ready'] })
     .filter((record) => !options.ids || options.ids.includes(record.sourceId));
 
+  const { assets, duplicates } = migration
+    ? await scanAssets(deps, state.list(), migration)
+    : { assets: new Map<string, Asset>(), duplicates: [] };
+
   const failed: VerifyItemResult[] = [];
   let reset = 0;
   for (const record of records) {
-    const { checks, missing } = await checkItem(deps, record);
+    const listed = record.assetId ? assets.get(record.assetId) : undefined;
+    const { checks, missing } = await checkItem(deps, record, listed);
     const passed = checks.every((check) => check.ok);
     state.update(record.sourceId, {
       verification: { verifiedAt: deps.clock.now(), passed, checks },
@@ -189,9 +200,6 @@ export async function verifyMigration(
     }
   }
 
-  const duplicates = migration
-    ? await findDuplicates(deps, state.list(), migration)
-    : [];
   const ok = failed.length === 0 && duplicates.length === 0;
   return {
     checked: records.length,

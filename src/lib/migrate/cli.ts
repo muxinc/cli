@@ -124,6 +124,7 @@ function assetSettings(flags: RunFlags, recipe?: Recipe): RunOptions['asset'] {
 }
 
 function formatDurationSeconds(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.round((seconds % 3600) / 60);
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
@@ -159,6 +160,11 @@ function printPlan(io: MigrateIO, plan: PlanSummary): void {
   for (const warning of plan.warnings) {
     io.err(`Warning [${warning.code}]: ${warning.message}`);
     if (warning.hint) io.err(`Hint: ${warning.hint}`);
+  }
+  if (plan.create_seconds > 0) {
+    io.out(
+      `  Creating the remaining assets takes at least ${formatDurationSeconds(plan.create_seconds)}: Mux allows one asset create per second.`,
+    );
   }
   io.out(`  Nothing is billed by planning. Pricing: ${plan.pricing_url}`);
 }

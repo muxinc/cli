@@ -342,10 +342,10 @@ describe('runs that could wait forever', () => {
     const h = harness([sourceItem('a')]);
     h.mux.autoReady = false;
     let failures = 1;
-    const retrieve = h.mux.retrieveAsset.bind(h.mux);
-    h.mux.retrieveAsset = async (id) => {
+    const list = h.mux.listAssets.bind(h.mux);
+    h.mux.listAssets = () => {
       if (failures-- > 0) throw new Error('socket hang up');
-      return retrieve(id);
+      return list();
     };
     h.mux.afterCreate = (asset) =>
       setTimeout(() => h.mux.markReady(asset.id), 30);
@@ -358,6 +358,41 @@ describe('runs that could wait forever', () => {
 });
 
 describe('scale', () => {
+  test('catching up after missed events lists assets instead of fetching each one', async () => {
+    const items = Array.from({ length: 50 }, (_, i) => sourceItem(`v${i}`));
+    const h = harness(items);
+    let retrieves = 0;
+    let listings = 0;
+    const retrieve = h.mux.retrieveAsset.bind(h.mux);
+    const list = h.mux.listAssets.bind(h.mux);
+    h.mux.retrieveAsset = async (id) => {
+      retrieves++;
+      return retrieve(id);
+    };
+    h.mux.listAssets = () => {
+      listings++;
+      return list();
+    };
+    h.mux.autoReady = false;
+    h.mux.beforeCreate = () => h.stream.goOffline();
+    let created = 0;
+    h.mux.afterCreate = () => {
+      created++;
+      if (created < items.length) return;
+      // Every asset becomes ready while the stream is offline.
+      setTimeout(() => {
+        for (const asset of h.mux.assets) h.mux.markReady(asset.id);
+        h.stream.reconnect();
+      }, 5);
+    };
+
+    const result = await h.run({ concurrency: 8 });
+
+    expect(result.exitCode).toBe(0);
+    expect(retrieves).toBe(0);
+    expect(listings).toBeLessThanOrEqual(3);
+  });
+
   test('rows read from the state file grow linearly with the library size', async () => {
     const rowsReadFor = async (n: number) => {
       const h = harness(

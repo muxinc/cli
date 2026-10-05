@@ -18,7 +18,16 @@ function muxWithResponses(responses: Array<() => Response>) {
     baseURL: 'https://api.mux.test',
     fetch: fetch as typeof globalThis.fetch,
   });
-  return { client: createMuxMigrateClient(mux), requests };
+  let now = 0;
+  const sleeps: number[] = [];
+  const client = createMuxMigrateClient(mux, {
+    now: () => now,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+      now += ms;
+    },
+  });
+  return { client, requests, sleeps, elapsed: () => now };
 }
 
 const json = (
@@ -73,5 +82,36 @@ describe('createMuxMigrateClient', () => {
 
     expect(asset.status).toBe('ready');
     expect(requests).toHaveLength(2);
+  });
+
+  test('paces asset creation at the Mux create rate limit of one per second', async () => {
+    const { client, elapsed } = muxWithResponses(
+      Array.from(
+        { length: 10 },
+        (_, i) => () => json(201, { data: { id: `asset_${i}` } }),
+      ),
+    );
+
+    for (let i = 0; i < 10; i++) {
+      await client.createAsset({ inputs: [{ url: 'https://x/y.mp4' }] });
+    }
+
+    // A burst of four, then one per second, which fits a low-priority token.
+    expect(elapsed()).toBeGreaterThanOrEqual(6000);
+    expect(elapsed()).toBeLessThan(7000);
+  });
+
+  test('paces reads separately from creates, one token per list page', async () => {
+    const page = (ids: string[]) => () =>
+      json(200, { data: ids.map((id) => ({ id })) });
+    const { client, requests, elapsed } = muxWithResponses([
+      ...Array.from({ length: 30 }, () => page(['a'])),
+    ]);
+
+    for (let i = 0; i < 30; i++) await client.retrieveAsset('a');
+
+    expect(requests).toHaveLength(30);
+    // A burst of twenty, then one per second.
+    expect(elapsed()).toBeGreaterThanOrEqual(10_000);
   });
 });

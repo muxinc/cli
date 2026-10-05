@@ -71,8 +71,7 @@ export class Reconciler<C> {
    * start of a run, after a reconnect, and periodically as a safety net.
    */
   async reconcile({ resume = false } = {}): Promise<void> {
-    const { state, deps } = this.ctx;
-    const lifecycle = this.lifecycle;
+    const { state } = this.ctx;
     await this.adoptOrphanedCreates(resume);
 
     if (resume) {
@@ -83,13 +82,40 @@ export class Reconciler<C> {
       }
     }
 
-    for (const record of state.list({ states: ['processing'] })) {
-      if (!record.assetId) continue;
-      const asset = await deps.mux.retrieveAsset(record.assetId);
-      if (asset.status === 'ready') lifecycle.markReady(record.sourceId, asset);
-      else if (asset.status === 'errored') {
-        lifecycle.markErrored(record.sourceId, asset);
-      }
+    await this.refreshProcessing();
+  }
+
+  /**
+   * Reads processing assets a page of 100 at a time, newest first, rather
+   * than one request each, which keeps catch-up within Mux's read limits.
+   * Assets the listing does not reach, such as deleted ones, are fetched
+   * individually.
+   */
+  private async refreshProcessing(): Promise<void> {
+    const { state, deps } = this.ctx;
+    const lifecycle = this.lifecycle;
+    const processing = state
+      .list({ states: ['processing'] })
+      .filter((record) => record.assetId);
+    if (processing.length === 0) return;
+
+    const byAsset = new Map(processing.map((r) => [r.assetId as string, r]));
+    const oldest = Math.min(...processing.map((r) => r.createStartedAt ?? 0));
+    const apply = (sourceId: string, asset: Asset) => {
+      if (asset.status === 'ready') lifecycle.markReady(sourceId, asset);
+      else if (asset.status === 'errored')
+        lifecycle.markErrored(sourceId, asset);
+    };
+    for await (const asset of deps.mux.listAssets()) {
+      if (assetCreatedAtMs(asset) < oldest - ADOPTION_WINDOW_MS) break;
+      const record = byAsset.get(asset.id);
+      if (!record) continue;
+      byAsset.delete(asset.id);
+      apply(record.sourceId, asset);
+      if (byAsset.size === 0) return;
+    }
+    for (const [assetId, record] of byAsset) {
+      apply(record.sourceId, await deps.mux.retrieveAsset(assetId));
     }
   }
 

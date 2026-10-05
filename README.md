@@ -343,7 +343,9 @@ Credentials are read from environment variables, so an agent can supply them. `-
 | `bucket` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, optional `AWS_SESSION_TOKEN`, `AWS_ENDPOINT_URL` | S3, R2, GCS interoperability, or MinIO |
 | `manifest` | none | A CSV or JSON list of URLs (`--manifest <path>`), for any other platform |
 
-Mux credentials come from `mux login` or the environment, as for every other command.
+Mux credentials come from `mux login` or the environment, as for every other command. When you use an access token, create a **low-priority** token for migrations: low-priority requests use their own [rate limit](https://www.mux.com/docs/core/make-api-requests#api-rate-limits) buckets, so a long migration cannot slow down asset creation for your production application.
+
+Mux creates at most one asset per second, so a library of 10,000 videos takes at least about three hours. `plan` reports the minimum time as `create_seconds`, and `run` paces itself to stay within Mux's rate limits.
 
 ### The recipe
 

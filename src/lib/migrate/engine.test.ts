@@ -149,6 +149,7 @@ describe('plan', () => {
       size_bytes: 1000,
       fidelity: { original: 1, rendition: 1, unknown: 1 },
       captions: { en: 2, es: 1 },
+      create_seconds: 3,
       warnings: [
         expect.objectContaining({ code: 'CLOUDFLARE_RENDITION_ONLY' }),
       ],

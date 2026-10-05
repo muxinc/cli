@@ -214,6 +214,21 @@ describe('verifyMigration', () => {
     expect(listed).toBeLessThan(10);
   });
 
+  test('reads assets from one listing instead of fetching each one', async () => {
+    for (let i = 0; i < 30; i++) migrated(`v${i}`);
+    let retrieves = 0;
+    const retrieve = mux.retrieveAsset.bind(mux);
+    mux.retrieveAsset = async (id) => {
+      retrieves++;
+      return retrieve(id);
+    };
+
+    const report = await run();
+
+    expect(report.passed).toBe(30);
+    expect(retrieves).toBe(0);
+  });
+
   test('--ids verifies only the listed items', async () => {
     migrated('a');
     migrated('b');
