@@ -19,6 +19,11 @@ export interface Outcome {
 }
 
 /** Applies the precedence in MIGRATE_SPEC.md "Output contract". */
-export function resolveExitCode(_outcome: Outcome): ExitCodeValue {
-  throw new Error('Not implemented');
+export function resolveExitCode(outcome: Outcome): ExitCodeValue {
+  if (outcome.usageError) return ExitCode.Usage;
+  if (outcome.confirmationRequired) return ExitCode.ConfirmationRequired;
+  if (outcome.commandFailed) return ExitCode.Failed;
+  if (outcome.remaining > 0) return ExitCode.WorkRemaining;
+  if (outcome.errored > 0) return ExitCode.Failed;
+  return ExitCode.Success;
 }

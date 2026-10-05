@@ -255,7 +255,7 @@ SQLite via `bun:sqlite` at `./.mux-migrate/state.db`. SQLite gives atomic per-it
 
 Agents and humans read state through `status`, `verify`, and `export`, not the database directly.
 
-Tables: `migration` (one row: run IDs, provider, recipe hash, created time), `items` (source ID, state, source metadata JSON, resolved fidelity, asset ID, playback IDs, `create_started_at`, error code and message, attempts, timestamps), `tracks` (per caption: language, kind, state), `directive_runs` (item, directive ID, run ID, status, per-binding status and job ID).
+Tables: `migration` (one row: run IDs, provider, recipe hash, created time), `items` (source ID, state, source metadata JSON, resolved fidelity, asset ID, playback IDs, `create_started_at`, error code and message, attempts, timestamps), `tracks` (per caption: language, kind, state). Each item's directive runs (directive ID, run ID, status) are stored as JSON on the item row, indexed by asset ID for event lookups.
 
 `.mux-migrate/` should be added to `.gitignore` by `init`.
 

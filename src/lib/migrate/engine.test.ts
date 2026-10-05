@@ -449,6 +449,30 @@ describe('duplicate prevention', () => {
     expect(h.state.get('a')?.assetId).not.toBe(old.id);
   });
 
+  test('on resume, each item only adopts assets created after its own create attempt', async () => {
+    const h = harness([sourceItem('a'), sourceItem('b')]);
+    const now = h.clock.now();
+    h.state.initMigration('manifest');
+    h.state.upsertDiscovered(h.provider.items);
+    h.state.update('a', { state: 'creating', createStartedAt: now });
+    h.state.update('b', {
+      state: 'creating',
+      createStartedAt: now - 24 * 60 * MINUTE,
+    });
+    const stale = h.mux.injectAsset(
+      { external_id: 'manifest:a' },
+      now - 2 * 60 * MINUTE,
+    );
+
+    await h.run();
+
+    expect(h.state.get('a')?.assetId).not.toBe(stale.id);
+    expect(h.mux.createCalls.map((c) => c.meta?.external_id).sort()).toEqual([
+      'manifest:a',
+      'manifest:b',
+    ]);
+  });
+
   test('on resume, an item left in creating with no matching asset is created again', async () => {
     const h = harness([sourceItem('a')]);
     seedCreating(h, h.clock.now());
@@ -678,7 +702,10 @@ describe('Robots directives', () => {
     });
     expect(result.exitCode).toBe(0);
     expect(h.emitted).toContainEqual(
-      expect.objectContaining({ type: 'warning', code: 'DIRECTIVE_RUN_PARTIAL' }),
+      expect.objectContaining({
+        type: 'warning',
+        code: 'DIRECTIVE_RUN_PARTIAL',
+      }),
     );
   });
 
