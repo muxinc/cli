@@ -345,6 +345,64 @@ describe('run', () => {
   });
 });
 
+describe('sources that need preparation', () => {
+  function pendingOnce(h: ReturnType<typeof harness>, retryAfterMs = 5) {
+    const seen = new Set<string>();
+    h.provider.resolveOverride = (item) => {
+      if (!seen.has(item.sourceId)) {
+        seen.add(item.sourceId);
+        return { kind: 'pending', retryAfterMs };
+      }
+      return {
+        kind: 'resolved',
+        url: `https://cdn.example.com/${item.sourceId}.mp4`,
+        fidelity: 'rendition',
+        captions: [],
+      };
+    };
+  }
+
+  test('retries pending items in the same run once the provider says to', async () => {
+    const h = harness([sourceItem('a'), sourceItem('b')]);
+    pendingOnce(h);
+
+    const result = await h.run();
+
+    expect(statesFor(h.emitted, 'a')).toEqual([
+      'preparing',
+      'resolved',
+      'creating',
+      'processing',
+      'ready',
+    ]);
+    expect(h.provider.resolveCalls).toEqual(['a', 'b', 'a', 'b']);
+    expect(result.exitCode).toBe(0);
+  });
+
+  test('with --no-wait, leaves pending items for the next run', async () => {
+    const h = harness([sourceItem('a')]);
+    pendingOnce(h);
+
+    const result = await h.run({ wait: false });
+
+    expect(h.state.get('a')?.state).toBe('preparing');
+    expect(result.exitCode).toBe(4);
+    expect(result.nextCommand).toBe('mux migrate run --yes');
+  });
+
+  test('stops waiting for pending items when the time budget is spent', async () => {
+    const h = harness([sourceItem('a')]);
+    pendingOnce(h, 60 * MINUTE);
+    h.clock.advance(0);
+
+    const started = Date.now();
+    const result = await h.run({ timeBudgetMs: 10 });
+
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result.exitCode).toBe(4);
+  });
+});
+
 describe('errors and retry', () => {
   test('a rejected create marks the item errored and exits 1 with the retry command', async () => {
     const h = harness([sourceItem('a'), sourceItem('b')]);
@@ -694,6 +752,100 @@ describe('event stream', () => {
       errored: 0,
       remaining: 0,
     });
+  });
+});
+
+describe('inline captions', () => {
+  const srt = {
+    kind: 'text' as const,
+    text: '1\n00:00:00,000 --> 00:00:01,000\nHello\n',
+    format: 'srt' as const,
+    language: 'en',
+    label: 'English',
+    closedCaptions: false,
+  };
+
+  function withInlineCaptions(h: ReturnType<typeof harness>) {
+    h.provider.resolveOverride = (item) => ({
+      kind: 'resolved',
+      url: `https://cdn.example.com/${item.sourceId}.mp4`,
+      fidelity: 'original',
+      captions: [srt],
+    });
+    const saved: string[] = [];
+    const uploads: string[] = [];
+    const removed: string[] = [];
+    h.deps.captions = {
+      saveLocal: async (sourceId, caption) => {
+        const path = `/state/captions/${sourceId}.${caption.language}.${caption.format}`;
+        saved.push(path);
+        return path;
+      },
+    };
+    const enableHost = () => {
+      h.deps.captions = {
+        ...h.deps.captions!,
+        host: {
+          upload: async (key) => {
+            uploads.push(key);
+            return `https://bucket.example.com/${key}?signature=x`;
+          },
+          remove: async (key) => {
+            removed.push(key);
+          },
+        },
+      };
+    };
+    return { saved, uploads, removed, enableHost };
+  }
+
+  test('uploads inline captions to the host bucket, passes the URL to Mux, and removes them once the track is ready', async () => {
+    const h = harness([sourceItem('a', { captionCount: 1 })]);
+    const captions = withInlineCaptions(h);
+    captions.enableHost();
+
+    const result = await h.run();
+
+    expect(captions.uploads).toHaveLength(1);
+    expect(captions.uploads[0]).toMatch(/^mux-migrate\/mig_[^/]+\/a\/en\.srt$/);
+    expect(h.mux.createCalls[0].inputs?.[1]).toMatchObject({
+      url: `https://bucket.example.com/${captions.uploads[0]}?signature=x`,
+      type: 'text',
+      text_type: 'subtitles',
+      language_code: 'en',
+      name: 'English',
+    });
+    expect(captions.removed).toEqual(captions.uploads);
+    expect(h.state.get('a')?.hostedCaptions).toEqual([]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  test('without a host bucket, saves inline captions locally and records them as pending', async () => {
+    const h = harness([sourceItem('a', { captionCount: 1 })]);
+    const captions = withInlineCaptions(h);
+
+    const result = await h.run();
+
+    expect(h.mux.createCalls[0].inputs).toHaveLength(1);
+    expect(h.state.get('a')).toMatchObject({
+      state: 'ready',
+      pendingCaptions: [
+        {
+          language: 'en',
+          path: captions.saved[0],
+          label: 'English',
+          closedCaptions: false,
+        },
+      ],
+    });
+    expect(h.emitted).toContainEqual(
+      expect.objectContaining({
+        type: 'warning',
+        code: 'CAPTIONS_PENDING',
+        next_command: expect.stringContaining('mux assets tracks create'),
+      }),
+    );
+    expect(result.exitCode).toBe(0);
   });
 });
 

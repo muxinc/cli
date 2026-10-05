@@ -76,7 +76,8 @@ async function checkItem(
     });
   }
 
-  const expectedTracks = record.item.captionCount - record.captionsPending;
+  const expectedTracks =
+    record.item.captionCount - record.pendingCaptions.length;
   if (expectedTracks > 0) {
     const textTracks = (asset.tracks ?? []).filter(
       (track) => track.type === 'text' && track.status === 'ready',

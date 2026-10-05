@@ -69,6 +69,23 @@ export type CaptionSource =
       closedCaptions: boolean;
     };
 
+export type TextCaption = Extract<CaptionSource, { kind: 'text' }>;
+
+/**
+ * Where caption text goes when a provider returns it inline instead of by URL.
+ * See MIGRATE_SPEC.md "Captions".
+ */
+export interface CaptionHandler {
+  /** Set when `captions.host_bucket` names a bucket the customer owns. */
+  host?: {
+    /** Uploads the caption and returns a URL Mux can fetch. */
+    upload(key: string, caption: TextCaption): Promise<string>;
+    remove(key: string): Promise<void>;
+  };
+  /** Saves the caption under the state directory and returns its path. */
+  saveLocal(sourceId: string, caption: TextCaption): Promise<string>;
+}
+
 export type ResolveResult =
   | {
       kind: 'resolved';

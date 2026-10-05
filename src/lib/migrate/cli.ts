@@ -280,6 +280,13 @@ export function executeStatus(
         io.out(`  ${item.source_id}  ${item.state} since ${item.since}`);
       }
     }
+    if (report.pending_captions.length > 0) {
+      io.out('Captions saved locally, to host and attach:');
+      for (const caption of report.pending_captions) {
+        io.out(`  ${caption.source_id}  ${caption.language}  ${caption.path}`);
+        if (caption.attach_command) io.out(`    ${caption.attach_command}`);
+      }
+    }
     if (report.errored.length > 0) {
       io.out('Errored items:');
       for (const { source_id, error } of report.errored) {

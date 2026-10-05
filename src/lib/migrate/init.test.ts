@@ -47,9 +47,21 @@ describe('initMigration', () => {
     });
   });
 
-  test('rejects providers that are not available yet', async () => {
-    await expect(initMigration('vimeo', dir)).rejects.toMatchObject({
-      code: 'PROVIDER_NOT_AVAILABLE',
+  test('lists the credentials the provider needs', async () => {
+    const result = await initMigration('vimeo', dir);
+
+    expect(result.credentials).toEqual([
+      expect.objectContaining({ name: 'VIMEO_ACCESS_TOKEN', required: true }),
+    ]);
+    expect(await loadRecipe(undefined, dir)).toMatchObject({
+      provider: 'vimeo',
+      source: { include_private: true },
+    });
+  });
+
+  test('rejects unknown providers', async () => {
+    await expect(initMigration('youtube', dir)).rejects.toMatchObject({
+      code: 'PROVIDER_UNKNOWN',
     });
   });
 });

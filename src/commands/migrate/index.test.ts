@@ -33,6 +33,7 @@ describe('mux migrate', () => {
       'test',
       'recipe',
       'manifest',
+      'credential',
       'state',
       'json',
     ]) {

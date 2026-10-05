@@ -54,6 +54,11 @@ export const runCommand: Command<any> = new Command()
   )
   .option('--manifest <path:string>', 'Manifest file for the manifest provider')
   .option(
+    '--credential <assignment:string>',
+    'Provider credential as NAME=value, overriding the environment variable. Repeatable.',
+    { collect: true },
+  )
+  .option(
     '--state <path:string>',
     'State file (default: ./.mux-migrate/state.db)',
   )

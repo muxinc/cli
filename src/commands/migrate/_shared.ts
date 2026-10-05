@@ -1,14 +1,18 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { wantsJson } from '@/lib/context.ts';
+import { createLocalCaptionStore } from '@/lib/migrate/captions.ts';
 import type { MigrateContext, MigrateIO } from '@/lib/migrate/cli.ts';
 import { createMuxMigrateClient } from '@/lib/migrate/client.ts';
 import { MigrationFailure } from '@/lib/migrate/errors.ts';
 import { ExitCode } from '@/lib/migrate/exit-codes.ts';
-import { createManifestProvider } from '@/lib/migrate/providers/manifest.ts';
-import { loadRecipe, type Recipe } from '@/lib/migrate/recipe.ts';
+import {
+  createProvider,
+  providerCredentials,
+} from '@/lib/migrate/providers/index.ts';
+import { loadRecipe } from '@/lib/migrate/recipe.ts';
 import { MigrationState } from '@/lib/migrate/state.ts';
 import { createStreamEventSource } from '@/lib/migrate/stream.ts';
-import type { MigrationError, SourceProvider } from '@/lib/migrate/types.ts';
+import type { MigrationError } from '@/lib/migrate/types.ts';
 import {
   createAuthenticatedMuxClient,
   getAuthContext,
@@ -26,6 +30,8 @@ export interface SharedOptions {
 export interface SourceOptions extends SharedOptions {
   recipe?: string;
   manifest?: string;
+  /** `--credential NAME=value`, overriding the environment variable of that name. */
+  credential?: string[];
 }
 
 export function createIO(options: { json?: boolean }): MigrateIO {
@@ -36,8 +42,12 @@ export function createIO(options: { json?: boolean }): MigrateIO {
   };
 }
 
+function statePath(options: SharedOptions): string {
+  return resolve(options.state ?? DEFAULT_STATE_PATH);
+}
+
 export function openState(options: SharedOptions): MigrationState {
-  return MigrationState.open(resolve(options.state ?? DEFAULT_STATE_PATH));
+  return MigrationState.open(statePath(options));
 }
 
 /** Prints an error in the migrate output contract and exits. */
@@ -52,28 +62,15 @@ export function exitWithError(io: MigrateIO, error: MigrationError): never {
   process.exit(ExitCode.Usage);
 }
 
-function createProvider(
-  providerId: string,
-  options: SourceOptions,
-  recipe: Recipe | undefined,
-): SourceProvider<void> {
-  if (providerId === 'manifest') {
-    const path = options.manifest ?? recipe?.source?.manifest;
-    if (!path) {
-      throw new MigrationFailure({
-        code: 'MANIFEST_PATH_REQUIRED',
-        message:
-          'The manifest provider needs the path to a .json or .csv manifest.',
-        hint: 'Pass --manifest <path>, or set source.manifest in the recipe.',
-      });
-    }
-    return createManifestProvider(resolve(path));
-  }
-  throw new MigrationFailure({
-    code: 'PROVIDER_NOT_AVAILABLE',
-    message: `The ${providerId} provider is not available in this version of the CLI.`,
-    hint: 'Export the library to a manifest file and use the manifest provider.',
+async function muxDeps() {
+  const mux = createMuxMigrateClient(await createAuthenticatedMuxClient());
+  const { baseUrl } = await getAuthContext();
+  const events = createStreamEventSource({
+    url: `${baseUrl}/system/v1/webhook-events/stream`,
+    getHeaders: getAuthHeaders,
+    refreshCredentials: refreshActiveOAuthCredentials,
   });
+  return { mux, events, clock: { now: () => Date.now() } };
 }
 
 /** Builds the full migration context for commands that read the source and call Mux. */
@@ -82,15 +79,16 @@ export async function createMigrateContext(
   options: SourceOptions,
 ): Promise<MigrateContext> {
   const io = createIO(options);
-  const recipe = await loadRecipe(options.recipe, process.cwd());
+  const cwd = process.cwd();
+  const recipe = (await loadRecipe(options.recipe, cwd)) ?? {};
   const state = openState(options);
   const existing = state.migration();
-  const providerId = providerArg ?? recipe?.provider ?? existing?.provider;
+  const providerId = providerArg ?? recipe.provider ?? existing?.provider;
   if (!providerId) {
     throw new MigrationFailure({
       code: 'PROVIDER_REQUIRED',
       message: 'No provider was given.',
-      hint: 'Pass a provider, such as `mux migrate plan manifest`, or set "provider" in mux-migrate.json.',
+      hint: 'Pass a provider, such as `mux migrate plan vimeo`, or run `mux migrate init <provider>` to write a recipe.',
     });
   }
   if (existing && existing.provider !== providerId) {
@@ -101,26 +99,40 @@ export async function createMigrateContext(
     });
   }
 
-  const provider = createProvider(providerId, options, recipe);
-  const mux = createMuxMigrateClient(await createAuthenticatedMuxClient());
-  const { baseUrl } = await getAuthContext();
-  const events = createStreamEventSource({
-    url: `${baseUrl}/system/v1/webhook-events/stream`,
-    getHeaders: getAuthHeaders,
-    refreshCredentials: refreshActiveOAuthCredentials,
+  const provider = createProvider(providerId, {
+    recipe,
+    cwd,
+    manifestPath: options.manifest,
   });
+  const credentials = providerCredentials(
+    provider,
+    process.env,
+    options.credential,
+  );
 
   return {
     deps: {
       state,
-      provider: provider as SourceProvider<unknown>,
-      credentials: undefined,
-      mux,
-      events,
-      clock: { now: () => Date.now() },
+      provider,
+      credentials,
+      captions: createLocalCaptionStore(dirname(statePath(options))),
+      ...(await muxDeps()),
     },
     recipe,
     io,
+  };
+}
+
+/** Builds a context for commands that use the state file and Mux, but not the source. */
+export async function createMuxContext(
+  options: SharedOptions,
+): Promise<Pick<MigrateContext, 'deps' | 'io'>> {
+  return {
+    io: createIO(options),
+    deps: {
+      state: openState(options),
+      ...(await muxDeps()),
+    } as MigrateContext['deps'],
   };
 }
 
@@ -128,20 +140,19 @@ export async function createMigrateContext(
 export function createStateContext(
   options: SharedOptions,
 ): Pick<MigrateContext, 'deps' | 'io'> {
-  const state = openState(options);
   return {
     io: createIO(options),
     deps: {
-      state,
+      state: openState(options),
       clock: { now: () => Date.now() },
     } as MigrateContext['deps'],
   };
 }
 
-export async function withContext(
+export async function withContext<T>(
   io: MigrateIO,
-  build: () => Promise<MigrateContext>,
-): Promise<MigrateContext> {
+  build: () => Promise<T>,
+): Promise<T> {
   try {
     return await build();
   } catch (error) {

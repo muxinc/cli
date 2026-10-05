@@ -1,8 +1,15 @@
 import { APIConnectionError } from '@mux/ts';
 import type { Asset, AssetCreateParams } from '@mux/ts/resources/video/assets';
 import { type ExitCodeValue, resolveExitCode } from './exit-codes.ts';
-import type { ItemPatch, ItemRecord, MigrationState } from './state.ts';
 import type {
+  ItemPatch,
+  ItemRecord,
+  MigrationState,
+  PendingCaption,
+} from './state.ts';
+import type {
+  CaptionHandler,
+  CaptionSource,
   Clock,
   DirectiveRunStatus,
   DirectiveRunSummary,
@@ -25,6 +32,7 @@ export interface MigrationDeps<Credentials = void> {
   mux: MuxMigrateClient;
   events: MigrationEventSource;
   clock: Clock;
+  captions?: CaptionHandler;
   /** Called after each state change has been written to the state file. */
   emit?: (event: RunEvent) => void;
 }
@@ -311,6 +319,35 @@ export function continueCommand(options: RunOptions): string {
   return parts.join(' ');
 }
 
+function captionInput(
+  url: string,
+  caption: CaptionSource,
+): NonNullable<AssetCreateParams['inputs']>[number] {
+  return {
+    url,
+    type: 'text',
+    text_type: 'subtitles',
+    language_code: caption.language,
+    name: caption.label,
+    closed_captions: caption.closedCaptions,
+  };
+}
+
+/** The `mux assets tracks create` command that attaches a saved caption once it is hosted. */
+export function attachCaptionCommand(
+  assetId: string,
+  caption: PendingCaption,
+): string {
+  const file = caption.path.split('/').pop();
+  return [
+    `mux assets tracks create ${assetId}`,
+    `--url <URL of ${file}>`,
+    '--type text --text-type subtitles',
+    `--language-code ${caption.language}`,
+    ...(caption.closedCaptions ? ['--closed-captions'] : []),
+  ].join(' ');
+}
+
 function isDefinitiveRejection(status: number): boolean {
   return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
@@ -330,11 +367,14 @@ function assetErrorMessage(asset: Record<string, unknown>): string {
 class MigrationRun<C> {
   private readonly state: MigrationState;
   private readonly prefix: string;
+  private readonly migrationId: string;
   private readonly deadline?: number;
   private readonly controller = new AbortController();
   private readonly inFlight = new Set<string>();
   private readonly duplicates: DuplicateAsset[] = [];
   private readonly reportedDuplicates = new Set<string>();
+  private readonly cleanups = new Map<string, Promise<void>>();
+  private readonly savedCaptions = new Set<string>();
   private fatal?: unknown;
   private notify?: () => void;
 
@@ -345,6 +385,7 @@ class MigrationRun<C> {
   ) {
     this.state = deps.state;
     this.prefix = `${deps.provider.id}:`;
+    this.migrationId = deps.state.initMigration(deps.provider.id).id;
     if (options.timeBudgetMs !== undefined) {
       this.deadline = deps.clock.now() + options.timeBudgetMs;
     }
@@ -364,6 +405,7 @@ class MigrationRun<C> {
       // Handle events that have already arrived, such as the created event
       // of a duplicate, before the stream is closed.
       await new Promise((resolve) => setTimeout(resolve, 0));
+      await Promise.all(this.cleanups.values());
       this.throwIfFailed();
     } finally {
       clearInterval(reconcileTimer);
@@ -376,6 +418,20 @@ class MigrationRun<C> {
   }
 
   private finish(plan: PlanSummary): RunResult {
+    for (const sourceId of this.savedCaptions) {
+      const record = this.state.get(sourceId);
+      if (!record?.assetId || record.pendingCaptions.length === 0) continue;
+      this.warn({
+        code: 'CAPTIONS_PENDING',
+        message: `${record.pendingCaptions.length} caption track(s) for ${sourceId} were saved locally because the source provides caption text, not a URL. Host each file and attach it to asset ${record.assetId}.`,
+        hint: 'Set captions.host_bucket in the recipe to upload captions to a bucket you own automatically.',
+        next_command: attachCaptionCommand(
+          record.assetId,
+          record.pendingCaptions[0],
+        ),
+      });
+    }
+
     for (const record of this.state.list({ states: ['creating'] })) {
       if (!this.inScope(record.sourceId)) continue;
       this.warn({
@@ -434,6 +490,9 @@ class MigrationRun<C> {
   private transition(sourceId: string, patch: ItemPatch): ItemRecord {
     const record = this.state.update(sourceId, patch);
     this.changed();
+    if (record.state === 'ready' && record.hostedCaptions.length > 0) {
+      this.scheduleCaptionCleanup(sourceId);
+    }
     this.deps.emit?.({
       type: 'item',
       source_id: sourceId,
@@ -462,17 +521,45 @@ class MigrationRun<C> {
       1,
       this.options.concurrency ?? this.deps.provider.defaultConcurrency,
     );
-    const worker = async () => {
-      for (let record = queue.shift(); record; record = queue.shift()) {
-        this.throwIfFailed();
-        if (this.deadlinePassed()) return;
-        await this.migrateItem(record);
-      }
+    const pending: Array<{ sourceId: string; retryAfterMs: number }> = [];
+    const drain = async (records: ItemRecord[]) => {
+      const worker = async () => {
+        for (let record = records.shift(); record; record = records.shift()) {
+          this.throwIfFailed();
+          if (this.deadlinePassed()) return;
+          const retryAfterMs = await this.migrateItem(record);
+          if (retryAfterMs !== undefined) {
+            pending.push({ sourceId: record.sourceId, retryAfterMs });
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: concurrency }, worker));
     };
-    await Promise.all(Array.from({ length: concurrency }, worker));
+
+    await drain(queue);
+    // Sources that need preparation (such as a Cloudflare download being
+    // generated) are retried in this run rather than left for the next one.
+    while (pending.length > 0 && this.options.wait !== false) {
+      const waitMs = Math.min(...pending.map((p) => p.retryAfterMs));
+      const remainingMs =
+        this.deadline === undefined
+          ? Number.POSITIVE_INFINITY
+          : this.deadline - this.deps.clock.now();
+      if (remainingMs <= 0) return;
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(waitMs, remainingMs)),
+      );
+      if (waitMs >= remainingMs) return;
+      const due = pending.splice(0).flatMap(({ sourceId }) => {
+        const record = this.state.get(sourceId);
+        return record?.state === 'preparing' ? [record] : [];
+      });
+      await drain(due);
+    }
   }
 
-  private async migrateItem(record: ItemRecord): Promise<void> {
+  /** Returns the provider's retry delay when the source is still being prepared. */
+  private async migrateItem(record: ItemRecord): Promise<number | undefined> {
     const { sourceId } = record;
     const resolved = await this.deps.provider.resolve(
       this.deps.credentials,
@@ -480,7 +567,7 @@ class MigrationRun<C> {
     );
     if (resolved.kind === 'pending') {
       this.transition(sourceId, { state: 'preparing' });
-      return;
+      return resolved.retryAfterMs;
     }
     if (resolved.kind === 'unavailable') {
       this.transition(sourceId, {
@@ -495,25 +582,10 @@ class MigrationRun<C> {
     });
 
     const { item } = record;
+    const captionInputs = await this.prepareCaptions(record, resolved.captions);
     const params: AssetCreateParams = {
       ...this.options.asset,
-      inputs: [
-        { url: resolved.url },
-        ...resolved.captions.flatMap((caption) =>
-          caption.kind === 'url'
-            ? [
-                {
-                  url: caption.url,
-                  type: 'text' as const,
-                  text_type: 'subtitles' as const,
-                  language_code: caption.language,
-                  name: caption.label,
-                  closed_captions: caption.closedCaptions,
-                },
-              ]
-            : [],
-        ),
-      ],
+      inputs: [{ url: resolved.url }, ...captionInputs],
       meta: {
         external_id: `${this.prefix}${sourceId}`,
         ...(item.title && { title: item.title.slice(0, 512) }),
@@ -543,6 +615,92 @@ class MigrationRun<C> {
       this.changed();
     }
     this.recordAsset(sourceId, asset);
+  }
+
+  /**
+   * Turns source captions into asset inputs. Captions supplied as text are
+   * uploaded to the host bucket when one is configured, or saved locally and
+   * recorded as pending.
+   */
+  private async prepareCaptions(
+    record: ItemRecord,
+    captions: CaptionSource[],
+  ): Promise<NonNullable<AssetCreateParams['inputs']>> {
+    const inputs: NonNullable<AssetCreateParams['inputs']> = [];
+    const hosted: string[] = [];
+    const pending: PendingCaption[] = [];
+    const handler: CaptionHandler | undefined = this.deps.captions;
+    for (const caption of captions) {
+      if (caption.kind === 'url') {
+        inputs.push(captionInput(caption.url, caption));
+        continue;
+      }
+      if (!handler) {
+        this.warn({
+          code: 'CAPTIONS_SKIPPED',
+          message: `A ${caption.language} caption for ${record.sourceId} was skipped because no caption storage is configured.`,
+        });
+        continue;
+      }
+      if (handler.host) {
+        const key = `mux-migrate/${this.migrationId}/${record.sourceId}/${caption.language}.${caption.format}`;
+        inputs.push(
+          captionInput(await handler.host.upload(key, caption), caption),
+        );
+        hosted.push(key);
+      } else {
+        pending.push({
+          language: caption.language,
+          path: await handler.saveLocal(record.sourceId, caption),
+          ...(caption.label && { label: caption.label }),
+          closedCaptions: caption.closedCaptions,
+        });
+      }
+    }
+    if (hosted.length > 0) {
+      this.state.update(record.sourceId, {
+        hostedCaptions: [...new Set([...record.hostedCaptions, ...hosted])],
+      });
+    }
+    if (pending.length > 0) {
+      this.state.update(record.sourceId, { pendingCaptions: pending });
+      this.savedCaptions.add(record.sourceId);
+    }
+    return inputs;
+  }
+
+  /**
+   * Deletes uploaded caption objects once Mux has finished ingesting the text
+   * tracks. Anything not yet ingested is retried by the next run.
+   */
+  private scheduleCaptionCleanup(sourceId: string): void {
+    if (this.cleanups.has(sourceId) || !this.deps.captions?.host) return;
+    const host = this.deps.captions.host;
+    const cleanup = (async () => {
+      const record = this.state.get(sourceId);
+      if (!record?.assetId) return;
+      const asset = await this.deps.mux.retrieveAsset(record.assetId);
+      const textTracks = (asset.tracks ?? []).filter((t) => t.type === 'text');
+      if (textTracks.some((track) => track.status === 'preparing')) return;
+      const remaining: string[] = [];
+      for (const key of record.hostedCaptions) {
+        try {
+          await host.remove(key);
+        } catch (error) {
+          remaining.push(key);
+          this.warn({
+            code: 'CAPTION_CLEANUP_FAILED',
+            message: `Could not delete the uploaded caption ${key}: ${(error as Error).message}`,
+            hint: 'The next run tries again. You can also delete the object from the bucket yourself.',
+          });
+        }
+      }
+      this.state.update(sourceId, { hostedCaptions: remaining });
+    })().finally(() => this.cleanups.delete(sourceId));
+    this.cleanups.set(
+      sourceId,
+      cleanup.catch((error) => this.fail(error)),
+    );
   }
 
   private handleCreateFailure(sourceId: string, error: unknown): void {
@@ -760,6 +918,13 @@ class MigrationRun<C> {
    */
   private async reconcile({ resume = false } = {}): Promise<void> {
     await this.adoptOrphanedCreates(resume);
+
+    if (resume) {
+      for (const record of this.state.list({ states: ['ready'] })) {
+        if (record.hostedCaptions.length > 0)
+          this.scheduleCaptionCleanup(record.sourceId);
+      }
+    }
 
     for (const record of this.state.list({ states: ['processing'] })) {
       if (!record.assetId) continue;

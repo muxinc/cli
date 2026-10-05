@@ -1,3 +1,4 @@
+import { attachCaptionCommand } from './engine.ts';
 import { ExitCode, type ExitCodeValue, resolveExitCode } from './exit-codes.ts';
 import type { MigrationState } from './state.ts';
 import type { ItemState, MigrationError } from './types.ts';
@@ -14,6 +15,14 @@ export interface StatusReport {
     since: string;
   }>;
   errored: Array<{ source_id: string; error: MigrationError }>;
+  /** Captions saved locally that still need to be hosted and attached. */
+  pending_captions: Array<{
+    source_id: string;
+    asset_id: string | null;
+    language: string;
+    path: string;
+    attach_command: string | null;
+  }>;
   exit_code: ExitCodeValue;
   next_command?: string;
 }
@@ -41,6 +50,7 @@ export function summarizeStatus(state: MigrationState): StatusReport {
       counts,
       in_flight: [],
       errored: [],
+      pending_captions: [],
       exit_code: ExitCode.Usage,
       next_command: 'mux migrate plan',
     };
@@ -76,6 +86,17 @@ export function summarizeStatus(state: MigrationState): StatusReport {
     counts,
     in_flight: inFlight,
     errored,
+    pending_captions: state.list().flatMap((record) =>
+      record.pendingCaptions.map((caption) => ({
+        source_id: record.sourceId,
+        asset_id: record.assetId ?? null,
+        language: caption.language,
+        path: caption.path,
+        attach_command: record.assetId
+          ? attachCaptionCommand(record.assetId, caption)
+          : null,
+      })),
+    ),
     exit_code: exitCode,
     next_command: nextCommand,
   };

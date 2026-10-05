@@ -107,7 +107,11 @@ describe('verifyMigration', () => {
   test('fails when fewer text tracks than source captions arrived, excluding pending captions', async () => {
     migrated('a', { captions: 2, textTracks: 1 });
     migrated('b', { captions: 2, textTracks: 1 });
-    state.update('b', { captionsPending: 1 });
+    state.update('b', {
+      pendingCaptions: [
+        { language: 'en', path: 'b.en.srt', closedCaptions: false },
+      ],
+    });
 
     const report = await run();
 

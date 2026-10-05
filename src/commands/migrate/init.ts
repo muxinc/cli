@@ -16,7 +16,14 @@ export const initCommand = new Command()
         if (io.json) {
           io.out(JSON.stringify(result, null, 2));
         } else {
-          io.out(`Wrote ${result.recipe}. Edit it, then run:`);
+          io.out(`Wrote ${result.recipe}. Review the source settings in it.`);
+          if (result.credentials.length > 0) {
+            io.out('Set these environment variables before planning:');
+            for (const variable of result.credentials) {
+              const optional = variable.required ? '' : ' (optional)';
+              io.out(`  ${variable.name}${optional}: ${variable.description}`);
+            }
+          }
           io.out(`Next: ${result.next_command}`);
         }
       } catch (error) {

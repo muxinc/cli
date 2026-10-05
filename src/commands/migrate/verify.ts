@@ -2,8 +2,8 @@ import { Command } from '@cliffy/command';
 import { executeVerify } from '@/lib/migrate/cli.ts';
 import {
   createIO,
-  createMigrateContext,
-  type SourceOptions,
+  createMuxContext,
+  type SharedOptions,
   withContext,
 } from './_shared.ts';
 
@@ -13,18 +13,13 @@ export const verifyCommand = new Command()
   )
   .option('--ids <ids:string>', 'Verify only these comma-separated source IDs')
   .option(
-    '--recipe <path:string>',
-    'Recipe file (default: ./mux-migrate.json if present)',
-  )
-  .option('--manifest <path:string>', 'Manifest file for the manifest provider')
-  .option(
     '--state <path:string>',
     'State file (default: ./.mux-migrate/state.db)',
   )
   .option('--json', 'Output JSON')
-  .action(async (options: SourceOptions & { ids?: string }) => {
+  .action(async (options: SharedOptions & { ids?: string }) => {
     const ctx = await withContext(createIO(options), () =>
-      createMigrateContext(undefined, options),
+      createMuxContext(options),
     );
     process.exit(await executeVerify(options, ctx));
   });

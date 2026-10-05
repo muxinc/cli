@@ -76,6 +76,34 @@ describe('summarizeStatus', () => {
     expect(report.next_command).toBe('mux migrate export');
   });
 
+  test('lists pending captions with the command that attaches each one', () => {
+    seed(['a']);
+    state.update('a', {
+      state: 'ready',
+      assetId: 'asset_1',
+      pendingCaptions: [
+        {
+          language: 'en',
+          path: '.mux-migrate/captions/a.en.srt',
+          closedCaptions: false,
+        },
+      ],
+    });
+
+    const report = summarizeStatus(state);
+
+    expect(report.pending_captions).toEqual([
+      {
+        source_id: 'a',
+        asset_id: 'asset_1',
+        language: 'en',
+        path: '.mux-migrate/captions/a.en.srt',
+        attach_command:
+          'mux assets tracks create asset_1 --url <URL of a.en.srt> --type text --text-type subtitles --language-code en',
+      },
+    ]);
+  });
+
   test('lists at most ten in-flight items, oldest first', () => {
     const ids = Array.from({ length: 12 }, (_, i) => `item-${i}`);
     seed(ids);

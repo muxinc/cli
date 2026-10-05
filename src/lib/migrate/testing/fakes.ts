@@ -118,6 +118,7 @@ export class FakeMux implements MuxMigrateClient {
   beforeCreate?: (params: AssetCreateParams) => void;
   afterCreate?: (asset: Asset, params: AssetCreateParams) => void;
   private failures: CreateFailure[] = [];
+  private inputs = new Map<string, NonNullable<AssetCreateParams['inputs']>>();
 
   constructor(
     private clock: FakeClock,
@@ -150,6 +151,7 @@ export class FakeMux implements MuxMigrateClient {
 
     const asset = this.makeAsset(params, this.clock.now());
     this.assets.unshift(asset);
+    this.inputs.set(asset.id, params.inputs ?? []);
     this.emit('video.asset.created', asset);
     if (this.autoReady) this.markReady(asset.id);
 
@@ -162,6 +164,14 @@ export class FakeMux implements MuxMigrateClient {
   markReady(assetId: string): void {
     const asset = this.find(assetId);
     asset.status = 'ready';
+    asset.tracks = (this.inputs.get(assetId) ?? [])
+      .filter((input) => input.type === 'text')
+      .map((input, i) => ({
+        id: `track_${assetId}_${i}`,
+        type: 'text',
+        status: 'ready',
+        language_code: input.language_code,
+      }));
     this.emit('video.asset.ready', asset);
     for (const { id } of asset.directives ?? []) {
       const run: DirectiveRunSummary = {

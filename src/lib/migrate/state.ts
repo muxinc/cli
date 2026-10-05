@@ -29,9 +29,18 @@ export interface ItemRecord {
   recipeHash?: string;
   directiveRuns: DirectiveRunSummary[];
   /** Source captions saved locally because they could not be passed to Mux by URL. */
-  captionsPending: number;
+  pendingCaptions: PendingCaption[];
+  /** Caption objects uploaded to the customer's bucket, deleted once Mux has the track. */
+  hostedCaptions: string[];
   verification?: Verification;
   updatedAt: number;
+}
+
+export interface PendingCaption {
+  language: string;
+  path: string;
+  label?: string;
+  closedCaptions: boolean;
 }
 
 export interface VerifyCheck {
@@ -79,7 +88,8 @@ interface ItemRow {
   attempts: number;
   recipe_hash: string | null;
   directive_runs_json: string;
-  captions_pending: number;
+  pending_captions_json: string;
+  hosted_captions_json: string;
   verification_json: string | null;
   updated_at: number;
 }
@@ -109,7 +119,14 @@ const COLUMNS: Record<
     column: 'directive_runs_json',
     encode: (v: DirectiveRunSummary[]) => JSON.stringify(v),
   },
-  captionsPending: { column: 'captions_pending', encode: (v: number) => v },
+  pendingCaptions: {
+    column: 'pending_captions_json',
+    encode: (v: PendingCaption[]) => JSON.stringify(v),
+  },
+  hostedCaptions: {
+    column: 'hosted_captions_json',
+    encode: (v: string[]) => JSON.stringify(v),
+  },
   verification: {
     column: 'verification_json',
     encode: (v?: Verification) => (v ? JSON.stringify(v) : null),
@@ -129,7 +146,8 @@ function toRecord(row: ItemRow): ItemRecord {
     attempts: row.attempts,
     recipeHash: row.recipe_hash ?? undefined,
     directiveRuns: JSON.parse(row.directive_runs_json),
-    captionsPending: row.captions_pending,
+    pendingCaptions: JSON.parse(row.pending_captions_json),
+    hostedCaptions: JSON.parse(row.hosted_captions_json),
     verification: row.verification_json
       ? JSON.parse(row.verification_json)
       : undefined,
@@ -168,7 +186,8 @@ export class MigrationState {
         attempts INTEGER NOT NULL DEFAULT 0,
         recipe_hash TEXT,
         directive_runs_json TEXT NOT NULL DEFAULT '[]',
-        captions_pending INTEGER NOT NULL DEFAULT 0,
+        pending_captions_json TEXT NOT NULL DEFAULT '[]',
+        hosted_captions_json TEXT NOT NULL DEFAULT '[]',
         verification_json TEXT,
         updated_at INTEGER NOT NULL
       );
