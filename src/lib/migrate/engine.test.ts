@@ -111,6 +111,63 @@ describe('plan', () => {
     expect(h.state.get('b')?.state).toBe('skipped');
   });
 
+  test('reports what the migration involves without resolving anything', async () => {
+    const h = harness([
+      sourceItem('a', {
+        durationSeconds: 60,
+        sizeBytes: 1000,
+        expectedFidelity: 'original',
+        captionCount: 2,
+        captionLanguages: ['en', 'es'],
+      }),
+      sourceItem('b', {
+        durationSeconds: 30,
+        expectedFidelity: 'rendition',
+        captionCount: 1,
+        captionLanguages: ['en'],
+      }),
+      sourceItem('c', { type: 'audio' }),
+      sourceItem('d', { exportable: false, skipReason: 'Live archive' }),
+    ]);
+    h.provider.listWarnings = [
+      {
+        code: 'CLOUDFLARE_RENDITION_ONLY',
+        message: 'Originals are not retained.',
+      },
+    ];
+
+    const plan = await planMigration(h.deps, {
+      directives: [
+        { id: 'drv_1', name: 'Chapters', workflows: ['generate-chapters'] },
+      ],
+    });
+
+    expect(h.provider.resolveCalls).toEqual([]);
+    expect(plan).toMatchObject({
+      total: 4,
+      exportable: 3,
+      skipped: 1,
+      by_type: { video: 3, audio: 1 },
+      skip_reasons: { 'Live archive': 1 },
+      duration_seconds: 90,
+      size_bytes: 1000,
+      fidelity: { original: 1, rendition: 1, unknown: 1 },
+      captions: { en: 2, es: 1 },
+      directives: [
+        {
+          id: 'drv_1',
+          name: 'Chapters',
+          workflows: ['generate-chapters'],
+          items: 3,
+        },
+      ],
+      warnings: [
+        expect.objectContaining({ code: 'CLOUDFLARE_RENDITION_ONLY' }),
+      ],
+      pricing_url: expect.stringContaining('mux.com'),
+    });
+  });
+
   test('does not reset items that already progressed', async () => {
     const h = harness([sourceItem('a')]);
     await h.run();

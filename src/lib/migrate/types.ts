@@ -36,6 +36,10 @@ export interface SourceItem {
   posterUrl?: string;
   chapters?: Array<{ title: string; startSeconds: number }>;
   captionCount: number;
+  /** BCP 47 languages of the source captions, when known before resolving. */
+  captionLanguages?: string[];
+  /** The fidelity `resolve` is expected to return, when known from the listing. */
+  expectedFidelity?: 'original' | 'rendition';
   /** Customer-supplied passthrough, carried to the asset unchanged. */
   passthrough?: string;
   raw: unknown;
@@ -44,6 +48,8 @@ export interface SourceItem {
 export interface ListPage {
   items: SourceItem[];
   next?: string;
+  /** Library-wide conditions found while listing, reported by `plan`. */
+  warnings?: MigrationError[];
 }
 
 export type CaptionSource =

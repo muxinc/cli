@@ -5,6 +5,7 @@ import type {
   DirectiveRunStatus,
   DirectiveRunSummary,
   DirectiveSummary,
+  MigrationError,
   MigrationEventSource,
   MuxEvent,
   MuxMigrateClient,
@@ -275,6 +276,7 @@ export class FakeProvider implements SourceProvider<void> {
   defaultConcurrency = 1;
   resolveCalls: string[] = [];
   resolveOverride?: (item: SourceItem) => ResolveResult;
+  listWarnings: MigrationError[] = [];
 
   constructor(public items: SourceItem[]) {}
 
@@ -288,6 +290,7 @@ export class FakeProvider implements SourceProvider<void> {
     return {
       items: this.items.slice(start, end),
       next: end < this.items.length ? String(end) : undefined,
+      warnings: start === 0 ? this.listWarnings : [],
     };
   }
 

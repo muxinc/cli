@@ -159,6 +159,7 @@ function toSourceItem(row: Row, label: string): SourceItem {
     sourceUrl: url,
     embedPatterns: [url],
     captionCount: captions.length,
+    captionLanguages: captions.map((caption) => caption.language),
     raw: { ...row, captions },
   };
 }

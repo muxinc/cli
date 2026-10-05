@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import {
   continueCommand,
+  loadDirectives,
   type MigrationDeps,
   type PlanSummary,
   planMigration,
@@ -75,16 +76,6 @@ function handleFailure(
   return ExitCode.Failed;
 }
 
-function printPlan(io: MigrateIO, plan: PlanSummary): void {
-  if (io.json) {
-    io.out(JSON.stringify({ type: 'plan', ...plan }));
-    return;
-  }
-  io.out(
-    `Found ${plan.total} item(s): ${plan.exportable} to migrate, ${plan.skipped} skipped (${plan.added} new).`,
-  );
-}
-
 function renderRunEvent(io: MigrateIO, event: RunEvent): void {
   if (io.json) {
     io.out(JSON.stringify(event));
@@ -135,6 +126,51 @@ function assetSettings(flags: RunFlags, recipe?: Recipe): RunOptions['asset'] {
   };
 }
 
+function formatDurationSeconds(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
+function printPlan(io: MigrateIO, plan: PlanSummary): void {
+  if (io.json) {
+    io.out(JSON.stringify({ type: 'plan', ...plan }));
+    return;
+  }
+  io.out(
+    `Found ${plan.total} item(s): ${plan.exportable} to migrate, ${plan.skipped} skipped (${plan.added} new).`,
+  );
+  const types = Object.entries(plan.by_type).map(([type, n]) => `${n} ${type}`);
+  if (types.length > 0) io.out(`  Types: ${types.join(', ')}`);
+  for (const [reason, n] of Object.entries(plan.skip_reasons)) {
+    io.out(`  Skipped: ${n} (${reason})`);
+  }
+  if (plan.duration_seconds !== null) {
+    io.out(`  Total duration: ${formatDurationSeconds(plan.duration_seconds)}`);
+  }
+  if (plan.size_bytes !== null) {
+    io.out(`  Total size: ${(plan.size_bytes / 1e9).toFixed(2)} GB`);
+  }
+  const { original, rendition, unknown } = plan.fidelity;
+  io.out(
+    `  Fidelity: ${original} original, ${rendition} rendition, ${unknown} unknown`,
+  );
+  const captions = Object.entries(plan.captions).map(
+    ([lang, n]) => `${lang} (${n})`,
+  );
+  if (captions.length > 0) io.out(`  Captions: ${captions.join(', ')}`);
+  for (const directive of plan.directives) {
+    io.out(
+      `  Directive ${directive.name} (${directive.id}): ${directive.workflows.join(', ')} on ${directive.items} item(s)`,
+    );
+  }
+  for (const warning of plan.warnings) {
+    io.err(`Warning [${warning.code}]: ${warning.message}`);
+    if (warning.hint) io.err(`Hint: ${warning.hint}`);
+  }
+  io.out(`  Nothing is billed by planning. Pricing: ${plan.pricing_url}`);
+}
+
 export async function executePlan(ctx: MigrateContext): Promise<ExitCodeValue> {
   const { deps, io } = ctx;
   try {
@@ -143,7 +179,13 @@ export async function executePlan(ctx: MigrateContext): Promise<ExitCodeValue> {
       printError(io, verified.warnings[0]);
       return ExitCode.Usage;
     }
-    const plan = await planMigration(deps);
+    const loaded = await loadDirectives(deps.mux, ctx.recipe?.directives ?? []);
+    if ('error' in loaded) {
+      printError(io, loaded.error);
+      return ExitCode.Usage;
+    }
+    const plan = await planMigration(deps, { directives: loaded.directives });
+    plan.warnings.unshift(...verified.warnings);
     if (io.json) {
       io.out(JSON.stringify(plan, null, 2));
     } else {

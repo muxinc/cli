@@ -6,12 +6,14 @@ import type {
   Clock,
   DirectiveRunStatus,
   DirectiveRunSummary,
+  DirectiveSummary,
   ItemState,
   MigrationError,
   MigrationEventSource,
   MuxEvent,
   MuxMigrateClient,
   RunEvent,
+  SourceItem,
   SourceProvider,
   StreamMessage,
 } from './types.ts';
@@ -32,7 +34,20 @@ export interface PlanSummary {
   added: number;
   exportable: number;
   skipped: number;
+  by_type: Partial<Record<SourceItem['type'], number>>;
+  skip_reasons: Record<string, number>;
+  /** Sum of known source durations; null when the provider reports none. */
+  duration_seconds: number | null;
+  size_bytes: number | null;
+  fidelity: { original: number; rendition: number; unknown: number };
+  /** Source caption tracks by language. */
+  captions: Record<string, number>;
+  directives: Array<DirectiveSummary & { items: number }>;
+  warnings: MigrationError[];
+  pricing_url: string;
 }
+
+export const PRICING_URL = 'https://www.mux.com/pricing';
 
 export interface RunOptions {
   /** `--yes`. Without it nothing is created and the exit code is 3. */
@@ -99,24 +114,63 @@ const TERMINAL_RUN_STATUSES = new Set<DirectiveRunStatus>([
 /** Inventories the source into the state file. Free and idempotent. */
 export async function planMigration<C>(
   deps: MigrationDeps<C>,
+  options: { directives?: DirectiveSummary[] } = {},
 ): Promise<PlanSummary> {
   const { state, provider, credentials } = deps;
   state.initMigration(provider.id);
   let added = 0;
+  const warnings: MigrationError[] = [];
   let cursor: string | undefined;
   do {
     const page = await provider.list(credentials, cursor);
     added += state.upsertDiscovered(page.items).added;
+    warnings.push(...(page.warnings ?? []));
     cursor = page.next;
   } while (cursor);
 
-  const counts = state.counts();
-  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  const records = state.list();
+  const exportable = records.filter((record) => record.state !== 'skipped');
+  const tally = (values: Array<string | undefined>) => {
+    const counts: Record<string, number> = {};
+    for (const value of values) {
+      if (value !== undefined) counts[value] = (counts[value] ?? 0) + 1;
+    }
+    return counts;
+  };
+  const sum = (values: Array<number | undefined>) => {
+    const known = values.filter((v): v is number => v !== undefined);
+    return known.length ? known.reduce((total, v) => total + v, 0) : null;
+  };
+  const items = exportable.map((record) => record.item);
+
   return {
-    total,
+    total: records.length,
     added,
-    exportable: total - counts.skipped,
-    skipped: counts.skipped,
+    exportable: exportable.length,
+    skipped: records.length - exportable.length,
+    by_type: tally(records.map((record) => record.item.type)),
+    skip_reasons: tally(
+      records
+        .filter((record) => record.state === 'skipped')
+        .map((record) => record.item.skipReason ?? 'Not exportable'),
+    ),
+    duration_seconds: sum(items.map((item) => item.durationSeconds)),
+    size_bytes: sum(items.map((item) => item.sizeBytes)),
+    fidelity: {
+      original: items.filter((item) => item.expectedFidelity === 'original')
+        .length,
+      rendition: items.filter((item) => item.expectedFidelity === 'rendition')
+        .length,
+      unknown: items.filter((item) => item.expectedFidelity === undefined)
+        .length,
+    },
+    captions: tally(items.flatMap((item) => item.captionLanguages ?? [])),
+    directives: (options.directives ?? []).map((directive) => ({
+      ...directive,
+      items: exportable.length,
+    })),
+    warnings,
+    pricing_url: PRICING_URL,
   };
 }
 
@@ -145,18 +199,12 @@ export async function runMigration<C>(
     );
   }
 
-  const plan = await planMigration(deps);
   const directives = options.skipRobots ? [] : (options.directives ?? []);
-  const directiveError = await checkDirectives(deps.mux, directives);
-  if (directiveError) {
-    return stoppedResult(
-      deps,
-      options,
-      { usageError: true },
-      directiveError,
-      plan,
-    );
+  const loaded = await loadDirectives(deps.mux, directives);
+  if ('error' in loaded) {
+    return stoppedResult(deps, options, { usageError: true }, loaded.error);
   }
+  const plan = await planMigration(deps, { directives: loaded.directives });
   if (!options.confirmed) {
     return stoppedResult(
       deps,
@@ -171,33 +219,39 @@ export async function runMigration<C>(
   return run.execute(plan);
 }
 
-async function checkDirectives(
+/** Retrieves each directive, or the first error that makes the run invalid. */
+export async function loadDirectives(
   mux: MuxMigrateClient,
-  directives: string[],
-): Promise<MigrationError | undefined> {
-  for (const id of directives) {
+  ids: string[],
+): Promise<{ directives: DirectiveSummary[] } | { error: MigrationError }> {
+  const directives: DirectiveSummary[] = [];
+  for (const id of ids) {
     try {
-      await mux.retrieveDirective(id);
+      directives.push(await mux.retrieveDirective(id));
     } catch (error) {
       const status = (error as { status?: number }).status;
       if (status === 404) {
         return {
-          code: 'DIRECTIVE_NOT_FOUND',
-          message: `Directive ${id} was not found in this environment.`,
-          hint: 'Check the directive ID in the Directives section of the Mux Dashboard.',
+          error: {
+            code: 'DIRECTIVE_NOT_FOUND',
+            message: `Directive ${id} was not found in this environment.`,
+            hint: 'Check the directive ID in the Directives section of the Mux Dashboard.',
+          },
         };
       }
       if (status === 401 || status === 403) {
         return {
-          code: 'ROBOTS_NOT_ENABLED',
-          message: `Directive ${id} could not be read with the current credentials.`,
-          hint: 'Make sure Mux Robots is enabled for this environment and the token has Robots permissions.',
+          error: {
+            code: 'ROBOTS_NOT_ENABLED',
+            message: `Directive ${id} could not be read with the current credentials.`,
+            hint: 'Make sure Mux Robots is enabled for this environment and the token has Robots permissions.',
+          },
         };
       }
       throw error;
     }
   }
-  return undefined;
+  return { directives };
 }
 
 function stoppedResult<C>(
