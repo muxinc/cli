@@ -1,20 +1,18 @@
 name: Sync agent skills
 
 # Keeps skill/ in sync with the agent skills published in muxinc/skills.
-# Triggered by a repository_dispatch from that repo on skill changes, with a
-# weekly cron as a backstop and workflow_dispatch for manual runs. Opens a PR
-# only when the synced content actually changed.
+# The CLI pulls: a daily cron, plus workflow_dispatch for manual runs. That
+# repo is public and sends no notification, so no cross-repo token is needed.
+# Opens a PR only when the synced content actually changed.
 #
 # EMBEDDED_SKILLS is an allowlist: muxinc/skills also publishes skills with
 # vendored reference docs (skills/mux), which the CLI intentionally does not
 # embed — the CLI ships routing skills only, never docs content.
 
 on:
-  repository_dispatch:
-    types: [skills-updated]
   workflow_dispatch:
   schedule:
-    - cron: '17 6 * * 1'
+    - cron: '17 6 * * *'
 
 permissions:
   contents: write
