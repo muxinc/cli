@@ -6,7 +6,12 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist", "!.claude/settings.local.json"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!.claude/settings.local.json",
+      "!**/*.gen.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
