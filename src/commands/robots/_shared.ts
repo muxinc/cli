@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type Mux from '@mux/ts';
 import type {
+  AnalyzeStructureJob,
   AskQuestionsJob,
   EditCaptionsJob,
   FindBestThumbnailsJob,
   FindKeyMomentsJob,
-  FindScenesJob,
   GenerateChaptersJob,
   GenerateEngagementInsightsJob,
   GeneratePremiumCaptionsJob,
@@ -20,7 +20,7 @@ export type AnyRobotsJob =
   | EditCaptionsJob
   | FindBestThumbnailsJob
   | FindKeyMomentsJob
-  | FindScenesJob
+  | AnalyzeStructureJob
   | GenerateChaptersJob
   | GenerateEngagementInsightsJob
   | GeneratePremiumCaptionsJob
@@ -63,6 +63,22 @@ export async function loadJobParameters<T extends { asset_id?: string }>(
     );
   }
 
+  const legacyFields = [
+    'prompt_overrides',
+    'target_duration_ms',
+    'to_language_code',
+    'delete_original_track',
+    'track_name_suffix',
+    'replace_existing',
+    'min_scene_duration_ms',
+    'min_scenes',
+  ].filter((field) => Object.hasOwn(parsed, field));
+  if (legacyFields.length > 0) {
+    throw new Error(
+      `Robots v0 parameters are no longer supported: ${legacyFields.join(', ')}. Update the file to the Robots v1 parameters documented at https://www.mux.com/docs/guides/robots.`,
+    );
+  }
+
   if (parsed.asset_id && parsed.asset_id !== assetIdFromPositional) {
     throw new Error(
       `asset_id in config file (${parsed.asset_id}) does not match positional argument (${assetIdFromPositional}).`,
@@ -86,8 +102,8 @@ export function retrieveRobotsJob(
       return mux.robots.jobs.findBestThumbnails.retrieve(jobId);
     case 'find-key-moments':
       return mux.robots.jobs.findKeyMoments.retrieve(jobId);
-    case 'find-scenes':
-      return mux.robots.jobs.findScenes.retrieve(jobId);
+    case 'analyze-structure':
+      return mux.robots.jobs.analyzeStructure.retrieve(jobId);
     case 'generate-chapters':
       return mux.robots.jobs.generateChapters.retrieve(jobId);
     case 'generate-engagement-insights':

@@ -10,7 +10,7 @@ const WORKFLOWS: RobotsWorkflow[] = [
   'edit-captions',
   'find-best-thumbnails',
   'find-key-moments',
-  'find-scenes',
+  'analyze-structure',
   'generate-chapters',
   'generate-engagement-insights',
   'generate-premium-captions',

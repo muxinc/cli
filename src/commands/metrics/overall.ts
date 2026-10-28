@@ -76,7 +76,9 @@ export const overallCommand = new Command()
       }
 
       console.log(`Value:            ${overall.value ?? '-'}`);
-      console.log(`Global Value:     ${overall.global_value ?? '-'}`);
+      const globalValue =
+        'global_value' in overall ? overall.global_value : undefined;
+      console.log(`Global Value:     ${globalValue ?? '-'}`);
       console.log(`Total Views:      ${overall.total_views ?? '-'}`);
       console.log(`Total Watch Time: ${overall.total_watch_time ?? '-'}`);
     } catch (error) {

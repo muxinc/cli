@@ -89,41 +89,6 @@ describe('mux robots summarize', () => {
       const opt = summarizeCommand.getOptions().find((o) => o.name === 'file');
       expect(opt).toBeDefined();
     });
-
-    test('has --prompt-task flag', () => {
-      const opt = summarizeCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-task');
-      expect(opt).toBeDefined();
-    });
-
-    test('has --prompt-title flag', () => {
-      const opt = summarizeCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-title');
-      expect(opt).toBeDefined();
-    });
-
-    test('has --prompt-description flag', () => {
-      const opt = summarizeCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-description');
-      expect(opt).toBeDefined();
-    });
-
-    test('has --prompt-keywords flag', () => {
-      const opt = summarizeCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-keywords');
-      expect(opt).toBeDefined();
-    });
-
-    test('has --prompt-quality-guidelines flag', () => {
-      const opt = summarizeCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-quality-guidelines');
-      expect(opt).toBeDefined();
-    });
   });
 
   describe('Input validation', () => {

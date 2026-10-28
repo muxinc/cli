@@ -10,12 +10,12 @@ import {
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { findScenesCommand } from './find-scenes.ts';
+import { analyzeStructureCommand } from './analyze-structure.ts';
 
 // Note: These tests focus on CLI flag parsing and command structure
 // They do NOT test the actual Mux API integration (that's tested via E2E)
 
-describe('mux robots find-scenes', () => {
+describe('mux robots analyze-structure', () => {
   let tempDir: string;
   let exitSpy: Mock<typeof process.exit>;
   let consoleErrorSpy: Mock<typeof console.error>;
@@ -38,11 +38,11 @@ describe('mux robots find-scenes', () => {
 
   describe('Command metadata', () => {
     test('has correct command description', () => {
-      expect(findScenesCommand.getDescription()).toMatch(/scene/i);
+      expect(analyzeStructureCommand.getDescription()).toMatch(/scene/i);
     });
 
     test('requires asset-id argument', () => {
-      const args = findScenesCommand.getArguments();
+      const args = analyzeStructureCommand.getArguments();
       expect(args.length).toBeGreaterThan(0);
       expect(args[0].name).toBe('asset-id');
     });
@@ -51,11 +51,9 @@ describe('mux robots find-scenes', () => {
   describe('Flags', () => {
     test.each([
       'language-code',
-      'min-scene-duration-ms',
-      'min-scenes',
       'audience',
       'brand-term',
-      'narration-detail',
+      'granularity',
       'start-time',
       'end-time',
       'passthrough',
@@ -63,7 +61,9 @@ describe('mux robots find-scenes', () => {
       'wait',
       'json',
     ])('has --%s flag', (flag) => {
-      const opt = findScenesCommand.getOptions().find((o) => o.name === flag);
+      const opt = analyzeStructureCommand
+        .getOptions()
+        .find((o) => o.name === flag);
       expect(opt).toBeDefined();
     });
   });
@@ -71,7 +71,7 @@ describe('mux robots find-scenes', () => {
   describe('Input validation', () => {
     test('throws error when asset-id is not provided', async () => {
       try {
-        await findScenesCommand.parse([]);
+        await analyzeStructureCommand.parse([]);
       } catch (_error) {
         // Expected to throw
       }
@@ -79,13 +79,13 @@ describe('mux robots find-scenes', () => {
       expect(exitSpy).toHaveBeenCalled();
     });
 
-    test('rejects invalid --narration-detail value', async () => {
+    test('rejects invalid --granularity value', async () => {
       let errorThrown = false;
       let errorMessage = '';
       try {
-        await findScenesCommand.parse([
+        await analyzeStructureCommand.parse([
           'asset_abc',
-          '--narration-detail',
+          '--granularity',
           'verbose',
         ]);
       } catch (error) {
@@ -93,21 +93,24 @@ describe('mux robots find-scenes', () => {
         errorMessage = error instanceof Error ? error.message : String(error);
       }
       expect(errorThrown).toBe(true);
-      expect(errorMessage).toMatch(/narration-detail/i);
+      expect(errorMessage).toMatch(/granularity/i);
     });
   });
 
   describe('--file mode', () => {
-    test('errors when --file combined with --min-scenes', async () => {
+    test('errors when --file combined with --granularity', async () => {
       const configPath = join(tempDir, 'config.json');
-      await writeFile(configPath, JSON.stringify({ min_scenes: 3 }));
+      await writeFile(
+        configPath,
+        JSON.stringify({ output_steering: { granularity: 'fine' } }),
+      );
       try {
-        await findScenesCommand.parse([
+        await analyzeStructureCommand.parse([
           'asset_abc',
           '--file',
           configPath,
-          '--min-scenes',
-          '3',
+          '--granularity',
+          'fine',
         ]);
       } catch (_error) {
         // Expected

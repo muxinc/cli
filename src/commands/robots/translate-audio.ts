@@ -42,7 +42,7 @@ export const translateAudioCommand: Command<any> = new Command()
   )
   .option(
     '-f, --file <path:string>',
-    'JSON config file with the full parameters object (to_language_code, etc.)',
+    'JSON config file with the full parameters object (output_language_code, etc.)',
   )
   .option(
     '--wait',
@@ -72,7 +72,7 @@ export const translateAudioCommand: Command<any> = new Command()
         }
         parameters = {
           asset_id: assetId,
-          to_language_code: options.toLanguageCode,
+          output_language_code: options.toLanguageCode,
         };
         if (options.upload === false) {
           parameters.upload_to_mux = false;

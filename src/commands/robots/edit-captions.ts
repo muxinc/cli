@@ -24,8 +24,8 @@ interface EditCaptionsOptions {
   caseSensitive?: boolean;
   censorProfanity?: boolean;
   censorMode?: CensorMode;
-  deleteOriginalTrack?: boolean;
-  trackNameSuffix?: string;
+  replaceExistingTracks?: 'replace' | 'fail';
+  trackName?: string;
   upload?: boolean;
   passthrough?: string;
   file?: string;
@@ -88,12 +88,20 @@ export const editCaptionsCommand: Command<any> = new Command()
     },
   )
   .option(
-    '--delete-original-track',
-    'Delete the original caption track after the edited track is created',
+    '--replace-existing-tracks <policy:string>',
+    'Source-track policy: fail keeps the source and requires --track-name; replace deletes the source (default: fail)',
+    {
+      value: (value: string): 'replace' | 'fail' => {
+        if (value !== 'replace' && value !== 'fail') {
+          throw new Error('--replace-existing-tracks must be replace or fail');
+        }
+        return value;
+      },
+    },
   )
   .option(
-    '--track-name-suffix <trackNameSuffix:string>',
-    'Suffix appended to the edited track name',
+    '--track-name <trackName:string>',
+    'Name for the edited track; must differ from the source when keeping it',
   )
   .option(
     '--no-upload',
@@ -122,8 +130,8 @@ export const editCaptionsCommand: Command<any> = new Command()
         options.caseSensitive !== undefined ||
         options.censorProfanity !== undefined ||
         options.censorMode !== undefined ||
-        options.deleteOriginalTrack !== undefined ||
-        options.trackNameSuffix !== undefined ||
+        options.replaceExistingTracks !== undefined ||
+        options.trackName !== undefined ||
         options.upload === false;
 
       if (options.file && hasShapeFlags) {
@@ -162,10 +170,27 @@ export const editCaptionsCommand: Command<any> = new Command()
             censor.mode = options.censorMode;
           parameters.auto_censor_profanity = censor;
         }
-        if (options.deleteOriginalTrack !== undefined)
-          parameters.delete_original_track = options.deleteOriginalTrack;
-        if (options.trackNameSuffix !== undefined)
-          parameters.track_name_suffix = options.trackNameSuffix;
+        parameters.replace_existing_tracks =
+          options.replaceExistingTracks ?? 'fail';
+        if (options.trackName !== undefined)
+          parameters.track_name = options.trackName;
+        if (
+          options.upload !== false &&
+          parameters.replace_existing_tracks === 'fail' &&
+          !options.trackName
+        ) {
+          throw new Error(
+            '--track-name is required when keeping the source track (or use --replace-existing-tracks replace).',
+          );
+        }
+        if (
+          options.upload === false &&
+          parameters.replace_existing_tracks === 'replace'
+        ) {
+          throw new Error(
+            '--replace-existing-tracks replace cannot be combined with --no-upload.',
+          );
+        }
         if (options.upload === false) parameters.upload_to_mux = false;
       }
 
