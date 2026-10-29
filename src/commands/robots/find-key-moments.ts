@@ -29,12 +29,12 @@ export const findKeyMomentsCommand: Command<any> = new Command()
   .arguments('<asset-id:string>')
   .option(
     '--max-moments <maxMoments:number>',
-    'Maximum number of key moments to extract (1-10; server chooses the default when omitted)',
+    'Maximum number of key moments to extract (1-25; defaults to 10 for assets up to one hour and 25 for longer assets)',
     {
       value: (value: number): number => {
-        if (!Number.isInteger(value) || value < 1 || value > 10) {
+        if (!Number.isInteger(value) || value < 1 || value > 25) {
           throw new Error(
-            `--max-moments must be an integer between 1 and 10 (got: ${value})`,
+            `--max-moments must be an integer between 1 and 25 (got: ${value})`,
           );
         }
         return value;

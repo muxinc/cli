@@ -1014,7 +1014,7 @@ mux robots ask-questions abc123 --question "What is this video about?" --questio
 Find key moments and highlights in a video.
 
 **Options:**
-- `--max-moments <n>` - Maximum number of key moments to extract (1–10; the server chooses a default when omitted)
+- `--max-moments <n>` - Maximum number of key moments to extract (1–25; defaults to 10 for assets up to one hour and 25 for longer assets)
 - `--target-duration-min-ms <ms>` - Preferred minimum highlight duration in milliseconds (must be paired with max)
 - `--target-duration-max-ms <ms>` - Preferred maximum highlight duration in milliseconds (must be paired with min)
 - `--passthrough <string>` - Arbitrary metadata (max 255 chars)

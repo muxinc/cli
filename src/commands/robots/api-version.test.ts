@@ -108,6 +108,12 @@ describe('Robots API version', () => {
       parameters: { target_duration: { min: 15.125, max: 45 } },
     },
     {
+      name: 'key moment maximum',
+      command: findKeyMomentsCommand,
+      args: ['--max-moments', '25'],
+      parameters: { max_moments: 25 },
+    },
+    {
       name: 'premium caption replacement',
       command: generatePremiumCaptionsCommand,
       args: ['--replace-existing'],
