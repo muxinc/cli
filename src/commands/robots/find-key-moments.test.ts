@@ -112,17 +112,17 @@ describe('mux robots find-key-moments', () => {
       expect(exitSpy).toHaveBeenCalled();
     });
 
-    test('rejects --max-moments above 10', async () => {
+    test('rejects --max-moments above 25', async () => {
       let errorThrown = false;
       let errorMessage = '';
       try {
-        await findKeyMomentsCommand.parse(['asset_abc', '--max-moments', '11']);
+        await findKeyMomentsCommand.parse(['asset_abc', '--max-moments', '26']);
       } catch (error) {
         errorThrown = true;
         errorMessage = error instanceof Error ? error.message : String(error);
       }
       expect(errorThrown).toBe(true);
-      expect(errorMessage).toMatch(/max-moments|10/i);
+      expect(errorMessage).toMatch(/max-moments|25/i);
     });
 
     test('rejects --max-moments below 1', async () => {

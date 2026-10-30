@@ -23,11 +23,6 @@ interface SummarizeOptions {
   titleLength?: number;
   descriptionLength?: number;
   tagCount?: number;
-  promptTask?: string;
-  promptTitle?: string;
-  promptDescription?: string;
-  promptKeywords?: string;
-  promptQualityGuidelines?: string;
   passthrough?: string;
   file?: string;
   wait?: boolean;
@@ -72,32 +67,12 @@ export const summarizeCommand: Command<any> = new Command()
   )
   .option('--tag-count <tagCount:number>', 'Maximum number of tags to generate')
   .option(
-    '--prompt-task <promptTask:string>',
-    'Override the core task instruction for summarization',
-  )
-  .option(
-    '--prompt-title <promptTitle:string>',
-    'Override the title generation requirements',
-  )
-  .option(
-    '--prompt-description <promptDescription:string>',
-    'Override the description generation requirements',
-  )
-  .option(
-    '--prompt-keywords <promptKeywords:string>',
-    'Override the keyword/tag extraction requirements',
-  )
-  .option(
-    '--prompt-quality-guidelines <promptQualityGuidelines:string>',
-    'Override the quality standards for analysis',
-  )
-  .option(
     '--passthrough <passthrough:string>',
     'Arbitrary metadata returned in API responses (max 255 chars)',
   )
   .option(
     '-f, --file <path:string>',
-    'JSON config file with the full parameters object (tone, prompt_overrides, etc.)',
+    'JSON config file with the full parameters object (tone, output_steering, etc.)',
   )
   .option(
     '--wait',
@@ -106,15 +81,13 @@ export const summarizeCommand: Command<any> = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: SummarizeOptions, assetId: string) => {
     try {
-      const promptOverrides = buildPromptOverrides(options);
       const hasShapeFlags =
         options.tone !== undefined ||
         options.languageCode !== undefined ||
         options.outputLanguageCode !== undefined ||
         options.titleLength !== undefined ||
         options.descriptionLength !== undefined ||
-        options.tagCount !== undefined ||
-        promptOverrides !== undefined;
+        options.tagCount !== undefined;
 
       if (options.file && hasShapeFlags) {
         throw new Error(FILE_MUTEX_MSG);
@@ -139,8 +112,6 @@ export const summarizeCommand: Command<any> = new Command()
           parameters.description_length = options.descriptionLength;
         if (options.tagCount !== undefined)
           parameters.tag_count = options.tagCount;
-        if (promptOverrides !== undefined)
-          parameters.prompt_overrides = promptOverrides;
       }
 
       const body: SummarizeCreateParams = { parameters };
@@ -174,18 +145,3 @@ export const summarizeCommand: Command<any> = new Command()
       await handleCommandError(error, 'robots', 'summarize', options);
     }
   });
-
-function buildPromptOverrides(
-  options: SummarizeOptions,
-): SummarizeJobParameters.PromptOverrides | undefined {
-  const overrides: SummarizeJobParameters.PromptOverrides = {};
-  if (options.promptTask !== undefined) overrides.task = options.promptTask;
-  if (options.promptTitle !== undefined) overrides.title = options.promptTitle;
-  if (options.promptDescription !== undefined)
-    overrides.description = options.promptDescription;
-  if (options.promptKeywords !== undefined)
-    overrides.keywords = options.promptKeywords;
-  if (options.promptQualityGuidelines !== undefined)
-    overrides.quality_guidelines = options.promptQualityGuidelines;
-  return Object.keys(overrides).length > 0 ? overrides : undefined;
-}

@@ -923,6 +923,16 @@ mux drm-configurations get <drm-configuration-id>
 
 Run AI-powered workflows on your video assets using [Mux Robots](https://docs.mux.com/guides/robots). Requires accepting the Robots terms of service in the [Mux Dashboard](https://dashboard.mux.com) and a token with `robots:read` and `robots:write` permissions.
 
+Robots commands use the **v1 API**. When upgrading from a CLI using v0:
+
+- Use `analyze-structure` instead of the retired `find-scenes` workflow. Its `--granularity` control replaces the old scene-count and narration-detail flags.
+- Summarize and chapter commands no longer accept `--prompt-*` flags. Supply supported `output_steering` controls through `--file` instead.
+- `--to-language-code` is unchanged; JSON parameter files must use `output_language_code`.
+- Key-moment duration flags still take milliseconds. JSON files use `target_duration: { "min": 15, "max": 45 }` in seconds.
+- Caption editing uses `--track-name` and `--replace-existing-tracks fail|replace` instead of `--track-name-suffix` and `--delete-original-track`. Flag-based requests keep the source by default and require a distinct `--track-name`, unless `--no-upload` is set. Replacing the source requires `--replace-existing-tracks replace`.
+- Job JSON uses the v1 response schemas; update scripts that consume v0 output fields.
+- JSON parameter files must use v1 field names. Their replacement defaults follow the v1 API; set `replace_existing_tracks` explicitly when controlling which tracks are kept.
+
 #### Job Management
 
 ```bash
@@ -938,7 +948,7 @@ mux robots cancel <job-id>
 
 **List options:** `--workflow`, `--status`, `--asset-id`, `--limit`, `--page`, `--compact`
 
-**Workflow values:** `summarize`, `moderate`, `generate-chapters`, `ask-questions`, `find-key-moments`, `translate-captions`, `edit-captions`, `find-best-thumbnails`, `find-scenes`, `generate-engagement-insights`, `generate-premium-captions`, `translate-audio`
+**Workflow values:** `summarize`, `moderate`, `generate-chapters`, `ask-questions`, `find-key-moments`, `translate-captions`, `edit-captions`, `find-best-thumbnails`, `analyze-structure`, `generate-engagement-insights`, `generate-premium-captions`, `translate-audio`
 
 #### `mux robots summarize <asset-id>`
 
@@ -1004,7 +1014,7 @@ mux robots ask-questions abc123 --question "What is this video about?" --questio
 Find key moments and highlights in a video.
 
 **Options:**
-- `--max-moments <n>` - Maximum number of key moments to extract (default: 5)
+- `--max-moments <n>` - Maximum number of key moments to extract (1–25; defaults to 10 for assets up to one hour and 25 for longer assets)
 - `--target-duration-min-ms <ms>` - Preferred minimum highlight duration in milliseconds (must be paired with max)
 - `--target-duration-max-ms <ms>` - Preferred maximum highlight duration in milliseconds (must be paired with min)
 - `--passthrough <string>` - Arbitrary metadata (max 255 chars)
@@ -1050,13 +1060,13 @@ Edit a caption track with find/replace rules or automatic profanity censoring.
 - `--case-sensitive` - Make `--replace` rules match case-sensitively
 - `--censor-profanity` - Automatically censor profanity
 - `--censor-mode <mode>` - `blank`, `remove`, or `mask` (implies `--censor-profanity`)
-- `--delete-original-track` - Delete the original track after editing
-- `--track-name-suffix <suffix>` - Suffix appended to the edited track name
+- `--replace-existing-tracks <policy>` - `fail` keeps the source (default); `replace` deletes and replaces it
+- `--track-name <name>` - Name for the edited track; required when keeping and uploading alongside the source
 - `--no-upload` - Do not upload the edited VTT to Mux
 - `--passthrough <string>` - Arbitrary metadata (max 255 chars)
 
 ```bash
-mux robots edit-captions abc123 --track-id track456 --replace "Muks=Mux" --censor-profanity
+mux robots edit-captions abc123 --track-id track456 --replace "Muks=Mux" --censor-profanity --track-name "Edited captions"
 ```
 
 #### `mux robots generate-premium-captions <asset-id>`
@@ -1094,22 +1104,20 @@ Find the best thumbnail candidates for a video.
 mux robots find-best-thumbnails abc123 --max-thumbnails 3 --update-asset-thumbnail
 ```
 
-#### `mux robots find-scenes <asset-id>`
+#### `mux robots analyze-structure <asset-id>`
 
-Detect and describe the scenes in a video.
+Analyze scenes, chapters, and the structure of a video.
 
 **Options:**
 - `--language-code <code>` - BCP 47 code of the caption track to analyze
-- `--min-scene-duration-ms <ms>` - Minimum scene duration
-- `--min-scenes <n>` - Minimum number of scenes
 - `--audience <text>` - Intended audience used as model guidance
 - `--brand-term <term>` - Preferred brand or domain term (repeatable)
-- `--narration-detail <detail>` - `concise`, `balanced`, or `detailed`
+- `--granularity <level>` - `coarse`, `balanced`, or `fine` scene and chapter density
 - `--start-time <seconds>` / `--end-time <seconds>` - Execution window on the asset timeline
 - `--passthrough <string>` - Arbitrary metadata (max 255 chars)
 
 ```bash
-mux robots find-scenes abc123 --min-scenes 5 --narration-detail detailed
+mux robots analyze-structure abc123 --granularity fine
 ```
 
 #### `mux robots generate-engagement-insights <asset-id>`

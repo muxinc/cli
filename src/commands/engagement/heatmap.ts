@@ -63,10 +63,10 @@ export const heatmapCommand = new Command()
         return;
       }
 
-      // The SDK types declare { total_views, value } but the live API
-      // currently returns { asset_id, heatmap } — accept both shapes.
+      // Accept legacy response fields alongside the current heatmap shape.
       const heatmap = response.data as Partial<EngagementHeatmap> & {
-        heatmap?: number[];
+        value?: number[];
+        total_views?: number;
       };
       const values = heatmap.value ?? heatmap.heatmap ?? [];
       console.log(`Engagement heatmap for ${target.kind} ${target.id}:`);

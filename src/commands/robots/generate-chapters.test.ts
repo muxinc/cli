@@ -92,34 +92,6 @@ describe('mux robots generate-chapters', () => {
         .find((o) => o.name === 'file');
       expect(opt).toBeDefined();
     });
-
-    test('has --prompt-task flag', () => {
-      const opt = generateChaptersCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-task');
-      expect(opt).toBeDefined();
-    });
-
-    test('has --prompt-output-format flag', () => {
-      const opt = generateChaptersCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-output-format');
-      expect(opt).toBeDefined();
-    });
-
-    test('has --prompt-chapter-guidelines flag', () => {
-      const opt = generateChaptersCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-chapter-guidelines');
-      expect(opt).toBeDefined();
-    });
-
-    test('has --prompt-title-guidelines flag', () => {
-      const opt = generateChaptersCommand
-        .getOptions()
-        .find((o) => o.name === 'prompt-title-guidelines');
-      expect(opt).toBeDefined();
-    });
   });
 
   describe('Input validation', () => {

@@ -55,8 +55,8 @@ describe('mux robots edit-captions', () => {
       'case-sensitive',
       'censor-profanity',
       'censor-mode',
-      'delete-original-track',
-      'track-name-suffix',
+      'replace-existing-tracks',
+      'track-name',
       'no-upload',
       'passthrough',
       'file',
@@ -105,6 +105,55 @@ describe('mux robots edit-captions', () => {
   });
 
   describe('Input validation', () => {
+    test('requires a name when keeping and uploading alongside the source', async () => {
+      await expect(
+        editCaptionsCommand.parse([
+          'asset_abc',
+          '--track-id',
+          'trk_1',
+          '--replace',
+          'a=b',
+        ]),
+      ).rejects.toThrow();
+      expect(consoleErrorSpy.mock.calls[0]?.[0]).toMatch(
+        /--track-name is required/,
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    test('rejects replacing a source track when upload is disabled', async () => {
+      await expect(
+        editCaptionsCommand.parse([
+          'asset_abc',
+          '--track-id',
+          'trk_1',
+          '--replace',
+          'a=b',
+          '--replace-existing-tracks',
+          'replace',
+          '--no-upload',
+        ]),
+      ).rejects.toThrow();
+      expect(consoleErrorSpy.mock.calls[0]?.[0]).toMatch(
+        /cannot be combined with --no-upload/,
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    test('rejects unsupported replacement policies', async () => {
+      await expect(
+        editCaptionsCommand.parse([
+          'asset_abc',
+          '--track-id',
+          'trk_1',
+          '--replace',
+          'a=b',
+          '--replace-existing-tracks',
+          'all',
+        ]),
+      ).rejects.toThrow(/must be replace or fail/);
+    });
+
     test('errors when --track-id is missing without --file', async () => {
       try {
         await editCaptionsCommand.parse(['asset_abc', '--replace', 'a=b']);

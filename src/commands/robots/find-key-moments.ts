@@ -29,12 +29,12 @@ export const findKeyMomentsCommand: Command<any> = new Command()
   .arguments('<asset-id:string>')
   .option(
     '--max-moments <maxMoments:number>',
-    'Maximum number of key moments to extract (1-10, default 5)',
+    'Maximum number of key moments to extract (1-25; defaults to 10 for assets up to one hour and 25 for longer assets)',
     {
       value: (value: number): number => {
-        if (!Number.isInteger(value) || value < 1 || value > 10) {
+        if (!Number.isInteger(value) || value < 1 || value > 25) {
           throw new Error(
-            `--max-moments must be an integer between 1 and 10 (got: ${value})`,
+            `--max-moments must be an integer between 1 and 25 (got: ${value})`,
           );
         }
         return value;
@@ -55,7 +55,7 @@ export const findKeyMomentsCommand: Command<any> = new Command()
   )
   .option(
     '-f, --file <path:string>',
-    'JSON config file with the full parameters object (max_moments, target_duration_ms, etc.)',
+    'JSON config file with the full parameters object (max_moments, target_duration, etc.)',
   )
   .option(
     '--wait',
@@ -93,7 +93,7 @@ export const findKeyMomentsCommand: Command<any> = new Command()
         if (options.maxMoments !== undefined)
           parameters.max_moments = options.maxMoments;
         if (minMs !== undefined && maxMs !== undefined) {
-          parameters.target_duration_ms = { min: minMs, max: maxMs };
+          parameters.target_duration = { min: minMs / 1000, max: maxMs / 1000 };
         }
       }
 

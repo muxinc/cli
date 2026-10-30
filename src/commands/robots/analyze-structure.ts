@@ -1,8 +1,8 @@
 import { Command } from '@cliffy/command';
 import type {
-  FindSceneCreateParams,
-  FindScenesJobParameters,
-  FindScenesOutputSteering,
+  AnalyzeStructureCreateParams,
+  AnalyzeStructureJobParameters,
+  AnalyzeStructureOutputSteering,
 } from '@mux/ts/resources/robots/jobs';
 import { wantsJson } from '@/lib/context.ts';
 import { handleCommandError } from '@/lib/errors.ts';
@@ -14,22 +14,14 @@ import {
   pollForRobotsJob,
 } from './_shared.ts';
 
-type NarrationDetail = NonNullable<
-  FindScenesOutputSteering['narration_detail']
->;
-const VALID_NARRATION_DETAILS: NarrationDetail[] = [
-  'concise',
-  'balanced',
-  'detailed',
-];
+type Granularity = NonNullable<AnalyzeStructureOutputSteering['granularity']>;
+const VALID_GRANULARITIES: Granularity[] = ['coarse', 'balanced', 'fine'];
 
-interface FindScenesOptions {
+interface AnalyzeStructureOptions {
   languageCode?: string;
-  minSceneDurationMs?: number;
-  minScenes?: number;
   audience?: string;
   brandTerm?: string[];
-  narrationDetail?: NarrationDetail;
+  granularity?: Granularity;
   startTime?: number;
   endTime?: number;
   passthrough?: string;
@@ -39,18 +31,15 @@ interface FindScenesOptions {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Cliffy's chained types are too complex for TS to infer
-export const findScenesCommand: Command<any> = new Command()
-  .description('Create a job to detect and describe the scenes in a video')
+export const analyzeStructureCommand: Command<any> = new Command()
+  .description(
+    'Create a job to analyze scenes, chapters, and the structure of a video',
+  )
   .arguments('<asset-id:string>')
   .option(
     '--language-code <languageCode:string>',
     'BCP 47 language code of the caption track to analyze',
   )
-  .option(
-    '--min-scene-duration-ms <minSceneDurationMs:number>',
-    'Minimum scene duration in milliseconds',
-  )
-  .option('--min-scenes <minScenes:number>', 'Minimum number of scenes')
   .option(
     '--audience <audience:string>',
     'Intended audience used as best-effort model guidance',
@@ -61,16 +50,16 @@ export const findScenesCommand: Command<any> = new Command()
     { collect: true },
   )
   .option(
-    '--narration-detail <narrationDetail:string>',
-    'How much detail scene narratives should include (concise, balanced, detailed)',
+    '--granularity <granularity:string>',
+    'Scene and chapter density (coarse, balanced, fine)',
     {
-      value: (value: string): NarrationDetail => {
-        if (!VALID_NARRATION_DETAILS.includes(value as NarrationDetail)) {
+      value: (value: string): Granularity => {
+        if (!VALID_GRANULARITIES.includes(value as Granularity)) {
           throw new Error(
-            `Invalid --narration-detail: ${value}. Must be one of: ${VALID_NARRATION_DETAILS.join(', ')}`,
+            `Invalid --granularity: ${value}. Must be one of: ${VALID_GRANULARITIES.join(', ')}`,
           );
         }
-        return value as NarrationDetail;
+        return value as Granularity;
       },
     },
   )
@@ -88,29 +77,26 @@ export const findScenesCommand: Command<any> = new Command()
   )
   .option(
     '-f, --file <path:string>',
-    'JSON config file with the full parameters object (min_scenes, output_steering, etc.)',
+    'JSON config file with the full parameters object (language_code, output_steering, etc.)',
   )
   .option(
     '--wait',
     'Wait for the job to reach a terminal status (polls up to 15 minutes)',
   )
   .option('--json', 'Output JSON instead of pretty format')
-  .action(async (options: FindScenesOptions, assetId: string) => {
+  .action(async (options: AnalyzeStructureOptions, assetId: string) => {
     try {
       const outputSteering = buildOutputSteering(options);
       const hasShapeFlags =
-        options.languageCode !== undefined ||
-        options.minSceneDurationMs !== undefined ||
-        options.minScenes !== undefined ||
-        outputSteering !== undefined;
+        options.languageCode !== undefined || outputSteering !== undefined;
 
       if (options.file && hasShapeFlags) {
         throw new Error(FILE_MUTEX_MSG);
       }
 
-      let parameters: FindScenesJobParameters;
+      let parameters: AnalyzeStructureJobParameters;
       if (options.file) {
-        parameters = await loadJobParameters<FindScenesJobParameters>(
+        parameters = await loadJobParameters<AnalyzeStructureJobParameters>(
           options.file,
           assetId,
         );
@@ -118,29 +104,25 @@ export const findScenesCommand: Command<any> = new Command()
         parameters = { asset_id: assetId };
         if (options.languageCode !== undefined)
           parameters.language_code = options.languageCode;
-        if (options.minSceneDurationMs !== undefined)
-          parameters.min_scene_duration_ms = options.minSceneDurationMs;
-        if (options.minScenes !== undefined)
-          parameters.min_scenes = options.minScenes;
         if (outputSteering !== undefined)
           parameters.output_steering = outputSteering;
       }
 
-      const body: FindSceneCreateParams = { parameters };
+      const body: AnalyzeStructureCreateParams = { parameters };
       if (options.passthrough !== undefined)
         body.passthrough = options.passthrough;
 
       const mux = await createAuthenticatedMuxClient();
-      let job = await mux.robots.jobs.findScenes.create(body);
+      let job = await mux.robots.jobs.analyzeStructure.create(body);
 
       if (!wantsJson(options)) {
-        console.log('Find scenes job created');
+        console.log('Analyze structure job created');
         console.log(`  Job ID: ${job.id}`);
         console.log(`  Status: ${job.status}`);
       }
 
       if (options.wait) {
-        job = (await pollForRobotsJob(mux, 'find-scenes', job.id, {
+        job = (await pollForRobotsJob(mux, 'analyze-structure', job.id, {
           json: wantsJson(options),
         })) as typeof job;
       }
@@ -154,19 +136,19 @@ export const findScenesCommand: Command<any> = new Command()
 
       if (options.wait) assertJobCompleted(job);
     } catch (error) {
-      await handleCommandError(error, 'robots', 'find-scenes', options);
+      await handleCommandError(error, 'robots', 'analyze-structure', options);
     }
   });
 
 function buildOutputSteering(
-  options: FindScenesOptions,
-): FindScenesOutputSteering | undefined {
-  const steering: FindScenesOutputSteering = {};
+  options: AnalyzeStructureOptions,
+): AnalyzeStructureOutputSteering | undefined {
+  const steering: AnalyzeStructureOutputSteering = {};
   if (options.audience !== undefined) steering.audience = options.audience;
   if (options.brandTerm !== undefined && options.brandTerm.length > 0)
     steering.brand_terms = options.brandTerm;
-  if (options.narrationDetail !== undefined)
-    steering.narration_detail = options.narrationDetail;
+  if (options.granularity !== undefined)
+    steering.granularity = options.granularity;
   if (options.startTime !== undefined || options.endTime !== undefined) {
     steering.scope = {};
     if (options.startTime !== undefined)

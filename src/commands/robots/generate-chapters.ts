@@ -16,10 +16,6 @@ import {
 interface GenerateChaptersOptions {
   languageCode?: string;
   outputLanguageCode?: string;
-  promptTask?: string;
-  promptOutputFormat?: string;
-  promptChapterGuidelines?: string;
-  promptTitleGuidelines?: string;
   passthrough?: string;
   file?: string;
   wait?: boolean;
@@ -39,28 +35,12 @@ export const generateChaptersCommand: Command<any> = new Command()
     'BCP 47 language code for the output chapter titles',
   )
   .option(
-    '--prompt-task <promptTask:string>',
-    'Override the core task instruction for chapter generation',
-  )
-  .option(
-    '--prompt-output-format <promptOutputFormat:string>',
-    'Override the JSON output format instructions',
-  )
-  .option(
-    '--prompt-chapter-guidelines <promptChapterGuidelines:string>',
-    'Override the chapter density and timing constraints',
-  )
-  .option(
-    '--prompt-title-guidelines <promptTitleGuidelines:string>',
-    'Override the chapter title style requirements',
-  )
-  .option(
     '--passthrough <passthrough:string>',
     'Arbitrary metadata returned in API responses (max 255 chars)',
   )
   .option(
     '-f, --file <path:string>',
-    'JSON config file with the full parameters object (language_code, prompt_overrides, etc.)',
+    'JSON config file with the full parameters object (language_code, output_steering, etc.)',
   )
   .option(
     '--wait',
@@ -69,11 +49,9 @@ export const generateChaptersCommand: Command<any> = new Command()
   .option('--json', 'Output JSON instead of pretty format')
   .action(async (options: GenerateChaptersOptions, assetId: string) => {
     try {
-      const promptOverrides = buildPromptOverrides(options);
       const hasShapeFlags =
         options.languageCode !== undefined ||
-        options.outputLanguageCode !== undefined ||
-        promptOverrides !== undefined;
+        options.outputLanguageCode !== undefined;
 
       if (options.file && hasShapeFlags) {
         throw new Error(FILE_MUTEX_MSG);
@@ -91,8 +69,6 @@ export const generateChaptersCommand: Command<any> = new Command()
           parameters.language_code = options.languageCode;
         if (options.outputLanguageCode !== undefined)
           parameters.output_language_code = options.outputLanguageCode;
-        if (promptOverrides !== undefined)
-          parameters.prompt_overrides = promptOverrides;
       }
 
       const body: GenerateChapterCreateParams = { parameters };
@@ -126,17 +102,3 @@ export const generateChaptersCommand: Command<any> = new Command()
       await handleCommandError(error, 'robots', 'generate-chapters', options);
     }
   });
-
-function buildPromptOverrides(
-  options: GenerateChaptersOptions,
-): GenerateChaptersJobParameters.PromptOverrides | undefined {
-  const overrides: GenerateChaptersJobParameters.PromptOverrides = {};
-  if (options.promptTask !== undefined) overrides.task = options.promptTask;
-  if (options.promptOutputFormat !== undefined)
-    overrides.output_format = options.promptOutputFormat;
-  if (options.promptChapterGuidelines !== undefined)
-    overrides.chapter_guidelines = options.promptChapterGuidelines;
-  if (options.promptTitleGuidelines !== undefined)
-    overrides.title_guidelines = options.promptTitleGuidelines;
-  return Object.keys(overrides).length > 0 ? overrides : undefined;
-}

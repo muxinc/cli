@@ -104,7 +104,10 @@ describe('mux robots translate-audio', () => {
 
     test('errors when --file combined with --to-language-code', async () => {
       const configPath = join(tempDir, 'config.json');
-      await writeFile(configPath, JSON.stringify({ to_language_code: 'es' }));
+      await writeFile(
+        configPath,
+        JSON.stringify({ output_language_code: 'es' }),
+      );
       try {
         await translateAudioCommand.parse([
           'asset_abc',

@@ -93,7 +93,7 @@ describe('retrieveRobotsJob', () => {
     ['edit-captions', 'editCaptions'],
     ['find-best-thumbnails', 'findBestThumbnails'],
     ['find-key-moments', 'findKeyMoments'],
-    ['find-scenes', 'findScenes'],
+    ['analyze-structure', 'analyzeStructure'],
     ['generate-chapters', 'generateChapters'],
     ['generate-engagement-insights', 'generateEngagementInsights'],
     ['generate-premium-captions', 'generatePremiumCaptions'],

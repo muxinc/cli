@@ -105,7 +105,9 @@ export const generatePremiumCaptionsCommand: Command<any> = new Command()
         if (options.phrase !== undefined && options.phrase.length > 0)
           parameters.phrases = options.phrase;
         if (options.replaceExisting !== undefined)
-          parameters.replace_existing = options.replaceExisting;
+          parameters.replace_existing_tracks = options.replaceExisting
+            ? 'replace_generated'
+            : 'fail';
         if (options.trackName !== undefined)
           parameters.track_name = options.trackName;
         if (options.upload === false) parameters.upload_to_mux = false;

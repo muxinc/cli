@@ -136,7 +136,7 @@ describe('mux robots translate-captions', () => {
       const configPath = join(tempDir, 'config.json');
       await writeFile(
         configPath,
-        JSON.stringify({ track_id: 'track_1', to_language_code: 'es' }),
+        JSON.stringify({ track_id: 'track_1', output_language_code: 'es' }),
       );
       try {
         await translateCaptionsCommand.parse([
