@@ -1,4 +1,8 @@
-import { AuthenticationError, NotFoundError } from '@mux/ts';
+import {
+  AuthenticationError,
+  NotFoundError,
+  PermissionDeniedError,
+} from '@mux/ts';
 import { wantsJson } from '@/lib/context.ts';
 import { getAuthContext } from './mux.ts';
 
@@ -71,11 +75,58 @@ async function fetchTokenInfo(): Promise<{
  */
 export async function handleCommandError(
   error: unknown,
-  _commandGroup: string,
+  commandGroup: string,
   _action: string,
   options: { json?: boolean },
 ): Promise<never> {
   const json = wantsJson(options);
+
+  const permissionError =
+    error instanceof PermissionDeniedError ? error : undefined;
+  const apiResponse = permissionError?.error;
+  const detail =
+    apiResponse && 'error' in apiResponse ? apiResponse.error : undefined;
+
+  if (
+    commandGroup === 'robots' &&
+    permissionError &&
+    detail &&
+    typeof detail === 'object' &&
+    'type' in detail &&
+    detail.type === 'insufficient_scope'
+  ) {
+    const body = detail;
+    const messages =
+      'messages' in body && Array.isArray(body.messages)
+        ? body.messages.filter(
+            (message): message is string => typeof message === 'string',
+          )
+        : [permissionError.message];
+    const auth = await getAuthContext().catch(() => null);
+    const recovery = !auth
+      ? "Replace the API access token with the required permissions, or authorize the OAuth client again with 'mux login --oauth --agent'."
+      : auth.headers.Authorization.startsWith('Bearer ')
+        ? "Run 'mux login --oauth --agent' again and grant the required Robots permissions. If MUX_OAUTH_SCOPES is set, include the missing scope; write access requires an organization admin."
+        : "Create a replacement token with the required Robots permissions at https://dashboard.mux.com/settings/access-tokens. Update MUX_TOKEN_ID/MUX_TOKEN_SECRET if set; those values override saved logins. Otherwise save the replacement with 'mux login --interactive'.";
+    const details = [...messages, recovery];
+
+    if (json) {
+      console.error(
+        JSON.stringify(
+          {
+            error: 'insufficient_scope',
+            messages: details,
+            api_response: apiResponse,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.error(`Error: ${details.join('\n')}`);
+    }
+    process.exit(1);
+  }
 
   // 401: invalid/expired credentials
   if (error instanceof AuthenticationError) {
