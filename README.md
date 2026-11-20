@@ -921,7 +921,7 @@ mux drm-configurations get <drm-configuration-id>
 <details>
 <summary><h3>Robots</h3></summary>
 
-Run AI-powered workflows on your video assets using [Mux Robots](https://docs.mux.com/guides/robots). Requires accepting the Robots terms of service in the [Mux Dashboard](https://dashboard.mux.com) and a token with `robots:read` and `robots:write` permissions.
+Run AI-powered workflows on your video assets using [Mux Robots](https://docs.mux.com/guides/robots). Requires a token with `robots:read` and `robots:write` permissions. Robots is enabled for organizations on Mux's standard terms; organizations on custom contract terms enable it from the Robots page in the [Mux Dashboard](https://dashboard.mux.com).
 
 Robots commands use the **v1 API**. When upgrading from a CLI using v0:
 
